@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, Truck } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -21,6 +21,8 @@ const Layout: React.FC = () => {
     { name: 'Finance', path: '/finance', icon: CreditCard, roles: ['FOUNDER', 'BURSAR'] },
     { name: 'Présences', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY'] },
     { name: 'Admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY'] },
+    { name: 'Requêtes', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE'] },
+    { name: 'Transport', path: '/transport', icon: Truck, roles: ['FOUNDER', 'DIRECTOR', 'DRIVER', 'SECRETARY'] },
   ];
 
   return (

@@ -1,4 +1,4 @@
-export type Role = 'FOUNDER' | 'DIRECTOR' | 'SECRETARY' | 'BURSAR' | 'TEACHER';
+export type Role = 'FOUNDER' | 'DIRECTOR' | 'SECRETARY' | 'BURSAR' | 'TEACHER' | 'ADVISOR' | 'DRIVER' | 'MAINTENANCE';
 
 export interface User {
   id: number;
@@ -26,5 +26,16 @@ export interface Class {
   name: string;
   section: 'FRANCOPHONE' | 'ANGLOPHONE';
   level: 'MATERNELLE' | 'PRIMAIRE';
-  teacherId?: number;
+  mainTeacherId?: number;
+  assistantTeacherId?: number;
+}
+
+export interface Ticket {
+  id: number;
+  senderId: number;
+  receiverRole: Role;
+  subject: string;
+  message: string;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string;
 }

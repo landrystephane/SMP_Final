@@ -15,10 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS classes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, -- e.g., SIL, CP, Class 1
-    section TEXT NOT NULL,
-    level TEXT NOT NULL,
-    teacher_id INTEGER,
-    FOREIGN KEY (teacher_id) REFERENCES users(id)
+    section TEXT NOT NULL, -- 'FRANCOPHONE' or 'ANGLOPHONE'
+    level TEXT NOT NULL, -- 'MATERNELLE' or 'PRIMAIRE'
+    main_teacher_id INTEGER, -- Enseignant titulaire
+    assistant_teacher_id INTEGER, -- Second enseignant (ex: pour la maternelle bilingue)
+    FOREIGN KEY (main_teacher_id) REFERENCES users(id),
+    FOREIGN KEY (assistant_teacher_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS subjects (
@@ -117,6 +119,41 @@ CREATE TABLE IF NOT EXISTS validation_logs (
     validated_at DATETIME,
     FOREIGN KEY (class_id) REFERENCES classes(id),
     FOREIGN KEY (validated_by) REFERENCES users(id)
+);
+
+-- Ticketing System (for internal requests like unlocking grades)
+CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER,
+    receiver_role TEXT, -- e.g., 'DIRECTOR'
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'OPEN', -- 'OPEN', 'CLOSED'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+);
+
+-- Messaging System (Internal and future Parent communication)
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER,
+    receiver_id INTEGER,
+    content TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+
+-- Transport / Bus Tracking (Placeholder for geoloc)
+CREATE TABLE IF NOT EXISTS transport_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    driver_id INTEGER,
+    bus_number TEXT,
+    last_latitude REAL,
+    last_longitude REAL,
+    last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (driver_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS settings (

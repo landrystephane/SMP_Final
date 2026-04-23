@@ -5,10 +5,13 @@ import Login from './pages/Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
+import Subjects from './pages/Subjects';
 import Grades from './pages/Grades';
 import Finance from './pages/Finance';
 import AdminWorkflow from './pages/AdminWorkflow';
 import Attendance from './pages/Attendance';
+import Tickets from './pages/Tickets';
+import Transport from './pages/Transport';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -32,11 +35,13 @@ function App() {
           >
             <Route index element={<Dashboard />} />
             <Route path="students" element={<Students />} />
-            <Route path="subjects" element={<div>Gestion des Matières</div>} />
+            <Route path="subjects" element={<Subjects />} />
             <Route path="grades" element={<Grades />} />
             <Route path="finance" element={<Finance />} />
             <Route path="admin-workflow" element={<AdminWorkflow />} />
             <Route path="attendance" element={<Attendance />} />
+            <Route path="tickets" element={<Tickets />} />
+            <Route path="transport" element={<Transport />} />
           </Route>
         </Routes>
       </BrowserRouter>
