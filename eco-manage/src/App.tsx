@@ -15,7 +15,6 @@ import Transport from './pages/Transport';
 import MobileAccess from './pages/MobileAccess';
 import MobileProvisioning from './pages/MobileProvisioning';
 import SyncCenter from './pages/SyncCenter';
-import ConnectionGuide from './pages/ConnectionGuide';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -49,7 +48,6 @@ function App() {
             <Route path="transport" element={<Transport />} />
             <Route path="mobile-access" element={<MobileAccess />} />
             <Route path="sync" element={<SyncCenter />} />
-            <Route path="guide" element={<ConnectionGuide />} />
           </Route>
         </Routes>
       </BrowserRouter>
