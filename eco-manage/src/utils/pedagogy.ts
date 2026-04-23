@@ -2,6 +2,14 @@
  * Cameroon MINEDUB Standards for Grade Evaluation
  */
 
+export const NURSERY_DOMAINS = [
+  'Langue et Communication (Language & Communication)',
+  'Éveil Scientifique (Science & Tech)',
+  'Vie Courante (Life Skills)',
+  'Création et Artistique (Arts & Craft)',
+  'Motricité (Physical Education)'
+];
+
 export const getAppreciationNursery = (score: number) => {
   if (score >= 18) return { code: 'A+', label: 'Expert' };
   if (score >= 15) return { code: 'A', label: 'Acquis' };

@@ -7,6 +7,8 @@ const Subjects: React.FC = () => {
     { id: 2, name: 'English Language', section: 'ANGLOPHONE', domain: 'Languages & Communication', coef: 5 },
     { id: 3, name: 'Mathématiques', section: 'FRANCOPHONE', domain: 'Sciences et Techno', coef: 4 },
     { id: 4, name: 'Mathematics', section: 'ANGLOPHONE', domain: 'Science & Tech', coef: 4 },
+    { id: 5, name: 'Activités Langagières', section: 'FRANCOPHONE', level: 'MATERNELLE', domain: 'Langue', coef: 1 },
+    { id: 6, name: 'Language Activities', section: 'ANGLOPHONE', level: 'MATERNELLE', domain: 'Language', coef: 1 },
   ]);
 
   return (

@@ -28,7 +28,7 @@ function createWindow() {
 app.whenReady().then(() => {
   initDb();
 
-  // Seed admin if not exists
+  // Seed admin if not exists (In production, use hashing)
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
   if (!admin) {
     db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
@@ -62,13 +62,16 @@ ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
 });
 
 ipcMain.handle('db:saveGrades', async (event, grades) => {
-  const insert = db.prepare(`
+  const upsert = db.prepare(`
     INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id)
     VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id)
+    ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
+    score = excluded.score,
+    updated_at = CURRENT_TIMESTAMP
   `);
 
   const transaction = db.transaction((gradesList) => {
-    for (const g of gradesList) insert.run(g);
+    for (const g of gradesList) upsert.run(g);
   });
 
   return transaction(grades);

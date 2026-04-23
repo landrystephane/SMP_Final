@@ -6,6 +6,8 @@ export interface ElectronAPI {
   saveGrades: (grades: any[]) => Promise<any>;
   getPayments: () => Promise<any[]>;
   addPayment: (payment: any) => Promise<any>;
+  sendTicket: (ticket: any) => Promise<any>;
+  getTickets: () => Promise<any[]>;
 }
 
 declare global {

@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS grades (
     locked INTEGER DEFAULT 0,
     teacher_id INTEGER,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(student_id, subject_id, class_id, term, month),
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),
