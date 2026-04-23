@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "concurrently \"npm run vite:dev\" \"npm run electron:dev\"",
-    "vite:dev": "vite",
+    "vite:dev": "vite --host",
     "electron:dev": "wait-on http://localhost:5173 && electron .",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

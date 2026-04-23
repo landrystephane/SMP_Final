@@ -1,14 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Filter } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
 
 const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
 
-  const handleAddStudent = (data: any) => {
-    console.log('Nouveau élève:', data);
-    // Ici on ajoutera l'appel à Electron pour sauvegarder dans SQLite
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const loadStudents = async () => {
+    if (window.electronAPI) {
+      const data = await window.electronAPI.getStudents();
+      setStudents(data);
+    }
+  };
+
+  const handleAddStudent = async (data: any) => {
+    if (window.electronAPI) {
+      await window.electronAPI.addStudent(data);
+      loadStudents();
+    }
     setIsModalOpen(false);
   };
 
@@ -57,18 +71,27 @@ const Students: React.FC = () => {
             </tr>
           </thead>
           <tbody className="text-slate-300 divide-y divide-slate-800/50">
-            <tr>
-              <td className="px-4 py-4 font-mono text-sm">2026-001</td>
-              <td className="px-4 py-4 uppercase font-semibold text-slate-100">MBARGA Jean Paul</td>
-              <td className="px-4 py-4">SIL</td>
-              <td className="px-4 py-4">
-                <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded-full text-[10px] font-bold border border-blue-500/20">FRANCOPHONE</span>
-              </td>
-              <td className="px-4 py-4 space-x-3">
-                <button className="text-slate-gold-gold hover:text-yellow-500 transition-colors text-sm font-medium">Modifier</button>
-                <button className="text-red-400 hover:text-red-300 transition-colors text-sm font-medium">Supprimer</button>
-              </td>
-            </tr>
+            {students.filter(s =>
+              `${s.first_name} ${s.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              s.matricule.toLowerCase().includes(searchTerm.toLowerCase())
+            ).map((s) => (
+              <tr key={s.id}>
+                <td className="px-4 py-4 font-mono text-sm">{s.matricule}</td>
+                <td className="px-4 py-4 uppercase font-semibold text-slate-100">{s.last_name} {s.first_name}</td>
+                <td className="px-4 py-4">{s.class_id || 'N/A'}</td>
+                <td className="px-4 py-4">
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${
+                    s.section === 'FRANCOPHONE' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
+                  }`}>
+                    {s.section}
+                  </span>
+                </td>
+                <td className="px-4 py-4 space-x-3">
+                  <button className="text-slate-gold-gold hover:text-yellow-500 transition-colors text-sm font-medium">Modifier</button>
+                  <button className="text-red-400 hover:text-red-300 transition-colors text-sm font-medium">Supprimer</button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

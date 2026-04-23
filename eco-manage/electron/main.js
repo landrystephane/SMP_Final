@@ -38,16 +38,10 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-// IPC Handlers for actual persistence
+// IPC Handlers
 ipcMain.handle('auth:login', async (event, { username, password }) => {
-  try {
-    const user = db.prepare('SELECT id, username, full_name as fullName, role FROM users WHERE username = ? AND password = ?')
-      .get(username, password);
-    return user || null;
-  } catch (error) {
-    console.error('Login error:', error);
-    return null;
-  }
+  return db.prepare('SELECT id, username, full_name as fullName, role FROM users WHERE username = ? AND password = ?')
+    .get(username, password) || null;
 });
 
 ipcMain.handle('db:getStudents', async () => {
@@ -61,6 +55,48 @@ ipcMain.handle('db:addStudent', async (event, student) => {
     INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, address, section, class_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, address, section, classId);
+});
+
+ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
+  return db.prepare('SELECT * FROM grades WHERE class_id = ? AND term = ?').all(classId, term);
+});
+
+ipcMain.handle('db:saveGrades', async (event, grades) => {
+  const insert = db.prepare(`
+    INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id)
+    VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id)
+  `);
+
+  const transaction = db.transaction((gradesList) => {
+    for (const g of gradesList) insert.run(g);
+  });
+
+  return transaction(grades);
+});
+
+ipcMain.handle('db:getPayments', async () => {
+  return db.prepare('SELECT p.*, s.first_name, s.last_name FROM payments p JOIN students s ON p.student_id = s.id').all();
+});
+
+ipcMain.handle('db:addPayment', async (event, payment) => {
+  const { studentId, amount, type, userId } = payment;
+  const receiptNumber = `RCP-${Date.now()}`;
+  return db.prepare(`
+    INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(studentId, amount, type, userId, receiptNumber);
+});
+
+ipcMain.handle('db:getTickets', async () => {
+  return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id').all();
+});
+
+ipcMain.handle('db:sendTicket', async (event, ticket) => {
+  const { senderId, role, subject, message } = ticket;
+  return db.prepare(`
+    INSERT INTO tickets (sender_id, receiver_role, subject, message)
+    VALUES (?, ?, ?, ?)
+  `).run(senderId, role, subject, message);
 });
 
 app.on('window-all-closed', () => {

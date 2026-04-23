@@ -26,9 +26,9 @@ const Layout: React.FC = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-slate-900 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 glass-card m-4 mr-0 flex flex-col">
+    <div className="flex flex-col md:flex-row h-screen bg-slate-900 overflow-hidden">
+      {/* Sidebar / Topbar on mobile */}
+      <aside className="w-full md:w-64 glass-card md:m-4 md:mr-0 flex flex-col z-50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-2xl font-bold text-slate-gold-gold">Eco-Manage</h2>
           <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">{user?.role}</p>
@@ -36,7 +36,7 @@ const Layout: React.FC = () => {
             <LanguageSwitcher />
           </div>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-x-auto md:overflow-y-auto flex md:flex-col items-center md:items-stretch scrollbar-hide">
           {menuItems.filter(item => item.roles.includes(user?.role || '')).map((item) => (
             <NavLink
               key={item.path}
@@ -47,8 +47,8 @@ const Layout: React.FC = () => {
                 }`
               }
             >
-              <item.icon className="w-5 h-5 mr-3" />
-              {item.name}
+              <item.icon className="w-5 h-5 md:mr-3" />
+              <span className="hidden md:inline">{item.name}</span>
             </NavLink>
           ))}
         </nav>
