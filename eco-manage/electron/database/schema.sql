@@ -157,6 +157,18 @@ CREATE TABLE IF NOT EXISTS transport_logs (
     FOREIGN KEY (driver_id) REFERENCES users(id)
 );
 
+-- Mobile Access Keys (Single-use security)
+CREATE TABLE IF NOT EXISTS mobile_access_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    access_key TEXT UNIQUE NOT NULL,
+    generated_by INTEGER,
+    assigned_to_name TEXT, -- Optional info
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'USED', 'REVOKED'
+    used_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (generated_by) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT

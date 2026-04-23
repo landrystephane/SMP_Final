@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { initDb, db } = require('./database/db');
+const { startApiServer } = require('./api-server');
 const isDev = !app.isPackaged;
 
 function createWindow() {
@@ -27,6 +28,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDb();
+  startApiServer();
 
   // Seed admin if not exists (In production, use hashing)
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');

@@ -12,6 +12,8 @@ import AdminWorkflow from './pages/AdminWorkflow';
 import Attendance from './pages/Attendance';
 import Tickets from './pages/Tickets';
 import Transport from './pages/Transport';
+import MobileAccess from './pages/MobileAccess';
+import MobileProvisioning from './pages/MobileProvisioning';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -25,6 +27,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/activate" element={<MobileProvisioning />} />
           <Route
             path="/"
             element={
@@ -42,6 +45,7 @@ function App() {
             <Route path="attendance" element={<Attendance />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="transport" element={<Transport />} />
+            <Route path="mobile-access" element={<MobileAccess />} />
           </Route>
         </Routes>
       </BrowserRouter>
