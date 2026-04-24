@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const crypto = require('crypto');
 const { initDb, db } = require('./database/db');
 const { startApiServer } = require('./api-server');
 const isDev = !app.isPackaged;
@@ -21,22 +22,21 @@ function createWindow() {
       : `file://${path.join(__dirname, '../dist/index.html')}`
   );
 
-  if (isDev) {
-    win.webContents.openDevTools();
-  }
+  // if (isDev) {
+  //   win.webContents.openDevTools();
+  // }
 }
 
 app.whenReady().then(() => {
   initDb();
   startApiServer();
 
-  // Seed admin if not exists (In production, use hashing)
+  // Seed admin if not exists
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
   if (!admin) {
-    // In a real project, we would use a library like bcrypt.
-    // Here we use a simpler approach but warn the user in documentation.
+    const hash = crypto.createHash('sha256').update('admin').digest('hex');
     db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-      .run('admin', 'admin', 'Super Admin', 'FOUNDER');
+      .run('admin', hash, 'Super Admin', 'FOUNDER');
   }
 
   createWindow();
@@ -44,8 +44,9 @@ app.whenReady().then(() => {
 
 // IPC Handlers
 ipcMain.handle('auth:login', async (event, { username, password }) => {
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
   return db.prepare('SELECT id, username, full_name as fullName, role FROM users WHERE username = ? AND password = ?')
-    .get(username, password) || null;
+    .get(username, hash) || null;
 });
 
 ipcMain.handle('db:getStudents', async () => {

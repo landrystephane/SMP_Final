@@ -7,16 +7,16 @@ const Students: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadStudents();
-  }, []);
-
   const loadStudents = async () => {
     if (window.electronAPI) {
       const data = await window.electronAPI.getStudents();
       setStudents(data);
     }
   };
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
 
   const handleAddStudent = async (data: any) => {
     if (window.electronAPI) {
