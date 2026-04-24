@@ -7,7 +7,6 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: 'fr',
-    lng: 'fr', // Explicitly set language for consistent testing
     debug: false,
     interpolation: {
       escapeValue: false,
