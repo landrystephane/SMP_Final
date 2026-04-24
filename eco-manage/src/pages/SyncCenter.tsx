@@ -1,16 +1,41 @@
-import React, { useState } from 'react';
-import { RefreshCw, CloudUpload, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { RefreshCw, CloudUpload, CheckCircle2, Settings } from 'lucide-react';
+import { dataService } from '../utils/dataService';
 
 const SyncCenter: React.FC = () => {
-  const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS'>('IDLE');
-  const [unsyncedCount, setUnsyncedCount] = useState(14);
+  const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [serverIp, setServerIp] = useState(localStorage.getItem('serverIp') || '');
+  const [activationKey, setActivationKey] = useState(localStorage.getItem('activationKey') || '');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSync = () => {
+  useEffect(() => {
+    const checkUnsynced = async () => {
+        const grades = await dataService.getUnsyncedGrades();
+        setUnsyncedCount(grades.length);
+    };
+    checkUnsynced();
+  }, []);
+
+  const handleSync = async () => {
+    if (!serverIp || !activationKey) {
+        alert('Veuillez configurer l\'IP du serveur et la clé d\'activation.');
+        return;
+    }
+
     setSyncStatus('SYNCING');
-    setTimeout(() => {
+    localStorage.setItem('serverIp', serverIp);
+    localStorage.setItem('activationKey', activationKey);
+
+    const result = await dataService.sync(serverIp, activationKey);
+
+    if (result.success) {
         setSyncStatus('SUCCESS');
         setUnsyncedCount(0);
-    }, 3000);
+    } else {
+        setSyncStatus('ERROR');
+        setErrorMessage(result.error || 'Erreur inconnue');
+    }
   };
 
   return (
@@ -19,6 +44,34 @@ const SyncCenter: React.FC = () => {
         <h1 className="text-3xl font-bold text-white">Centre de Synchronisation</h1>
         <p className="text-slate-400 mt-1">Transférez vos données vers le serveur de l'école</p>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="glass-card p-6 space-y-4">
+            <div className="flex items-center space-x-2 text-slate-gold-gold mb-4">
+                <Settings className="w-5 h-5" />
+                <h2 className="font-bold uppercase tracking-wider text-sm">Configuration Connexion</h2>
+            </div>
+            <div>
+                <label className="text-[10px] uppercase text-slate-500 font-bold">IP du Serveur Principal</label>
+                <input
+                    type="text"
+                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+                    placeholder="ex: 192.168.1.10"
+                    value={serverIp}
+                    onChange={(e) => setServerIp(e.target.value)}
+                />
+            </div>
+            <div>
+                <label className="text-[10px] uppercase text-slate-500 font-bold">Clé d'Activation</label>
+                <input
+                    type="text"
+                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+                    placeholder="Clé générée par le Fondateur"
+                    value={activationKey}
+                    onChange={(e) => setActivationKey(e.target.value)}
+                />
+            </div>
+        </div>
 
       <div className="glass-card p-8 flex flex-col items-center text-center space-y-6">
         <div className={`p-6 rounded-full ${unsyncedCount > 0 ? 'bg-yellow-500/10' : 'bg-green-500/10'}`}>
@@ -53,6 +106,14 @@ const SyncCenter: React.FC = () => {
                 <span className="font-bold">Données envoyées avec succès !</span>
             </div>
         )}
+
+        {syncStatus === 'ERROR' && (
+            <div className="flex flex-col items-center space-y-2 text-red-500 bg-red-500/10 p-4 rounded-lg border border-red-500/20">
+                <span className="font-bold">Échec de la synchronisation</span>
+                <span className="text-xs">{errorMessage}</span>
+            </div>
+        )}
+      </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

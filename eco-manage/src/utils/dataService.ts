@@ -43,7 +43,35 @@ class DataService {
   async getUnsyncedGrades() {
     if (!this.db) return [];
     const res = await this.db.query('SELECT * FROM local_grades WHERE synced = 0');
-    return res.values;
+    return res.values || [];
+  }
+
+  async sync(serverIp: string, activationKey: string) {
+    const grades = await this.getUnsyncedGrades();
+    if (grades.length === 0) return { success: true, count: 0 };
+
+    try {
+      const response = await fetch(`http://${serverIp}:3001/api/grades`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-activation-key': activationKey
+        },
+        body: JSON.stringify(grades)
+      });
+
+      if (response.ok) {
+        // Mark as synced
+        const ids = grades.map((g: any) => g.id).join(',');
+        await this.db.run(`UPDATE local_grades SET synced = 1 WHERE id IN (${ids})`);
+        return { success: true, count: grades.length };
+      } else {
+        const error = await response.text();
+        throw new Error(error);
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 }
 

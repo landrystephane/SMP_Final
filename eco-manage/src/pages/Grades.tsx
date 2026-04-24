@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Lock, Unlock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Capacitor } from '@capacitor/core';
+import { dataService } from '../utils/dataService';
+import { useTranslation } from 'react-i18next';
 
 const Grades: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [isLocked, setIsLocked] = useState(false);
   const [grades, setGrades] = useState([
@@ -10,14 +14,46 @@ const Grades: React.FC = () => {
     { id: 2, name: 'ATANGANA Marie', note: '' },
   ]);
 
-  const handleSave = () => {
-    setIsLocked(true);
-    console.log('Notes enregistrées et verrouillées');
+  const handleSave = async () => {
+    const isMobile = Capacitor.getPlatform() !== 'web';
+
+    const formattedGrades = grades.map(g => ({
+        student_id: g.id,
+        subject_id: 1, // Mock subject
+        class_id: 1, // Mock class
+        term: 1,
+        month: 'Octobre',
+        score: parseFloat(g.note),
+        teacher_id: user?.id
+    }));
+
+    if (isMobile) {
+        // Use Capacitor local storage for offline use
+        for (const g of formattedGrades) {
+            await dataService.saveGrade(g);
+        }
+        setIsLocked(true);
+        alert('Notes enregistrées localement. N\'oubliez pas de synchroniser une fois connecté au Wi-Fi de l\'école.');
+    } else if (window.electronAPI) {
+        const result = await window.electronAPI.saveGrades(formattedGrades);
+        if (result.success) {
+            setIsLocked(true);
+            alert('Notes enregistrées et verrouillées avec succès.');
+        } else {
+            alert(`Erreur: ${result.error}`);
+        }
+    } else {
+        setIsLocked(true);
+        console.log('Mode Web: Simulation d\'enregistrement');
+    }
   };
 
-  const handleUnlock = () => {
+  const handleUnlock = async () => {
     if (user?.role === 'DIRECTOR' || user?.role === 'FOUNDER') {
-      setIsLocked(false);
+        if (window.electronAPI) {
+            await window.electronAPI.unlockGrades?.({ classId: 1, term: 1, month: 'Octobre' });
+        }
+        setIsLocked(false);
     } else {
       alert('Seul le directeur peut déverrouiller les notes.');
     }
@@ -27,7 +63,7 @@ const Grades: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Saisie des Notes</h1>
+          <h1 className="text-3xl font-bold text-white">{t('grades_entry')}</h1>
           <p className="text-slate-400 mt-1">Mois: Octobre | Matière: Mathématiques | Classe: SIL</p>
         </div>
         <div className="flex space-x-3">
@@ -37,7 +73,7 @@ const Grades: React.FC = () => {
               className="flex items-center px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-semibold hover:bg-red-500/20 transition-all"
             >
               <Unlock className="w-5 h-5 mr-2" />
-              Déverrouiller
+              {t('unlock')}
             </button>
           ) : (
             <button
@@ -45,7 +81,7 @@ const Grades: React.FC = () => {
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
             >
               <Save className="w-5 h-5 mr-2" />
-              Enregistrer
+              {t('save')}
             </button>
           )}
         </div>

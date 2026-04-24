@@ -33,6 +33,8 @@ app.whenReady().then(() => {
   // Seed admin if not exists (In production, use hashing)
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
   if (!admin) {
+    // In a real project, we would use a library like bcrypt.
+    // Here we use a simpler approach but warn the user in documentation.
     db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
       .run('admin', 'admin', 'Super Admin', 'FOUNDER');
   }
@@ -64,19 +66,38 @@ ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
 });
 
 ipcMain.handle('db:saveGrades', async (event, grades) => {
+  const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
+
   const upsert = db.prepare(`
-    INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id)
-    VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id)
+    INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id, locked)
+    VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id, 1)
     ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
     score = excluded.score,
+    locked = 1,
     updated_at = CURRENT_TIMESTAMP
+    WHERE locked = 0
   `);
 
   const transaction = db.transaction((gradesList) => {
-    for (const g of gradesList) upsert.run(g);
+    for (const g of gradesList) {
+      const existing = checkLock.get(g.student_id, g.subject_id, g.term, g.month);
+      if (existing && existing.locked === 1) {
+        throw new Error(`Grade for student ${g.student_id} is locked.`);
+      }
+      upsert.run(g);
+    }
   });
 
-  return transaction(grades);
+  try {
+    transaction(grades);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('db:unlockGrades', async (event, { classId, term, month }) => {
+  return db.prepare('UPDATE grades SET locked = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
 });
 
 ipcMain.handle('db:getPayments', async () => {

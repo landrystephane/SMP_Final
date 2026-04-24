@@ -27,8 +27,35 @@ function startApiServer() {
   });
 
   app.post('/api/grades', validateMobileKey, (req, res) => {
-    // Logic for saving grades via mobile
-    res.json({ success: true });
+    const grades = req.body; // Expecting an array of grades
+
+    const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
+    const upsert = db.prepare(`
+      INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id, locked)
+      VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id, 1)
+      ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
+      score = excluded.score,
+      locked = 1,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE locked = 0
+    `);
+
+    const transaction = db.transaction((gradesList) => {
+      for (const g of gradesList) {
+        const existing = checkLock.get(g.student_id, g.subject_id, g.term, g.month);
+        if (existing && existing.locked === 1) {
+          throw new Error(`Grade for student ${g.student_id} is locked.`);
+        }
+        upsert.run(g);
+      }
+    });
+
+    try {
+      transaction(grades);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
   });
 
   app.listen(port, '0.0.0.0', () => {

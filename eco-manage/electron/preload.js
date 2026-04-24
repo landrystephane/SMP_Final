@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addStudent: (student) => ipcRenderer.invoke('db:addStudent', student),
   getGrades: (filters) => ipcRenderer.invoke('db:getGrades', filters),
   saveGrades: (grades) => ipcRenderer.invoke('db:saveGrades', grades),
+  unlockGrades: (params) => ipcRenderer.invoke('db:unlockGrades', params),
   getPayments: () => ipcRenderer.invoke('db:getPayments'),
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
   sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),

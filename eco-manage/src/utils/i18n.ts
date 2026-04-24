@@ -34,6 +34,8 @@ i18n
           evaluation_period: 'Période d\'évaluation',
           attendance: 'Présences',
           founder_stats: 'Statistiques Globales',
+          grades_entry: 'Saisie des Notes',
+          unlock: 'Déverrouiller',
         }
       },
       en: {
@@ -57,6 +59,8 @@ i18n
           evaluation_period: 'Evaluation Period',
           attendance: 'Attendance',
           founder_stats: 'Global Statistics',
+          grades_entry: 'Grades Entry',
+          unlock: 'Unlock',
         }
       }
     }
