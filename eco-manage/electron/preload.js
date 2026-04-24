@@ -11,4 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
   sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),
   getTickets: () => ipcRenderer.invoke('db:getTickets'),
+  getDashboardStats: () => ipcRenderer.invoke('db:getDashboardStats'),
+  getSubjects: () => ipcRenderer.invoke('db:getSubjects'),
+  addSubject: (subject) => ipcRenderer.invoke('db:addSubject', subject),
+  getClasses: () => ipcRenderer.invoke('db:getClasses'),
 });

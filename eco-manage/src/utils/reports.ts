@@ -30,14 +30,26 @@ export const generateReportCard = (student: any, grades: any[], _section: string
   let tableHead, tableBody;
 
   if (isNursery) {
-    tableHead = [['Domaines / Subjects', 'Note / 20', 'Cote', 'Appréciation']];
+    tableHead = [['Domaines / Subjects', 'Cote', 'Appréciation']];
     tableBody = grades.map(g => {
-        const appreciation = getAppreciationNursery(g.score);
-        return [g.subject, g.score, appreciation.code, appreciation.label];
+        const score = typeof g.score === 'number' ? g.score : 0;
+        const appreciation = getAppreciationNursery(score);
+        return [g.subject_name || g.subject, appreciation.code, appreciation.label];
     });
   } else {
     tableHead = [['Matières / Subjects', 'Note / 20', 'Coef', 'Total', 'Appréciation']];
-    tableBody = grades.map(g => [g.subject, g.score, g.coef, (g.score * g.coef), g.appreciation]);
+    tableBody = grades.map(g => {
+      const score = typeof g.score === 'number' ? g.score : 0;
+      const coef = typeof g.coef === 'number' ? g.coef : 1;
+      const total = score * coef;
+      let app = 'Passable';
+      if (score >= 16) app = 'Excellent';
+      else if (score >= 14) app = 'Très Bien';
+      else if (score >= 12) app = 'Bien';
+      else if (score < 10) app = 'Médiocre';
+
+      return [g.subject_name || g.subject, score, coef, total, app];
+    });
   }
 
   autoTable(doc, {

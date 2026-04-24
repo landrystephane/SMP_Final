@@ -9,10 +9,26 @@ const Grades: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [isLocked, setIsLocked] = useState(false);
-  const [grades, setGrades] = useState([
-    { id: 1, name: 'MBARGA Jean Paul', note: '' },
-    { id: 2, name: 'ATANGANA Marie', note: '' },
-  ]);
+  const [grades, setGrades] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (window.electronAPI) {
+        const students = await window.electronAPI.getStudents();
+        setGrades(students.map((s: any) => ({
+          id: s.id,
+          name: `${s.last_name} ${s.first_name}`,
+          note: ''
+        })));
+      } else {
+        setGrades([
+          { id: 1, name: 'MBARGA Jean Paul', note: '' },
+          { id: 2, name: 'ATANGANA Marie', note: '' },
+        ]);
+      }
+    };
+    loadData();
+  }, []);
 
   const handleSave = async () => {
     const isMobile = Capacitor.getPlatform() !== 'web';

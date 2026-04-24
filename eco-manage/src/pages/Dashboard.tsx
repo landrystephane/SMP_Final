@@ -1,7 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, TrendingUp, CreditCard, PieChart, Activity } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (window.electronAPI) {
+        const data = await window.electronAPI.getDashboardStats();
+        setStats(data);
+      } else {
+        // Mock fallback for web preview
+        setStats({
+          totalStudents: 458,
+          genderDist: { boys: 240, girls: 218 },
+          totalRevenue: 12450000,
+          classStats: [
+            { level: 'SIL', avg: 14.2, passRate: 85 },
+            { level: 'CP', avg: 11.5, passRate: 78 },
+            { level: 'CE1', avg: 15.1, passRate: 92 },
+            { level: 'CE2', avg: 9.8, passRate: 65 },
+          ]
+        });
+      }
+    };
+    loadStats();
+  }, []);
+
+  if (!stats) return <div className="text-white p-8">Chargement du tableau de bord...</div>;
+
   return (
     <div className="space-y-8">
       <div>
@@ -19,8 +46,8 @@ const Dashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-slate-400 text-sm mt-4 font-medium">Effectif Total</p>
-          <p className="text-3xl font-bold text-white">458</p>
-          <p className="text-[10px] text-slate-500 mt-1">240 Garçons / 218 Filles</p>
+          <p className="text-3xl font-bold text-white">{stats.totalStudents}</p>
+          <p className="text-[10px] text-slate-500 mt-1">{stats.genderDist.boys} Garçons / {stats.genderDist.girls} Filles</p>
         </div>
 
         <div className="glass-card p-6 border-l-4 border-green-500">
@@ -39,7 +66,7 @@ const Dashboard: React.FC = () => {
             <span className="text-xs font-bold text-yellow-500">75% Payé</span>
           </div>
           <p className="text-slate-400 text-sm mt-4 font-medium">Recettes Scolarité</p>
-          <p className="text-2xl font-bold text-white">12,450,000</p>
+          <p className="text-2xl font-bold text-white">{stats.totalRevenue.toLocaleString()} FCFA</p>
           <p className="text-[10px] text-slate-500 mt-1">FCFA (Objectif: 16M)</p>
         </div>
 
@@ -60,26 +87,23 @@ const Dashboard: React.FC = () => {
         <div className="glass-card p-6">
           <h2 className="text-xl font-bold text-white mb-6">Performance par Niveau</h2>
           <div className="space-y-4">
-            {[
-              { level: 'SIL', pass: 85, avg: 14.2 },
-              { level: 'CP', pass: 78, avg: 11.5 },
-              { level: 'CE1', pass: 92, avg: 15.1 },
-              { level: 'CE2', pass: 65, avg: 9.8 },
-            ].map((item) => (
+            {stats.classStats.length > 0 ? stats.classStats.map((item: any) => (
               <div key={item.level} className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-300 font-bold">{item.level}</span>
-                  <span className={`${item.avg >= 10 ? 'text-green-500' : 'text-red-500'}`}>Moy: {item.avg}</span>
+                  <span className={`${item.avg >= 10 ? 'text-green-500' : 'text-red-500'}`}>Moy: {item.avg.toFixed(2)}</span>
                 </div>
                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-1000 ${item.pass >= 80 ? 'bg-green-500' : item.pass >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                    style={{ width: `${item.pass}%` }}
+                    className={`h-full rounded-full transition-all duration-1000 ${item.passRate >= 80 ? 'bg-green-500' : item.passRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                    style={{ width: `${item.passRate}%` }}
                   />
                 </div>
-                <div className="text-[10px] text-slate-500 text-right">{item.pass}% de réussite</div>
+                <div className="text-[10px] text-slate-500 text-right">{item.passRate.toFixed(1)}% de réussite</div>
               </div>
-            ))}
+            )) : (
+              <p className="text-slate-500 text-sm">Aucune donnée disponible</p>
+            )}
           </div>
         </div>
 
