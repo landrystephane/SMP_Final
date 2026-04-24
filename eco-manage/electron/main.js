@@ -45,12 +45,26 @@ app.whenReady().then(() => {
   const subjectsCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
   if (subjectsCount === 0) {
     const defaultSubjects = [
+      // PRIMAIRE - Francophone
       ['Langue Française', 'Langues et Communication', 'PRIMAIRE', 5],
-      ['English Language', 'Languages & Communication', 'PRIMAIRE', 5],
       ['Mathématiques', 'Sciences et Techno', 'PRIMAIRE', 4],
+      ['Sciences Humaines', 'Milieu Physique et Humain', 'PRIMAIRE', 2],
+      ['Développement Personnel', 'Vie Courante', 'PRIMAIRE', 2],
+      ['Activités Pratiques', 'Arts et Culture', 'PRIMAIRE', 1],
+
+      // PRIMARY - Anglophone
+      ['English Language', 'Languages & Communication', 'PRIMAIRE', 5],
       ['Mathematics', 'Science & Tech', 'PRIMAIRE', 4],
-      ['Activités Langagières', 'Langue', 'MATERNELLE', 1],
-      ['Language Activities', 'Language', 'MATERNELLE', 1],
+      ['Social Studies', 'Human Environment', 'PRIMAIRE', 2],
+      ['Personal Development', 'Life Skills', 'PRIMAIRE', 2],
+      ['Vocational Activities', 'Arts & Culture', 'PRIMAIRE', 1],
+
+      // MATERNELLE
+      ['Activités Langagières', 'Langage et Communication', 'MATERNELLE', 1],
+      ['Éveil Scientifique', 'Éveil Scientifique et Technologique', 'MATERNELLE', 1],
+      ['Développement de la Personnalité', 'Milieu Physique et Humain', 'MATERNELLE', 1],
+      ['Activités Créatrices', 'Arts et Culture', 'MATERNELLE', 1],
+      ['Motricité', 'Éducation Physique', 'MATERNELLE', 1],
     ];
     const insert = db.prepare('INSERT INTO subjects (name, domain, level, coefficient) VALUES (?, ?, ?, ?)');
     defaultSubjects.forEach(s => insert.run(s));
