@@ -9,6 +9,10 @@ export interface ElectronAPI {
   addPayment: (payment: any) => Promise<any>;
   sendTicket: (ticket: any) => Promise<any>;
   getTickets: () => Promise<any[]>;
+  getDashboardStats: () => Promise<any>;
+  getSubjects: () => Promise<any[]>;
+  getClasses: () => Promise<any[]>;
+  updateGPS?: (lat: number, lng: number) => void;
 }
 
 declare global {
