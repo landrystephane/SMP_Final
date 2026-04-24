@@ -12,6 +12,7 @@ import AdminWorkflow from './pages/AdminWorkflow';
 import Attendance from './pages/Attendance';
 import Tickets from './pages/Tickets';
 import Transport from './pages/Transport';
+import Users from './pages/Users';
 import MobileAccess from './pages/MobileAccess';
 import MobileProvisioning from './pages/MobileProvisioning';
 import SyncCenter from './pages/SyncCenter';
@@ -46,6 +47,7 @@ function App() {
             <Route path="attendance" element={<Attendance />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="transport" element={<Transport />} />
+            <Route path="users" element={<Users />} />
             <Route path="mobile-access" element={<MobileAccess />} />
             <Route path="sync" element={<SyncCenter />} />
           </Route>

@@ -18,11 +18,13 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
       await login(username, password);
-      navigate('/');
-    } catch {
-      setError('Identifiants invalides');
+      // AuthContext will handle the state update, then useEffect will navigate
+    } catch (err: any) {
+      setError('Identifiants invalides ou erreur de connexion');
+      console.error(err);
     }
   };
 

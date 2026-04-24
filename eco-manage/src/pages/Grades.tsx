@@ -1,199 +1,233 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, Unlock } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { Capacitor } from '@capacitor/core';
-import { dataService } from '../utils/dataService';
-import { useTranslation } from 'react-i18next';
+import { Save, Lock, Unlock, FileText } from 'lucide-react';
+import { generateReportCard } from '../utils/reports';
 
 const Grades: React.FC = () => {
-  const { t } = useTranslation();
-  const { user } = useAuth();
+  const [sections, _setSections] = useState(['FRANCOPHONE', 'ANGLOPHONE']);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState(1);
+  const [selectedMonth, setSelectedMonth] = useState('Octobre');
+
+  const [grades, setGrades] = useState<Record<string, number>>({});
   const [isLocked, setIsLocked] = useState(false);
-  const [grades, setGrades] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadData = async () => {
+    const init = async () => {
       if (window.electronAPI) {
-        const students = await window.electronAPI.getStudents();
-        setGrades(students.map((s: any) => ({
-          id: s.id,
-          name: `${s.last_name} ${s.first_name}`,
-          note: ''
-        })));
-      } else {
-        setGrades([
-          { id: 1, name: 'MBARGA Jean Paul', note: '' },
-          { id: 2, name: 'ATANGANA Marie', note: '' },
-        ]);
+        const c = await window.electronAPI.getClasses();
+        const s = await window.electronAPI.getSubjects();
+        setClasses(c);
+        setSubjects(s);
       }
     };
-    loadData();
+    init();
   }, []);
 
-  const handleSave = async () => {
-    const isMobile = Capacitor.getPlatform() !== 'web';
+  const handleLoadStudents = async () => {
+    if (window.electronAPI && selectedClass) {
+        const allStudents = await window.electronAPI.getStudents();
+        setStudents(allStudents.filter((s: any) => s.class_id.toString() === selectedClass));
 
-    const formattedGrades = grades.map(g => ({
-        student_id: g.id,
-        subject_id: 1, // Mock subject
-        class_id: 1, // Mock class
-        term: 1,
-        month: 'Octobre',
-        score: parseFloat(g.note),
-        teacher_id: user?.id
-    }));
+        const existingGrades = await window.electronAPI.getGrades({
+            classId: parseInt(selectedClass),
+            term: selectedTerm
+        });
 
-    if (isMobile) {
-        // Use Capacitor local storage for offline use
-        for (const g of formattedGrades) {
-            await dataService.saveGrade(g);
-        }
-        setIsLocked(true);
-        alert('Notes enregistrées localement. N\'oubliez pas de synchroniser une fois connecté au Wi-Fi de l\'école.');
-    } else if (window.electronAPI) {
-        const result = await window.electronAPI.saveGrades(formattedGrades);
-        if (result.success) {
-            setIsLocked(true);
-            alert('Notes enregistrées et verrouillées avec succès.');
-        } else {
-            alert(`Erreur: ${result.error}`);
-        }
-    } else {
-        setIsLocked(true);
-        console.log('Mode Web: Simulation d\'enregistrement');
+        const gradeMap: Record<string, number> = {};
+        existingGrades.forEach((g: any) => {
+            if (g.month === selectedMonth) {
+                gradeMap[`${g.student_id}-${g.subject_id}`] = g.score;
+                if (g.locked) setIsLocked(true);
+            }
+        });
+        setGrades(gradeMap);
     }
   };
 
-  const handleUnlock = async () => {
-    if (user?.role === 'DIRECTOR' || user?.role === 'FOUNDER') {
-        if (window.electronAPI) {
-            await window.electronAPI.unlockGrades?.({ classId: 1, term: 1, month: 'Octobre' });
-        }
+  useEffect(() => {
+    if (selectedClass && selectedMonth) {
+        handleLoadStudents();
         setIsLocked(false);
+    }
+  }, [selectedClass, selectedMonth, selectedTerm]);
+
+  const handleSave = async () => {
+    const formattedGrades = Object.entries(grades).map(([key, score]) => {
+        const [studentId, subjectId] = key.split('-');
+        return {
+          student_id: parseInt(studentId),
+          subject_id: parseInt(subjectId),
+          class_id: parseInt(selectedClass),
+          term: selectedTerm,
+          month: selectedMonth,
+          score: score,
+          teacher_id: 1 // TODO: get from auth
+        };
+      });
+
+    if (window.electronAPI) {
+      const result = await window.electronAPI.saveGrades(formattedGrades);
+      if (result.success) {
+        setIsLocked(true);
+        alert('Notes enregistrées et verrouillées !');
+      } else {
+        alert('Erreur: ' + result.error);
+      }
     } else {
-      alert('Seul le directeur peut déverrouiller les notes.');
+        // Mode Mobile (Smartphone Browser) - Sauvegarde locale avant synchronisation
+        // On simule la sauvegarde pour l'utilisateur
+        localStorage.setItem(`pending_grades_${selectedClass}_${selectedMonth}`, JSON.stringify(formattedGrades));
+        alert('Notes sauvegardées localement sur votre téléphone. N\'oubliez pas de synchroniser dès que vous êtes connecté au réseau Wi-Fi de l\'école.');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-white">{t('grades_entry')}</h1>
-          <p className="text-slate-400 mt-1">Mois: Octobre | Matière: Mathématiques | Classe: SIL</p>
+          <h1 className="text-3xl font-bold text-white">Saisie des Notes</h1>
+          <p className="text-slate-400 mt-1">Évaluation mensuelle et trimestrielle</p>
         </div>
-        <div className="flex space-x-3">
-          {isLocked ? (
+        <div className="flex space-x-2">
             <button
-              onClick={handleUnlock}
-              className="flex items-center px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-semibold hover:bg-red-500/20 transition-all"
+                onClick={() => generateReportCard({ lastName: 'EXEMPLE', firstName: 'Élève' } as any, [], "")}
+                className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-500/20 transition-all flex items-center"
             >
-              <Unlock className="w-5 h-5 mr-2" />
-              {t('unlock')}
+                <FileText className="w-4 h-4 mr-2" /> Aperçu Bulletin
             </button>
-          ) : (
-            <button
-              onClick={handleSave}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
-            >
-              <Save className="w-5 h-5 mr-2" />
-              {t('save')}
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden">
-        {/* Table on desktop */}
-        <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-            <thead>
-                <tr className="bg-slate-800/50 text-slate-400 uppercase text-xs tracking-wider">
-                <th className="px-6 py-4 font-medium">Nom de l'élève</th>
-                <th className="px-6 py-4 font-medium w-32">Note / 20</th>
-                <th className="px-6 py-4 font-medium">Appréciation</th>
-                <th className="px-6 py-4 font-medium">Statut</th>
-                </tr>
-            </thead>
-            <tbody className="text-slate-300 divide-y divide-slate-800/50">
-                {grades.map((student) => (
-                <tr key={student.id}>
-                    <td className="px-6 py-4 font-semibold">{student.name}</td>
-                    <td className="px-6 py-4">
-                    <input
-                        type="number"
-                        disabled={isLocked}
-                        className="w-20 bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none focus:border-slate-gold-gold disabled:opacity-50 disabled:cursor-not-allowed"
-                        value={student.note}
-                        onChange={(e) => {
-                            const newGrades = grades.map(g => g.id === student.id ? {...g, note: e.target.value} : g);
-                            setGrades(newGrades);
-                        }}
-                    />
-                    </td>
-                    <td className="px-6 py-4">
-                    {student.note && (
-                        <span className="text-sm font-medium">
-                        {parseFloat(student.note) >= 18 ? 'Expert' :
-                        parseFloat(student.note) >= 15 ? 'Acquis' :
-                        parseFloat(student.note) >= 11 ? 'En cours d\'acquisition' : 'Non acquis'}
-                        </span>
-                    )}
-                    </td>
-                    <td className="px-6 py-4">
+      {/* Sélecteurs de Contexte */}
+      <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase">Section</label>
+          <select
+            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+            value={selectedSection}
+            onChange={(e) => {
+                setSelectedSection(e.target.value);
+                setSelectedClass('');
+            }}
+          >
+            <option value="">Choisir...</option>
+            {sections.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase">Salle de Classe</label>
+          <select
+            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1 disabled:opacity-50"
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            disabled={!selectedSection}
+          >
+            <option value="">Choisir...</option>
+            {classes.filter(c => c.section === selectedSection).map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase">Trimestre</label>
+          <select className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+            value={selectedTerm} onChange={(e) => setSelectedTerm(parseInt(e.target.value))}>
+            <option value={1}>Trimestre 1</option>
+            <option value={2}>Trimestre 2</option>
+            <option value={3}>Trimestre 3</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase">Mois d'Évaluation</label>
+          <select className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+            value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+            <option>Octobre</option>
+            <option>Novembre</option>
+            <option>Décembre</option>
+            <option>Janvier</option>
+          </select>
+        </div>
+      </div>
+
+      {!selectedClass ? (
+          <div className="glass-card p-12 text-center text-slate-500">
+              Veuillez sélectionner une section et une salle de classe pour commencer la saisie.
+          </div>
+      ) : (
+          <div className="glass-card overflow-hidden">
+            <div className="p-4 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
                     {isLocked ? (
-                        <span className="flex items-center text-red-400 text-xs font-bold uppercase">
-                        <Lock className="w-3 h-3 mr-1" /> Verrouillé
+                        <span className="flex items-center text-xs font-bold text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full">
+                            <Lock className="w-3 h-3 mr-1" /> VERROUILLÉ
                         </span>
                     ) : (
-                        <span className="flex items-center text-green-400 text-xs font-bold uppercase">
-                        <Unlock className="w-3 h-3 mr-1" /> Éditable
+                        <span className="flex items-center text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full">
+                            <Unlock className="w-3 h-3 mr-1" /> MODIFICATION AUTORISÉE
                         </span>
                     )}
-                    </td>
-                </tr>
-                ))}
-            </tbody>
-            </table>
-        </div>
-
-        {/* Card list on mobile */}
-        <div className="md:hidden divide-y divide-slate-800">
-            {grades.map((student) => (
-                <div key={student.id} className="p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                        <span className="font-bold text-white uppercase text-sm">{student.name}</span>
-                        {isLocked ? <Lock className="w-4 h-4 text-red-500" /> : <Unlock className="w-4 h-4 text-green-500" />}
-                    </div>
-                    <div className="flex items-center space-x-4">
-                        <div className="flex-1">
-                            <label className="text-[10px] text-slate-500 uppercase font-bold">Note / 20</label>
-                            <input
-                                type="number"
-                                disabled={isLocked}
-                                className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white outline-none focus:border-slate-gold-gold disabled:opacity-50"
-                                value={student.note}
-                                onChange={(e) => {
-                                    const newGrades = grades.map(g => g.id === student.id ? {...g, note: e.target.value} : g);
-                                    setGrades(newGrades);
-                                }}
-                            />
-                        </div>
-                        <div className="flex-1">
-                            <label className="text-[10px] text-slate-500 uppercase font-bold">Appréciation</label>
-                            <div className="p-3 bg-slate-800/30 rounded text-xs text-slate-300 min-h-[46px] flex items-center">
-                                {student.note ? (
-                                    parseFloat(student.note) >= 18 ? 'A+' :
-                                    parseFloat(student.note) >= 15 ? 'A' :
-                                    parseFloat(student.note) >= 11 ? 'ECA' : 'NA'
-                                ) : '-'}
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            ))}
-        </div>
-      </div>
+                <div className="space-x-4">
+                    {!isLocked && (
+                        <button
+                            onClick={handleSave}
+                            className="bg-slate-gold-gold text-slate-900 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-yellow-500 transition-colors inline-flex items-center"
+                        >
+                            <Save className="w-4 h-4 mr-2" /> Enregistrer & Verrouiller
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] uppercase text-slate-500 font-black border-b border-white/5">
+                  <tr>
+                    <th className="px-6 py-4 sticky left-0 bg-slate-900/50 backdrop-blur-md">Élèves</th>
+                    {subjects.filter(s => s.level === classes.find(c => c.id.toString() === selectedClass)?.level).map(s => (
+                      <th key={s.id} className="px-4 py-4 text-center min-w-[120px]">
+                        <div className="truncate max-w-[100px] mx-auto">{s.name}</div>
+                        <div className="text-[8px] text-slate-600">Coef: {s.coefficient}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {students.map(student => (
+                    <tr key={student.id} className="hover:bg-white/5">
+                      <td className="px-6 py-4 sticky left-0 bg-slate-900/50 backdrop-blur-md">
+                        <div className="text-white font-bold uppercase text-sm">{student.last_name}</div>
+                        <div className="text-[10px] text-slate-500">{student.first_name}</div>
+                      </td>
+                      {subjects.filter(s => s.level === classes.find(c => c.id.toString() === selectedClass)?.level).map(subject => (
+                        <td key={subject.id} className="px-4 py-4">
+                          <input
+                            type="number"
+                            step="0.25"
+                            min="0"
+                            max="20"
+                            disabled={isLocked}
+                            value={grades[`${student.id}-${subject.id}`] || ''}
+                            onChange={(e) => setGrades({
+                                ...grades,
+                                [`${student.id}-${subject.id}`]: parseFloat(e.target.value)
+                            })}
+                            className="w-16 bg-slate-800 border border-slate-700 rounded p-1.5 text-center text-white text-sm focus:border-slate-gold-gold outline-none disabled:opacity-50 disabled:bg-slate-900"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+      )}
     </div>
   );
 };

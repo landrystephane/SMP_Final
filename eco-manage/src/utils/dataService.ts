@@ -41,6 +41,18 @@ class DataService {
   }
 
   async getUnsyncedGrades() {
+    if (Capacitor.getPlatform() === 'web') {
+        // Fallback to localStorage for mobile browsers
+        const allPending: any[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith('pending_grades_')) {
+                const data = JSON.parse(localStorage.getItem(key) || '[]');
+                allPending.push(...data);
+            }
+        }
+        return allPending;
+    }
     if (!this.db) return [];
     const res = await this.db.query('SELECT * FROM local_grades WHERE synced = 0');
     return res.values || [];
@@ -62,8 +74,18 @@ class DataService {
 
       if (response.ok) {
         // Mark as synced
-        const ids = grades.map((g: any) => g.id).join(',');
-        await this.db.run(`UPDATE local_grades SET synced = 1 WHERE id IN (${ids})`);
+        if (Capacitor.getPlatform() === 'web') {
+            // Clean up localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith('pending_grades_')) {
+                    localStorage.removeItem(key);
+                }
+            }
+        } else {
+            const ids = grades.map((g: any) => g.id).join(',');
+            await this.db.run(`UPDATE local_grades SET synced = 1 WHERE id IN (${ids})`);
+        }
         return { success: true, count: grades.length };
       } else {
         const error = await response.text();

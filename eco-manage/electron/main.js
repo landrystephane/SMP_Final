@@ -41,6 +41,35 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  // Seed Classes if empty
+  const classesCount = db.prepare('SELECT COUNT(*) as count FROM classes').get().count;
+  if (classesCount === 0) {
+    const defaultClasses = [
+      ['SIL A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['SIL B', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CP A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CP B', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CE1 A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CE2 A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CM1 A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['CM2 A', 'FRANCOPHONE', 'PRIMAIRE'],
+      ['Class 1', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Class 2', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Class 3', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Class 4', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Class 5', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Class 6', 'ANGLOPHONE', 'PRIMAIRE'],
+      ['Petite Section', 'FRANCOPHONE', 'MATERNELLE'],
+      ['Moyenne Section', 'FRANCOPHONE', 'MATERNELLE'],
+      ['Grande Section', 'FRANCOPHONE', 'MATERNELLE'],
+      ['Pre-Nursery', 'ANGLOPHONE', 'MATERNELLE'],
+      ['Nursery 1', 'ANGLOPHONE', 'MATERNELLE'],
+      ['Nursery 2', 'ANGLOPHONE', 'MATERNELLE'],
+    ];
+    const insertClass = db.prepare('INSERT INTO classes (name, section, level) VALUES (?, ?, ?)');
+    defaultClasses.forEach(c => insertClass.run(c));
+  }
+
   // Initial Seed for subjects if empty
   const subjectsCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
   if (subjectsCount === 0) {
@@ -171,26 +200,50 @@ ipcMain.handle('db:getClasses', async () => {
   return db.prepare('SELECT * FROM classes').all();
 });
 
-ipcMain.handle('db:getDashboardStats', async () => {
-  const totalStudents = db.prepare('SELECT COUNT(*) as count FROM students').get().count;
-  const boys = db.prepare('SELECT COUNT(*) as count FROM students WHERE gender = "M"').get().count;
-  const girls = db.prepare('SELECT COUNT(*) as count FROM students WHERE gender = "F"').get().count;
-  const totalRevenue = db.prepare('SELECT SUM(amount) as total FROM payments').get().total || 0;
+ipcMain.handle('db:getUsers', async () => {
+  return db.prepare('SELECT id, username, full_name as fullName, role FROM users').all();
+});
 
-  // Basic class performance (MOCK logic for now based on grades)
+ipcMain.handle('db:addUser', async (event, user) => {
+  const { username, password, fullName, role } = user;
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  return db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
+    .run(username, hash, fullName, role);
+});
+
+ipcMain.handle('db:getDashboardStats', async (event, section) => {
+  const whereSection = section ? "WHERE section = ?" : "";
+  const params = section ? [section] : [];
+
+  const totalStudents = db.prepare(`SELECT COUNT(*) as count FROM students ${whereSection}`).get(...params).count;
+  const boys = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'M' ${section ? 'AND section = ?' : ''}`).get(...params).count;
+  const girls = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'F' ${section ? 'AND section = ?' : ''}`).get(...params).count;
+
+  const totalRevenue = db.prepare(`
+    SELECT SUM(p.amount) as total
+    FROM payments p
+    JOIN students s ON p.student_id = s.id
+    ${whereSection}
+  `).get(...params).total || 0;
+
   const classStats = db.prepare(`
     SELECT c.name as level, AVG(g.score) as avg,
-    (COUNT(CASE WHEN g.score >= 10 THEN 1 END) * 100.0 / COUNT(*)) as passRate
-    FROM grades g
-    JOIN classes c ON g.class_id = c.id
-    GROUP BY g.class_id
-  `).all();
+    (COUNT(CASE WHEN g.score >= 10 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as passRate
+    FROM classes c
+    LEFT JOIN grades g ON g.class_id = c.id
+    ${whereSection}
+    GROUP BY c.id
+  `).all(...params);
 
   return {
     totalStudents,
     genderDist: { boys, girls },
     totalRevenue,
-    classStats
+    classStats: classStats.map(c => ({
+        ...c,
+        avg: c.avg || 0,
+        passRate: c.passRate || 0
+    }))
   };
 });
 

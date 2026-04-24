@@ -8,3 +8,15 @@ Port 5173 is in use, trying another one...
 
   ➜  Local:   http://localhost:5174/
   ➜  Network: http://192.168.0.2:5174/
+3:33:31 PM [vite] (client) hmr update /src/index.css
+4:46:45 PM [vite] (client) hmr update /src/App.tsx, /src/index.css
+4:46:48 PM [vite] (client) hmr update /src/components/Layout.tsx, /src/index.css
+4:47:04 PM [vite] (client) hmr update /src/pages/Dashboard.tsx, /src/index.css
+4:47:24 PM [vite] (client) hmr update /src/pages/Dashboard.tsx, /src/index.css
+4:49:01 PM [vite] (client) hmr update /src/index.css, /src/pages/Students.tsx
+4:49:15 PM [vite] (client) hmr update /src/index.css, /src/pages/Grades.tsx
+4:49:24 PM [vite] (client) hmr update /src/index.css, /src/pages/Attendance.tsx
+4:49:46 PM [vite] (client) hmr update /src/pages/Login.tsx, /src/index.css
+4:51:28 PM [vite] (client) [optimizer] bundling dependencies...
+4:51:29 PM [vite] (client) ✨ new dependencies optimized: jspdf-autotable, jspdf
+4:51:29 PM [vite] (client) ✨ optimized dependencies changed. reloading

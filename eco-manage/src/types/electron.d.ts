@@ -12,6 +12,8 @@ export interface ElectronAPI {
   getDashboardStats: () => Promise<any>;
   getSubjects: () => Promise<any[]>;
   getClasses: () => Promise<any[]>;
+  getUsers: () => Promise<any[]>;
+  addUser: (user: any) => Promise<any>;
   updateGPS?: (lat: number, lng: number) => void;
 }
 

@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './utils/i18n'
 import App from './App.tsx'
+import { dataService } from './utils/dataService'
+
+dataService.init().catch(console.error);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

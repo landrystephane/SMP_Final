@@ -22,6 +22,7 @@ const Layout: React.FC = () => {
     { name: 'Présences', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY'] },
     { name: 'Admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY'] },
     { name: 'Requêtes', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE'] },
+    { name: 'Personnel', path: '/users', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR'] },
     { name: 'Transport', path: '/transport', icon: Truck, roles: ['FOUNDER', 'DIRECTOR', 'DRIVER', 'SECRETARY'] },
     { name: 'Accès Mobile', path: '/mobile-access', icon: Key, roles: ['FOUNDER'] },
     { name: 'Sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'] },
