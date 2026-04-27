@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, Role } from '../types';
 
 interface AuthContextType {
@@ -48,8 +48,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('user');
   };
 
+  const [isSgActingDirector, setIsSgActingDirector] = useState(false);
+
+  useEffect(() => {
+    const checkActingStatus = async () => {
+        if (window.electronAPI) {
+            const status = await window.electronAPI.getSetting('sg_acting_director');
+            setIsSgActingDirector(status === 'true');
+        }
+    };
+    checkActingStatus();
+    // Poll every 30s or use an event listener if possible
+    const interval = setInterval(checkActingStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const hasRole = (roles: Role[]) => {
-    return user ? roles.includes(user.role) : false;
+    if (!user) return false;
+
+    // Acting roles logic
+    if (user.role === 'SECRETARY') {
+        // SG can ALWAYS do secretary stuff
+        if (roles.includes('SECRETARY')) return true;
+
+        // SG can do DIRECTOR stuff ONLY if activated
+        if (roles.includes('DIRECTOR') && isSgActingDirector) return true;
+    }
+
+    return roles.includes(user.role);
   };
 
   return (

@@ -75,27 +75,34 @@ app.whenReady().then(() => {
   if (subjectsCount === 0) {
     const defaultSubjects = [
       // PRIMAIRE - Francophone
-      ['Langue Française', 'Langues et Communication', 'PRIMAIRE', 5],
-      ['Mathématiques', 'Sciences et Techno', 'PRIMAIRE', 4],
-      ['Sciences Humaines', 'Milieu Physique et Humain', 'PRIMAIRE', 2],
-      ['Développement Personnel', 'Vie Courante', 'PRIMAIRE', 2],
-      ['Activités Pratiques', 'Arts et Culture', 'PRIMAIRE', 1],
+      ['Langue Française', 'Langues et Communication', 'PRIMAIRE', 'FRANCOPHONE', 5],
+      ['Mathématiques', 'Sciences et Techno', 'PRIMAIRE', 'FRANCOPHONE', 4],
+      ['Sciences Humaines', 'Milieu Physique et Humain', 'PRIMAIRE', 'FRANCOPHONE', 2],
+      ['Développement Personnel', 'Vie Courante', 'PRIMAIRE', 'FRANCOPHONE', 2],
+      ['Activités Pratiques', 'Arts et Culture', 'PRIMAIRE', 'FRANCOPHONE', 1],
 
       // PRIMARY - Anglophone
-      ['English Language', 'Languages & Communication', 'PRIMAIRE', 5],
-      ['Mathematics', 'Science & Tech', 'PRIMAIRE', 4],
-      ['Social Studies', 'Human Environment', 'PRIMAIRE', 2],
-      ['Personal Development', 'Life Skills', 'PRIMAIRE', 2],
-      ['Vocational Activities', 'Arts & Culture', 'PRIMAIRE', 1],
+      ['English Language', 'Languages & Communication', 'PRIMAIRE', 'ANGLOPHONE', 5],
+      ['Mathematics', 'Science & Tech', 'PRIMAIRE', 'ANGLOPHONE', 4],
+      ['Social Studies', 'Human Environment', 'PRIMAIRE', 'ANGLOPHONE', 2],
+      ['Personal Development', 'Life Skills', 'PRIMAIRE', 'ANGLOPHONE', 2],
+      ['Vocational Activities', 'Arts & Culture', 'PRIMAIRE', 'ANGLOPHONE', 1],
 
-      // MATERNELLE
-      ['Activités Langagières', 'Langage et Communication', 'MATERNELLE', 1],
-      ['Éveil Scientifique', 'Éveil Scientifique et Technologique', 'MATERNELLE', 1],
-      ['Développement de la Personnalité', 'Milieu Physique et Humain', 'MATERNELLE', 1],
-      ['Activités Créatrices', 'Arts et Culture', 'MATERNELLE', 1],
-      ['Motricité', 'Éducation Physique', 'MATERNELLE', 1],
+      // MATERNELLE - Francophone
+      ['Activités Langagières', 'Langage et Communication', 'MATERNELLE', 'FRANCOPHONE', 1],
+      ['Éveil Scientifique', 'Éveil Scientifique et Technologique', 'MATERNELLE', 'FRANCOPHONE', 1],
+      ['Développement de la Personnalité', 'Milieu Physique et Humain', 'MATERNELLE', 'FRANCOPHONE', 1],
+      ['Activités Créatrices', 'Arts et Culture', 'MATERNELLE', 'FRANCOPHONE', 1],
+      ['Motricité', 'Éducation Physique', 'MATERNELLE', 'FRANCOPHONE', 1],
+
+      // MATERNELLE - Anglophone
+      ['Language Activities', 'Language & Communication', 'MATERNELLE', 'ANGLOPHONE', 1],
+      ['Scientific Awakening', 'Scientific & Technological Awakening', 'MATERNELLE', 'ANGLOPHONE', 1],
+      ['Personality Development', 'Human & Physical Environment', 'MATERNELLE', 'ANGLOPHONE', 1],
+      ['Creative Activities', 'Arts & Culture', 'MATERNELLE', 'ANGLOPHONE', 1],
+      ['Motor Skills', 'Physical Education', 'MATERNELLE', 'ANGLOPHONE', 1],
     ];
-    const insert = db.prepare('INSERT INTO subjects (name, domain, level, coefficient) VALUES (?, ?, ?, ?)');
+    const insert = db.prepare('INSERT INTO subjects (name, domain, level, section, coefficient) VALUES (?, ?, ?, ?, ?)');
     defaultSubjects.forEach(s => insert.run(s));
   }
 });
@@ -112,12 +119,12 @@ ipcMain.handle('db:getStudents', async () => {
 });
 
 ipcMain.handle('db:addStudent', async (event, student) => {
-  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, address, section, classId } = student;
+  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, section, classId } = student;
   const matricule = `MAT-${Date.now()}`;
   return db.prepare(`
-    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, address, section, class_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, address, section, classId);
+    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, section, class_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, section, classId);
 });
 
 ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
@@ -189,11 +196,11 @@ ipcMain.handle('db:getSubjects', async () => {
 });
 
 ipcMain.handle('db:addSubject', async (event, subject) => {
-  const { name, domain, level, coefficient } = subject;
+  const { name, domain, level, section, coefficient } = subject;
   return db.prepare(`
-    INSERT INTO subjects (name, domain, level, coefficient)
-    VALUES (?, ?, ?, ?)
-  `).run(name, domain, level, coefficient);
+    INSERT INTO subjects (name, domain, level, section, coefficient)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(name, domain, level, section, coefficient);
 });
 
 ipcMain.handle('db:getClasses', async () => {
@@ -211,6 +218,35 @@ ipcMain.handle('db:addUser', async (event, user) => {
     .run(username, hash, fullName, role);
 });
 
+ipcMain.handle('db:changePassword', async (event, { userId, newPassword }) => {
+  const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
+  return db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, userId);
+});
+
+ipcMain.handle('db:getTuitionFees', async () => {
+  return db.prepare(`
+    SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee
+    FROM classes c
+    LEFT JOIN tuition_fees t ON c.id = t.class_id
+  `).all();
+});
+
+ipcMain.handle('db:updateTuitionFee', async (event, { classId, totalFee }) => {
+  return db.prepare(`
+    INSERT INTO tuition_fees (class_id, total_fee)
+    VALUES (?, ?)
+    ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee
+  `).run(classId, totalFee);
+});
+
+ipcMain.handle('db:getSetting', async (event, key) => {
+  return db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value || null;
+});
+
+ipcMain.handle('db:setSetting', async (event, { key, value }) => {
+  return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+});
+
 ipcMain.handle('db:getDashboardStats', async (event, section) => {
   const whereSection = section ? "WHERE section = ?" : "";
   const params = section ? [section] : [];
@@ -223,6 +259,13 @@ ipcMain.handle('db:getDashboardStats', async (event, section) => {
     SELECT SUM(p.amount) as total
     FROM payments p
     JOIN students s ON p.student_id = s.id
+    ${whereSection}
+  `).get(...params).total || 0;
+
+  const totalTuitionDue = db.prepare(`
+    SELECT SUM(t.total_fee) as total
+    FROM tuition_fees t
+    JOIN students s ON s.class_id = t.class_id
     ${whereSection}
   `).get(...params).total || 0;
 
@@ -239,6 +282,7 @@ ipcMain.handle('db:getDashboardStats', async (event, section) => {
     totalStudents,
     genderDist: { boys, girls },
     totalRevenue,
+    totalTuitionDue,
     classStats: classStats.map(c => ({
         ...c,
         avg: c.avg || 0,

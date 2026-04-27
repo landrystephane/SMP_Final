@@ -189,7 +189,10 @@ const Grades: React.FC = () => {
                 <thead className="text-[10px] uppercase text-slate-500 font-black border-b border-white/5">
                   <tr>
                     <th className="px-6 py-4 sticky left-0 bg-slate-900/50 backdrop-blur-md">Élèves</th>
-                    {subjects.filter(s => s.level === classes.find(c => c.id.toString() === selectedClass)?.level).map(s => (
+                    {subjects.filter(s =>
+                      s.level === classes.find(c => c.id.toString() === selectedClass)?.level &&
+                      s.section === selectedSection
+                    ).map(s => (
                       <th key={s.id} className="px-4 py-4 text-center min-w-[120px]">
                         <div className="truncate max-w-[100px] mx-auto">{s.name}</div>
                         <div className="text-[8px] text-slate-600">Coef: {s.coefficient}</div>
@@ -204,7 +207,10 @@ const Grades: React.FC = () => {
                         <div className="text-white font-bold uppercase text-sm">{student.last_name}</div>
                         <div className="text-[10px] text-slate-500">{student.first_name}</div>
                       </td>
-                      {subjects.filter(s => s.level === classes.find(c => c.id.toString() === selectedClass)?.level).map(subject => (
+                      {subjects.filter(s =>
+                        s.level === classes.find(c => c.id.toString() === selectedClass)?.level &&
+                        s.section === selectedSection
+                      ).map(subject => (
                         <td key={subject.id} className="px-4 py-4">
                           <input
                             type="number"

@@ -113,7 +113,10 @@ const Dashboard: React.FC = () => {
           <p className="text-slate-400 text-xs mt-4 font-bold uppercase">Recettes Totales</p>
           <p className="text-2xl font-bold text-white">{stats.totalRevenue.toLocaleString()} FCFA</p>
           <div className="w-full h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
-             <div className="h-full bg-slate-gold-gold" style={{ width: '75%' }} />
+             <div
+                className="h-full bg-slate-gold-gold"
+                style={{ width: `${Math.min(100, (stats.totalRevenue / (stats.totalTuitionDue || 1)) * 100)}%` }}
+             />
           </div>
         </div>
 

@@ -14,6 +14,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
     birthPlace: '',
     gender: 'M',
     parentContact: '',
+    emergencyContact: '',
+    medicalInfo: '',
     address: '',
     section: 'FRANCOPHONE',
     classId: '',
@@ -89,6 +91,22 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-slate-gold-gold"
                 value={formData.parentContact}
                 onChange={(e) => setFormData({...formData, parentContact: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Contact d'Urgence</label>
+              <input
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-slate-gold-gold"
+                value={formData.emergencyContact}
+                onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <label className="text-sm font-medium text-slate-300">Antécédents Médicaux / Infos Santé</label>
+              <textarea
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-slate-gold-gold h-20"
+                value={formData.medicalInfo}
+                onChange={(e) => setFormData({...formData, medicalInfo: e.target.value})}
               />
             </div>
             <div className="space-y-2">

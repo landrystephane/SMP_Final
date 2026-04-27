@@ -8,11 +8,13 @@ import Students from './pages/Students';
 import Subjects from './pages/Subjects';
 import Grades from './pages/Grades';
 import Finance from './pages/Finance';
+import TuitionConfig from './pages/TuitionConfig';
 import AdminWorkflow from './pages/AdminWorkflow';
 import Attendance from './pages/Attendance';
 import Tickets from './pages/Tickets';
 import Transport from './pages/Transport';
 import Users from './pages/Users';
+import Profile from './pages/Profile';
 import MobileAccess from './pages/MobileAccess';
 import MobileProvisioning from './pages/MobileProvisioning';
 import SyncCenter from './pages/SyncCenter';
@@ -43,11 +45,13 @@ function App() {
             <Route path="subjects" element={<Subjects />} />
             <Route path="grades" element={<Grades />} />
             <Route path="finance" element={<Finance />} />
+            <Route path="tuition-config" element={<TuitionConfig />} />
             <Route path="admin-workflow" element={<AdminWorkflow />} />
             <Route path="attendance" element={<Attendance />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="transport" element={<Transport />} />
             <Route path="users" element={<Users />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="mobile-access" element={<MobileAccess />} />
             <Route path="sync" element={<SyncCenter />} />
           </Route>

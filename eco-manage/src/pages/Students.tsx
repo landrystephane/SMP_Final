@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Search, UserPlus, Filter, Download, Trash2, Edit } from 'lucide-react';
+import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
+import { generateRegistrationSheet } from '../utils/reports';
 
 const Students: React.FC = () => {
   const [students, setStudents] = useState<any[]>([]);
@@ -126,6 +127,13 @@ const Students: React.FC = () => {
                     <span className={s.gender === 'M' ? 'text-blue-400' : 'text-pink-400'}>{s.gender}</span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
+                    <button
+                        onClick={() => generateRegistrationSheet(s)}
+                        className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-500/20 rounded-md transition-all"
+                        title="Fiche d'enregistrement"
+                    >
+                        <FileText className="w-4 h-4" />
+                    </button>
                     <button className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>

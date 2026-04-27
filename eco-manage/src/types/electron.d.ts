@@ -11,9 +11,15 @@ export interface ElectronAPI {
   getTickets: () => Promise<any[]>;
   getDashboardStats: () => Promise<any>;
   getSubjects: () => Promise<any[]>;
+  addSubject: (subject: any) => Promise<any>;
   getClasses: () => Promise<any[]>;
   getUsers: () => Promise<any[]>;
   addUser: (user: any) => Promise<any>;
+  changePassword: (data: { userId: number, newPassword: string }) => Promise<any>;
+  getTuitionFees: () => Promise<any[]>;
+  updateTuitionFee: (data: { classId: number, totalFee: number }) => Promise<any>;
+  getSetting: (key: string) => Promise<string | null>;
+  setSetting: (data: { key: string, value: string }) => Promise<any>;
   updateGPS?: (lat: number, lng: number) => void;
 }
 

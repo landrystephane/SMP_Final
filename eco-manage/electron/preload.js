@@ -17,4 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getClasses: () => ipcRenderer.invoke('db:getClasses'),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   addUser: (user) => ipcRenderer.invoke('db:addUser', user),
+  changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
+  getTuitionFees: () => ipcRenderer.invoke('db:getTuitionFees'),
+  updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
+  getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
+  setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
 });

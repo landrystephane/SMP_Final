@@ -38,8 +38,9 @@ const Login: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300">Utilisateur</label>
+            <label htmlFor="username" className="block text-sm font-medium text-slate-300">Utilisateur</label>
             <input
+              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -48,8 +49,9 @@ const Login: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300">Mot de passe</label>
+            <label htmlFor="password" className="block text-sm font-medium text-slate-300">Mot de passe</label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

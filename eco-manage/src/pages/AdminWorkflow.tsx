@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, ShieldCheck, CheckCircle2, UserCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const AdminWorkflow: React.FC = () => {
   const { t: _t } = useTranslation();
+  const [isSgActing, setIsSgActing] = useState(false);
   const [period, _setPeriod] = useState({
     term: 1,
     start: '2026-04-20',
@@ -11,6 +12,25 @@ const AdminWorkflow: React.FC = () => {
     active: true,
     editingAllowed: true
   });
+
+  const loadActingStatus = async () => {
+    if (window.electronAPI) {
+        const status = await window.electronAPI.getSetting('sg_acting_director');
+        setIsSgActing(status === 'true');
+    }
+  };
+
+  useEffect(() => {
+    loadActingStatus();
+  }, []);
+
+  const toggleSgActing = async () => {
+    if (window.electronAPI) {
+        const newValue = !isSgActing;
+        await window.electronAPI.setSetting({ key: 'sg_acting_director', value: newValue.toString() });
+        setIsSgActing(newValue);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -46,6 +66,31 @@ const AdminWorkflow: React.FC = () => {
             <button className="w-full py-2 bg-slate-gold-gold text-slate-900 rounded font-bold hover:bg-yellow-500 transition-colors">
               Mettre à jour la période
             </button>
+          </div>
+        </div>
+
+        {/* SG Acting Director Toggle */}
+        <div className="glass-card p-6 space-y-4 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 text-purple-400">
+                <UserCheck className="w-6 h-6" />
+                <h2 className="text-xl font-semibold">Suppléance du Directeur</h2>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400">
+            Activez cette option pour permettre au **Secrétaire Général** de valider les notes et les bulletins en l'absence du Directeur.
+          </p>
+          <div className="flex items-center justify-between p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
+            <div>
+                <span className="text-white font-bold block text-sm">Mode Suppléance SG</span>
+                <span className="text-[10px] text-slate-500 uppercase font-black">Actuellement: {isSgActing ? 'ACTIVÉ' : 'DÉSACTIVÉ'}</span>
+            </div>
+            <div
+                onClick={toggleSgActing}
+                className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all duration-300 ${isSgActing ? 'bg-purple-500' : 'bg-slate-700'}`}
+            >
+                <div className={`w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-300 ${isSgActing ? 'translate-x-7' : ''}`} />
+            </div>
           </div>
         </div>
 

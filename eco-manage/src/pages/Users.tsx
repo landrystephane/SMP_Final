@@ -32,13 +32,13 @@ const Users: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-[1600px] mx-auto">
       <div>
         <h1 className="text-3xl font-bold text-white">Gestion du Personnel</h1>
         <p className="text-slate-400 mt-1">Créer et gérer les accès des utilisateurs</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Formulaire d'ajout */}
         <div className="glass-card p-6 h-fit">
           <div className="flex items-center space-x-3 text-slate-gold-gold mb-6">
@@ -84,7 +84,7 @@ const Users: React.FC = () => {
                 onChange={(e) => setNewUser({...newUser, role: e.target.value as Role})}
               >
                 <option value="DIRECTOR">Directeur</option>
-                <option value="SECRETARY">Secrétaire</option>
+                <option value="SECRETARY">Secrétaire Général</option>
                 <option value="BURSAR">Économe</option>
                 <option value="TEACHER">Enseignant</option>
                 <option value="ADVISOR">Conseiller Pédagogique</option>
