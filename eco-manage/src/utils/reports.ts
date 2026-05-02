@@ -90,12 +90,12 @@ export const generateReportCard = (student: any, grades: any[], _section: string
   // Attendance
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Absences: ${student.absences || 0} jours`, 14, finalY);
+  doc.text(`Absences: ${student.absences || 0} jours`, 14, finalY + 15);
 
   // Footer / Signatures
-  doc.text('Visa Enseignant', 14, finalY + 20);
-  doc.text('Visa Directeur', 105, finalY + 20, { align: 'center' });
-  doc.text('Visa Parent', 180, finalY + 20, { align: 'right' });
+  doc.text('Visa Enseignant', 14, finalY + 30);
+  doc.text('Visa Directeur', 105, finalY + 30, { align: 'center' });
+  doc.text('Visa Parent', 180, finalY + 30, { align: 'right' });
 
   doc.save(`bulletin_${student.matricule}.pdf`);
 };
