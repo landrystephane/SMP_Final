@@ -212,10 +212,15 @@ ipcMain.handle('db:getUsers', async () => {
 });
 
 ipcMain.handle('db:addUser', async (event, user) => {
-  const { username, password, fullName, role } = user;
+  const { username, password, fullName, role, classId } = user;
   const hash = crypto.createHash('sha256').update(password).digest('hex');
-  return db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
+  const result = db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
     .run(username, hash, fullName, role);
+
+  if (classId && role === 'TEACHER') {
+      db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id = ?').run(result.lastInsertRowid, classId);
+  }
+  return result;
 });
 
 ipcMain.handle('db:changePassword', async (event, { userId, newPassword }) => {

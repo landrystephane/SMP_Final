@@ -14,10 +14,14 @@ i18n
     resources: {
       fr: {
         translation: {
-          dashboard: 'Tableau de bord',
-          students: 'Élèves',
-          grades: 'Notes',
-          finance: 'Finance',
+          dashboard: 'Tableau de Bord',
+          students: 'Gestion des Élèves',
+          subjects: 'Gestion des Matières',
+          grades: 'Saisie des Notes',
+          finance: 'Gestion Financière',
+          tuition_config: 'Config Scolarité',
+          attendance: 'Cahier de Présence',
+          admin: 'Contrôle Accès',
           login: 'Se connecter',
           logout: 'Déconnexion',
           welcome: 'Bienvenue sur Eco-Manage',
@@ -31,18 +35,29 @@ i18n
           section: 'Section',
           actions: 'Actions',
           evaluation_period: 'Période d\'évaluation',
-          attendance: 'Présences',
           founder_stats: 'Statistiques Globales',
           grades_entry: 'Saisie des Notes',
           unlock: 'Déverrouiller',
+          payments: 'Paiements',
+          transport: 'Transport',
+          profile: 'Mon Profil',
+          tickets: 'Requêtes',
+          settings: 'Paramètres',
+          acting_director: 'Mode Intérim Directeur',
+          medical_info: 'Infos Santé',
+          emergency_contact: 'Contact d\'Urgence'
         }
       },
       en: {
         translation: {
           dashboard: 'Dashboard',
-          students: 'Students',
-          grades: 'Grades',
-          finance: 'Finance',
+          students: 'Student Management',
+          subjects: 'Subject Management',
+          grades: 'Grades Entry',
+          finance: 'Finance Management',
+          tuition_config: 'Tuition Fees',
+          attendance: 'Daily Attendance',
+          admin: 'Access Control',
           login: 'Login',
           logout: 'Logout',
           welcome: 'Welcome to Eco-Manage',
@@ -56,10 +71,17 @@ i18n
           section: 'Section',
           actions: 'Actions',
           evaluation_period: 'Evaluation Period',
-          attendance: 'Attendance',
           founder_stats: 'Global Statistics',
           grades_entry: 'Grades Entry',
           unlock: 'Unlock',
+          payments: 'Payments',
+          transport: 'Transport',
+          profile: 'My Profile',
+          tickets: 'Requests',
+          settings: 'Settings',
+          acting_director: 'Acting Director Mode',
+          medical_info: 'Health Info',
+          emergency_contact: 'Emergency Contact'
         }
       }
     }

@@ -7,6 +7,7 @@ const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -18,13 +19,18 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setError('');
+    setIsLoading(true);
     try {
+      console.log('Tentative de connexion pour:', username);
       await login(username, password);
-      // AuthContext will handle the state update, then useEffect will navigate
+      console.log('Connexion réussie, redirection...');
     } catch (err: any) {
       setError('Identifiants invalides ou erreur de connexion');
-      console.error(err);
+      console.error('Erreur login:', err);
+      setIsLoading(false);
     }
   };
 
@@ -62,10 +68,15 @@ const Login: React.FC = () => {
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             type="submit"
-            className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-900 bg-slate-gold-gold hover:bg-yellow-500 transition-colors"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-900 bg-slate-gold-gold hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <LogIn className="w-4 h-4 mr-2" />
-            Se connecter
+            {isLoading ? (
+                <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin mr-2" />
+            ) : (
+                <LogIn className="w-4 h-4 mr-2" />
+            )}
+            {isLoading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
       </div>

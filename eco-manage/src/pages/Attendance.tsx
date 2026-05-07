@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar } from 'lucide-react';
+import { Calendar, UserCheck, Clock, Save, AlertCircle } from 'lucide-react';
 
 const Attendance: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
@@ -7,6 +7,7 @@ const Attendance: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [absences, setAbsences] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -28,29 +29,35 @@ const Attendance: React.FC = () => {
     loadStudents();
   }, [selectedClass]);
 
+  const handleSave = () => {
+      // Logic to save to DB would go here
+      console.log('Enregistrement des absences:', absences);
+      alert('Cahier de présence enregistré pour le ' + new Date(currentDate).toLocaleDateString());
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Appel & Présences</h1>
-          <p className="text-slate-400 mt-1">Suivi quotidien de l'assiduité par salle de classe</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Cahier de Présence</h1>
+          <p className="text-slate-500 mt-1">Saisie des heures d'absence par élève</p>
         </div>
-        <div className="flex items-center bg-slate-800 border border-slate-700 p-2 rounded-lg text-white">
-            <Calendar className="w-4 h-4 mr-2 text-slate-gold-gold" />
+        <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl shadow-sm text-slate-900 dark:text-white">
+            <Calendar className="w-5 h-5 mr-3 text-blue-600" />
             <input
                 type="date"
                 value={currentDate}
                 onChange={(e) => setCurrentDate(e.target.value)}
-                className="bg-transparent outline-none text-sm font-bold"
+                className="bg-transparent outline-none text-sm font-black"
             />
         </div>
       </div>
 
-      <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase">Section</label>
+      <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sélectionner la Section</label>
           <select
-            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-all font-bold"
             value={selectedSection}
             onChange={(e) => {
                 setSelectedSection(e.target.value);
@@ -58,19 +65,19 @@ const Attendance: React.FC = () => {
             }}
           >
             <option value="">Choisir la section...</option>
-            <option value="FRANCOPHONE">FRANCOPHONE</option>
-            <option value="ANGLOPHONE">ANGLOPHONE</option>
+            <option value="FRANCOPHONE">SECTION FRANCOPHONE</option>
+            <option value="ANGLOPHONE">ANGLOPHONE SECTION</option>
           </select>
         </div>
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase">Salle de Classe</label>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Choisir la Salle de Classe</label>
           <select
-            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1 disabled:opacity-50"
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-all font-bold disabled:opacity-50"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
             disabled={!selectedSection}
           >
-            <option value="">Choisir la classe...</option>
+            <option value="">Sélectionner la classe...</option>
             {classes.filter(c => c.section === selectedSection).map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -79,59 +86,95 @@ const Attendance: React.FC = () => {
       </div>
 
       {!selectedClass ? (
-          <div className="glass-card p-12 text-center text-slate-500 border-2 border-dashed border-slate-800">
-              Veuillez sélectionner une salle de classe pour faire l'appel.
+          <div className="glass-card p-20 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center">
+              <UserCheck className="w-16 h-16 mb-4 opacity-20" />
+              <p className="text-xl font-bold">Sélectionnez une classe pour commencer l'appel</p>
+              <p className="text-sm mt-2">Par défaut, tous les élèves sont considérés comme présents.</p>
           </div>
       ) : (
-          <div className="glass-card overflow-hidden">
-            <div className="p-4 bg-white/5 flex items-center justify-between border-b border-white/5">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="text" placeholder="Rechercher un élève..." className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white text-sm" />
+          <div className="space-y-6">
+            <div className="glass-card p-4 bg-blue-600 text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl border-none">
+                <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-white/20 rounded-full">
+                        <Clock className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold">Appel du Jour : {classes.find(c => c.id.toString() === selectedClass)?.name}</h2>
+                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">Mettre à 0 pour une présence totale</p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-600 transition-all uppercase">
-                        Tous présents
-                    </button>
-                    <button className="px-4 py-2 bg-slate-gold-gold text-slate-900 rounded-lg text-xs font-bold hover:bg-yellow-500 transition-all uppercase">
-                        Enregistrer l'appel
-                    </button>
-                </div>
+                <button
+                    onClick={handleSave}
+                    className="w-full md:w-auto px-8 py-3 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 transition-all flex items-center justify-center shadow-lg active:scale-95"
+                >
+                    <Save className="w-5 h-5 mr-2" /> ENREGISTRER LE CAHIER
+                </button>
             </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="text-[10px] uppercase text-slate-500 font-black border-b border-white/5">
-                            <th className="px-6 py-4">Élève</th>
-                            <th className="px-6 py-4 text-center">Présent</th>
-                            <th className="px-6 py-4 text-center">Absent</th>
-                            <th className="px-6 py-4 text-center">En retard</th>
-                            <th className="px-6 py-4">Justification</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                        {students.map(student => (
-                            <tr key={student.id} className="hover:bg-white/5">
-                                <td className="px-6 py-4">
-                                    <div className="text-white font-bold uppercase text-sm">{student.last_name}</div>
-                                    <div className="text-[10px] text-slate-500">{student.first_name}</div>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="radio" name={`status-${student.id}`} className="w-4 h-4 accent-green-500" defaultChecked />
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="radio" name={`status-${student.id}`} className="w-4 h-4 accent-red-500" />
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="radio" name={`status-${student.id}`} className="w-4 h-4 accent-yellow-500" />
-                                </td>
-                                <td className="px-6 py-4">
-                                    <input type="text" placeholder="Note..." className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white w-full max-w-[150px]" />
-                                </td>
+
+            <div className="glass-card shadow-xl border-none">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-800/50 text-[10px] uppercase text-slate-500 font-black border-b border-slate-100 dark:border-slate-800">
+                                <th className="px-6 py-5">Élève</th>
+                                <th className="px-6 py-5 text-center">Heures d'absence</th>
+                                <th className="px-6 py-5 text-center">Statut Automatique</th>
+                                <th className="px-6 py-5 text-right">Sanction Prévisionnelle</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {students.map(student => {
+                                const h = absences[student.id] || 0;
+                                return (
+                                    <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="text-slate-900 dark:text-white font-bold uppercase text-sm">{student.last_name}</div>
+                                            <div className="text-[10px] text-slate-500 font-bold">{student.first_name} • {student.matricule}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex items-center justify-center space-x-3">
+                                                <button
+                                                    onClick={() => setAbsences({...absences, [student.id]: Math.max(0, h - 1)})}
+                                                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black hover:bg-rose-500 hover:text-white transition-all"
+                                                >
+                                                    -
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    value={h}
+                                                    onChange={(e) => setAbsences({...absences, [student.id]: parseInt(e.target.value) || 0})}
+                                                    className="w-16 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-lg p-2 text-center text-slate-900 dark:text-white font-black focus:border-blue-600 outline-none"
+                                                />
+                                                <button
+                                                    onClick={() => setAbsences({...absences, [student.id]: h + 1})}
+                                                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black hover:bg-blue-600 hover:text-white transition-all"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {h === 0 ? (
+                                                <span className="text-[10px] font-black bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full uppercase">Présent</span>
+                                            ) : (
+                                                <span className="text-[10px] font-black bg-rose-100 text-rose-600 px-3 py-1 rounded-full uppercase">Absent</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {h > 4 ? (
+                                                <span className="text-[9px] font-black text-rose-500 flex items-center justify-end">
+                                                    <AlertCircle className="w-3 h-3 mr-1" /> AVERTISSEMENT AUTOMATIQUE
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">RAS</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
           </div>
       )}

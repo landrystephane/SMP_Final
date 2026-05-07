@@ -11,13 +11,21 @@ export const NURSERY_DOMAINS = [
 ];
 
 export const getAppreciationNursery = (score: number) => {
-  if (score >= 18) return { code: 'A+', label: 'Expert' };
-  if (score >= 15) return { code: 'A', label: 'Acquis' };
-  if (score >= 11) return { code: 'ECA', label: 'En cours d\'acquisition' };
-  return { code: 'NA', label: 'Non acquis' };
+  if (score >= 18) return { code: 'A+', label: 'Expert', label_en: 'Expert' };
+  if (score >= 15) return { code: 'A', label: 'Acquis', label_en: 'Acquired' };
+  if (score >= 11) return { code: 'ECA', label: 'En cours d\'acquisition', label_en: 'In progress' };
+  return { code: 'NA', label: 'Non acquis', label_en: 'Not acquired' };
 };
 
-export const getAppreciationPrimary = (score: number) => {
+export const getAppreciationPrimary = (score: number, isEnglish: boolean = false) => {
+  if (isEnglish) {
+      if (score >= 18) return 'Excellent';
+      if (score >= 16) return 'Very Good';
+      if (score >= 14) return 'Good';
+      if (score >= 12) return 'Fairly Good';
+      if (score >= 10) return 'Average';
+      return 'Poor';
+  }
   if (score >= 18) return 'Excellent';
   if (score >= 16) return 'Très Bien';
   if (score >= 14) return 'Bien';
