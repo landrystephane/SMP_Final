@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS students (
     medical_info TEXT,
     photo TEXT,
     address TEXT,
+    neighborhood TEXT,
     class_id INTEGER,
     section TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -177,7 +178,23 @@ CREATE TABLE IF NOT EXISTS mobile_access_keys (
 CREATE TABLE IF NOT EXISTS tuition_fees (
     class_id INTEGER PRIMARY KEY,
     total_fee REAL NOT NULL,
+    registration_fee REAL DEFAULT 0,
     FOREIGN KEY (class_id) REFERENCES classes(id)
+);
+
+CREATE TABLE IF NOT EXISTS installments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    display_order INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS class_installment_fees (
+    class_id INTEGER,
+    installment_id INTEGER,
+    amount REAL NOT NULL,
+    PRIMARY KEY (class_id, installment_id),
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (installment_id) REFERENCES installments(id)
 );
 
 CREATE TABLE IF NOT EXISTS settings (

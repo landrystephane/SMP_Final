@@ -19,6 +19,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
     emergencyContact: '',
     medicalInfo: '',
     address: '',
+    neighborhood: '',
     section: 'FRANCOPHONE',
     classId: '',
   });
@@ -93,6 +94,15 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
                 value={formData.birthPlace}
                 onChange={(e) => setFormData({...formData, birthPlace: e.target.value})}
                 placeholder="Ex: Douala"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quartier (Suivi Bus)</label>
+              <input
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-colors font-bold"
+                value={formData.neighborhood}
+                onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
+                placeholder="Ex: Bonapriso"
               />
             </div>
             <div className="space-y-1">

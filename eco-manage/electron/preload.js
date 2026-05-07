@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
   getTuitionFees: () => ipcRenderer.invoke('db:getTuitionFees'),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
+  getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
+  getClassInstallmentFees: () => ipcRenderer.invoke('db:getClassInstallmentFees'),
+  updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
   getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
   setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
+  saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),
+  getAttendance: (data) => ipcRenderer.invoke('db:getAttendance', data),
 });

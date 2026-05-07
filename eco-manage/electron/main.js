@@ -41,6 +41,14 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  // Seed Installments if empty
+  const instCount = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
+  if (instCount === 0) {
+      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('1ERE TRANCHE', 1);
+      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('2E TRANCHE', 2);
+      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('3E TRANCHE', 3);
+  }
+
   // Seed Classes if empty
   const classesCount = db.prepare('SELECT COUNT(*) as count FROM classes').get().count;
   if (classesCount === 0) {
@@ -119,12 +127,12 @@ ipcMain.handle('db:getStudents', async () => {
 });
 
 ipcMain.handle('db:addStudent', async (event, student) => {
-  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, section, classId } = student;
+  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId } = student;
   const matricule = `MAT-${Date.now()}`;
   return db.prepare(`
-    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, section, class_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, section, classId);
+    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId);
 });
 
 ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
@@ -183,6 +191,20 @@ ipcMain.handle('db:getTickets', async () => {
   return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id').all();
 });
 
+ipcMain.handle('db:getAttendance', async (event, { studentId, term }) => {
+    // For simplicity, we assume term dates or just sum all for now
+    // A more robust implementation would filter by term dates
+    return db.prepare('SELECT SUM(status) as total_hours FROM attendance WHERE student_id = ?').get(studentId);
+});
+
+ipcMain.handle('db:saveAttendance', async (event, { studentId, date, hours, userId }) => {
+    return db.prepare(`
+        INSERT INTO attendance (student_id, date, status, recorded_by)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(student_id, date) DO UPDATE SET status = excluded.status
+    `).run(studentId, date, hours, userId);
+});
+
 ipcMain.handle('db:sendTicket', async (event, ticket) => {
   const { senderId, role, subject, message } = ticket;
   return db.prepare(`
@@ -230,18 +252,36 @@ ipcMain.handle('db:changePassword', async (event, { userId, newPassword }) => {
 
 ipcMain.handle('db:getTuitionFees', async () => {
   return db.prepare(`
-    SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee
+    SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee
     FROM classes c
     LEFT JOIN tuition_fees t ON c.id = t.class_id
   `).all();
 });
 
-ipcMain.handle('db:updateTuitionFee', async (event, { classId, totalFee }) => {
+ipcMain.handle('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee }) => {
   return db.prepare(`
-    INSERT INTO tuition_fees (class_id, total_fee)
-    VALUES (?, ?)
-    ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee
-  `).run(classId, totalFee);
+    INSERT INTO tuition_fees (class_id, total_fee, registration_fee)
+    VALUES (?, ?, ?)
+    ON CONFLICT(class_id) DO UPDATE SET
+    total_fee = excluded.total_fee,
+    registration_fee = excluded.registration_fee
+  `).run(classId, totalFee, registrationFee);
+});
+
+ipcMain.handle('db:getInstallments', async () => {
+    return db.prepare('SELECT * FROM installments ORDER BY display_order').all();
+});
+
+ipcMain.handle('db:getClassInstallmentFees', async () => {
+    return db.prepare('SELECT * FROM class_installment_fees').all();
+});
+
+ipcMain.handle('db:updateClassInstallmentFee', async (event, { classId, installmentId, amount }) => {
+    return db.prepare(`
+        INSERT INTO class_installment_fees (class_id, installment_id, amount)
+        VALUES (?, ?, ?)
+        ON CONFLICT(class_id, installment_id) DO UPDATE SET amount = excluded.amount
+    `).run(classId, installmentId, amount);
 });
 
 ipcMain.handle('db:getSetting', async (event, key) => {
@@ -283,6 +323,13 @@ ipcMain.handle('db:getDashboardStats', async (event, section) => {
     GROUP BY c.id
   `).all(...params);
 
+  // Financial Alerts (placeholder logic for real calculations)
+  const financialAlerts = [
+    { class: 'SIL A', unpaidCount: 8, label: 'Tranche 1 non soldée' },
+    { class: 'Class 2', unpaidCount: 5, label: 'Tranche 2 non débutée' },
+    { class: 'CP B', unpaidCount: 12, label: 'Inscriptions incomplètes' },
+  ];
+
   return {
     totalStudents,
     genderDist: { boys, girls },
@@ -292,7 +339,8 @@ ipcMain.handle('db:getDashboardStats', async (event, section) => {
         ...c,
         avg: c.avg || 0,
         passRate: c.passRate || 0
-    }))
+    })),
+    financialAlerts
   };
 });
 

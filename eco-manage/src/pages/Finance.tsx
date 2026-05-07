@@ -10,16 +10,23 @@ const Finance: React.FC = () => {
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité' });
 
+  const [installments, setInstallments] = useState<any[]>([]);
+  const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
+
   const loadData = async () => {
     if (window.electronAPI) {
       const p = await window.electronAPI.getPayments();
       const s = await window.electronAPI.getStudents();
       const c = await window.electronAPI.getClasses();
       const t = await window.electronAPI.getTuitionFees();
+      const inst = await window.electronAPI.getInstallments();
+      const cif = await window.electronAPI.getClassInstallmentFees();
       setPayments(p);
       setStudents(s);
       setClasses(c);
       setTuitionFees(t);
+      setInstallments(inst);
+      setClassInstallmentFees(cif);
     }
   };
 
@@ -45,10 +52,36 @@ const Finance: React.FC = () => {
     }
   };
 
-  const getStudentBalance = (student: any) => {
-      const classFee = tuitionFees.find(f => f.classId === student.class_id)?.totalFee || 0;
-      const paid = payments.filter(p => p.student_id === student.id).reduce((acc, curr) => acc + curr.amount, 0);
-      return classFee - paid;
+  const getStudentFinancials = (student: any) => {
+      const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+      const totalPension = classConfig?.totalFee || 0;
+      const totalReg = classConfig?.registrationFee || 0;
+      const totalDue = totalPension + totalReg;
+
+      const studentPayments = payments.filter(p => p.student_id === student.id);
+      const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
+
+      // Calculate breakdown
+      let remaining = totalPaid;
+      const breakdown: any = { registration: 0, installments: [] };
+
+      // 1. Registration first
+      breakdown.registration = Math.min(totalReg, remaining);
+      remaining -= breakdown.registration;
+
+      // 2. Installments
+      const classInsts = (installments || []).map(inst => ({
+          ...inst,
+          amountDue: (classInstallmentFees || []).find(cif => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
+      }));
+
+      for (const inst of classInsts) {
+          const paidForThis = Math.min(inst.amountDue, remaining);
+          breakdown.installments.push({ ...inst, paid: paidForThis });
+          remaining -= paidForThis;
+      }
+
+      return { totalDue, totalPaid, balance: totalDue - totalPaid, breakdown, overpaid: remaining };
   };
 
   return (
@@ -92,7 +125,7 @@ const Finance: React.FC = () => {
                     </div>
                     <p className="text-slate-500 text-xs font-bold uppercase">Élèves à jour</p>
                     <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                        {students.filter(s => getStudentBalance(s) <= 0).length} / {students.length}
+                        {students.filter(s => getStudentFinancials(s).balance <= 0).length} / {students.length}
                     </p>
                 </div>
                 <div className="glass-card p-6 border-t-4 border-rose-500">
@@ -102,7 +135,7 @@ const Finance: React.FC = () => {
                     </div>
                     <p className="text-slate-500 text-xs font-bold uppercase">Reste à recouvrer</p>
                     <p className="text-2xl font-black text-rose-600 mt-1">
-                        {students.reduce((acc, s) => acc + Math.max(0, getStudentBalance(s)), 0).toLocaleString()} <span className="text-xs">FCFA</span>
+                        {students.reduce((acc, s) => acc + Math.max(0, getStudentFinancials(s).balance), 0).toLocaleString()} <span className="text-xs">FCFA</span>
                     </p>
                 </div>
             </div>
@@ -140,7 +173,16 @@ const Finance: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 text-xs text-slate-500">{new Date(p.payment_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Réimprimer le reçu">
+                                        <button
+                                            onClick={() => {
+                                                const s = students.find(stud => stud.id === p.student_id);
+                                                const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id });
+                                                // @ts-ignore
+                                                import('../utils/reports').then(m => m.generatePaymentReceipt(p, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials));
+                                            }}
+                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            title="Réimprimer le reçu"
+                                        >
                                             <Printer className="w-5 h-5" />
                                         </button>
                                     </td>
@@ -194,26 +236,24 @@ const Finance: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {students.map(s => {
-                                const balance = getStudentBalance(s);
-                                const total = tuitionFees.find(f => f.classId === s.class_id)?.totalFee || 0;
-                                const paid = total - balance;
+                                const fin = getStudentFinancials(s);
                                 return (
                                     <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="font-bold uppercase text-slate-900 dark:text-white text-sm">{s.last_name} {s.first_name}</div>
                                             <div className="text-[10px] text-slate-500">{classes.find(c => c.id === s.class_id)?.name || 'N/A'} • {s.matricule}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm font-bold text-slate-500">{total.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-sm font-bold text-emerald-600">{paid.toLocaleString()}</td>
-                                        <td className={`px-6 py-4 text-sm font-black ${balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                            {balance <= 0 ? 'SOLDÉ' : `${balance.toLocaleString()} FCFA`}
+                                        <td className="px-6 py-4 text-sm font-bold text-slate-500">{fin.totalDue.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-sm font-bold text-emerald-600">{fin.totalPaid.toLocaleString()}</td>
+                                        <td className={`px-6 py-4 text-sm font-black ${fin.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                            {fin.balance <= 0 ? 'SOLDÉ' : `${fin.balance.toLocaleString()} FCFA`}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {balance <= 0 ? (
+                                            {fin.balance <= 0 ? (
                                                 <CheckCircle className="w-5 h-5 text-emerald-500" />
                                             ) : (
                                                 <div className="w-full max-w-[100px] h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-blue-600" style={{ width: `${(paid/total)*100}%` }} />
+                                                    <div className="h-full bg-blue-600" style={{ width: `${(fin.totalPaid/fin.totalDue)*100}%` }} />
                                                 </div>
                                             )}
                                         </td>

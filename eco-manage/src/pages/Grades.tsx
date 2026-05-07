@@ -14,6 +14,7 @@ const Grades: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('Octobre');
 
   const [grades, setGrades] = useState<Record<string, number>>({});
+  const [dbGrades, setDbGrades] = useState<any[]>([]);
   const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ const Grades: React.FC = () => {
             classId: parseInt(selectedClass),
             term: selectedTerm
         });
+        setDbGrades(existingGrades);
 
         const gradeMap: Record<string, number> = {};
         existingGrades.forEach((g: any) => {
@@ -94,12 +96,23 @@ const Grades: React.FC = () => {
           <p className="text-slate-400 mt-1">Évaluation mensuelle et trimestrielle</p>
         </div>
         <div className="flex space-x-2">
-            <button
-                onClick={() => generateReportCard({ lastName: 'EXEMPLE', firstName: 'Élève' } as any, [], "")}
-                className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-500/20 transition-all flex items-center"
-            >
-                <FileText className="w-4 h-4 mr-2" /> Aperçu Bulletin
-            </button>
+            {selectedClass && students.length > 0 && (
+                <button
+                    onClick={() => {
+                        const s = students[0];
+                        const classSubjects = subjects.filter(sub => sub.level === classes.find(c => c.id.toString() === selectedClass)?.level && sub.section === selectedSection);
+                        generateReportCard(
+                            { ...s, className: classes.find(c => c.id.toString() === selectedClass)?.name },
+                            dbGrades.filter(g => g.student_id === s.id),
+                            selectedSection,
+                            classSubjects
+                        );
+                    }}
+                    className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-500/20 transition-all flex items-center"
+                >
+                    <FileText className="w-4 h-4 mr-2" /> Aperçu Bulletin (1er élève)
+                </button>
+            )}
         </div>
       </div>
 

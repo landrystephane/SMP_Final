@@ -29,10 +29,19 @@ const Attendance: React.FC = () => {
     loadStudents();
   }, [selectedClass]);
 
-  const handleSave = () => {
-      // Logic to save to DB would go here
-      console.log('Enregistrement des absences:', absences);
-      alert('Cahier de présence enregistré pour le ' + new Date(currentDate).toLocaleDateString());
+  const handleSave = async () => {
+      if (window.electronAPI) {
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          for (const studentId of Object.keys(absences)) {
+              await window.electronAPI.saveAttendance({
+                  studentId: parseInt(studentId),
+                  date: currentDate,
+                  hours: absences[studentId],
+                  userId: user.id
+              });
+          }
+          alert('Cahier de présence enregistré pour le ' + new Date(currentDate).toLocaleDateString());
+      }
   };
 
   return (

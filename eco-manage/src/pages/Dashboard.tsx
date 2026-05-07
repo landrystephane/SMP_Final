@@ -186,11 +186,7 @@ const Dashboard: React.FC = () => {
                     Alertes Financières
                 </h2>
                 <div className="space-y-4">
-                    {[
-                        { class: 'SIL A', unpaidCount: 8, label: 'Tranche 1 non soldée' },
-                        { class: 'Class 2', unpaidCount: 5, label: 'Tranche 2 non débutée' },
-                        { class: 'CP B', unpaidCount: 12, label: 'Inscriptions incomplètes' },
-                    ].map(alert => (
+                    {stats.financialAlerts ? stats.financialAlerts.map((alert: any) => (
                         <div key={alert.class} className="p-4 bg-rose-50/50 dark:bg-rose-900/10 border-l-4 border-rose-500 rounded-lg group cursor-pointer hover:bg-rose-50 transition-colors">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-black text-slate-900 dark:text-white">{alert.class}</span>
@@ -198,7 +194,9 @@ const Dashboard: React.FC = () => {
                             </div>
                             <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tight">{alert.label}</p>
                         </div>
-                    ))}
+                    )) : (
+                        <p className="text-xs text-slate-400 italic">Aucune alerte critique ce jour.</p>
+                    )}
                 </div>
             </div>
 

@@ -104,6 +104,7 @@ const Users: React.FC = () => {
                         <option value="BURSAR">Économe (Gestion Financière)</option>
                         <option value="TEACHER">Enseignant (Saisie Notes & Présences)</option>
                         <option value="ADVISOR">Conseiller Pédagogique</option>
+                        <option value="DRIVER">Chauffeur (Suivi Bus)</option>
                     </select>
                     </div>
 
