@@ -1,0 +1,9 @@
+
+> eco-manage@0.1.0 vite:dev
+> vite --host
+
+
+  VITE v8.0.10  ready in 276 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/

@@ -31,12 +31,20 @@ app.whenReady().then(() => {
   initDb();
   startApiServer();
 
-  // Seed admin if not exists
+  // Seed SuperAdmin if not exists
+  const superadmin = db.prepare('SELECT * FROM users WHERE username = ?').get('superadmin');
+  if (!superadmin) {
+    const hash = crypto.createHash('sha256').update('superadmin').digest('hex');
+    db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
+      .run('superadmin', hash, 'Maintenance Support', 'SUPERADMIN');
+  }
+
+  // Seed Founder if not exists
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
   if (!admin) {
     const hash = crypto.createHash('sha256').update('admin').digest('hex');
     db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-      .run('admin', hash, 'Super Admin', 'FOUNDER');
+      .run('admin', hash, 'Fondateur', 'FOUNDER');
   }
 
   createWindow();

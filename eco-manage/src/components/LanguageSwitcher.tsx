@@ -16,7 +16,7 @@ const LanguageSwitcher: React.FC = () => {
   return (
     <button
       onClick={toggleLanguage}
-      className="flex items-center space-x-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-black text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm w-full justify-center tracking-widest"
+      className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black text-amber-500 hover:bg-amber-500 hover:text-slate-950 transition-all shadow-sm w-full justify-center tracking-widest"
     >
       <Languages className="w-4 h-4" />
       <span>{isFrench ? 'SWITCH TO ENGLISH' : 'PASSER AU FRANÇAIS'}</span>

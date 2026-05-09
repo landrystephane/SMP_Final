@@ -19,6 +19,11 @@ module.exports = {
           800: '#343a40',
           900: '#212529',
           gold: '#D4AF37',
+        },
+        'brand': {
+          'dark': '#0f172a',
+          'card': '#1e293b',
+          'accent': '#fbbf24', // Gold-like amber
         }
       },
       backdropBlur: {
