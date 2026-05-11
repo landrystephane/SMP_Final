@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
@@ -11,8 +13,8 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        if (window.electronAPI) {
-          const data = await window.electronAPI.getDashboardStats();
+        if (window.electronAPI && user) {
+          const data = await window.electronAPI.getDashboardStats({ schoolId: user.schoolId, section: selectedSection });
           setStats(data);
         }
       } catch (err) {
@@ -20,7 +22,7 @@ const Dashboard: React.FC = () => {
       }
     };
     loadStats();
-  }, [selectedSection]);
+  }, [selectedSection, user]);
 
   if (!stats) return (
     <div className="flex items-center justify-center h-[70vh] text-slate-500">
@@ -123,12 +125,12 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center">
-                   <LayoutGrid className="w-6 h-6 mr-3 text-blue-600" />
+                <h2 className="text-xl font-black text-white flex items-center">
+                   <LayoutGrid className="w-6 h-6 mr-3 text-amber-500" />
                    {t('diagnostic_per_class')}
                 </h2>
                 <select
-                    className="bg-white dark:bg-slate-800 border-none shadow-sm rounded-xl px-4 py-2 text-xs font-bold outline-none ring-1 ring-slate-200 dark:ring-slate-700"
+                    className="bg-slate-800 border-none shadow-sm rounded-xl px-4 py-2 text-xs font-bold text-white outline-none ring-1 ring-slate-700"
                     value={selectedDiagnosticClass}
                     onChange={(e) => setSelectedDiagnosticClass(e.target.value)}
                 >
@@ -166,7 +168,7 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4 flex justify-end">
-                        <button className="text-[10px] font-black text-amber-500 hover:text-white transition-colors uppercase tracking-widest flex items-center">
+                        <button className="text-[10px] font-black text-slate-950 bg-amber-500 px-4 py-2 rounded-xl hover:bg-yellow-400 transition-colors uppercase tracking-widest flex items-center shadow-lg">
                             {t('class_details')} <ChevronRight className="w-3 h-3 ml-1" />
                         </button>
                     </div>
@@ -188,7 +190,7 @@ const Dashboard: React.FC = () => {
                     {t('financial_alerts')}
                 </h2>
                 <div className="space-y-4">
-                    {stats.financialAlerts ? stats.financialAlerts.map((alert: any) => (
+                    {stats.financialAlerts && stats.financialAlerts.length > 0 ? stats.financialAlerts.map((alert: any) => (
                         <div key={alert.class} className="p-4 bg-rose-500/5 border-l-4 border-rose-500 rounded-xl group cursor-pointer hover:bg-rose-500/10 transition-colors">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-black text-white">{alert.class}</span>

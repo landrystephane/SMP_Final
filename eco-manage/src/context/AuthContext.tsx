@@ -22,7 +22,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const login = async (username: string, password: string) => {
-    // Call Electron Main Process via IPC
     if (window.electronAPI) {
         const dbUser = await window.electronAPI.login({ username, password });
         if (dbUser) {
@@ -32,9 +31,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error('Invalid credentials');
         }
     } else {
-        // Fallback for web preview if necessary
         if (username === 'admin' && password === 'admin') {
-            const mockUser: User = { id: 1, username: 'admin', fullName: 'Super Admin', role: 'FOUNDER' };
+            const mockUser: User = { id: 1, username: 'admin', fullName: 'Super Admin', role: 'FOUNDER', schoolId: 1 };
             setUser(mockUser);
             localStorage.setItem('user', JSON.stringify(mockUser));
         } else {
@@ -52,26 +50,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const checkActingStatus = async () => {
-        if (window.electronAPI) {
+        if (window.electronAPI && user) {
             const status = await window.electronAPI.getSetting('sg_acting_director');
             setIsSgActingDirector(status === 'true');
         }
     };
     checkActingStatus();
-    // Poll every 30s or use an event listener if possible
     const interval = setInterval(checkActingStatus, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const hasRole = (roles: Role[]) => {
     if (!user) return false;
+    if (user.role === 'SUPERADMIN') return true;
 
-    // Acting roles logic
     if (user.role === 'SECRETARY') {
-        // SG can ALWAYS do secretary stuff
         if (roles.includes('SECRETARY')) return true;
-
-        // SG can do DIRECTOR stuff ONLY if activated
         if (roles.includes('DIRECTOR') && isSgActingDirector) return true;
     }
 

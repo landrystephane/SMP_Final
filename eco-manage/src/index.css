@@ -3,30 +3,10 @@
 @tailwind utilities;
 
 :root {
-  /* Light Professional Theme (Default) */
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --primary: 221 83% 53%; /* Professional Blue */
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
-  --radius: 0.5rem;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-}
-
-.dark {
   --background: 222 47% 11%;
   --foreground: 213 31% 91%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary: 38 92% 50%; /* Amber/Gold */
+  --primary-foreground: 222 47% 11%;
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
   --muted: 217.2 32.6% 17.5%;
@@ -35,17 +15,22 @@
   --accent-foreground: 210 40% 98%;
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --ring: 38 92% 50%;
+  --radius: 0.75rem;
   --card: 222.2 47.4% 11.2%;
   --card-foreground: 210 40% 98%;
 }
 
 body {
-  @apply bg-slate-900 text-slate-100 font-sans transition-colors duration-300;
+  @apply bg-[#030711] text-slate-100 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
 }
 
 .glass-card {
-  @apply bg-slate-800/80 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-xl overflow-hidden;
+  @apply bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300;
+}
+
+.glass-card:hover {
+  @apply border-white/10 bg-slate-900/60;
 }
 
 .bg-slate-gold-gold {
@@ -56,10 +41,15 @@ body {
   @apply text-amber-500;
 }
 
+/* Sidebar Hover Styles */
+.nav-link-hover {
+  @apply hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 font-black;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -67,9 +57,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
+  @apply bg-slate-800 rounded-full hover:bg-amber-500/50 transition-colors;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700;
+@layer components {
+  .btn-primary {
+    @apply bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition-all shadow-lg shadow-amber-500/20;
+  }
+
+  .input-field {
+    @apply bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-amber-500 font-bold transition-all placeholder:text-slate-700;
+  }
 }

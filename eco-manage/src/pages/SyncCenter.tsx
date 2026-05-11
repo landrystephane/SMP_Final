@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, CloudUpload, CheckCircle2, Settings } from 'lucide-react';
+import { RefreshCw, CloudUpload, CheckCircle2, Settings, Info, Wifi } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 
 const SyncCenter: React.FC = () => {
@@ -39,92 +39,94 @@ const SyncCenter: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Centre de Synchronisation</h1>
-        <p className="text-slate-400 mt-1">Transférez vos données vers le serveur de l'école</p>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-4xl font-black text-white tracking-tight">Centre de Synchronisation</h1>
+          <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest italic">Fusion des données mobiles vers le serveur central</p>
+        </div>
+        <div className="flex items-center space-x-2 bg-amber-500/10 text-amber-500 px-4 py-2 rounded-full border border-amber-500/20">
+            <Wifi className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Réseau Local Actif</span>
+        </div>
+      </div>
+
+      <div className="glass-card p-8 bg-amber-500/5 border-l-4 border-amber-500 flex items-start space-x-6">
+          <Info className="text-amber-500 w-10 h-10 flex-shrink-0" />
+          <div className="space-y-2">
+              <h3 className="font-black text-white uppercase tracking-widest text-sm">À quoi sert ce module ?</h3>
+              <p className="text-xs text-slate-400 font-bold uppercase leading-relaxed tracking-wider">
+                  Les enseignants utilisent souvent leurs smartphones pour faire l'appel ou saisir des notes en classe sans connexion internet.
+                  Ce bouton permet de "pousser" les données enregistrées sur le téléphone vers l'ordinateur central de l'école une fois connecté au Wi-Fi.
+              </p>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-6 space-y-4">
-            <div className="flex items-center space-x-2 text-slate-gold-gold mb-4">
-                <Settings className="w-5 h-5" />
-                <h2 className="font-bold uppercase tracking-wider text-sm">Configuration Connexion</h2>
+        <div className="glass-card p-8 space-y-6">
+            <div className="flex items-center space-x-3 text-amber-500 mb-4">
+                <Settings className="w-6 h-6" />
+                <h2 className="text-xl font-black uppercase tracking-tight text-white">Paramètres de Liaison</h2>
             </div>
-            <div>
-                <label className="text-[10px] uppercase text-slate-500 font-bold">IP du Serveur Principal</label>
-                <input
-                    type="text"
-                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
-                    placeholder="ex: 192.168.1.10"
-                    value={serverIp}
-                    onChange={(e) => setServerIp(e.target.value)}
-                />
-            </div>
-            <div>
-                <label className="text-[10px] uppercase text-slate-500 font-bold">Clé d'Activation</label>
-                <input
-                    type="text"
-                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1"
-                    placeholder="Clé générée par le Fondateur"
-                    value={activationKey}
-                    onChange={(e) => setActivationKey(e.target.value)}
-                />
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <label className="text-[10px] uppercase text-slate-500 font-black tracking-widest ml-1">Adresse IP du PC Central</label>
+                    <input
+                        type="text"
+                        className="input-field w-full text-amber-500 font-mono"
+                        placeholder="Ex: 192.168.1.15"
+                        value={serverIp}
+                        onChange={(e) => setServerIp(e.target.value)}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] uppercase text-slate-500 font-black tracking-widest ml-1">Clé de Sécurité Instance</label>
+                    <input
+                        type="text"
+                        className="input-field w-full"
+                        placeholder="Fournie par l'administration"
+                        value={activationKey}
+                        onChange={(e) => setActivationKey(e.target.value)}
+                    />
+                </div>
             </div>
         </div>
 
-      <div className="glass-card p-8 flex flex-col items-center text-center space-y-6">
-        <div className={`p-6 rounded-full ${unsyncedCount > 0 ? 'bg-yellow-500/10' : 'bg-green-500/10'}`}>
-            <RefreshCw className={`w-16 h-16 ${unsyncedCount > 0 ? 'text-yellow-500' : 'text-green-500'} ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
+      <div className="glass-card p-10 flex flex-col items-center text-center space-y-8 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl">
+        <div className={`p-8 rounded-3xl shadow-inner ${unsyncedCount > 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
+            <RefreshCw className={`w-16 h-16 ${unsyncedCount > 0 ? 'text-amber-500' : 'text-emerald-500'} ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
         </div>
 
         <div>
-            <h2 className="text-2xl font-bold text-white">
-                {unsyncedCount > 0 ? `${unsyncedCount} Éléments en attente` : 'Toutes les données sont à jour'}
+            <h2 className="text-3xl font-black text-white tracking-tight uppercase italic">
+                {unsyncedCount > 0 ? `${unsyncedCount} Enregistrements locaux` : 'Système Synchronisé'}
             </h2>
-            <p className="text-slate-500 mt-2 max-w-sm">
-                {unsyncedCount > 0
-                  ? "Connectez-vous au Wi-Fi de l'école ou au Hotspot du PC principal pour synchroniser vos notes."
-                  : "Votre smartphone est parfaitement synchronisé avec la base de données centrale."}
-            </p>
         </div>
 
         {unsyncedCount > 0 && (
             <button
                 onClick={handleSync}
                 disabled={syncStatus === 'SYNCING'}
-                className="flex items-center px-8 py-3 bg-slate-gold-gold text-slate-900 rounded-xl font-bold text-lg hover:bg-yellow-500 transition-all disabled:opacity-50"
+                className="btn-primary flex items-center px-10 py-5 text-sm"
             >
-                <CloudUpload className="w-6 h-6 mr-2" />
-                {syncStatus === 'SYNCING' ? 'Synchronisation...' : 'Lancer la Synchronisation'}
+                <CloudUpload className="w-6 h-6 mr-3" />
+                {syncStatus === 'SYNCING' ? 'TRANSFÈRT EN COURS...' : 'SYNCHRONISER MAINTENANT'}
             </button>
         )}
 
         {syncStatus === 'SUCCESS' && (
-            <div className="flex items-center space-x-2 text-green-500 bg-green-500/10 p-4 rounded-lg border border-green-500/20">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="font-bold">Données envoyées avec succès !</span>
+            <div className="flex items-center space-x-3 text-emerald-500 bg-emerald-500/5 p-5 rounded-2xl border border-emerald-500/20 animate-in zoom-in duration-300">
+                <CheckCircle2 className="w-6 h-6" />
+                <span className="font-black uppercase tracking-widest text-xs">Données fusionnées avec succès !</span>
             </div>
         )}
 
         {syncStatus === 'ERROR' && (
-            <div className="flex flex-col items-center space-y-2 text-red-500 bg-red-500/10 p-4 rounded-lg border border-red-500/20">
-                <span className="font-bold">Échec de la synchronisation</span>
-                <span className="text-xs">{errorMessage}</span>
+            <div className="text-rose-500 font-black text-xs uppercase tracking-widest">
+                Échec: {errorMessage}
             </div>
         )}
       </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card p-4 border-l-4 border-blue-500">
-            <h3 className="text-slate-400 text-xs font-bold uppercase">Grades à envoyer</h3>
-            <p className="text-2xl font-bold text-white mt-1">12</p>
-        </div>
-        <div className="glass-card p-4 border-l-4 border-purple-500">
-            <h3 className="text-slate-400 text-xs font-bold uppercase">Présences à envoyer</h3>
-            <p className="text-2xl font-bold text-white mt-1">2</p>
-        </div>
       </div>
     </div>
   );

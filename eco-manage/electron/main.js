@@ -7,8 +7,8 @@ const isDev = !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 850,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -21,35 +21,35 @@ function createWindow() {
       ? 'http://localhost:5173'
       : `file://${path.join(__dirname, '../dist/index.html')}`
   );
-
-  // if (isDev) {
-  //   win.webContents.openDevTools();
-  // }
 }
 
 app.whenReady().then(() => {
   initDb();
   startApiServer();
 
-  // Seed SuperAdmin if not exists
+  // Seed initial school
+  const school = db.prepare('SELECT * FROM schools WHERE id = 1').get();
+  if (!school) {
+    db.prepare('INSERT INTO schools (id, name, address) VALUES (1, ?, ?)').run('Complexe Scolaire Bilingue Eco-Manage', 'Yaoundé, Cameroun');
+  }
+
+  // Seed SuperAdmin
   const superadmin = db.prepare('SELECT * FROM users WHERE username = ?').get('superadmin');
   if (!superadmin) {
     const hash = crypto.createHash('sha256').update('superadmin').digest('hex');
-    db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-      .run('superadmin', hash, 'Maintenance Support', 'SUPERADMIN');
+    db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+      .run('superadmin', hash, 'Super Développeur', 'SUPERADMIN', 1);
   }
 
-  // Seed Founder if not exists
+  // Seed Founder
   const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
   if (!admin) {
     const hash = crypto.createHash('sha256').update('admin').digest('hex');
-    db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-      .run('admin', hash, 'Fondateur', 'FOUNDER');
+    db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+      .run('admin', hash, 'Fondateur École', 'FOUNDER', 1);
   }
 
-  createWindow();
-
-  // Seed Installments if empty
+  // Seed Installments
   const instCount = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
   if (instCount === 0) {
       db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('1ERE TRANCHE', 1);
@@ -57,99 +57,70 @@ app.whenReady().then(() => {
       db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('3E TRANCHE', 3);
   }
 
-  // Seed Classes if empty
-  const classesCount = db.prepare('SELECT COUNT(*) as count FROM classes').get().count;
-  if (classesCount === 0) {
-    const defaultClasses = [
-      ['SIL A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['SIL B', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CP A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CP B', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CE1 A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CE2 A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CM1 A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['CM2 A', 'FRANCOPHONE', 'PRIMAIRE'],
-      ['Class 1', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Class 2', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Class 3', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Class 4', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Class 5', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Class 6', 'ANGLOPHONE', 'PRIMAIRE'],
-      ['Petite Section', 'FRANCOPHONE', 'MATERNELLE'],
-      ['Moyenne Section', 'FRANCOPHONE', 'MATERNELLE'],
-      ['Grande Section', 'FRANCOPHONE', 'MATERNELLE'],
-      ['Pre-Nursery', 'ANGLOPHONE', 'MATERNELLE'],
-      ['Nursery 1', 'ANGLOPHONE', 'MATERNELLE'],
-      ['Nursery 2', 'ANGLOPHONE', 'MATERNELLE'],
-    ];
-    const insertClass = db.prepare('INSERT INTO classes (name, section, level) VALUES (?, ?, ?)');
-    defaultClasses.forEach(c => insertClass.run(c));
+  // Seed Bus Routes
+  const routeCount = db.prepare('SELECT COUNT(*) as count FROM bus_routes WHERE school_id = 1').get().count;
+  if (routeCount === 0) {
+      db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Nord (Bastos/Golf)', 'BUS-001-CE', 1);
+      db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Sud (Ahala/Mvan)', 'BUS-002-CE', 1);
   }
 
-  // Initial Seed for subjects if empty
-  const subjectsCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
-  if (subjectsCount === 0) {
-    const defaultSubjects = [
-      // PRIMAIRE - Francophone
-      ['Langue Française', 'Langues et Communication', 'PRIMAIRE', 'FRANCOPHONE', 5],
-      ['Mathématiques', 'Sciences et Techno', 'PRIMAIRE', 'FRANCOPHONE', 4],
-      ['Sciences Humaines', 'Milieu Physique et Humain', 'PRIMAIRE', 'FRANCOPHONE', 2],
-      ['Développement Personnel', 'Vie Courante', 'PRIMAIRE', 'FRANCOPHONE', 2],
-      ['Activités Pratiques', 'Arts et Culture', 'PRIMAIRE', 'FRANCOPHONE', 1],
-
-      // PRIMARY - Anglophone
-      ['English Language', 'Languages & Communication', 'PRIMAIRE', 'ANGLOPHONE', 5],
-      ['Mathematics', 'Science & Tech', 'PRIMAIRE', 'ANGLOPHONE', 4],
-      ['Social Studies', 'Human Environment', 'PRIMAIRE', 'ANGLOPHONE', 2],
-      ['Personal Development', 'Life Skills', 'PRIMAIRE', 'ANGLOPHONE', 2],
-      ['Vocational Activities', 'Arts & Culture', 'PRIMAIRE', 'ANGLOPHONE', 1],
-
-      // MATERNELLE - Francophone
-      ['Activités Langagières', 'Langage et Communication', 'MATERNELLE', 'FRANCOPHONE', 1],
-      ['Éveil Scientifique', 'Éveil Scientifique et Technologique', 'MATERNELLE', 'FRANCOPHONE', 1],
-      ['Développement de la Personnalité', 'Milieu Physique et Humain', 'MATERNELLE', 'FRANCOPHONE', 1],
-      ['Activités Créatrices', 'Arts et Culture', 'MATERNELLE', 'FRANCOPHONE', 1],
-      ['Motricité', 'Éducation Physique', 'MATERNELLE', 'FRANCOPHONE', 1],
-
-      // MATERNELLE - Anglophone
-      ['Language Activities', 'Language & Communication', 'MATERNELLE', 'ANGLOPHONE', 1],
-      ['Scientific Awakening', 'Scientific & Technological Awakening', 'MATERNELLE', 'ANGLOPHONE', 1],
-      ['Personality Development', 'Human & Physical Environment', 'MATERNELLE', 'ANGLOPHONE', 1],
-      ['Creative Activities', 'Arts & Culture', 'MATERNELLE', 'ANGLOPHONE', 1],
-      ['Motor Skills', 'Physical Education', 'MATERNELLE', 'ANGLOPHONE', 1],
-    ];
-    const insert = db.prepare('INSERT INTO subjects (name, domain, level, section, coefficient) VALUES (?, ?, ?, ?, ?)');
-    defaultSubjects.forEach(s => insert.run(s));
-  }
+  createWindow();
 });
 
-// IPC Handlers
-ipcMain.handle('auth:login', async (event, { username, password }) => {
+// IPC Handlers wrapper for logging
+const handleIPC = (channel, handler) => {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...args);
+    } catch (error) {
+      console.error(`[IPC Error] ${channel}:`, error.message);
+      return { error: error.message };
+    }
+  });
+};
+
+// Auth
+handleIPC('auth:login', async (event, { username, password }) => {
   const hash = crypto.createHash('sha256').update(password).digest('hex');
-  return db.prepare('SELECT id, username, full_name as fullName, role FROM users WHERE username = ? AND password = ?')
+  return db.prepare('SELECT id, username, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses FROM users WHERE username = ? AND password = ?')
     .get(username, hash) || null;
 });
 
-ipcMain.handle('db:getStudents', async () => {
-  return db.prepare('SELECT * FROM students').all();
+// System Admin
+handleIPC('db:getSchools', async () => {
+    return db.prepare('SELECT * FROM schools').all();
 });
 
-ipcMain.handle('db:addStudent', async (event, student) => {
-  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId } = student;
+handleIPC('db:addSchool', async (event, school) => {
+    const { name, address, contact_email, contact_phone } = school;
+    return db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone) VALUES (?, ?, ?, ?)').run(name, address, contact_email, contact_phone);
+});
+
+// Students
+handleIPC('db:getStudents', async (event, schoolId) => {
+  return db.prepare('SELECT * FROM students WHERE school_id = ?').all(schoolId);
+});
+
+handleIPC('db:addStudent', async (event, student) => {
+  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId } = student;
   const matricule = `MAT-${Date.now()}`;
   return db.prepare(`
-    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId);
+    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId);
 });
 
-ipcMain.handle('db:getGrades', async (event, { classId, term }) => {
+handleIPC('db:assignStudentToBus', async (event, { studentId, routeId }) => {
+    return db.prepare('UPDATE students SET bus_route_id = ? WHERE id = ?').run(routeId, studentId);
+});
+
+// Grades
+handleIPC('db:getGrades', async (event, { classId, term }) => {
   return db.prepare('SELECT * FROM grades WHERE class_id = ? AND term = ?').all(classId, term);
 });
 
-ipcMain.handle('db:saveGrades', async (event, grades) => {
+handleIPC('db:saveGrades', async (event, grades) => {
   const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
-
   const upsert = db.prepare(`
     INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id, locked)
     VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id, 1)
@@ -163,9 +134,7 @@ ipcMain.handle('db:saveGrades', async (event, grades) => {
   const transaction = db.transaction((gradesList) => {
     for (const g of gradesList) {
       const existing = checkLock.get(g.student_id, g.subject_id, g.term, g.month);
-      if (existing && existing.locked === 1) {
-        throw new Error(`Grade for student ${g.student_id} is locked.`);
-      }
+      if (existing && existing.locked === 1) throw new Error(`Grade locked.`);
       upsert.run(g);
     }
   });
@@ -178,113 +147,56 @@ ipcMain.handle('db:saveGrades', async (event, grades) => {
   }
 });
 
-ipcMain.handle('db:unlockGrades', async (event, { classId, term, month }) => {
+handleIPC('db:unlockGrades', async (event, { classId, term, month }) => {
   return db.prepare('UPDATE grades SET locked = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
 });
 
-ipcMain.handle('db:getPayments', async () => {
-  return db.prepare('SELECT p.*, s.first_name, s.last_name FROM payments p JOIN students s ON p.student_id = s.id').all();
+// Finance
+handleIPC('db:getPayments', async (event, schoolId) => {
+  return db.prepare(`
+    SELECT p.*, s.first_name, s.last_name, s.class_id, i.name as installment_name
+    FROM payments p
+    JOIN students s ON p.student_id = s.id
+    LEFT JOIN installments i ON p.installment_id = i.id
+    WHERE s.school_id = ?
+  `).all(schoolId);
 });
 
-ipcMain.handle('db:addPayment', async (event, payment) => {
-  const { studentId, amount, type, userId } = payment;
+handleIPC('db:addPayment', async (event, payment) => {
+  const { studentId, amount, type, userId, installmentId } = payment;
   const receiptNumber = `RCP-${Date.now()}`;
   return db.prepare(`
-    INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(studentId, amount, type, userId, receiptNumber);
+    INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(studentId, amount, type, userId, receiptNumber, installmentId);
 });
 
-ipcMain.handle('db:getTickets', async () => {
-  return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id').all();
-});
-
-ipcMain.handle('db:getAttendance', async (event, { studentId, term }) => {
-    // For simplicity, we assume term dates or just sum all for now
-    // A more robust implementation would filter by term dates
-    return db.prepare('SELECT SUM(status) as total_hours FROM attendance WHERE student_id = ?').get(studentId);
-});
-
-ipcMain.handle('db:saveAttendance', async (event, { studentId, date, hours, userId }) => {
-    return db.prepare(`
-        INSERT INTO attendance (student_id, date, status, recorded_by)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(student_id, date) DO UPDATE SET status = excluded.status
-    `).run(studentId, date, hours, userId);
-});
-
-ipcMain.handle('db:sendTicket', async (event, ticket) => {
-  const { senderId, role, subject, message } = ticket;
-  return db.prepare(`
-    INSERT INTO tickets (sender_id, receiver_role, subject, message)
-    VALUES (?, ?, ?, ?)
-  `).run(senderId, role, subject, message);
-});
-
-ipcMain.handle('db:getSubjects', async () => {
-  return db.prepare('SELECT * FROM subjects').all();
-});
-
-ipcMain.handle('db:addSubject', async (event, subject) => {
-  const { name, domain, level, section, coefficient } = subject;
-  return db.prepare(`
-    INSERT INTO subjects (name, domain, level, section, coefficient)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(name, domain, level, section, coefficient);
-});
-
-ipcMain.handle('db:getClasses', async () => {
-  return db.prepare('SELECT * FROM classes').all();
-});
-
-ipcMain.handle('db:getUsers', async () => {
-  return db.prepare('SELECT id, username, full_name as fullName, role FROM users').all();
-});
-
-ipcMain.handle('db:addUser', async (event, user) => {
-  const { username, password, fullName, role, classId } = user;
-  const hash = crypto.createHash('sha256').update(password).digest('hex');
-  const result = db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-    .run(username, hash, fullName, role);
-
-  if (classId && role === 'TEACHER') {
-      db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id = ?').run(result.lastInsertRowid, classId);
-  }
-  return result;
-});
-
-ipcMain.handle('db:changePassword', async (event, { userId, newPassword }) => {
-  const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
-  return db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, userId);
-});
-
-ipcMain.handle('db:getTuitionFees', async () => {
+handleIPC('db:getTuitionFees', async (event, schoolId) => {
   return db.prepare(`
     SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee
     FROM classes c
     LEFT JOIN tuition_fees t ON c.id = t.class_id
-  `).all();
+    WHERE c.school_id = ?
+  `).all(schoolId);
 });
 
-ipcMain.handle('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee }) => {
-  return db.prepare(`
-    INSERT INTO tuition_fees (class_id, total_fee, registration_fee)
-    VALUES (?, ?, ?)
-    ON CONFLICT(class_id) DO UPDATE SET
-    total_fee = excluded.total_fee,
-    registration_fee = excluded.registration_fee
-  `).run(classId, totalFee, registrationFee);
-});
-
-ipcMain.handle('db:getInstallments', async () => {
+handleIPC('db:getInstallments', async () => {
     return db.prepare('SELECT * FROM installments ORDER BY display_order').all();
 });
 
-ipcMain.handle('db:getClassInstallmentFees', async () => {
-    return db.prepare('SELECT * FROM class_installment_fees').all();
+handleIPC('db:getClassInstallmentFees', async (event, schoolId) => {
+    return db.prepare('SELECT cif.* FROM class_installment_fees cif JOIN classes c ON cif.class_id = c.id WHERE c.school_id = ?').all(schoolId);
 });
 
-ipcMain.handle('db:updateClassInstallmentFee', async (event, { classId, installmentId, amount }) => {
+handleIPC('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee }) => {
+  return db.prepare(`
+    INSERT INTO tuition_fees (class_id, total_fee, registration_fee)
+    VALUES (?, ?, ?)
+    ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee, registration_fee = excluded.registration_fee
+  `).run(classId, totalFee, registrationFee);
+});
+
+handleIPC('db:updateClassInstallmentFee', async (event, { classId, installmentId, amount }) => {
     return db.prepare(`
         INSERT INTO class_installment_fees (class_id, installment_id, amount)
         VALUES (?, ?, ?)
@@ -292,34 +204,92 @@ ipcMain.handle('db:updateClassInstallmentFee', async (event, { classId, installm
     `).run(classId, installmentId, amount);
 });
 
-ipcMain.handle('db:getSetting', async (event, key) => {
-  return db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value || null;
+// Pedagogy
+handleIPC('db:getSubjects', async (event, schoolId) => {
+  return db.prepare('SELECT * FROM subjects WHERE school_id = ?').all(schoolId);
 });
 
-ipcMain.handle('db:setSetting', async (event, { key, value }) => {
+handleIPC('db:getClasses', async (event, schoolId) => {
+  return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(schoolId);
+});
+
+handleIPC('db:getSchedules', async (event, schoolId) => {
+    return db.prepare('SELECT * FROM schedules WHERE school_id = ?').all(schoolId);
+});
+
+handleIPC('db:updateSchedule', async (event, schedule) => {
+    const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id } = schedule;
+    if (id) {
+        return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, id);
+    } else {
+        return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id);
+    }
+});
+
+// Transport
+handleIPC('db:getBusRoutes', async (event, schoolId) => {
+    return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(schoolId);
+});
+
+handleIPC('db:getRouteStudents', async (event, routeId) => {
+    return db.prepare('SELECT * FROM students WHERE bus_route_id = ?').all(routeId);
+});
+
+handleIPC('db:logTransport', async (event, log) => {
+    const { route_id, event_type, latitude, longitude } = log;
+    return db.prepare(`INSERT INTO transport_logs (route_id, event_type, latitude, longitude) VALUES (?, ?, ?, ?)`).run(route_id, event_type, latitude, longitude);
+});
+
+// Settings
+handleIPC('db:getSetting', async (event, key) => {
+  const res = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  return res ? res.value : null;
+});
+
+handleIPC('db:setSetting', async (event, { key, value }) => {
   return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
 });
 
-ipcMain.handle('db:getDashboardStats', async (event, section) => {
-  const whereSection = section ? "WHERE section = ?" : "";
-  const params = section ? [section] : [];
+// Attendance
+handleIPC('db:saveAttendance', async (event, { studentId, date, status, recorded_by }) => {
+    return db.prepare(`
+        INSERT INTO attendance (student_id, date, status, recorded_by)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(student_id, date) DO UPDATE SET status = excluded.status
+    `).run(studentId, date, status, recorded_by);
+});
 
-  const totalStudents = db.prepare(`SELECT COUNT(*) as count FROM students ${whereSection}`).get(...params).count;
-  const boys = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'M' ${section ? 'AND section = ?' : ''}`).get(...params).count;
-  const girls = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'F' ${section ? 'AND section = ?' : ''}`).get(...params).count;
+handleIPC('db:getUsers', async (event, schoolId) => {
+  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses FROM users WHERE school_id = ?').all(schoolId);
+});
+
+handleIPC('db:addUser', async (event, user) => {
+  const { username, password, fullName, role, schoolId, assignedClasses } = user;
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  return db.prepare('INSERT INTO users (username, password, full_name, role, school_id, assigned_classes) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(username, hash, fullName, role, schoolId, JSON.stringify(assignedClasses || []));
+});
+
+handleIPC('db:getDashboardStats', async (event, { schoolId, section }) => {
+  const whereSect = section ? "AND section = ?" : "";
+  const params = section ? [schoolId, section] : [schoolId];
+
+  const totalStudents = db.prepare(`SELECT COUNT(*) as count FROM students WHERE school_id = ? ${whereSect}`).get(...params).count;
+  const boys = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'M' AND school_id = ? ${whereSect}`).get(...params).count;
+  const girls = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'F' AND school_id = ? ${whereSect}`).get(...params).count;
 
   const totalRevenue = db.prepare(`
     SELECT SUM(p.amount) as total
     FROM payments p
     JOIN students s ON p.student_id = s.id
-    ${whereSection}
+    WHERE s.school_id = ? ${whereSect}
   `).get(...params).total || 0;
 
   const totalTuitionDue = db.prepare(`
     SELECT SUM(t.total_fee) as total
     FROM tuition_fees t
     JOIN students s ON s.class_id = t.class_id
-    ${whereSection}
+    WHERE s.school_id = ? ${whereSect}
   `).get(...params).total || 0;
 
   const classStats = db.prepare(`
@@ -327,39 +297,19 @@ ipcMain.handle('db:getDashboardStats', async (event, section) => {
     (COUNT(CASE WHEN g.score >= 10 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as passRate
     FROM classes c
     LEFT JOIN grades g ON g.class_id = c.id
-    ${whereSection}
+    WHERE c.school_id = ? ${whereSect}
     GROUP BY c.id
   `).all(...params);
-
-  // Financial Alerts (placeholder logic for real calculations)
-  const financialAlerts = [
-    { class: 'SIL A', unpaidCount: 8, label: 'Tranche 1 non soldée' },
-    { class: 'Class 2', unpaidCount: 5, label: 'Tranche 2 non débutée' },
-    { class: 'CP B', unpaidCount: 12, label: 'Inscriptions incomplètes' },
-  ];
 
   return {
     totalStudents,
     genderDist: { boys, girls },
     totalRevenue,
     totalTuitionDue,
-    classStats: classStats.map(c => ({
-        ...c,
-        avg: c.avg || 0,
-        passRate: c.passRate || 0
-    })),
-    financialAlerts
+    classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
+    financialAlerts: []
   };
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

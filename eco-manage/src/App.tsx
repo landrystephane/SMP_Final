@@ -18,6 +18,10 @@ import Profile from './pages/Profile';
 import MobileAccess from './pages/MobileAccess';
 import MobileProvisioning from './pages/MobileProvisioning';
 import SyncCenter from './pages/SyncCenter';
+import SystemAdmin from './pages/SystemAdmin';
+import AdvisorPortal from './pages/AdvisorPortal';
+import DriverPortal from './pages/DriverPortal';
+import ParentPortal from './pages/ParentPortal';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -54,6 +58,10 @@ function App() {
             <Route path="profile" element={<Profile />} />
             <Route path="mobile-access" element={<MobileAccess />} />
             <Route path="sync" element={<SyncCenter />} />
+            <Route path="system-admin" element={<SystemAdmin />} />
+            <Route path="advisor" element={<AdvisorPortal />} />
+            <Route path="driver-portal" element={<DriverPortal />} />
+            <Route path="parent-portal" element={<ParentPortal />} />
           </Route>
         </Routes>
       </BrowserRouter>
