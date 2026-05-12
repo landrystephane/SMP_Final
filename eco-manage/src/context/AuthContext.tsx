@@ -32,19 +32,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     if (window.electronAPI) {
         try {
-            const dbUser = await window.electronAPI.login({ username, password });
-            if (dbUser) {
+            const result = await window.electronAPI.login({ username, password });
+
+            if (result && result.error) {
+                throw new Error(result.error);
+            }
+
+            if (result) {
                 // Ensure role is correctly handled from DB
                 const userObj: User = {
-                    ...dbUser,
-                    role: dbUser.role || 'FOUNDER' // Fallback to avoid role_undefined
+                    ...result,
+                    role: result.role || 'FOUNDER' // Fallback to avoid role_undefined
                 };
                 setUser(userObj);
                 localStorage.setItem('user', JSON.stringify(userObj));
             } else {
                 throw new Error('Invalid credentials');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Login error:', err);
             throw err;
         }
@@ -88,8 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return false;
     if (user.role === 'SUPERADMIN') return true;
 
-    if (user.role === 'SECRETARY') {
-        if (roles.includes('SECRETARY')) return true;
+    if (user.role === 'SG') {
+        if (roles.includes('SG')) return true;
         if (roles.includes('DIRECTOR') && isSgActingDirector) return true;
     }
 

@@ -33,6 +33,17 @@ function initDb() {
         }
     });
 
+    // 3. User Table Migration: Add assigned_classes if missing
+    try {
+        const userCols = db.prepare(`PRAGMA table_info(users)`).all();
+        if (!userCols.find(c => c.name === 'assigned_classes')) {
+            console.log(`[Migration] Adding assigned_classes to users`);
+            db.prepare(`ALTER TABLE users ADD COLUMN assigned_classes TEXT`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] User table migration failed:`, e.message);
+    }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 
