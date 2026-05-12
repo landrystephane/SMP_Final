@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, CloudUpload, CheckCircle2, Settings, Info, Wifi } from 'lucide-react';
+import { RefreshCw, UploadCloud, CheckCircle2, Settings, Info, Wifi } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 
 const SyncCenter: React.FC = () => {
@@ -109,7 +109,7 @@ const SyncCenter: React.FC = () => {
                 disabled={syncStatus === 'SYNCING'}
                 className="btn-primary flex items-center px-10 py-5 text-sm"
             >
-                <CloudUpload className="w-6 h-6 mr-3" />
+                <UploadCloud className="w-6 h-6 mr-3" />
                 {syncStatus === 'SYNCING' ? 'TRANSFÈRT EN COURS...' : 'SYNCHRONISER MAINTENANT'}
             </button>
         )}
