@@ -16,6 +16,24 @@ const Dashboard: React.FC = () => {
         if (window.electronAPI && user) {
           const data = await window.electronAPI.getDashboardStats({ schoolId: user.schoolId, section: selectedSection });
           setStats(data);
+        } else if (!window.electronAPI) {
+          // Fallback for demo/web context
+          setTimeout(() => {
+            setStats({
+              totalStudents: 156,
+              genderDist: { boys: 82, girls: 74 },
+              totalRevenue: 2450000,
+              totalTuitionDue: 5000000,
+              classStats: [
+                { level: 'SIL', avg: 14.5, passRate: 85 },
+                { level: 'CP', avg: 12.8, passRate: 72 },
+                { level: 'CE1', avg: 15.2, passRate: 90 }
+              ],
+              financialAlerts: [
+                { class: 'CM2', unpaidCount: 5, label: 'Échéance Tranche 2 dépassée' }
+              ]
+            });
+          }, 500);
         }
       } catch (err) {
         console.error("Dashboard error:", err);
@@ -25,10 +43,13 @@ const Dashboard: React.FC = () => {
   }, [selectedSection, user]);
 
   if (!stats) return (
-    <div className="flex items-center justify-center h-[70vh] text-slate-500">
-      <div className="text-center space-y-4">
-        <Activity className="w-12 h-12 text-blue-600 animate-pulse mx-auto" />
-        <p className="text-xl font-bold">{t('initializing_dashboard')}</p>
+    <div className="flex items-center justify-center h-[70vh] bg-slate-950">
+      <div className="text-center space-y-6">
+        <div className="relative inline-block">
+          <Activity className="w-16 h-16 text-amber-500 animate-pulse mx-auto" />
+          <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20 animate-pulse" />
+        </div>
+        <p className="text-xl font-black text-white tracking-widest uppercase">{t('initializing_dashboard')}</p>
       </div>
     </div>
   );

@@ -15,8 +15,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('user');
     try {
-      return savedUser ? JSON.parse(savedUser) : null;
+      if (!savedUser) return null;
+      const parsed = JSON.parse(savedUser);
+      // Safety check: ensure required fields and valid role exist
+      if (!parsed.role || !parsed.username) {
+        localStorage.removeItem('user');
+        return null;
+      }
+      return parsed;
     } catch {
+      localStorage.removeItem('user');
       return null;
     }
   });
@@ -31,8 +39,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error('Invalid credentials');
         }
     } else {
-        if (username === 'admin' && password === 'admin') {
+        // Normalizing for mock login
+        const lowerUser = username.toLowerCase();
+        if (lowerUser === 'admin' && password === 'admin') {
             const mockUser: User = { id: 1, username: 'admin', fullName: 'Super Admin', role: 'FOUNDER', schoolId: 1 };
+            setUser(mockUser);
+            localStorage.setItem('user', JSON.stringify(mockUser));
+        } else if (lowerUser === 'teacher' && password === 'teacher') {
+            const mockUser: User = { id: 2, username: 'teacher', fullName: 'M. Enseignant', role: 'TEACHER', schoolId: 1 };
             setUser(mockUser);
             localStorage.setItem('user', JSON.stringify(mockUser));
         } else {

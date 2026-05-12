@@ -4,10 +4,10 @@
 
 Port 5173 is in use, trying another one...
 Port 5174 is in use, trying another one...
-Port 5175 is in use, trying another one...
-Port 5176 is in use, trying another one...
-
-  VITE v8.0.10  ready in 395 ms
-
-  ➜  Local:   http://localhost:5177/
-  ➜  Network: http://192.168.0.2:5177/
+Port 5175 is in use, trying 9:49:51 AM [vite] (client) hmr update /src/pages/Dashboard.tsx, /src/index.css
+9:50:13 AM [vite] (client) hmr update /src/context/AuthContext.tsx, /src/index.css
+9:52:49 AM [vite] (client) page reload src/utils/i18n.ts
+9:55:55 AM [vite] (client) hmr update /src/context/AuthContext.tsx, /src/index.css
+AuthContext.tsx, /src/index.css
+9:52:49 AM [vite] (client) page reload src/utils/i18n.ts
+9:55:55 AM [vite] (client) hmr update /src/context/AuthContext.tsx, /src/index.css
