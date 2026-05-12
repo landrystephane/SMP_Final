@@ -27,4 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),
   getAttendance: (data) => ipcRenderer.invoke('db:getAttendance', data),
+  getMobileKeys: () => ipcRenderer.invoke('db:getMobileKeys'),
+  generateMobileKey: (data) => ipcRenderer.invoke('db:generateMobileKey', data),
+  revokeMobileKey: (id) => ipcRenderer.invoke('db:revokeMobileKey', id),
 });

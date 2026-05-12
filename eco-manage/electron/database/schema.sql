@@ -179,6 +179,17 @@ CREATE TABLE IF NOT EXISTS transport_logs (
     FOREIGN KEY (route_id) REFERENCES bus_routes(id)
 );
 
+-- Mobile Access Keys
+CREATE TABLE IF NOT EXISTS mobile_access_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    access_key TEXT UNIQUE NOT NULL,
+    assigned_to_user_id INTEGER,
+    assigned_to_name TEXT,
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'REVOKED'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
+);
+
 -- System Settings
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

@@ -31,12 +31,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     if (window.electronAPI) {
-        const dbUser = await window.electronAPI.login({ username, password });
-        if (dbUser) {
-            setUser(dbUser);
-            localStorage.setItem('user', JSON.stringify(dbUser));
-        } else {
-            throw new Error('Invalid credentials');
+        try {
+            const dbUser = await window.electronAPI.login({ username, password });
+            if (dbUser) {
+                // Ensure role is correctly handled from DB
+                const userObj: User = {
+                    ...dbUser,
+                    role: dbUser.role || 'FOUNDER' // Fallback to avoid role_undefined
+                };
+                setUser(userObj);
+                localStorage.setItem('user', JSON.stringify(userObj));
+            } else {
+                throw new Error('Invalid credentials');
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            throw err;
         }
     } else {
         // Normalizing for mock login

@@ -257,6 +257,21 @@ handleIPC('db:logTransport', async (event, log) => {
     return db.prepare(`INSERT INTO transport_logs (route_id, event_type, latitude, longitude) VALUES (?, ?, ?, ?)`).run(route_id, event_type, latitude, longitude);
 });
 
+// Mobile Keys
+handleIPC('db:getMobileKeys', async () => {
+    return db.prepare('SELECT * FROM mobile_access_keys').all();
+});
+
+handleIPC('db:generateMobileKey', async (event, { name, userId }) => {
+    const key = `KEY-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    return db.prepare('INSERT INTO mobile_access_keys (access_key, assigned_to_name, assigned_to_user_id) VALUES (?, ?, ?)')
+        .run(key, name, userId);
+});
+
+handleIPC('db:revokeMobileKey', async (event, keyId) => {
+    return db.prepare('UPDATE mobile_access_keys SET status = "REVOKED" WHERE id = ?').run(keyId);
+});
+
 // Settings
 handleIPC('db:getSetting', async (event, key) => {
   const res = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
