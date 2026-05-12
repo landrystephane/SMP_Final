@@ -50,7 +50,7 @@ export const generateReportCard = (student: any, grades: any[], section: string,
   if (isNursery) {
     tableHead = [[isEnglish ? 'Domains / Subjects' : 'Domaines / Activités', 'Cote', isEnglish ? 'Appreciation' : 'Appréciation']];
     tableBody = completeGrades.map(g => {
-        const appreciation = g.score !== null ? getAppreciationNursery(g.score) : { code: '-', label: '-', label_en: '-' };
+        const appreciation = g.score !== null ? getAppreciationNursery(g.score, isEnglish) : { code: '-', label: '-', label_en: '-' };
         return [g.name, appreciation.code, isEnglish ? appreciation.label_en : appreciation.label];
     });
   } else {

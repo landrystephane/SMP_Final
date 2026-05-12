@@ -127,10 +127,12 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-black text-white flex items-center">
                    <LayoutGrid className="w-6 h-6 mr-3 text-amber-500" />
-                   {t('diagnostic_per_class')}
+                   <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                     {t('diagnostic_per_class')}
+                   </span>
                 </h2>
                 <select
-                    className="bg-slate-800 border-none shadow-sm rounded-xl px-4 py-2 text-xs font-bold text-white outline-none ring-1 ring-slate-700"
+                    className="bg-slate-800 border-none shadow-sm rounded-xl px-4 py-2 text-xs font-bold text-white outline-none ring-1 ring-slate-700 focus:ring-amber-500 transition-all cursor-pointer"
                     value={selectedDiagnosticClass}
                     onChange={(e) => setSelectedDiagnosticClass(e.target.value)}
                 >
@@ -142,7 +144,7 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredClassStats && filteredClassStats.length > 0 ? (
                 filteredClassStats.map((item: any) => (
-                    <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all border-l-4 border-l-amber-500">
+                    <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all border-l-4 border-l-amber-500 bg-slate-900/60 group hover:bg-slate-900/80">
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <span className="text-white font-black text-xl tracking-tight">{item.level}</span>
@@ -168,7 +170,7 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4 flex justify-end">
-                        <button className="text-[10px] font-black text-slate-950 bg-amber-500 px-4 py-2 rounded-xl hover:bg-yellow-400 transition-colors uppercase tracking-widest flex items-center shadow-lg">
+                        <button className="text-[10px] font-black text-slate-950 bg-amber-500 px-4 py-2 rounded-xl hover:bg-yellow-400 active:scale-95 transition-all uppercase tracking-widest flex items-center shadow-lg shadow-amber-500/10">
                             {t('class_details')} <ChevronRight className="w-3 h-3 ml-1" />
                         </button>
                     </div>

@@ -200,7 +200,14 @@ i18n
           scolarite: 'Scolarité',
           inscription: 'Inscription',
           examen: 'Examen',
-          sync_pending_msg: 'Notes sauvegardées localement. N\'oubliez pas de synchroniser dès que vous êtes connecté au réseau Wi-Fi de l\'école.'
+          sync_pending_msg: 'Notes sauvegardées localement. N\'oubliez pas de synchroniser dès que vous êtes connecté au réseau Wi-Fi de l\'école.',
+          confirm_unlock: 'Êtes-vous sûr de vouloir déverrouiller ces notes pour correction ?',
+          unlock_for_correction: 'DÉVERROUILLER POUR CORRECTION',
+          installment_assignment: 'Imputation à une Tranche',
+          parent_portal: 'Portail Parent',
+          pedagogy_advisor: 'Conseiller Pédagogique',
+          transport_driver: 'Portail Chauffeur',
+          system_admin: 'Admin Système'
         }
       },
       en: {
@@ -391,7 +398,14 @@ i18n
           scolarite: 'Tuition',
           inscription: 'Registration',
           examen: 'Exam',
-          sync_pending_msg: 'Grades saved locally. Remember to synchronize once connected to the school Wi-Fi.'
+          sync_pending_msg: 'Grades saved locally. Remember to synchronize once connected to the school Wi-Fi.',
+          confirm_unlock: 'Are you sure you want to unlock these grades for correction?',
+          unlock_for_correction: 'UNLOCK FOR CORRECTION',
+          installment_assignment: 'Assign to Installment',
+          parent_portal: 'Parent Portal',
+          pedagogy_advisor: 'Pedagogical Advisor',
+          transport_driver: 'Driver Portal',
+          system_admin: 'System Admin'
         }
       }
     }

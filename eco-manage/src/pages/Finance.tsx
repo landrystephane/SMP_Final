@@ -10,7 +10,7 @@ const Finance: React.FC = () => {
   const [tuitionFees, setTuitionFees] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS'>('MANAGEMENT');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
-  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité' });
+  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
 
   const [installments, setInstallments] = useState<any[]>([]);
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
@@ -45,10 +45,11 @@ const Finance: React.FC = () => {
         await window.electronAPI.addPayment({
             ...newPayment,
             amount: parseFloat(newPayment.amount),
-            userId: user.id
+            userId: user.id,
+            installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
         });
         setIsAddingPayment(false);
-        setNewPayment({ studentId: '', amount: '', type: 'Scolarité' });
+        setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
         loadData();
     }
   };
@@ -318,6 +319,22 @@ const Finance: React.FC = () => {
                               ))}
                           </select>
                       </div>
+
+                      {newPayment.studentId && (
+                          <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl animate-in fade-in duration-300">
+                              <div className="flex justify-between items-center mb-2">
+                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte</span>
+                                  <span className="text-sm font-black text-white">{getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).balance.toLocaleString()} FCFA Restant</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-amber-500"
+                                    style={{ width: `${(getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue) * 100}%` }}
+                                  />
+                              </div>
+                          </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
@@ -351,6 +368,24 @@ const Finance: React.FC = () => {
                             </select>
                         </div>
                       </div>
+
+                      {newPayment.type === 'Scolarité' && (
+                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                                <Clock className="w-3 h-3 mr-2" /> {t('installment_assignment')}
+                            </label>
+                            <select
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
+                                value={newPayment.installmentId}
+                                onChange={(e) => setNewPayment({...newPayment, installmentId: e.target.value})}
+                            >
+                                <option value="">Imputation Automatique</option>
+                                {installments.map(inst => (
+                                    <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                      )}
 
                       <div className="pt-6 flex flex-col md:flex-row gap-4">
                           <button type="button" onClick={() => setIsAddingPayment(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all order-2 md:order-1">Annuler</button>

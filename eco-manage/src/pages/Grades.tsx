@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Save, Lock, Unlock, FileText, BookOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
+import { useAuth } from '../context/AuthContext';
 
 const Grades: React.FC = () => {
   const { t } = useTranslation();
+  const { hasRole } = useAuth();
   const [sections, _setSections] = useState(['FRANCOPHONE', 'ANGLOPHONE']);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -78,13 +80,28 @@ const Grades: React.FC = () => {
       const result = await window.electronAPI.saveGrades(formattedGrades);
       if (result.success) {
         setIsLocked(true);
-        alert(t('grades_locked_msg'));
+        alert(t('grades_locked_msg') || 'Notes enregistrées et verrouillées.');
+        handleLoadStudents();
       } else {
         alert('Erreur: ' + result.error);
       }
     } else {
         localStorage.setItem(`pending_grades_${selectedClass}_${selectedMonth}`, JSON.stringify(formattedGrades));
         alert(t('sync_pending_msg') || 'Sauvegardé localement. Synchronisez plus tard.');
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (window.electronAPI) {
+        if (confirm(t('confirm_unlock') || 'Êtes-vous sûr de vouloir déverrouiller ces notes ?')) {
+            await window.electronAPI.unlockGrades({
+                classId: parseInt(selectedClass),
+                term: selectedTerm,
+                month: selectedMonth
+            });
+            setIsLocked(false);
+            handleLoadStudents();
+        }
     }
   };
 
@@ -186,13 +203,22 @@ const Grades: React.FC = () => {
                     )}
                 </div>
                 <div className="flex items-center space-x-4">
-                    {!isLocked && (
+                    {!isLocked ? (
                         <button
                             onClick={handleSave}
                             className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
                         >
                             <Save className="w-4 h-4 mr-2" /> {t('save_and_lock')}
                         </button>
+                    ) : (
+                        hasRole(['DIRECTOR', 'FOUNDER']) && (
+                            <button
+                                onClick={handleUnlock}
+                                className="bg-rose-500 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all inline-flex items-center shadow-lg shadow-rose-500/20"
+                            >
+                                <Unlock className="w-4 h-4 mr-2" /> {t('unlock_for_correction')}
+                            </button>
+                        )
                     )}
                 </div>
             </div>

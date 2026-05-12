@@ -215,6 +215,13 @@ handleIPC('db:getSubjects', async (event, schoolId) => {
   return db.prepare('SELECT * FROM subjects WHERE school_id = ?').all(sid);
 });
 
+handleIPC('db:addSubject', async (event, subject) => {
+  const { name, domain, level, section, coefficient, max_score, schoolId } = subject;
+  const sid = schoolId || 1;
+  return db.prepare('INSERT INTO subjects (name, domain, level, section, coefficient, max_score, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(name, domain, level, section, coefficient || 1, max_score || 20.0, sid);
+});
+
 handleIPC('db:getClasses', async (event, schoolId) => {
   const sid = schoolId || 1;
   return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
@@ -269,6 +276,15 @@ handleIPC('db:saveAttendance', async (event, { studentId, date, status, recorded
     `).run(studentId, date, status, recorded_by);
 });
 
+handleIPC('db:getAttendance', async (event, { classId, date }) => {
+    return db.prepare(`
+      SELECT a.*, s.first_name, s.last_name
+      FROM attendance a
+      JOIN students s ON a.student_id = s.id
+      WHERE s.class_id = ? AND a.date = ?
+    `).all(classId, date);
+});
+
 handleIPC('db:getUsers', async (event, schoolId) => {
   const sid = schoolId || 1;
   return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses FROM users WHERE school_id = ?').all(sid);
@@ -280,6 +296,28 @@ handleIPC('db:addUser', async (event, user) => {
   const hash = crypto.createHash('sha256').update(password).digest('hex');
   return db.prepare('INSERT INTO users (username, password, full_name, role, school_id, assigned_classes) VALUES (?, ?, ?, ?, ?, ?)')
     .run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []));
+});
+
+handleIPC('db:changePassword', async (event, { userId, newPassword }) => {
+  const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
+  return db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, userId);
+});
+
+// Ticketing
+handleIPC('db:sendTicket', async (event, ticket) => {
+  const { sender_id, receiver_role, subject, message, school_id } = ticket;
+  const sid = school_id || 1;
+  return db.prepare('INSERT INTO tickets (sender_id, receiver_role, subject, message, school_id) VALUES (?, ?, ?, ?, ?)')
+    .run(sender_id, receiver_role, subject, message, sid);
+});
+
+handleIPC('db:getTickets', async (event, { userId, role, schoolId }) => {
+  const sid = schoolId || 1;
+  if (role === 'SUPERADMIN' || role === 'FOUNDER') {
+      return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ?').all(sid);
+  }
+  return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ? AND (t.sender_id = ? OR t.receiver_role = ?)')
+    .all(sid, userId, role);
 });
 
 handleIPC('db:getDashboardStats', async (event, params) => {

@@ -10,7 +10,14 @@ export const NURSERY_DOMAINS = [
   'Motricité (Physical Education)'
 ];
 
-export const getAppreciationNursery = (score: number) => {
+export const getAppreciationNursery = (score: number, isEnglish: boolean = false) => {
+  // Normalize to 20 if needed, but assuming score passed is already on 20
+  if (isEnglish) {
+    if (score >= 18) return { code: 'AE', label: 'Above Expectation', label_en: 'Above Expectation' };
+    if (score >= 15) return { code: 'ME', label: 'Meeting Expectation', label_en: 'Meeting Expectation' };
+    if (score >= 11) return { code: 'E', label: 'Acquiring', label_en: 'Acquiring' };
+    return { code: 'NYE', label: 'Not Yet Meeting Expectation', label_en: 'Not Yet Meeting Expectation' };
+  }
   if (score >= 18) return { code: 'A+', label: 'Expert', label_en: 'Expert' };
   if (score >= 15) return { code: 'A', label: 'Acquis', label_en: 'Acquired' };
   if (score >= 11) return { code: 'ECA', label: 'En cours d\'acquisition', label_en: 'In progress' };
@@ -19,12 +26,10 @@ export const getAppreciationNursery = (score: number) => {
 
 export const getAppreciationPrimary = (score: number, isEnglish: boolean = false) => {
   if (isEnglish) {
-      if (score >= 18) return 'Excellent';
-      if (score >= 16) return 'Very Good';
-      if (score >= 14) return 'Good';
-      if (score >= 12) return 'Fairly Good';
-      if (score >= 10) return 'Average';
-      return 'Poor';
+      if (score >= 18) return 'Above Expectation';
+      if (score >= 15) return 'Meeting Expectation';
+      if (score >= 11) return 'Acquiring';
+      return 'Not Yet Meeting Expectation';
   }
   if (score >= 18) return 'Excellent';
   if (score >= 16) return 'Très Bien';
