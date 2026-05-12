@@ -98,16 +98,18 @@ handleIPC('db:addSchool', async (event, school) => {
 
 // Students
 handleIPC('db:getStudents', async (event, schoolId) => {
-  return db.prepare('SELECT * FROM students WHERE school_id = ?').all(schoolId);
+  const sid = schoolId || 1;
+  return db.prepare('SELECT * FROM students WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:addStudent', async (event, student) => {
   const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId } = student;
   const matricule = `MAT-${Date.now()}`;
+  const sid = schoolId || 1;
   return db.prepare(`
     INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId);
+  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, sid);
 });
 
 handleIPC('db:assignStudentToBus', async (event, { studentId, routeId }) => {
@@ -153,13 +155,14 @@ handleIPC('db:unlockGrades', async (event, { classId, term, month }) => {
 
 // Finance
 handleIPC('db:getPayments', async (event, schoolId) => {
+  const sid = schoolId || 1;
   return db.prepare(`
     SELECT p.*, s.first_name, s.last_name, s.class_id, i.name as installment_name
     FROM payments p
     JOIN students s ON p.student_id = s.id
     LEFT JOIN installments i ON p.installment_id = i.id
     WHERE s.school_id = ?
-  `).all(schoolId);
+  `).all(sid);
 });
 
 handleIPC('db:addPayment', async (event, payment) => {
@@ -172,12 +175,13 @@ handleIPC('db:addPayment', async (event, payment) => {
 });
 
 handleIPC('db:getTuitionFees', async (event, schoolId) => {
+  const sid = schoolId || 1;
   return db.prepare(`
     SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee
     FROM classes c
     LEFT JOIN tuition_fees t ON c.id = t.class_id
     WHERE c.school_id = ?
-  `).all(schoolId);
+  `).all(sid);
 });
 
 handleIPC('db:getInstallments', async () => {
@@ -185,7 +189,8 @@ handleIPC('db:getInstallments', async () => {
 });
 
 handleIPC('db:getClassInstallmentFees', async (event, schoolId) => {
-    return db.prepare('SELECT cif.* FROM class_installment_fees cif JOIN classes c ON cif.class_id = c.id WHERE c.school_id = ?').all(schoolId);
+    const sid = schoolId || 1;
+    return db.prepare('SELECT cif.* FROM class_installment_fees cif JOIN classes c ON cif.class_id = c.id WHERE c.school_id = ?').all(sid);
 });
 
 handleIPC('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee }) => {
@@ -206,29 +211,34 @@ handleIPC('db:updateClassInstallmentFee', async (event, { classId, installmentId
 
 // Pedagogy
 handleIPC('db:getSubjects', async (event, schoolId) => {
-  return db.prepare('SELECT * FROM subjects WHERE school_id = ?').all(schoolId);
+  const sid = schoolId || 1;
+  return db.prepare('SELECT * FROM subjects WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:getClasses', async (event, schoolId) => {
-  return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(schoolId);
+  const sid = schoolId || 1;
+  return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:getSchedules', async (event, schoolId) => {
-    return db.prepare('SELECT * FROM schedules WHERE school_id = ?').all(schoolId);
+    const sid = schoolId || 1;
+    return db.prepare('SELECT * FROM schedules WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:updateSchedule', async (event, schedule) => {
     const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id } = schedule;
+    const sid = school_id || 1;
     if (id) {
         return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, id);
     } else {
-        return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id);
+        return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, sid);
     }
 });
 
 // Transport
 handleIPC('db:getBusRoutes', async (event, schoolId) => {
-    return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(schoolId);
+    const sid = schoolId || 1;
+    return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:getRouteStudents', async (event, routeId) => {
@@ -260,37 +270,42 @@ handleIPC('db:saveAttendance', async (event, { studentId, date, status, recorded
 });
 
 handleIPC('db:getUsers', async (event, schoolId) => {
-  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses FROM users WHERE school_id = ?').all(schoolId);
+  const sid = schoolId || 1;
+  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses FROM users WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:addUser', async (event, user) => {
   const { username, password, fullName, role, schoolId, assignedClasses } = user;
+  const sid = schoolId || 1;
   const hash = crypto.createHash('sha256').update(password).digest('hex');
   return db.prepare('INSERT INTO users (username, password, full_name, role, school_id, assigned_classes) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(username, hash, fullName, role, schoolId, JSON.stringify(assignedClasses || []));
+    .run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []));
 });
 
-handleIPC('db:getDashboardStats', async (event, { schoolId, section }) => {
-  const whereSect = section ? "AND section = ?" : "";
-  const params = section ? [schoolId, section] : [schoolId];
+handleIPC('db:getDashboardStats', async (event, params) => {
+  const schoolId = (params && params.schoolId) ? params.schoolId : 1;
+  const section = (params && params.section) ? params.section : null;
 
-  const totalStudents = db.prepare(`SELECT COUNT(*) as count FROM students WHERE school_id = ? ${whereSect}`).get(...params).count;
-  const boys = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'M' AND school_id = ? ${whereSect}`).get(...params).count;
-  const girls = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'F' AND school_id = ? ${whereSect}`).get(...params).count;
+  const whereSect = section ? "AND section = ?" : "";
+  const queryParams = section ? [schoolId, section] : [schoolId];
+
+  const totalStudents = db.prepare(`SELECT COUNT(*) as count FROM students WHERE school_id = ? ${whereSect}`).get(...queryParams).count;
+  const boys = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'M' AND school_id = ? ${whereSect}`).get(...queryParams).count;
+  const girls = db.prepare(`SELECT COUNT(*) as count FROM students WHERE gender = 'F' AND school_id = ? ${whereSect}`).get(...queryParams).count;
 
   const totalRevenue = db.prepare(`
     SELECT SUM(p.amount) as total
     FROM payments p
     JOIN students s ON p.student_id = s.id
     WHERE s.school_id = ? ${whereSect}
-  `).get(...params).total || 0;
+  `).get(...queryParams).total || 0;
 
   const totalTuitionDue = db.prepare(`
     SELECT SUM(t.total_fee) as total
     FROM tuition_fees t
     JOIN students s ON s.class_id = t.class_id
     WHERE s.school_id = ? ${whereSect}
-  `).get(...params).total || 0;
+  `).get(...queryParams).total || 0;
 
   const classStats = db.prepare(`
     SELECT c.name as level, AVG(g.score) as avg,
@@ -299,7 +314,7 @@ handleIPC('db:getDashboardStats', async (event, { schoolId, section }) => {
     LEFT JOIN grades g ON g.class_id = c.id
     WHERE c.school_id = ? ${whereSect}
     GROUP BY c.id
-  `).all(...params);
+  `).all(...queryParams);
 
   return {
     totalStudents,
