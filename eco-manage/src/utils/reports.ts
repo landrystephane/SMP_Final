@@ -2,10 +2,16 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getAppreciationNursery, getAppreciationPrimary } from './pedagogy';
 
-export const generateReportCard = (student: any, grades: any[], section: string, allSubjects: any[]) => {
+export const generateReportCard = (student: any, grades: any[], section: string, allSubjects: any[], schoolInfo?: any) => {
   const doc = new jsPDF();
   const isNursery = student.level === 'MATERNELLE';
   const isEnglish = section === 'ANGLOPHONE';
+  const school = schoolInfo || {
+      name: 'Complexe Scolaire Bilingue Eco-Manage',
+      motto: 'Travail - Discipline - Succès',
+      address: 'Yaoundé, Cameroun',
+      bp: 'BP 1234'
+  };
 
   // Header
   doc.setFontSize(8);
@@ -14,6 +20,14 @@ export const generateReportCard = (student: any, grades: any[], section: string,
   doc.text('REPUBLIC OF CAMEROON', 105, 13, { align: 'center' });
   doc.text('MINISTERE DE L\'EDUCATION DE BASE', 105, 16, { align: 'center' });
   doc.text('MINISTRY OF BASIC EDUCATION', 105, 19, { align: 'center' });
+
+  // School Specific Branding
+  doc.setFontSize(10);
+  doc.text(school.name.toUpperCase(), 105, 26, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7);
+  doc.text(school.motto || '', 105, 30, { align: 'center' });
+  doc.text(`${school.address} | ${school.bp || ''}`, 105, 33, { align: 'center' });
 
   doc.setFontSize(14);
   const title = isNursery
@@ -31,7 +45,7 @@ export const generateReportCard = (student: any, grades: any[], section: string,
   doc.text(`Classe : ${student.className || 'N/A'}`, 20, 59);
 
   doc.text(`Section : ${section}`, 130, 45);
-  doc.text(`Année : 2025-2026`, 130, 52);
+  doc.text(`Année Scolaire : ${student.schoolYear || '2025-2026'}`, 130, 52);
   doc.text(`Trimestre : ${student.term || '1'}`, 130, 59);
 
   // Merge grades with all subjects to ensure every subject appears
@@ -51,7 +65,7 @@ export const generateReportCard = (student: any, grades: any[], section: string,
     tableHead = [[isEnglish ? 'Domains / Subjects' : 'Domaines / Activités', 'Cote', isEnglish ? 'Appreciation' : 'Appréciation']];
     tableBody = completeGrades.map(g => {
         const appreciation = g.score !== null ? getAppreciationNursery(g.score, isEnglish) : { code: '-', label: '-', label_en: '-' };
-        return [g.name, appreciation.code, isEnglish ? appreciation.label_en : appreciation.label];
+        return [g.name + (g.is_optional ? ' (*)' : ''), appreciation.code, isEnglish ? appreciation.label_en : appreciation.label];
     });
   } else {
     tableHead = [[isEnglish ? 'Subjects' : 'Matières', 'Note / 20', 'Coef', 'Total', isEnglish ? 'Appreciation' : 'Appréciation']];
@@ -61,7 +75,7 @@ export const generateReportCard = (student: any, grades: any[], section: string,
       const total = score !== null ? (score * coef).toFixed(2) : '-';
       const app = score !== null ? (isEnglish ? getAppreciationPrimary(score, true) : getAppreciationPrimary(score)) : '-';
 
-      return [g.name, score !== null ? score : '-', coef, total, app];
+      return [g.name + (g.is_optional ? ' (*)' : ''), score !== null ? score : '-', coef, total, app];
     });
   }
 

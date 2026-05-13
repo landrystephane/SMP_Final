@@ -1,150 +1,238 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Globe, X, Save, Trash2 } from 'lucide-react';
+import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Subjects: React.FC = () => {
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
+  const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [classSubjects, setClassSubjects] = useState<any[]>([]);
+  const [isAddingGlobal, setIsAddingGlobal] = useState(false);
   const [newSubject, setNewSubject] = useState({
     name: '',
     domain: '',
     level: 'PRIMAIRE',
-    section: 'FRANCOPHONE',
-    coefficient: 1
+    section: 'FRANCOPHONE'
   });
-  const { hasRole } = useAuth();
-  const canEdit = hasRole(['FOUNDER', 'DIRECTOR']);
 
-  const loadSubjects = async () => {
+  const { hasRole, user } = useAuth();
+  const isSuperAdmin = hasRole(['SUPERADMIN']);
+  const canConfigClass = hasRole(['ADVISOR', 'DIRECTOR', 'FOUNDER']);
+
+  const loadData = async () => {
     if (window.electronAPI) {
-      const data = await window.electronAPI.getSubjects();
-      setSubjects(data);
+      const gSubjects = await window.electronAPI.getGlobalSubjects();
+      setGlobalSubjects(gSubjects);
+      const cls = await window.electronAPI.getClasses(user?.schoolId);
+      setClasses(cls);
+    }
+  };
+
+  const loadClassSubjects = async (classId: number) => {
+    if (window.electronAPI) {
+      const data = await window.electronAPI.getClassSubjects(classId);
+      setClassSubjects(data);
     }
   };
 
   useEffect(() => {
-    loadSubjects();
+    loadData();
   }, []);
 
-  const handleAddSubject = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (selectedClassId) {
+      loadClassSubjects(selectedClassId);
+    }
+  }, [selectedClassId]);
+
+  const handleAddGlobalSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (window.electronAPI) {
-      await window.electronAPI.addSubject(newSubject);
-      setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE', coefficient: 1 });
-      setIsAdding(false);
-      loadSubjects();
+      await window.electronAPI.addGlobalSubject(newSubject);
+      setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
+      setIsAddingGlobal(false);
+      loadData();
     }
+  };
+
+  const toggleSubjectForClass = async (subjectId: number) => {
+    if (!selectedClassId || !window.electronAPI) return;
+
+    const existing = classSubjects.find(s => s.id === subjectId);
+    if (existing) {
+      await window.electronAPI.removeSubjectFromClass({ classId: selectedClassId, subjectId });
+    } else {
+      await window.electronAPI.assignSubjectToClass({
+        classId: selectedClassId,
+        subjectId,
+        coefficient: 1,
+        isOptional: false
+      });
+    }
+    loadClassSubjects(selectedClassId);
+  };
+
+  const updateCoefficient = async (subjectId: number, coef: number) => {
+    if (!selectedClassId || !window.electronAPI) return;
+    const s = classSubjects.find(s => s.id === subjectId);
+    await window.electronAPI.assignSubjectToClass({
+        classId: selectedClassId,
+        subjectId,
+        coefficient: coef,
+        isOptional: s?.is_optional || false
+    });
+    loadClassSubjects(selectedClassId);
+  };
+
+  const toggleOptional = async (subjectId: number) => {
+    if (!selectedClassId || !window.electronAPI) return;
+    const s = classSubjects.find(s => s.id === subjectId);
+    await window.electronAPI.assignSubjectToClass({
+        classId: selectedClassId,
+        subjectId,
+        coefficient: s?.coefficient || 1,
+        isOptional: !s?.is_optional
+    });
+    loadClassSubjects(selectedClassId);
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Gestion des Matières</h1>
-          <p className="text-slate-400 mt-1 text-sm">Définissez les programmes officiels par section et par niveau</p>
+          <h1 className="text-3xl font-bold text-white">Programmes & Matières</h1>
+          <p className="text-slate-400 mt-1 text-sm">Configuration pédagogique par classe</p>
         </div>
-        {canEdit && (
+        {isSuperAdmin && (
           <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center px-4 py-2 bg-slate-gold-gold text-slate-900 rounded-lg font-bold hover:bg-yellow-500 transition-all shadow-lg active:scale-95"
+            onClick={() => setIsAddingGlobal(true)}
+            className="btn-primary flex items-center"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Nouvelle Matière
+            Répertoire Global
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Section Francophone */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Liste des Classes */}
         <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3 text-blue-400">
-                <Globe className="w-6 h-6" />
-                <h2 className="text-xl font-bold uppercase tracking-tight">Section Francophone</h2>
-              </div>
-              <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">FR</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {subjects.filter(s => s.section === 'FRANCOPHONE').length > 0 ? (
-                subjects.filter(s => s.section === 'FRANCOPHONE').map(s => (
-                    <div key={s.id} className="group p-4 bg-slate-800/40 border border-slate-700/50 rounded-xl flex justify-between items-center hover:border-slate-gold-gold/50 transition-all">
-                        <div className="min-w-0">
-                            <p className="text-white font-bold truncate">{s.name}</p>
-                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">{s.domain}</p>
-                            <p className="text-[8px] text-blue-400 font-bold">{s.level}</p>
-                        </div>
-                        <div className="flex items-center space-x-3 ml-4">
-                            <span className="bg-slate-900/80 text-slate-gold-gold px-2 py-1 rounded text-[10px] font-black border border-slate-700">COEF: {s.coefficient}</span>
-                            {canEdit && (
-                                <button className="text-slate-600 hover:text-red-500 transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))
-            ) : (
-                <div className="col-span-full py-12 text-center text-slate-500 italic border-2 border-dashed border-slate-800 rounded-2xl">
-                    Aucune matière configurée
-                </div>
-            )}
+          <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider">Classes</h2>
+          <div className="space-y-2">
+            {classes.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedClassId(c.id)}
+                className={`w-full text-left p-4 rounded-xl font-bold transition-all border ${
+                  selectedClassId === c.id
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
+                  : 'bg-slate-900/40 text-slate-400 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                {c.name}
+                <span className={`block text-[10px] uppercase mt-1 ${selectedClassId === c.id ? 'text-slate-800' : 'text-slate-600'}`}>
+                    {c.section} • {c.level}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Section Anglophone */}
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3 text-emerald-400">
-                <Globe className="w-6 h-6" />
-                <h2 className="text-xl font-bold uppercase tracking-tight">Anglophone Section</h2>
+        {/* Configuration des Matières pour la classe sélectionnée */}
+        <div className="lg:col-span-2 glass-card p-6">
+          {!selectedClassId ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 py-12">
+              <Globe className="w-16 h-16 opacity-20" />
+              <p className="font-medium">Sélectionnez une classe pour configurer son programme</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                <h2 className="text-xl font-black text-white uppercase tracking-tighter">
+                  Matières : {classes.find(c => c.id === selectedClassId)?.name}
+                </h2>
               </div>
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold">EN</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {subjects.filter(s => s.section === 'ANGLOPHONE').length > 0 ? (
-                subjects.filter(s => s.section === 'ANGLOPHONE').map(s => (
-                    <div key={s.id} className="group p-4 bg-slate-800/40 border border-slate-700/50 rounded-xl flex justify-between items-center hover:border-slate-gold-gold/50 transition-all">
-                        <div className="min-w-0">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {globalSubjects
+                  .filter(s => s.level === classes.find(c => c.id === selectedClassId)?.level && s.section === classes.find(c => c.id === selectedClassId)?.section)
+                  .map(s => {
+                    const isAssigned = classSubjects.some(cs => cs.id === s.id);
+                    const classSub = classSubjects.find(cs => cs.id === s.id);
+
+                    return (
+                      <div
+                        key={s.id}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isAssigned
+                          ? 'bg-slate-800/80 border-amber-500/30'
+                          : 'bg-slate-950/40 border-slate-800 opacity-60'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="min-w-0">
                             <p className="text-white font-bold truncate">{s.name}</p>
-                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">{s.domain}</p>
-                            <p className="text-[8px] text-emerald-400 font-bold">{s.level}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">{s.domain}</p>
+                          </div>
+                          <button
+                            onClick={() => toggleSubjectForClass(s.id)}
+                            className={`p-1.5 rounded-full transition-all ${
+                              isAssigned ? 'text-amber-500' : 'text-slate-700 hover:text-slate-500'
+                            }`}
+                          >
+                            {isAssigned ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                          </button>
                         </div>
-                        <div className="flex items-center space-x-3 ml-4">
-                            <span className="bg-slate-900/80 text-slate-gold-gold px-2 py-1 rounded text-[10px] font-black border border-slate-700">COEF: {s.coefficient}</span>
-                            {canEdit && (
-                                <button className="text-slate-600 hover:text-red-500 transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))
-            ) : (
-                <div className="col-span-full py-12 text-center text-slate-500 italic border-2 border-dashed border-slate-800 rounded-2xl">
-                    Aucune matière configurée
-                </div>
-            )}
-          </div>
+
+                        {isAssigned && (
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-black text-slate-500 uppercase">Coef:</span>
+                                <input
+                                    type="number"
+                                    className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-xs text-amber-500 font-black"
+                                    value={classSub?.coefficient || 1}
+                                    onChange={(e) => updateCoefficient(s.id, parseInt(e.target.value))}
+                                />
+                            </div>
+                            <button
+                                onClick={() => toggleOptional(s.id)}
+                                className={`text-[10px] font-black px-2 py-1 rounded transition-all ${
+                                    classSub?.is_optional
+                                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                    : 'bg-slate-900 text-slate-500 border border-slate-800'
+                                }`}
+                            >
+                                {classSub?.is_optional ? 'OPTIONNELLE' : 'OBLIGATOIRE'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Modal Ajout Matière */}
-      {isAdding && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+      {/* Modal Ajout Matière Globale (SuperAdmin) */}
+      {isAddingGlobal && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md animate-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">Ajouter une Matière</h2>
-              <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-white">
+              <h2 className="text-xl font-bold text-white uppercase">Répertoire Global</h2>
+              <button onClick={() => setIsAddingGlobal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <form onSubmit={handleAddSubject} className="p-6 space-y-4">
+            <form onSubmit={handleAddGlobalSubject} className="p-6 space-y-4">
               <div>
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la matière</label>
                 <input
                     required
                     type="text"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mt-1 outline-none focus:border-slate-gold-gold transition-colors"
+                    className="input-field w-full mt-1"
                     placeholder="Ex: Mathématiques"
                     value={newSubject.name}
                     onChange={(e) => setNewSubject({...newSubject, name: e.target.value})}
@@ -155,7 +243,7 @@ const Subjects: React.FC = () => {
                 <input
                     required
                     type="text"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mt-1 outline-none focus:border-slate-gold-gold transition-colors"
+                    className="input-field w-full mt-1"
                     placeholder="Ex: Sciences et Technologie"
                     value={newSubject.domain}
                     onChange={(e) => setNewSubject({...newSubject, domain: e.target.value})}
@@ -165,7 +253,7 @@ const Subjects: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
                     <select
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mt-1 outline-none focus:border-slate-gold-gold"
+                        className="input-field w-full mt-1"
                         value={newSubject.section}
                         onChange={(e) => setNewSubject({...newSubject, section: e.target.value})}
                     >
@@ -176,7 +264,7 @@ const Subjects: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau</label>
                     <select
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mt-1 outline-none focus:border-slate-gold-gold"
+                        className="input-field w-full mt-1"
                         value={newSubject.level}
                         onChange={(e) => setNewSubject({...newSubject, level: e.target.value})}
                     >
@@ -185,34 +273,20 @@ const Subjects: React.FC = () => {
                     </select>
                   </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Coefficient</label>
-                    <input
-                        required
-                        type="number"
-                        min="1"
-                        max="10"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mt-1 outline-none focus:border-slate-gold-gold"
-                        value={newSubject.coefficient}
-                        onChange={(e) => setNewSubject({...newSubject, coefficient: parseInt(e.target.value)})}
-                    />
-                  </div>
-              </div>
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsAdding(false)}
-                  className="flex-1 py-3 border border-slate-700 rounded-lg text-slate-400 font-bold hover:bg-slate-800 transition-all"
+                  onClick={() => setIsAddingGlobal(false)}
+                  className="flex-1 py-3 border border-slate-700 rounded-xl text-slate-400 font-bold hover:bg-slate-900 transition-all"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-slate-gold-gold text-slate-900 rounded-lg font-black hover:bg-yellow-500 transition-all flex items-center justify-center"
+                  className="btn-primary flex-1 flex items-center justify-center"
                 >
                   <Save className="w-5 h-5 mr-2" />
-                  Enregistrer
+                  Ajouter au Répertoire
                 </button>
               </div>
             </form>

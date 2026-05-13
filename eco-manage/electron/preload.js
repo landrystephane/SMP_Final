@@ -2,32 +2,61 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
-  getStudents: () => ipcRenderer.invoke('db:getStudents'),
+
+  // Students
+  getStudents: (schoolId) => ipcRenderer.invoke('db:getStudents', schoolId),
   addStudent: (student) => ipcRenderer.invoke('db:addStudent', student),
+  assignStudentToBus: (data) => ipcRenderer.invoke('db:assignStudentToBus', data),
+
+  // Grades
   getGrades: (filters) => ipcRenderer.invoke('db:getGrades', filters),
   saveGrades: (grades) => ipcRenderer.invoke('db:saveGrades', grades),
   unlockGrades: (params) => ipcRenderer.invoke('db:unlockGrades', params),
-  getPayments: () => ipcRenderer.invoke('db:getPayments'),
+
+  // Finance
+  getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
-  sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),
-  getTickets: () => ipcRenderer.invoke('db:getTickets'),
-  getDashboardStats: (section) => ipcRenderer.invoke('db:getDashboardStats', section),
-  getSubjects: () => ipcRenderer.invoke('db:getSubjects'),
-  addSubject: (subject) => ipcRenderer.invoke('db:addSubject', subject),
-  getClasses: () => ipcRenderer.invoke('db:getClasses'),
-  getUsers: () => ipcRenderer.invoke('db:getUsers'),
-  addUser: (user) => ipcRenderer.invoke('db:addUser', user),
-  changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
-  getTuitionFees: () => ipcRenderer.invoke('db:getTuitionFees'),
+  getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
   getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
-  getClassInstallmentFees: () => ipcRenderer.invoke('db:getClassInstallmentFees'),
+  getClassInstallmentFees: (schoolId) => ipcRenderer.invoke('db:getClassInstallmentFees', schoolId),
   updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
-  getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
-  setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
+
+  // Pedagogy
+  getGlobalSubjects: () => ipcRenderer.invoke('db:getGlobalSubjects'),
+  addGlobalSubject: (subject) => ipcRenderer.invoke('db:addGlobalSubject', subject),
+  getSchoolSubjects: (schoolId) => ipcRenderer.invoke('db:getSchoolSubjects', schoolId),
+  toggleSchoolSubject: (data) => ipcRenderer.invoke('db:toggleSchoolSubject', data),
+  getClassSubjects: (classId) => ipcRenderer.invoke('db:getClassSubjects', classId),
+  assignSubjectToClass: (data) => ipcRenderer.invoke('db:assignSubjectToClass', data),
+  removeSubjectFromClass: (data) => ipcRenderer.invoke('db:removeSubjectFromClass', data),
+  getClasses: (schoolId) => ipcRenderer.invoke('db:getClasses', schoolId),
+
+  // Users
+  getUsers: (schoolId) => ipcRenderer.invoke('db:getUsers', schoolId),
+  addUser: (user) => ipcRenderer.invoke('db:addUser', user),
+  changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
+
+  // Communication
+  sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),
+  getTickets: (params) => ipcRenderer.invoke('db:getTickets', params),
+
+  // Transport
+  getBusRoutes: (schoolId) => ipcRenderer.invoke('db:getBusRoutes', schoolId),
+  getRouteStudents: (routeId) => ipcRenderer.invoke('db:getRouteStudents', routeId),
+  logTransport: (log) => ipcRenderer.invoke('db:logTransport', log),
+
+  // Attendance
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),
   getAttendance: (data) => ipcRenderer.invoke('db:getAttendance', data),
+
+  // System/Admin
+  getDashboardStats: (params) => ipcRenderer.invoke('db:getDashboardStats', params),
+  getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
+  setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
   getMobileKeys: () => ipcRenderer.invoke('db:getMobileKeys'),
   generateMobileKey: (data) => ipcRenderer.invoke('db:generateMobileKey', data),
   revokeMobileKey: (id) => ipcRenderer.invoke('db:revokeMobileKey', id),
+  getSchools: () => ipcRenderer.invoke('db:getSchools'),
+  addSchool: (school) => ipcRenderer.invoke('db:addSchool', school),
 });

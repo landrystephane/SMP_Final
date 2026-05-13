@@ -10,6 +10,7 @@ const Finance: React.FC = () => {
   const [tuitionFees, setTuitionFees] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS'>('MANAGEMENT');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
 
   const [installments, setInstallments] = useState<any[]>([]);
@@ -224,6 +225,8 @@ const Finance: React.FC = () => {
                             type="text"
                             placeholder={t('search_student_payment')}
                             className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-6 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     <button className="p-3.5 bg-slate-800 hover:bg-slate-700 rounded-2xl text-slate-400 transition-colors">
@@ -243,7 +246,11 @@ const Finance: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {students.map(s => {
+                            {students.filter(s =>
+                                s.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                s.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                s.matricule.toLowerCase().includes(searchQuery.toLowerCase())
+                            ).map(s => {
                                 const fin = getStudentFinancials(s);
                                 return (
                                     <tr key={s.id} className="hover:bg-white/5 transition-colors group">

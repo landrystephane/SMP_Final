@@ -26,6 +26,7 @@ const Layout: React.FC = () => {
     { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'] },
     { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] },
     { key: 'users', path: '/users', icon: UserCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'] },
+    { key: 'transport', path: '/transport', icon: Bus, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'] },
     { key: 'pedagogy_advisor', path: '/advisor', icon: Calendar, roles: ['SUPERADMIN', 'ADVISOR'] },
     { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['SUPERADMIN', 'DRIVER'] },
     { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE', 'SG'] },

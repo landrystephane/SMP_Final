@@ -4,7 +4,9 @@
 CREATE TABLE IF NOT EXISTS schools (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    motto TEXT,
     address TEXT,
+    bp TEXT,
     contact_email TEXT,
     contact_phone TEXT,
     logo TEXT,
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name TEXT NOT NULL,
     role TEXT NOT NULL,
     assigned_classes TEXT, -- JSON string of class IDs for teachers
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id)
 );
@@ -30,6 +33,7 @@ CREATE TABLE IF NOT EXISTS classes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER,
     name TEXT NOT NULL, -- e.g., SIL, CP, Class 1
+    code TEXT NOT NULL, -- e.g., SIL, CP1, CM2 (used for matricule)
     section TEXT NOT NULL, -- 'FRANCOPHONE' or 'ANGLOPHONE'
     level TEXT NOT NULL, -- 'MATERNELLE' or 'PRIMAIRE'
     main_teacher_id INTEGER,
@@ -39,22 +43,42 @@ CREATE TABLE IF NOT EXISTS classes (
     FOREIGN KEY (assistant_teacher_id) REFERENCES users(id)
 );
 
+-- Global subjects registry
 CREATE TABLE IF NOT EXISTS subjects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    school_id INTEGER,
     name TEXT NOT NULL,
     domain TEXT NOT NULL,
     level TEXT NOT NULL,
-    section TEXT NOT NULL DEFAULT 'FRANCOPHONE',
+    section TEXT NOT NULL DEFAULT 'FRANCOPHONE'
+);
+
+-- Which subjects are used by which school
+CREATE TABLE IF NOT EXISTS school_subjects (
+    school_id INTEGER,
+    subject_id INTEGER,
+    is_active INTEGER DEFAULT 1,
+    PRIMARY KEY (school_id, subject_id),
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id)
+);
+
+-- Class-specific subject configuration (coefficients, optional status)
+CREATE TABLE IF NOT EXISTS class_subjects (
+    class_id INTEGER,
+    subject_id INTEGER,
     coefficient INTEGER DEFAULT 1,
-    max_score REAL DEFAULT 20.0,
-    FOREIGN KEY (school_id) REFERENCES schools(id)
+    is_optional INTEGER DEFAULT 0,
+    PRIMARY KEY (class_id, subject_id),
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id)
 );
 
 CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER,
     matricule TEXT UNIQUE NOT NULL,
+    registration_year INTEGER NOT NULL,
+    order_number INTEGER NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     birth_date DATE NOT NULL,
@@ -69,6 +93,8 @@ CREATE TABLE IF NOT EXISTS students (
     class_id INTEGER,
     section TEXT NOT NULL,
     bus_route_id INTEGER,
+    scholarship_reduction REAL DEFAULT 0, -- Scholarship amount or percentage
+    has_moratoire INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),
@@ -130,13 +156,16 @@ CREATE TABLE IF NOT EXISTS class_installment_fees (
     FOREIGN KEY (installment_id) REFERENCES installments(id)
 );
 
--- Attendance (hours for pedagogy, status for daily)
+-- Attendance tracking (Daily roll call)
 CREATE TABLE IF NOT EXISTS attendance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,
     date DATE NOT NULL,
     status TEXT NOT NULL, -- 'PRESENT', 'ABSENT', 'LATE'
+    hours_absent INTEGER DEFAULT 0,
     recorded_by INTEGER,
+    notes TEXT,
+    UNIQUE(student_id, date),
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (recorded_by) REFERENCES users(id)
 );
@@ -167,6 +196,16 @@ CREATE TABLE IF NOT EXISTS bus_routes (
     bus_number TEXT,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (driver_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS transport_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id INTEGER,
+    name TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    estimated_time_from_start INTEGER, -- minutes
+    FOREIGN KEY (route_id) REFERENCES bus_routes(id)
 );
 
 CREATE TABLE IF NOT EXISTS transport_logs (

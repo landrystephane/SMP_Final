@@ -103,13 +103,27 @@ handleIPC('db:getStudents', async (event, schoolId) => {
 });
 
 handleIPC('db:addStudent', async (event, student) => {
-  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId } = student;
-  const matricule = `MAT-${Date.now()}`;
+  const { firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId, entryYear } = student;
   const sid = schoolId || 1;
+  const year = entryYear || new Date().getFullYear();
+  const yearShort = year.toString().slice(-2);
+
+  // Get class code
+  const classObj = db.prepare('SELECT code FROM classes WHERE id = ?').get(classId);
+  const classCode = classObj ? classObj.code : 'STUD';
+
+  // Generate order number per class and year
+  const lastStudent = db.prepare('SELECT MAX(order_number) as maxOrder FROM students WHERE class_id = ? AND registration_year = ?')
+    .get(classId, year);
+  const orderNumber = (lastStudent && lastStudent.maxOrder ? lastStudent.maxOrder : 0) + 1;
+
+  // Format: YY + CLASS + OrderNumber (4 digits)
+  const matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
+
   return db.prepare(`
-    INSERT INTO students (matricule, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(matricule, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, sid);
+    INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(matricule, year, orderNumber, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, sid);
 });
 
 handleIPC('db:assignStudentToBus', async (event, { studentId, routeId }) => {
@@ -168,10 +182,16 @@ handleIPC('db:getPayments', async (event, schoolId) => {
 handleIPC('db:addPayment', async (event, payment) => {
   const { studentId, amount, type, userId, installmentId } = payment;
   const receiptNumber = `RCP-${Date.now()}`;
-  return db.prepare(`
+
+  const result = db.prepare(`
     INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(studentId, amount, type, userId, receiptNumber, installmentId);
+
+  if (result.changes > 0) {
+      return { success: true, receiptNumber };
+  }
+  return { success: false };
 });
 
 handleIPC('db:getTuitionFees', async (event, schoolId) => {
@@ -210,16 +230,56 @@ handleIPC('db:updateClassInstallmentFee', async (event, { classId, installmentId
 });
 
 // Pedagogy
-handleIPC('db:getSubjects', async (event, schoolId) => {
-  const sid = schoolId || 1;
-  return db.prepare('SELECT * FROM subjects WHERE school_id = ?').all(sid);
+handleIPC('db:getGlobalSubjects', async () => {
+  return db.prepare('SELECT * FROM subjects').all();
 });
 
-handleIPC('db:addSubject', async (event, subject) => {
-  const { name, domain, level, section, coefficient, max_score, schoolId } = subject;
+handleIPC('db:addGlobalSubject', async (event, subject) => {
+  const { name, domain, level, section } = subject;
+  return db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)')
+    .run(name, domain, level, section);
+});
+
+handleIPC('db:getSchoolSubjects', async (event, schoolId) => {
   const sid = schoolId || 1;
-  return db.prepare('INSERT INTO subjects (name, domain, level, section, coefficient, max_score, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(name, domain, level, section, coefficient || 1, max_score || 20.0, sid);
+  return db.prepare(`
+    SELECT s.*, ss.is_active
+    FROM subjects s
+    JOIN school_subjects ss ON s.id = ss.subject_id
+    WHERE ss.school_id = ?
+  `).all(sid);
+});
+
+handleIPC('db:toggleSchoolSubject', async (event, { schoolId, subjectId, isActive }) => {
+  return db.prepare(`
+    INSERT INTO school_subjects (school_id, subject_id, is_active)
+    VALUES (?, ?, ?)
+    ON CONFLICT(school_id, subject_id) DO UPDATE SET is_active = excluded.is_active
+  `).run(schoolId, subjectId, isActive ? 1 : 0);
+});
+
+handleIPC('db:getClassSubjects', async (event, classId) => {
+  return db.prepare(`
+    SELECT s.*, cs.coefficient, cs.is_optional
+    FROM subjects s
+    JOIN class_subjects cs ON s.id = cs.subject_id
+    WHERE cs.class_id = ?
+  `).all(classId);
+});
+
+handleIPC('db:assignSubjectToClass', async (event, { classId, subjectId, coefficient, isOptional }) => {
+  return db.prepare(`
+    INSERT INTO class_subjects (class_id, subject_id, coefficient, is_optional)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(class_id, subject_id) DO UPDATE SET
+      coefficient = excluded.coefficient,
+      is_optional = excluded.is_optional
+  `).run(classId, subjectId, coefficient || 1, isOptional ? 1 : 0);
+});
+
+handleIPC('db:removeSubjectFromClass', async (event, { classId, subjectId }) => {
+  return db.prepare('DELETE FROM class_subjects WHERE class_id = ? AND subject_id = ?')
+    .run(classId, subjectId);
 });
 
 handleIPC('db:getClasses', async (event, schoolId) => {
@@ -283,12 +343,16 @@ handleIPC('db:setSetting', async (event, { key, value }) => {
 });
 
 // Attendance
-handleIPC('db:saveAttendance', async (event, { studentId, date, status, recorded_by }) => {
+handleIPC('db:saveAttendance', async (event, { studentId, date, hours, userId }) => {
+    const status = hours > 0 ? 'ABSENT' : 'PRESENT';
     return db.prepare(`
-        INSERT INTO attendance (student_id, date, status, recorded_by)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(student_id, date) DO UPDATE SET status = excluded.status
-    `).run(studentId, date, status, recorded_by);
+        INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(student_id, date) DO UPDATE SET
+            status = excluded.status,
+            hours_absent = excluded.hours_absent,
+            recorded_by = excluded.recorded_by
+    `).run(studentId, date, status, hours, userId);
 });
 
 handleIPC('db:getAttendance', async (event, { classId, date }) => {
