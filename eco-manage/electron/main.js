@@ -92,8 +92,14 @@ handleIPC('db:getSchools', async () => {
 });
 
 handleIPC('db:addSchool', async (event, school) => {
-    const { name, address, contact_email, contact_phone } = school;
-    return db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone) VALUES (?, ?, ?, ?)').run(name, address, contact_email, contact_phone);
+    const { name, address, contact_email, contact_phone, bp, motto } = school;
+    return db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto) VALUES (?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto);
+});
+
+handleIPC('db:updateSchool', async (event, school) => {
+    const { id, name, address, contact_email, contact_phone, bp, motto } = school;
+    return db.prepare('UPDATE schools SET name = ?, address = ?, contact_email = ?, contact_phone = ?, bp = ?, motto = ? WHERE id = ?')
+        .run(name, address, contact_email, contact_phone, bp, motto, id);
 });
 
 // Students
@@ -250,11 +256,11 @@ handleIPC('db:deleteGlobalSubject', async (event, id) => {
 
 handleIPC('db:getSchoolSubjects', async (event, schoolId) => {
   const sid = schoolId || 1;
+  // Use LEFT JOIN to ensure we see all subjects even if not yet mapped to this school
   return db.prepare(`
-    SELECT s.*, ss.is_active
+    SELECT s.*, COALESCE(ss.is_active, 0) as is_active
     FROM subjects s
-    JOIN school_subjects ss ON s.id = ss.subject_id
-    WHERE ss.school_id = ?
+    LEFT JOIN school_subjects ss ON s.id = ss.subject_id AND ss.school_id = ?
   `).all(sid);
 });
 

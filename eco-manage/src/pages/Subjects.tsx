@@ -21,10 +21,11 @@ const Subjects: React.FC = () => {
 
   const loadData = async () => {
     if (window.electronAPI) {
-      const gSubjects = await window.electronAPI.getGlobalSubjects();
-      setGlobalSubjects(gSubjects);
+      const gSubjects = await window.electronAPI.getSchoolSubjects(user?.schoolId);
+      // Filter only subjects authorized for this school by the SuperAdmin
+      setGlobalSubjects(gSubjects?.filter((s: any) => s.is_active) || []);
       const cls = await window.electronAPI.getClasses(user?.schoolId);
-      setClasses(cls);
+      setClasses(cls || []);
     }
   };
 

@@ -1,18 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Plus, Globe, Shield, Trash2, Edit, CheckCircle, Search, Mail, Phone, MapPin, BookOpen, X } from 'lucide-react';
+import {
+  Building2, Plus, Globe, Shield, Trash2, Edit, CheckCircle, Search,
+  Mail, Phone, MapPin, BookOpen, X, Settings, UserPlus, ExternalLink,
+  Activity, Server, Database, Lock
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const SystemAdmin: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'SCHOOLS' | 'SUBJECTS'>('SCHOOLS');
+  const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH'>('INSTANCES');
   const [schools, setSchools] = useState<any[]>([]);
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
   const [schoolSubjects, setSchoolSubjects] = useState<number[]>([]);
+  const [schoolUsers, setSchoolUsers] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
-  const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '' });
+  const [isAddingFounder, setIsAddingFounder] = useState(false);
+
+  const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
   const [newSubject, setNewSubject] = useState({ name: '', domain: 'Science', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
+  const [newFounder, setNewFounder] = useState({ username: '', password: '', fullName: '' });
 
   const loadSchools = async () => {
     if (window.electronAPI) {
@@ -37,7 +45,7 @@ const SystemAdmin: React.FC = () => {
       e.preventDefault();
       if (window.electronAPI) {
           await window.electronAPI.addSchool(newSchool);
-          setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '' });
+          setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
           setIsAdding(false);
           loadSchools();
       }
@@ -53,18 +61,31 @@ const SystemAdmin: React.FC = () => {
       }
   }
 
-  const deleteSubject = async (id: number) => {
-      if (window.electronAPI && confirm('Supprimer définitivement cette matière du référentiel ?')) {
-          await window.electronAPI.deleteGlobalSubject(id);
-          loadGlobalSubjects();
-      }
+  const handleAddFounder = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedSchool || !window.electronAPI) return;
+
+      await window.electronAPI.addUser({
+          ...newFounder,
+          role: 'FOUNDER',
+          schoolId: selectedSchool.id
+      });
+
+      setNewFounder({ username: '', password: '', fullName: '' });
+      setIsAddingFounder(false);
+      // Reload users for this school
+      const users = await window.electronAPI.getUsers(selectedSchool.id);
+      setSchoolUsers(users || []);
   }
 
-  const openSchoolConfig = async (school: any) => {
+  const openSchoolDetail = async (school: any) => {
       setSelectedSchool(school);
       if (window.electronAPI) {
           const activeSubs = await window.electronAPI.getSchoolSubjects(school.id);
           setSchoolSubjects(activeSubs.filter((s: any) => s.is_active).map((s: any) => s.id));
+
+          const users = await window.electronAPI.getUsers(school.id);
+          setSchoolUsers(users || []);
       }
   }
 
@@ -80,256 +101,430 @@ const SystemAdmin: React.FC = () => {
       }
   }
 
-  if (user?.role !== 'SUPERADMIN') return <div className="p-20 text-center text-rose-500 font-black uppercase tracking-widest bg-slate-950 h-screen flex flex-col items-center justify-center">
-      <Shield className="w-16 h-16 mb-4 opacity-50" />
-      <h2 className="text-2xl">Accès Restreint</h2>
-      <p className="text-xs mt-2 opacity-70">Cette section est réservée à l'administration technique du système.</p>
-  </div>;
+  if (user?.role !== 'SUPERADMIN') return (
+    <div className="p-20 text-center bg-slate-950 h-screen flex flex-col items-center justify-center">
+      <div className="p-6 bg-rose-500/10 rounded-full mb-6 border border-rose-500/20">
+        <Lock className="w-12 h-12 text-rose-500" />
+      </div>
+      <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Maintenance Space Restricted</h2>
+      <p className="text-slate-500 mt-4 max-w-md font-medium">This workspace is reserved for system administrators and maintenance personnel.</p>
+    </div>
+  );
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+      {/* Maintenance Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-5xl font-black text-white tracking-tighter italic">ECO-HUB <span className="text-amber-500">ADMIN</span></h1>
-          <p className="text-slate-500 mt-2 uppercase text-xs font-black tracking-[0.3em]">Infrastructure Centrale du Système</p>
-        </div>
-        <div className="flex gap-4">
-            <button
-                onClick={() => setActiveTab('SCHOOLS')}
-                className={`px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all ${activeTab === 'SCHOOLS' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'bg-white/5 text-slate-500 hover:text-white'}`}
-            >
-                ÉTABLISSEMENTS
-            </button>
-            <button
-                onClick={() => setActiveTab('SUBJECTS')}
-                className={`px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all ${activeTab === 'SUBJECTS' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'bg-white/5 text-slate-500 hover:text-white'}`}
-            >
-                RÉFÉRENTIEL MATIÈRES
-            </button>
-        </div>
-      </div>
-
-      {activeTab === 'SCHOOLS' ? (
-      <>
-      <div className="flex justify-end">
-        <button
-          onClick={() => setIsAdding(true)}
-          className="btn-primary flex items-center px-8 py-4 text-sm"
-        >
-          <Plus className="w-5 h-5 mr-3" /> DÉPLOYER UNE INSTANCE
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="glass-card p-8 border-l-4 border-l-amber-500 bg-gradient-to-br from-slate-900 to-slate-950">
-              <div className="p-3 bg-amber-500/10 rounded-2xl w-fit mb-6">
-                <Globe className="w-8 h-8 text-amber-500" />
-              </div>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Établissements Actifs</p>
-              <p className="text-5xl font-black text-white mt-2 tracking-tighter">{schools.length}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">System Core v2.4.0</div>
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <div className="glass-card p-8 border-l-4 border-l-emerald-500 bg-gradient-to-br from-slate-900 to-slate-950">
-              <div className="p-3 bg-emerald-500/10 rounded-2xl w-fit mb-6">
-                <Shield className="w-8 h-8 text-emerald-500" />
-              </div>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Serveurs en Ligne</p>
-              <div className="flex items-center mt-2">
+          <h1 className="text-6xl font-black text-white tracking-tighter italic">ECO-HUB <span className="text-amber-500">ROOT</span></h1>
+          <p className="text-slate-500 mt-2 uppercase text-[10px] font-black tracking-[0.4em]">Infrastructure Management & Fleet Monitoring</p>
+        </div>
+
+        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+            {[
+              { id: 'INSTANCES', label: 'Instances', icon: Server },
+              { id: 'REGISTRY', label: 'Global Registry', icon: Database },
+              { id: 'HEALTH', label: 'Status', icon: Activity }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-3 px-6 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeTab === tab.id ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
+        </div>
+      </div>
+
+      {activeTab === 'INSTANCES' && (
+        <div className="space-y-8">
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border-white/5">
+                <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1">Active Schools</p>
                 <p className="text-5xl font-black text-white tracking-tighter">{schools.length}</p>
-                <div className="ml-4 flex flex-col justify-center">
-                    <span className="text-[10px] text-emerald-500 font-black uppercase flex items-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-ping" />
-                        Live
-                    </span>
+                <div className="mt-6 flex items-center gap-2 text-emerald-500 text-[10px] font-bold">
+                  <CheckCircle className="w-4 h-4" /> All Nodes Stable
+                </div>
+              </div>
+              <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border-white/5">
+                <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1">Global Storage</p>
+                <p className="text-5xl font-black text-white tracking-tighter">1.2<span className="text-xl">GB</span></p>
+                <div className="mt-6 w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-amber-500 h-full w-[15%]" />
+                </div>
+              </div>
+              <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border-white/5 md:col-span-2">
+                <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Maintenance Summary</p>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <span>Database Backups</span>
+                    <span className="text-emerald-500">Automated</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <span>Encryption Protocol</span>
+                    <span className="text-amber-500">AES-256 Active</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <span>Isolation Engine</span>
+                    <span className="text-white">Enabled</span>
+                  </div>
                 </div>
               </div>
           </div>
-          <div className="glass-card p-8 border-l-4 border-l-blue-500 bg-gradient-to-br from-slate-900 to-slate-950 col-span-1 md:col-span-2">
-              <div className="p-3 bg-blue-500/10 rounded-2xl w-fit mb-6">
-                <Plus className="w-8 h-8 text-blue-500" />
-              </div>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Capacité Système</p>
-              <p className="text-xl font-black text-white mt-2 italic">Infrastructure prête pour l'expansion régionale.</p>
-              <p className="text-[10px] text-blue-400 font-bold uppercase mt-2 tracking-widest">Multi-tenant isolation active</p>
-          </div>
-      </div>
 
-      <div className="glass-card border-none shadow-2xl overflow-hidden">
-          <div className="p-8 border-b border-white/5 bg-slate-900/80 flex flex-col md:flex-row justify-between items-center gap-4">
-              <h2 className="text-2xl font-black text-white tracking-tight flex items-center italic">
-                <Building2 className="w-7 h-7 mr-4 text-amber-500" />
-                Répertoire des Instances Déployées
-              </h2>
-              <div className="relative group min-w-[300px]">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-amber-500 transition-colors" />
-                  <input type="text" placeholder="Filtrer une école..." className="bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-6 py-3 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner w-full" />
-              </div>
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-3xl font-black text-white tracking-tighter italic">Instance Directory</h2>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2">Manage school deployments and administrative keys</p>
+            </div>
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-8 py-4 bg-white text-slate-950 rounded-2xl text-[10px] font-black tracking-[0.2em] hover:bg-amber-500 transition-all flex items-center shadow-xl"
+            >
+              <Plus className="w-5 h-5 mr-3" /> DEPLOY NEW INSTANCE
+            </button>
           </div>
-          <div className="overflow-x-auto">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {schools.map(s => (
+              <div key={s.id} className="glass-card group hover:border-amber-500/50 transition-all p-0 overflow-hidden bg-slate-900/50">
+                <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-2xl font-black shadow-lg transform group-hover:scale-105 transition-all">
+                      {s.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white uppercase tracking-tight">{s.name}</h3>
+                      <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-1">ID: HUB-SC-{s.id.toString().padStart(3, '0')}</p>
+                    </div>
+                  </div>
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <Activity className="w-4 h-4 text-emerald-500" />
+                  </div>
+                </div>
+                <div className="p-8 space-y-4">
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
+                    <MapPin className="w-4 h-4 text-slate-600" /> {s.address}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
+                    <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
+                  </div>
+                  <div className="pt-4 flex gap-3">
+                    <button
+                      onClick={() => openSchoolDetail(s)}
+                      className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Settings className="w-3.5 h-3.5" /> Configure
+                    </button>
+                    <button className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'REGISTRY' && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+           <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-3xl font-black text-white tracking-tighter italic">Global Subject Registry</h2>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2">Master list of Cameroon educational modules</p>
+            </div>
+            <button
+              onClick={() => setIsAddingSubject(true)}
+              className="px-8 py-4 bg-amber-500 text-slate-950 rounded-2xl text-[10px] font-black tracking-[0.2em] shadow-xl hover:scale-105 transition-all"
+            >
+              <Plus className="w-5 h-5 mr-3" /> ADD TO REGISTRY
+            </button>
+          </div>
+
+          <div className="glass-card p-0 overflow-hidden border-none shadow-2xl">
               <table className="w-full text-left">
                   <thead>
                       <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                          <th className="px-8 py-6">Établissement</th>
-                          <th className="px-8 py-6">Emplacement</th>
-                          <th className="px-8 py-6">Canaux de Support</th>
-                          <th className="px-8 py-6">Status Licence</th>
-                          <th className="px-8 py-6 text-right">Actions Système</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 bg-slate-900/30">
-                      {schools.map(s => (
-                          <tr key={s.id} className="hover:bg-white/5 transition-all group">
-                              <td className="px-8 py-6">
-                                  <div className="flex items-center">
-                                      <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center mr-5 text-lg font-black shadow-lg transform group-hover:rotate-6 transition-transform">
-                                          {s.name.charAt(0)}
-                                      </div>
-                                      <div>
-                                          <div className="font-black text-white uppercase text-base tracking-tight">{s.name}</div>
-                                          <div className="text-[10px] text-amber-500/70 font-black uppercase tracking-widest mt-1">Tenant Hash: CS-{s.id.toString(16).toUpperCase()}-99</div>
-                                      </div>
-                                  </div>
-                              </td>
-                              <td className="px-8 py-6">
-                                  <div className="flex items-center text-xs text-slate-400 font-bold uppercase tracking-tight">
-                                      <MapPin className="w-3.5 h-3.5 mr-2 text-slate-600" />
-                                      {s.address}
-                                  </div>
-                              </td>
-                              <td className="px-8 py-6">
-                                  <div className="space-y-1.5">
-                                      <div className="text-[10px] text-amber-500 font-black flex items-center">
-                                          <Mail className="w-3 h-3 mr-2" /> {s.contact_email}
-                                      </div>
-                                      <div className="text-[10px] text-white font-black flex items-center">
-                                          <Phone className="w-3 h-3 mr-2 text-slate-600" /> {s.contact_phone}
-                                      </div>
-                                  </div>
-                              </td>
-                              <td className="px-8 py-6">
-                                  <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[9px] font-black uppercase tracking-widest">
-                                      PERPÉTUELLE
-                                  </span>
-                              </td>
-                              <td className="px-8 py-6 text-right">
-                                  <div className="flex justify-end space-x-2">
-                                      <button onClick={() => openSchoolConfig(s)} className="p-3 text-slate-500 hover:text-amber-500 transition-colors bg-white/5 rounded-2xl border border-white/5 shadow-sm" title="Gérer les matières autorisées"><BookOpen className="w-4 h-4" /></button>
-                                      <button className="p-3 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-2xl border border-white/5 shadow-sm" title="Configurer l'instance"><Edit className="w-4 h-4" /></button>
-                                      <button className="p-3 text-slate-500 hover:text-rose-500 transition-colors bg-white/5 rounded-2xl border border-white/5 shadow-sm" title="Suspendre l'école"><Trash2 className="w-4 h-4" /></button>
-                                  </div>
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-      </>
-      ) : (
-      <>
-      <div className="flex justify-end">
-        <button
-          onClick={() => setIsAddingSubject(true)}
-          className="btn-primary flex items-center px-8 py-4 text-sm"
-        >
-          <Plus className="w-5 h-5 mr-3" /> NOUVELLE MATIÈRE GLOBALE
-        </button>
-      </div>
-
-      <div className="glass-card border-none shadow-2xl overflow-hidden">
-          <div className="p-8 border-b border-white/5 bg-slate-900/80 flex flex-col md:flex-row justify-between items-center gap-4">
-              <h2 className="text-2xl font-black text-white tracking-tight flex items-center italic">
-                <BookOpen className="w-7 h-7 mr-4 text-amber-500" />
-                Référentiel des Matières du Cameroun
-              </h2>
-          </div>
-          <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                  <thead>
-                      <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                          <th className="px-8 py-6">Matière</th>
-                          <th className="px-8 py-6">Domaine</th>
-                          <th className="px-8 py-6">Section</th>
-                          <th className="px-8 py-6">Niveau</th>
-                          <th className="px-8 py-6 text-right">Actions</th>
+                          <th className="px-10 py-6">Reference</th>
+                          <th className="px-10 py-6">Module Name</th>
+                          <th className="px-10 py-6">Domain</th>
+                          <th className="px-10 py-6">Target Level</th>
+                          <th className="px-10 py-6">Section</th>
+                          <th className="px-10 py-6 text-right">Ops</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 bg-slate-900/30">
                       {globalSubjects.map(subj => (
                           <tr key={subj.id} className="hover:bg-white/5 transition-all group">
-                              <td className="px-8 py-6 font-black text-white uppercase text-sm tracking-tight">{subj.name}</td>
-                              <td className="px-8 py-6">
+                              <td className="px-10 py-6">
+                                <span className="font-mono text-xs text-amber-500/50">SUB-{subj.id.toString().padStart(4, '0')}</span>
+                              </td>
+                              <td className="px-10 py-6 font-black text-white uppercase text-sm tracking-tight">{subj.name}</td>
+                              <td className="px-10 py-6">
                                   <span className="px-3 py-1 bg-white/5 text-slate-400 rounded-lg text-[10px] font-bold uppercase tracking-tight">{subj.domain}</span>
                               </td>
-                              <td className="px-8 py-6">
-                                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${subj.section === 'FRANCOPHONE' ? 'bg-blue-500/10 text-blue-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                              <td className="px-10 py-6 text-xs text-slate-400 font-bold uppercase tracking-widest">{subj.level}</td>
+                              <td className="px-10 py-6">
+                                  <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${subj.section === 'FRANCOPHONE' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                                       {subj.section}
                                   </span>
                               </td>
-                              <td className="px-8 py-6 text-xs text-slate-500 font-black uppercase tracking-widest">{subj.level}</td>
-                              <td className="px-8 py-6 text-right">
-                                  <button onClick={() => deleteSubject(subj.id)} className="p-3 text-slate-600 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              <td className="px-10 py-6 text-right">
+                                  <button className="p-3 text-slate-600 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                               </td>
                           </tr>
                       ))}
                   </tbody>
               </table>
           </div>
-      </div>
-      </>
+        </div>
       )}
 
+      {/* Detail School Modal (Full View) */}
       {selectedSchool && (
-          <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[150] flex items-center justify-center p-6 animate-in fade-in duration-300">
-              <div className="glass-card w-full max-w-4xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-10 border-b border-white/5 bg-slate-900/50 flex justify-between items-center">
-                      <div>
-                          <h2 className="text-3xl font-black text-white tracking-tighter">Configuration : {selectedSchool.name}</h2>
-                          <p className="text-amber-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Activation des matières du référentiel pour cet établissement</p>
+          <div className="fixed inset-0 bg-slate-950 z-[150] overflow-y-auto animate-in fade-in duration-300">
+              <div className="min-h-screen p-10 flex flex-col">
+                  <div className="flex justify-between items-start mb-16">
+                      <div className="flex items-center gap-8">
+                        <div className="w-24 h-24 rounded-3xl bg-amber-500 text-slate-950 flex items-center justify-center text-4xl font-black shadow-2xl">
+                          {selectedSchool.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h2 className="text-6xl font-black text-white tracking-tighter uppercase italic">{selectedSchool.name}</h2>
+                          <div className="flex gap-4 mt-3">
+                            <span className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Activity className="w-3 h-3 text-emerald-500" /> Instance Live
+                            </span>
+                            <span className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Cameroon Cluster
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <button onClick={() => setSelectedSchool(null)} className="p-4 bg-white/5 rounded-2xl text-slate-500 hover:text-white transition-all"><X className="w-6 h-6" /></button>
+                      <button
+                        onClick={() => setSelectedSchool(null)}
+                        className="p-5 bg-white/5 hover:bg-white/10 rounded-3xl text-slate-500 hover:text-white transition-all flex items-center gap-3 font-black text-[10px] uppercase tracking-widest border border-white/5"
+                      >
+                        <X className="w-6 h-6" /> Close Instance View
+                      </button>
                   </div>
-                  <div className="p-10 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {globalSubjects.map(subj => {
-                          const isActive = schoolSubjects.includes(subj.id);
-                          return (
-                              <button
-                                key={subj.id}
-                                onClick={() => toggleSchoolSubject(subj.id)}
-                                className={`p-6 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isActive ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/5' : 'bg-slate-950/50 border-slate-800 opacity-60 hover:opacity-100'}`}
-                              >
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 flex-1">
+                      {/* Left: General Info & Admin Users */}
+                      <div className="space-y-8">
+                        <section className="glass-card p-10 bg-slate-900 border-white/10">
+                          <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
+                              <Building2 className="w-6 h-6 text-amber-500" /> Metadata
+                            </h3>
+                            <button className="p-2 text-slate-500 hover:text-white transition-colors"><Edit className="w-4 h-4" /></button>
+                          </div>
+                          <div className="space-y-6">
+                            {[
+                              { icon: MapPin, label: 'Headquarters', value: selectedSchool.address },
+                              { icon: Globe, label: 'Contact Email', value: selectedSchool.contact_email },
+                              { icon: Phone, label: 'System Phone', value: selectedSchool.contact_phone },
+                              { icon: Mail, label: 'BP / Mailbox', value: selectedSchool.bp || 'N/A' },
+                            ].map((item, i) => (
+                              <div key={i}>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{item.label}</p>
+                                <div className="flex items-center gap-3 text-white font-black text-sm">
+                                  <item.icon className="w-4 h-4 text-amber-500/50" />
+                                  {item.value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="glass-card p-10 bg-slate-900 border-white/10">
+                          <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
+                              <Shield className="w-6 h-6 text-amber-500" /> Founders & Keys
+                            </h3>
+                            <button
+                              onClick={() => setIsAddingFounder(true)}
+                              className="p-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-slate-950 rounded-xl transition-all"
+                            >
+                              <UserPlus className="w-5 h-5" />
+                            </button>
+                          </div>
+                          <div className="space-y-4">
+                            {schoolUsers.filter(u => u.role === 'FOUNDER').map(u => (
+                              <div key={u.id} className="p-5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between group">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-slate-400 group-hover:text-amber-500 transition-colors">
+                                    F
+                                  </div>
                                   <div>
-                                      <p className={`font-black uppercase text-sm tracking-tight ${isActive ? 'text-amber-500' : 'text-white'}`}>{subj.name}</p>
-                                      <p className="text-[10px] text-slate-500 font-bold mt-1">{subj.section} • {subj.level}</p>
+                                    <p className="text-sm font-black text-white uppercase">{u.fullName}</p>
+                                    <p className="text-[10px] text-slate-500 font-bold">@{u.username}</p>
                                   </div>
-                                  <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${isActive ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'border-slate-800 group-hover:border-slate-600'}`}>
-                                      {isActive && <CheckCircle className="w-5 h-5" />}
-                                  </div>
-                              </button>
-                          );
-                      })}
-                  </div>
-                  <div className="p-8 border-t border-white/5 bg-slate-950/50 flex justify-end">
-                      <button onClick={() => setSelectedSchool(null)} className="btn-primary px-12 py-4">TERMINER LA CONFIGURATION</button>
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button className="p-2 text-slate-500 hover:text-white"><Edit className="w-3.5 h-3.5" /></button>
+                                  <button className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                              </div>
+                            ))}
+                            {schoolUsers.filter(u => u.role === 'FOUNDER').length === 0 && (
+                              <div className="text-center py-6 text-slate-600 border-2 border-dashed border-white/5 rounded-3xl">
+                                No Founder account deployed yet
+                              </div>
+                            )}
+                          </div>
+                        </section>
+                      </div>
+
+                      {/* Right: Subject Permissions (authorized for this school) */}
+                      <div className="lg:col-span-2 space-y-8">
+                        <section className="glass-card p-10 bg-slate-900 border-white/10">
+                          <div className="flex justify-between items-center mb-10">
+                            <div>
+                              <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase flex items-center gap-4">
+                                <BookOpen className="w-8 h-8 text-amber-500" /> Authorized Registry
+                              </h3>
+                              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Subjects enabled for this instance from the global catalog</p>
+                            </div>
+                            <div className="px-6 py-3 bg-white/5 rounded-2xl border border-white/5 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                              {schoolSubjects.length} Modules Active
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {globalSubjects.map(subj => {
+                                const isActive = schoolSubjects.includes(subj.id);
+                                return (
+                                    <button
+                                      key={subj.id}
+                                      onClick={() => toggleSchoolSubject(subj.id)}
+                                      className={`p-8 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isActive ? 'bg-amber-500/5 border-amber-500 shadow-xl shadow-amber-500/5' : 'bg-slate-950/50 border-slate-800 opacity-40 hover:opacity-100 hover:border-slate-600'}`}
+                                    >
+                                        <div>
+                                            <p className={`font-black uppercase text-base tracking-tight ${isActive ? 'text-amber-500' : 'text-slate-300'}`}>{subj.name}</p>
+                                            <p className="text-[10px] text-slate-500 font-bold mt-1 tracking-widest">{subj.section} • {subj.level}</p>
+                                        </div>
+                                        <div className={`w-10 h-10 rounded-2xl border-2 flex items-center justify-center transition-all ${isActive ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-lg' : 'border-slate-800 group-hover:border-slate-600'}`}>
+                                            {isActive ? <CheckCircle className="w-6 h-6" /> : <Plus className="w-5 h-5 text-slate-600" />}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                          </div>
+                        </section>
+
+                        <div className="flex justify-end pt-10">
+                          <button
+                            onClick={() => setSelectedSchool(null)}
+                            className="px-16 py-6 bg-white text-slate-950 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-amber-500 hover:scale-105 transition-all"
+                          >
+                            Finalize Configuration
+                          </button>
+                        </div>
+                      </div>
                   </div>
               </div>
           </div>
       )}
 
+      {/* Add School Modal */}
+      {isAdding && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-2xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
+                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
+                      <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Deploy New Node</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Provisioning fresh isolated resources for the fleet</p>
+                  </div>
+                  <form onSubmit={handleAddSchool} className="p-10 space-y-8">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">School Full Name</label>
+                          <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Groupe Scolaire Bilingue..." />
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">City / Location</label>
+                            <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Douala, Bonamoussadi" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">P.O Box (BP)</label>
+                            <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="BP 450..." />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Support Email</label>
+                            <input type="email" className="input-field w-full" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Support Phone</label>
+                            <input className="input-field w-full" value={newSchool.contact_phone} onChange={e => setNewSchool({...newSchool, contact_phone: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="pt-8 flex gap-4">
+                          <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-5 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">Cancel</button>
+                          <button type="submit" className="btn-primary flex-[2] py-5 flex items-center justify-center gap-3">
+                              <ExternalLink className="w-5 h-5" /> INITIALIZE INSTANCE
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Add Founder Modal */}
+      {isAddingFounder && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-md bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
+                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
+                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Create Founder</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Primary owner for {selectedSchool?.name}</p>
+                  </div>
+                  <form onSubmit={handleAddFounder} className="p-10 space-y-6">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Full Name</label>
+                          <input required className="input-field w-full" value={newFounder.fullName} onChange={e => setNewFounder({...newFounder, fullName: e.target.value})} placeholder="John Doe" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Login Username</label>
+                          <input required className="input-field w-full" value={newFounder.username} onChange={e => setNewFounder({...newFounder, username: e.target.value})} placeholder="admin_name" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Access Password</label>
+                          <input required type="password" className="input-field w-full font-mono" value={newFounder.password} onChange={e => setNewFounder({...newFounder, password: e.target.value})} />
+                      </div>
+                      <div className="pt-8 flex gap-4">
+                          <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Cancel</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">DEPLOY FOUNDER</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Add Subject Modal */}
       {isAddingSubject && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-6 animate-in zoom-in-95 duration-300">
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
                   <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter">Ajouter au Référentiel</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Définir une nouvelle matière pour l'ensemble du parc</p>
+                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Registry Entry</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Add new educational module to the central repository</p>
                   </div>
                   <form onSubmit={handleAddSubject} className="p-10 space-y-6">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Intitulé de la Matière</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Module Title</label>
                           <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domain</label>
                             <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
                                 <option>Science</option>
                                 <option>Langue</option>
@@ -347,60 +542,15 @@ const SystemAdmin: React.FC = () => {
                         </div>
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau d'Enseignement</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target Cycle</label>
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
                               <option value="MATERNELLE">Maternelle</option>
                               <option value="PRIMAIRE">Primaire</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Annuler</button>
-                          <button type="submit" className="btn-primary flex-[2] py-4">ENREGISTRER LA MATIÈRE</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {isAdding && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
-                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter">Déploiement d'Instance</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2 italic">Initialisation des ressources isolées pour un nouvel établissement</p>
-                  </div>
-                  <form onSubmit={handleAddSchool} className="p-10 space-y-8">
-                      <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                            <Building2 className="w-3 h-3 mr-2" /> Nom officiel de l'école
-                          </label>
-                          <input required className="input-field w-full text-lg py-4" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Ex: Groupe Scolaire Bilingue..." />
-                      </div>
-                      <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                            <MapPin className="w-3 h-3 mr-2" /> Ville & Quartier
-                          </label>
-                          <input className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Ex: Douala, Akwa" />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                                <Mail className="w-3 h-3 mr-2" /> Email Admin
-                            </label>
-                            <input className="input-field w-full" type="email" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                                <Phone className="w-3 h-3 mr-2" /> Téléphone
-                            </label>
-                            <input className="input-field w-full" value={newSchool.contact_phone} onChange={e => setNewSchool({...newSchool, contact_phone: e.target.value})} />
-                        </div>
-                      </div>
-                      <div className="pt-8 flex flex-col md:flex-row gap-4">
-                          <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-5 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all order-2 md:order-1">Annuler</button>
-                          <button type="submit" className="btn-primary flex-[2] py-5 order-1 md:order-2 flex items-center justify-center">
-                              <CheckCircle className="w-5 h-5 mr-3" /> INITIALISER L'INSTANCE
-                          </button>
+                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Discard</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">REGISTER MODULE</button>
                       </div>
                   </form>
               </div>
