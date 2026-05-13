@@ -22,6 +22,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
     neighborhood: '',
     section: 'FRANCOPHONE',
     classId: '',
+    scholarshipReduction: 0,
+    hasMoratoire: false,
   });
 
   useEffect(() => {
@@ -158,6 +160,25 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
                         <option key={c.id} value={c.id}>{c.name} ({c.level})</option>
                     ))}
                 </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Réduction Scolarité (Bourse)</label>
+              <input
+                type="number"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-colors"
+                value={formData.scholarshipReduction}
+                onChange={(e) => setFormData({...formData, scholarshipReduction: parseFloat(e.target.value) || 0})}
+              />
+            </div>
+            <div className="flex items-center space-x-3 pt-6">
+                <input
+                    type="checkbox"
+                    id="moratoire"
+                    className="w-5 h-5 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
+                    checked={formData.hasMoratoire}
+                    onChange={(e) => setFormData({...formData, hasMoratoire: e.target.checked})}
+                />
+                <label htmlFor="moratoire" className="text-xs font-black text-white uppercase tracking-widest">Éligible au Moratoire</label>
             </div>
             <div className="space-y-1 col-span-1 md:col-span-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Antécédents Médicaux / Infos Santé</label>

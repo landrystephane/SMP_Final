@@ -1,46 +1,23 @@
-/**
- * Cameroon MINEDUB Standards for Grade Evaluation
- */
-
-export const NURSERY_DOMAINS = [
-  'Langue et Communication (Language & Communication)',
-  'Éveil Scientifique (Science & Tech)',
-  'Vie Courante (Life Skills)',
-  'Création et Artistique (Arts & Craft)',
-  'Motricité (Physical Education)'
-];
-
-export const getAppreciationNursery = (score: number, isEnglish: boolean = false) => {
-  // Normalize to 20 if needed, but assuming score passed is already on 20
-  if (isEnglish) {
-    if (score >= 18) return { code: 'AE', label: 'Above Expectation', label_en: 'Above Expectation' };
-    if (score >= 15) return { code: 'ME', label: 'Meeting Expectation', label_en: 'Meeting Expectation' };
-    if (score >= 11) return { code: 'E', label: 'Acquiring', label_en: 'Acquiring' };
-    return { code: 'NYE', label: 'Not Yet Meeting Expectation', label_en: 'Not Yet Meeting Expectation' };
-  }
-  if (score >= 18) return { code: 'A+', label: 'Expert', label_en: 'Expert' };
-  if (score >= 15) return { code: 'A', label: 'Acquis', label_en: 'Acquired' };
-  if (score >= 11) return { code: 'ECA', label: 'En cours d\'acquisition', label_en: 'In progress' };
-  return { code: 'NA', label: 'Non acquis', label_en: 'Not acquired' };
+export const getNurseryAppreciation = (score: number) => {
+    if (score >= 18) return { label: 'A+', color: '#10b981', remark: 'Expert' };
+    if (score >= 14) return { label: 'A', color: '#3b82f6', remark: 'Acquis' };
+    if (score >= 10) return { label: 'ECA', color: '#f59e0b', remark: 'En cours d\'acquisition' };
+    return { label: 'NA', color: '#ef4444', remark: 'Non acquis' };
 };
 
-export const getAppreciationPrimary = (score: number, isEnglish: boolean = false) => {
-  if (isEnglish) {
-      if (score >= 18) return 'Above Expectation';
-      if (score >= 15) return 'Meeting Expectation';
-      if (score >= 11) return 'Acquiring';
-      return 'Not Yet Meeting Expectation';
-  }
-  if (score >= 18) return 'Excellent';
-  if (score >= 16) return 'Très Bien';
-  if (score >= 14) return 'Bien';
-  if (score >= 12) return 'Assez Bien';
-  if (score >= 10) return 'Passable';
-  return 'Médiocre';
+export const getPrimaryAppreciation = (score: number) => {
+    if (score >= 18) return 'EXCELLENT';
+    if (score >= 16) return 'TRÈS BIEN';
+    if (score >= 14) return 'BIEN';
+    if (score >= 12) return 'ASSEZ BIEN';
+    if (score >= 10) return 'PASSIBLE';
+    if (score >= 8) return 'INSUFFISANT';
+    return 'MÉDIOCRE';
 };
 
-export const calculateAverage = (scores: number[]) => {
-  if (scores.length === 0) return 0;
-  const sum = scores.reduce((a, b) => a + b, 0);
-  return (sum / scores.length).toFixed(2);
+export const calculateAttendanceObservations = (hours: number) => {
+    if (hours === 0) return 'CONDUITE EXEMPLAIRE';
+    if (hours <= 5) return 'À ENCOURAGER';
+    if (hours <= 15) return 'CONDUITE À SURVEILLER';
+    return 'AVERTISSEMENT CONDUITE';
 };

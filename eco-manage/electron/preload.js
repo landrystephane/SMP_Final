@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Students
   getStudents: (schoolId) => ipcRenderer.invoke('db:getStudents', schoolId),
+  getStudentDetails: (id) => ipcRenderer.invoke('db:getStudentDetails', id),
   addStudent: (student) => ipcRenderer.invoke('db:addStudent', student),
+  updateStudent: (student) => ipcRenderer.invoke('db:updateStudent', student),
   assignStudentToBus: (data) => ipcRenderer.invoke('db:assignStudentToBus', data),
 
   // Grades
@@ -16,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Finance
   getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
+  deletePayment: (id) => ipcRenderer.invoke('db:deletePayment', id),
   getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
   getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
@@ -25,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Pedagogy
   getGlobalSubjects: () => ipcRenderer.invoke('db:getGlobalSubjects'),
   addGlobalSubject: (subject) => ipcRenderer.invoke('db:addGlobalSubject', subject),
+  deleteGlobalSubject: (id) => ipcRenderer.invoke('db:deleteGlobalSubject', id),
   getSchoolSubjects: (schoolId) => ipcRenderer.invoke('db:getSchoolSubjects', schoolId),
   toggleSchoolSubject: (data) => ipcRenderer.invoke('db:toggleSchoolSubject', data),
   getClassSubjects: (classId) => ipcRenderer.invoke('db:getClassSubjects', classId),
@@ -35,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Users
   getUsers: (schoolId) => ipcRenderer.invoke('db:getUsers', schoolId),
   addUser: (user) => ipcRenderer.invoke('db:addUser', user),
+  toggleUserActive: (data) => ipcRenderer.invoke('db:toggleUserActive', data),
   changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
 
   // Communication
@@ -44,6 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Transport
   getBusRoutes: (schoolId) => ipcRenderer.invoke('db:getBusRoutes', schoolId),
   getRouteStudents: (routeId) => ipcRenderer.invoke('db:getRouteStudents', routeId),
+  getTransportPoints: (routeId) => ipcRenderer.invoke('db:getTransportPoints', routeId),
   logTransport: (log) => ipcRenderer.invoke('db:logTransport', log),
 
   // Attendance

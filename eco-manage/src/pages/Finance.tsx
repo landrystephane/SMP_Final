@@ -12,6 +12,7 @@ const Finance: React.FC = () => {
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
+  const [filterDate, setFilterDate] = useState('');
 
   const [installments, setInstallments] = useState<any[]>([]);
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
@@ -57,7 +58,8 @@ const Finance: React.FC = () => {
 
   const getStudentFinancials = (student: any) => {
       const classConfig = tuitionFees.find(f => f.classId === student.class_id);
-      const totalPension = classConfig?.totalFee || 0;
+      const scholarship = student.scholarship_reduction || 0;
+      const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
       const totalReg = classConfig?.registrationFee || 0;
       const totalDue = totalPension + totalReg;
 
@@ -152,9 +154,17 @@ const Finance: React.FC = () => {
                         <Clock className="w-6 h-6 mr-3 text-amber-500" />
                         {t('collection_journal')}
                     </h2>
-                    <button className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
-                        <Download className="w-4 h-4 mr-2" /> {t('export_report')}
-                    </button>
+                    <div className="flex gap-4">
+                        <input
+                            type="date"
+                            className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black text-white outline-none focus:ring-1 focus:ring-amber-500"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                        />
+                        <button className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
+                            <Download className="w-4 h-4 mr-2" /> {t('export_report')}
+                        </button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -169,7 +179,9 @@ const Finance: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {payments.map(p => (
+                            {payments
+                             .filter(p => !filterDate || p.payment_date.startsWith(filterDate))
+                             .map(p => (
                                 <tr key={p.id} className="hover:bg-white/5 transition-colors group">
                                     <td className="px-6 py-4 font-mono text-sm text-amber-500 font-bold tracking-tighter">#{p.receipt_number}</td>
                                     <td className="px-6 py-4">

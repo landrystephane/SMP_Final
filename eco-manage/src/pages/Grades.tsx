@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, Unlock, FileText, BookOpen } from 'lucide-react';
+import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
 import { useAuth } from '../context/AuthContext';
 
 const Grades: React.FC = () => {
   const { t } = useTranslation();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const [sections, _setSections] = useState(['FRANCOPHONE', 'ANGLOPHONE']);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -18,47 +18,47 @@ const Grades: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('month_oct');
 
   const [grades, setGrades] = useState<Record<string, number>>({});
-  const [dbGrades, setDbGrades] = useState<any[]>([]);
   const [isLocked, setIsLocked] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
+  const loadData = async () => {
       if (window.electronAPI) {
-        const c = await window.electronAPI.getClasses();
-        const s = await window.electronAPI.getSubjects();
+        const c = await window.electronAPI.getClasses(user?.schoolId);
         setClasses(c);
-        setSubjects(s);
       }
-    };
-    init();
-  }, []);
+  }
 
-  const handleLoadStudents = async () => {
+  useEffect(() => { loadData(); }, []);
+
+  const handleLoadContext = async () => {
     if (window.electronAPI && selectedClass) {
-        const allStudents = await window.electronAPI.getStudents();
+        const classObj = classes.find(c => c.id.toString() === selectedClass);
+        const allStudents = await window.electronAPI.getStudents(user?.schoolId);
         setStudents(allStudents.filter((s: any) => s.class_id.toString() === selectedClass));
+
+        const classSubs = await window.electronAPI.getClassSubjects(parseInt(selectedClass));
+        setSubjects(classSubs);
 
         const existingGrades = await window.electronAPI.getGrades({
             classId: parseInt(selectedClass),
             term: selectedTerm
         });
-        setDbGrades(existingGrades);
 
         const gradeMap: Record<string, number> = {};
+        let locked = false;
         existingGrades.forEach((g: any) => {
             if (g.month === selectedMonth) {
                 gradeMap[`${g.student_id}-${g.subject_id}`] = g.score;
-                if (g.locked) setIsLocked(true);
+                if (g.locked) locked = true;
             }
         });
         setGrades(gradeMap);
+        setIsLocked(locked);
     }
   };
 
   useEffect(() => {
     if (selectedClass && selectedMonth) {
-        handleLoadStudents();
-        setIsLocked(false);
+        handleLoadContext();
     }
   }, [selectedClass, selectedMonth, selectedTerm]);
 
@@ -72,7 +72,7 @@ const Grades: React.FC = () => {
           term: selectedTerm,
           month: selectedMonth,
           score: score,
-          teacher_id: 1 // TODO: get from auth
+          teacher_id: user?.id
         };
       });
 
@@ -80,30 +80,43 @@ const Grades: React.FC = () => {
       const result = await window.electronAPI.saveGrades(formattedGrades);
       if (result.success) {
         setIsLocked(true);
-        alert(t('grades_locked_msg') || 'Notes enregistrées et verrouillées.');
-        handleLoadStudents();
+        alert(t('grades_locked_msg'));
+        handleLoadContext();
       } else {
         alert('Erreur: ' + result.error);
       }
-    } else {
-        localStorage.setItem(`pending_grades_${selectedClass}_${selectedMonth}`, JSON.stringify(formattedGrades));
-        alert(t('sync_pending_msg') || 'Sauvegardé localement. Synchronisez plus tard.');
     }
   };
 
   const handleUnlock = async () => {
     if (window.electronAPI) {
-        if (confirm(t('confirm_unlock') || 'Êtes-vous sûr de vouloir déverrouiller ces notes ?')) {
+        if (confirm(t('confirm_unlock'))) {
             await window.electronAPI.unlockGrades({
                 classId: parseInt(selectedClass),
                 term: selectedTerm,
                 month: selectedMonth
             });
             setIsLocked(false);
-            handleLoadStudents();
+            handleLoadContext();
         }
     }
   };
+
+  const printStudentReport = async (student: any) => {
+      if (window.electronAPI) {
+          const details = await window.electronAPI.getStudentDetails(student.id);
+          const classObj = classes.find(c => c.id.toString() === selectedClass);
+          const school = (await window.electronAPI.getSchools())[0];
+          generateReportCard({
+              student,
+              classObj,
+              school,
+              grades: details.grades.filter((g: any) => g.term === selectedTerm),
+              attendance: details.attendance,
+              term: selectedTerm
+          });
+      }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -111,25 +124,6 @@ const Grades: React.FC = () => {
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">{t('grades_management')}</h1>
           <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest">{t('grades_subtitle')}</p>
-        </div>
-        <div className="flex space-x-2">
-            {selectedClass && students.length > 0 && (
-                <button
-                    onClick={() => {
-                        const s = students[0];
-                        const classSubjects = subjects.filter(sub => sub.level === classes.find(c => c.id.toString() === selectedClass)?.level && sub.section === selectedSection);
-                        generateReportCard(
-                            { ...s, className: classes.find(c => c.id.toString() === selectedClass)?.name },
-                            dbGrades.filter(g => g.student_id === s.id),
-                            selectedSection,
-                            classSubjects
-                        );
-                    }}
-                    className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center shadow-lg"
-                >
-                    <FileText className="w-4 h-4 mr-2" /> {t('report_card_preview')} <span className="ml-1 opacity-50">{t('first_student_only')}</span>
-                </button>
-            )}
         </div>
       </div>
 
@@ -139,10 +133,7 @@ const Grades: React.FC = () => {
           <select
             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
             value={selectedSection}
-            onChange={(e) => {
-                setSelectedSection(e.target.value);
-                setSelectedClass('');
-            }}
+            onChange={(e) => { setSelectedSection(e.target.value); setSelectedClass(''); }}
           >
             <option value="">{t('choose_section')}</option>
             {sections.map(s => <option key={s} value={s}>{t(`section_${s.toLowerCase()}`)}</option>)}
@@ -167,8 +158,8 @@ const Grades: React.FC = () => {
           <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
             value={selectedTerm} onChange={(e) => setSelectedTerm(parseInt(e.target.value))}>
             <option value={1}>{t('term_1')}</option>
-            <option value={2}>{t('term_2') || 'Term 2'}</option>
-            <option value={3}>{t('term_3') || 'Term 3'}</option>
+            <option value={2}>{t('term_2')}</option>
+            <option value={3}>{t('term_3')}</option>
           </select>
         </div>
         <div className="space-y-1">
@@ -228,15 +219,13 @@ const Grades: React.FC = () => {
                 <thead className="text-[10px] uppercase text-slate-500 font-black border-b border-white/5">
                   <tr className="bg-slate-900/50">
                     <th className="px-6 py-5 sticky left-0 bg-slate-900 backdrop-blur-md z-10">{t('student')}</th>
-                    {subjects.filter(s =>
-                      s.level === classes.find(c => c.id.toString() === selectedClass)?.level &&
-                      s.section === selectedSection
-                    ).map(s => (
+                    {subjects.map(s => (
                       <th key={s.id} className="px-4 py-5 text-center min-w-[120px]">
                         <div className="truncate max-w-[100px] mx-auto text-white">{s.name}</div>
                         <div className="text-[8px] text-amber-500/50 mt-0.5">{t('coefficient')}: {s.coefficient}</div>
                       </th>
                     ))}
+                    <th className="px-6 py-5 text-right">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -246,10 +235,7 @@ const Grades: React.FC = () => {
                         <div className="text-white font-black uppercase text-sm tracking-tight">{student.last_name}</div>
                         <div className="text-[10px] text-slate-500 font-bold">{student.first_name}</div>
                       </td>
-                      {subjects.filter(s =>
-                        s.level === classes.find(c => c.id.toString() === selectedClass)?.level &&
-                        s.section === selectedSection
-                      ).map(subject => (
+                      {subjects.map(subject => (
                         <td key={subject.id} className="px-4 py-4">
                           <input
                             type="number"
@@ -267,6 +253,14 @@ const Grades: React.FC = () => {
                           />
                         </td>
                       ))}
+                      <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => printStudentReport(student)}
+                            className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5"
+                          >
+                              <FileText className="w-5 h-5" />
+                          </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

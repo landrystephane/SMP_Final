@@ -194,6 +194,10 @@ handleIPC('db:addPayment', async (event, payment) => {
   return { success: false };
 });
 
+handleIPC('db:deletePayment', async (event, id) => {
+    return db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+});
+
 handleIPC('db:getTuitionFees', async (event, schoolId) => {
   const sid = schoolId || 1;
   return db.prepare(`
@@ -238,6 +242,10 @@ handleIPC('db:addGlobalSubject', async (event, subject) => {
   const { name, domain, level, section } = subject;
   return db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)')
     .run(name, domain, level, section);
+});
+
+handleIPC('db:deleteGlobalSubject', async (event, id) => {
+  return db.prepare('DELETE FROM subjects WHERE id = ?').run(id);
 });
 
 handleIPC('db:getSchoolSubjects', async (event, schoolId) => {
@@ -397,6 +405,26 @@ handleIPC('db:getTickets', async (event, { userId, role, schoolId }) => {
   }
   return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ? AND (t.sender_id = ? OR t.receiver_role = ?)')
     .all(sid, userId, role);
+});
+
+handleIPC('db:getStudentDetails', async (event, studentId) => {
+  const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ?').get(studentId);
+  const payments = db.prepare('SELECT p.*, i.name as installmentName FROM payments p LEFT JOIN installments i ON p.installment_id = i.id WHERE p.student_id = ?').all(studentId);
+  const attendance = db.prepare('SELECT * FROM attendance WHERE student_id = ?').all(studentId);
+  const grades = db.prepare('SELECT g.*, s.name as subjectName FROM grades g JOIN subjects s ON g.subject_id = s.id WHERE g.student_id = ?').all(studentId);
+
+  return { student, payments, attendance, grades };
+});
+
+handleIPC('db:updateStudent', async (event, student) => {
+  const { id, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire } = student;
+  return db.prepare(`
+    UPDATE students SET
+      first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, gender = ?,
+      parent_contact = ?, emergency_contact = ?, medical_info = ?, address = ?, neighborhood = ?,
+      section = ?, class_id = ?, scholarship_reduction = ?, has_moratoire = ?
+    WHERE id = ?
+  `).run(firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire, id);
 });
 
 handleIPC('db:getDashboardStats', async (event, params) => {

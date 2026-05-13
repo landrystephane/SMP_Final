@@ -1,211 +1,128 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { getAppreciationNursery, getAppreciationPrimary } from './pedagogy';
+import 'jspdf-autotable';
+import { getNurseryAppreciation, getPrimaryAppreciation, calculateAttendanceObservations } from './pedagogy';
 
-export const generateReportCard = (student: any, grades: any[], section: string, allSubjects: any[], schoolInfo?: any) => {
-  const doc = new jsPDF();
-  const isNursery = student.level === 'MATERNELLE';
-  const isEnglish = section === 'ANGLOPHONE';
-  const school = schoolInfo || {
-      name: 'Complexe Scolaire Bilingue Eco-Manage',
-      motto: 'Travail - Discipline - Succès',
-      address: 'Yaoundé, Cameroun',
-      bp: 'BP 1234'
-  };
+export const generateReportCard = (data: any) => {
+    const { student, classObj, school, grades, attendance, term } = data;
+    const doc = new jsPDF();
+    const isNursery = classObj.level === 'MATERNELLE';
 
-  // Header
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('REPUBLIQUE DU CAMEROUN', 105, 10, { align: 'center' });
-  doc.text('REPUBLIC OF CAMEROON', 105, 13, { align: 'center' });
-  doc.text('MINISTERE DE L\'EDUCATION DE BASE', 105, 16, { align: 'center' });
-  doc.text('MINISTRY OF BASIC EDUCATION', 105, 19, { align: 'center' });
+    // Header
+    doc.setFontSize(10);
+    doc.text(school.name.toUpperCase(), 105, 15, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(school.motto || 'Paix - Travail - Patrie', 105, 20, { align: 'center' });
+    doc.text(school.address || '', 105, 25, { align: 'center' });
 
-  // School Specific Branding
-  doc.setFontSize(10);
-  doc.text(school.name.toUpperCase(), 105, 26, { align: 'center' });
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(7);
-  doc.text(school.motto || '', 105, 30, { align: 'center' });
-  doc.text(`${school.address} | ${school.bp || ''}`, 105, 33, { align: 'center' });
+    doc.line(20, 30, 190, 30);
 
-  doc.setFontSize(14);
-  const title = isNursery
-    ? (isEnglish ? 'PROGRESS REPORT (NURSERY)' : 'CARNET DE SUIVI (MATERNELLE)')
-    : (isEnglish ? 'PROGRESS REPORT' : 'BULLETIN DE NOTES');
-  doc.text(title, 105, 30, { align: 'center' });
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`BULLETIN DE NOTES - TRIMESTRE ${term}`, 105, 40, { align: 'center' });
 
-  // Student & School Info Box
-  doc.setDrawColor(200);
-  doc.rect(14, 38, 182, 30);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${isEnglish ? 'Name' : 'Nom'} : ${student.lastName || student.last_name} ${student.firstName || student.first_name}`, 20, 45);
-  doc.text(`${isEnglish ? 'ID' : 'Matricule'} : ${student.matricule}`, 20, 52);
-  doc.text(`Classe : ${student.className || 'N/A'}`, 20, 59);
+    // Student Info
+    doc.setFontSize(10);
+    doc.text(`ÉLÈVE: ${student.last_name} ${student.first_name}`, 20, 55);
+    doc.text(`MATRICULE: ${student.matricule}`, 20, 62);
+    doc.text(`CLASSE: ${classObj.name}`, 140, 55);
+    doc.text(`ANNÉE: ${new Date().getFullYear()}`, 140, 62);
 
-  doc.text(`Section : ${section}`, 130, 45);
-  doc.text(`Année Scolaire : ${student.schoolYear || '2025-2026'}`, 130, 52);
-  doc.text(`Trimestre : ${student.term || '1'}`, 130, 59);
+    // Grades Table
+    const tableHeaders = isNursery
+        ? [['MATIÈRE / DOMAINE', 'ÉVALUATION', 'OBSERVATION']]
+        : [['MATIÈRE', 'NOTE', 'COEF', 'TOTAL', 'APPRÉCIATION']];
 
-  // Merge grades with all subjects to ensure every subject appears
-  const completeGrades = allSubjects.map(subject => {
-      const grade = grades.find(g => g.subject_id === subject.id);
-      return {
-          ...subject,
-          score: grade ? grade.score : null,
-          coef: subject.coefficient
-      };
-  });
-
-  // Table logic
-  let tableHead, tableBody;
-
-  if (isNursery) {
-    tableHead = [[isEnglish ? 'Domains / Subjects' : 'Domaines / Activités', 'Cote', isEnglish ? 'Appreciation' : 'Appréciation']];
-    tableBody = completeGrades.map(g => {
-        const appreciation = g.score !== null ? getAppreciationNursery(g.score, isEnglish) : { code: '-', label: '-', label_en: '-' };
-        return [g.name + (g.is_optional ? ' (*)' : ''), appreciation.code, isEnglish ? appreciation.label_en : appreciation.label];
+    const tableBody = grades.map((g: any) => {
+        if (isNursery) {
+            const app = getNurseryAppreciation(g.score);
+            return [g.subjectName, app.label, app.remark];
+        } else {
+            return [
+                g.subjectName,
+                g.score.toFixed(2),
+                g.coefficient,
+                (g.score * g.coefficient).toFixed(2),
+                getPrimaryAppreciation(g.score)
+            ];
+        }
     });
-  } else {
-    tableHead = [[isEnglish ? 'Subjects' : 'Matières', 'Note / 20', 'Coef', 'Total', isEnglish ? 'Appreciation' : 'Appréciation']];
-    tableBody = completeGrades.map(g => {
-      const score = g.score;
-      const coef = g.coef || 1;
-      const total = score !== null ? (score * coef).toFixed(2) : '-';
-      const app = score !== null ? (isEnglish ? getAppreciationPrimary(score, true) : getAppreciationPrimary(score)) : '-';
 
-      return [g.name + (g.is_optional ? ' (*)' : ''), score !== null ? score : '-', coef, total, app];
+    (doc as any).autoTable({
+        startY: 75,
+        head: tableHeaders,
+        body: tableBody,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     });
-  }
 
-  autoTable(doc, {
-    startY: 75,
-    head: tableHead,
-    body: tableBody,
-    theme: 'grid',
-    headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 80 } },
-  });
+    // Summary & Attendance
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    const totalAbsence = attendance.reduce((acc: number, cur: any) => acc + (cur.hours_absent || 0), 0);
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.text('RÉSUMÉ PÉDAGOGIQUE', 20, finalY);
+    doc.setFontSize(9);
+    doc.text(`Absences: ${totalAbsence} heures`, 20, finalY + 8);
+    doc.text(`Conduite: ${calculateAttendanceObservations(totalAbsence)}`, 20, finalY + 16);
 
-  // Summary Stats
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  const gradedSubjects = completeGrades.filter(g => g.score !== null);
-  const totalPoints = gradedSubjects.reduce((acc, g) => acc + (g.score * (g.coef || 1)), 0);
-  const totalCoef = gradedSubjects.reduce((acc, g) => acc + (g.coef || 1), 0);
-  const average = totalCoef > 0 ? (totalPoints / totalCoef).toFixed(2) : '0.00';
+    if (!isNursery) {
+        const totalPoints = grades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
+        const totalCoef = grades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
+        const average = totalPoints / (totalCoef || 1);
 
-  doc.text(`Total : ${totalPoints.toFixed(2)} / ${totalCoef * 20}`, 14, finalY);
-  doc.text(`${isEnglish ? 'Average' : 'Moyenne'} : ${average} / 20`, 14, finalY + 7);
-  doc.text(`${isEnglish ? 'Rank' : 'Rang'} : ${student.rank || '...'}`, 14, finalY + 14);
+        doc.setFontSize(12);
+        doc.text(`MOYENNE GÉNÉRALE: ${average.toFixed(2)} / 20`, 140, finalY + 16, { align: 'right' });
+    }
 
-  doc.text(`${isEnglish ? 'Class Average' : 'Moy. Classe'} : ${student.classAverage || '...'}`, 130, finalY);
-  doc.text(`${isEnglish ? 'Absences' : 'Absences'} : ${student.absences || 0} ${isEnglish ? 'hours' : 'heures'}`, 130, finalY + 7);
+    // Signatures
+    doc.text('L\'ENSEIGNANT', 30, finalY + 40);
+    doc.text('LE DIRECTEUR', 150, finalY + 40);
 
-  // Observation after absences
-  let observation = "RAS";
-  if (student.absences > 10) observation = isEnglish ? "Warning: Excessive absences" : "Blâme: Absences excessives";
-  else if (student.absences > 5) observation = isEnglish ? "Notice: Regular attendance required" : "Avertissement: Manque d'assiduité";
-
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(9);
-  doc.text(`Observation : ${observation}`, 130, finalY + 14);
-
-  // Decision
-  doc.setFont('helvetica', 'bold');
-  doc.setLineWidth(0.5);
-  doc.line(14, finalY + 22, 196, finalY + 22);
-  doc.text(isEnglish ? 'ADMISSION DECISION' : 'DÉCISION DU CONSEIL', 14, finalY + 30);
-  doc.setFont('helvetica', 'normal');
-  doc.rect(14, finalY + 34, 182, 15);
-
-  // Footer / Signatures
-  doc.setFontSize(9);
-  doc.text(isEnglish ? 'Teacher\'s Signature' : 'Visa Enseignant', 14, finalY + 65);
-  doc.text(isEnglish ? 'Parent\'s Signature' : 'Visa Parent', 105, finalY + 65, { align: 'center' });
-  doc.text(isEnglish ? 'Director\'s Signature' : 'Visa Directeur', 196, finalY + 65, { align: 'right' });
-
-  doc.save(`bulletin_${student.matricule}.pdf`);
-};
-
-export const generateRegistrationSheet = (student: any) => {
-  const doc = new jsPDF();
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ECO-MANAGE - FICHE D\'ENREGISTREMENT', 105, 20, { align: 'center' });
-
-  doc.setLineWidth(0.5);
-  doc.line(20, 25, 190, 25);
-
-  doc.setFontSize(11);
-  doc.text('IDENTITE DE L\'ELEVE', 20, 40);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Nom Complet: ${student.last_name} ${student.first_name}`, 20, 50);
-  doc.text(`Matricule: ${student.matricule}`, 20, 57);
-  doc.text(`Classe Affectée: ${student.className || 'Non définie'}`, 20, 64);
-  doc.text(`Quartier: ${student.neighborhood || 'N/A'}`, 20, 71);
-  doc.text(`Date & Lieu de Naissance: ${student.birth_date} à ${student.birth_place}`, 20, 78);
-  doc.text(`Sexe: ${student.gender === 'M' ? 'Masculin' : 'Féminin'}`, 20, 85);
-  doc.text(`Section: ${student.section}`, 20, 92);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('CONTACTS D\'URGENCE', 20, 110);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Parent: ${student.parent_contact}`, 20, 120);
-  doc.text(`Urgence: ${student.emergency_contact || 'N/A'}`, 20, 127);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('INFORMATIONS MEDICALES', 20, 145);
-  doc.setFont('helvetica', 'normal');
-  doc.rect(20, 150, 170, 30);
-  doc.text(student.medical_info || 'Néant.', 25, 160, { maxWidth: 160 });
-
-  doc.setFontSize(8);
-  doc.text(`Document généré le ${new Date().toLocaleDateString()} par le Secrétariat Eco-Manage`, 105, 280, { align: 'center' });
-
-  doc.save(`fiche_${student.matricule}.pdf`);
+    doc.save(`Bulletin_${student.matricule}_T${term}.pdf`);
 };
 
 export const generatePaymentReceipt = (payment: any, student: any, financials: any) => {
     const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('REÇU DE PAIEMENT / PAYMENT RECEIPT', 105, 20, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(`N°: ${payment.receipt_number}`, 105, 28, { align: 'center' });
-
-    doc.rect(14, 40, 182, 100);
-    doc.setFontSize(12);
-    doc.text(`Élève / Student: ${student.last_name} ${student.first_name}`, 20, 55);
-    doc.text(`Matricule / ID: ${student.matricule}`, 20, 62);
-    doc.text(`Classe / Class: ${student.className || 'N/A'}`, 20, 69);
-    doc.text(`Motif / Purpose: ${payment.payment_type}`, 20, 79);
-
     doc.setFontSize(14);
-    doc.text(`MONTANT VERSÉ: ${payment.amount.toLocaleString()} FCFA`, 20, 95);
+    doc.text('REÇU DE PAIEMENT', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`REÇU N°: ${payment.receipt_number}`, 20, 35);
+    doc.text(`DATE: ${new Date(payment.payment_date).toLocaleDateString()}`, 140, 35);
+
+    doc.line(20, 40, 190, 40);
+
+    doc.text(`ÉLÈVE: ${student.last_name} ${student.first_name}`, 20, 55);
+    doc.text(`MATRICULE: ${student.matricule}`, 20, 62);
+
+    doc.setFontSize(12);
+    doc.text(`MONTANT PAYÉ: ${payment.amount.toLocaleString()} FCFA`, 20, 80);
+    doc.text(`MOTIF: ${payment.payment_type.toUpperCase()}`, 20, 90);
 
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Scolarité Totale: ${financials.totalDue.toLocaleString()} FCFA`, 20, 110);
-    doc.text(`Cumul payé: ${financials.totalPaid.toLocaleString()} FCFA`, 20, 117);
-    doc.text(`RESTE À PAYER: ${financials.balance.toLocaleString()} FCFA`, 20, 124);
+    doc.text('SITUATION FINANCIÈRE APRÈS PAIEMENT:', 20, 110);
+    doc.text(`Total dû: ${financials.totalDue.toLocaleString()} FCFA`, 30, 120);
+    doc.text(`Total versé: ${financials.totalPaid.toLocaleString()} FCFA`, 30, 128);
+    doc.text(`Reste à payer: ${financials.balance.toLocaleString()} FCFA`, 30, 136);
 
-    // Breakdown
-    doc.setFontSize(8);
-    let breakdownText = `Répartition: Inscription: ${financials.breakdown.registration.toLocaleString()}`;
-    financials.breakdown.installments.forEach((inst: any) => {
-        breakdownText += ` | ${inst.name}: ${inst.paid.toLocaleString()}`;
-    });
-    doc.text(breakdownText, 20, 132);
+    doc.text('Signature de l\'Économe', 140, 160);
 
-    doc.text(`Fait le ${new Date().toLocaleDateString()}`, 140, 155);
-    doc.text('Le Caissier / Bursar', 140, 165);
+    doc.save(`Recu_${payment.receipt_number}.pdf`);
+};
 
-    doc.save(`recu_${payment.receipt_number}.pdf`);
+export const generateRegistrationSheet = (student: any) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('FICHE D\'ENREGISTREMENT ÉLÈVE', 105, 20, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(`MATRICULE: ${student.matricule}`, 20, 40);
+    doc.text(`NOM: ${student.last_name}`, 20, 50);
+    doc.text(`PRÉNOM: ${student.first_name}`, 20, 60);
+    doc.text(`CLASSE: ${student.className}`, 20, 70);
+    doc.text(`SECTION: ${student.section}`, 20, 80);
+    doc.text(`CONTACT PARENT: ${student.parent_contact}`, 20, 90);
+    doc.text(`INFOS MÉDICALES: ${student.medical_info || 'N/A'}`, 20, 100);
+
+    doc.save(`Fiche_${student.matricule}.pdf`);
 };
