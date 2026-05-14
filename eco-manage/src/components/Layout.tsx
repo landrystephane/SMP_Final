@@ -33,7 +33,7 @@ const Layout: React.FC = () => {
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
     { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['DRIVER'] },
-    { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['PARENT'] },
+    { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['PARENT', 'SUPERADMIN', 'FOUNDER'] },
   ];
 
   return (

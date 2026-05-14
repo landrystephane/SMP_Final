@@ -5,19 +5,48 @@ import { useAuth } from '../context/AuthContext';
 const ParentPortal: React.FC = () => {
     const { user } = useAuth();
     const [selectedChild, setSelectedChild] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<any>(null);
 
     const loadData = async () => {
         if (window.electronAPI && user) {
             const studs = await window.electronAPI.getStudents(user.schoolId);
-            if (studs.length > 0) setSelectedChild(studs[0]);
+            if (studs.length > 0) {
+                setSelectedChild(studs[0]);
+                const details = await window.electronAPI.getStudentDetails(studs[0].id);
+                setStats(details);
+            } else if (user.role === 'SUPERADMIN' || user.role === 'FOUNDER') {
+                // Mock data for demo
+                setSelectedChild({ first_name: 'Junior', last_name: 'DEMO', matricule: '24DEMO001', neighborhood: 'Bastos' });
+                setStats({ grades: [{ score: 15.5 }, { score: 14 }] });
+            }
+        } else {
+             // Browser mock
+             setSelectedChild({ first_name: 'Junior', last_name: 'DEMO', matricule: '24DEMO001', neighborhood: 'Bastos' });
         }
+        setLoading(false);
     };
 
     useEffect(() => {
         loadData();
     }, [user]);
 
-    if (!selectedChild) return <div className="p-20 text-center text-slate-500 font-black uppercase tracking-widest animate-pulse">Initialisation du Portail Parent...</div>;
+    if (loading) return (
+        <div className="h-[70vh] flex flex-col items-center justify-center space-y-4">
+            <Activity className="w-12 h-12 text-amber-500 animate-pulse" />
+            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">Initialisation du Portail Parent...</p>
+        </div>
+    );
+
+    if (!selectedChild) return (
+        <div className="p-20 text-center space-y-6">
+            <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto border border-white/5">
+                <User className="w-10 h-10 text-slate-700" />
+            </div>
+            <h2 className="text-xl font-black text-white uppercase italic">Aucun élève associé</h2>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">Veuillez contacter le secrétariat pour lier votre compte parent à la fiche de votre enfant.</p>
+        </div>
+    );
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-4xl mx-auto">
@@ -44,7 +73,13 @@ const ParentPortal: React.FC = () => {
                     </div>
                     <div className="p-6 bg-slate-950 rounded-2xl border border-white/5">
                         <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Moyenne Trimestrielle</p>
-                        <p className="text-3xl font-black text-emerald-500">14.50 <span className="text-xs text-slate-600">/ 20</span></p>
+                        <p className="text-3xl font-black text-emerald-500">
+                            {stats?.grades?.length > 0
+                                ? (stats.grades.reduce((acc: any, g: any) => acc + g.score, 0) / stats.grades.length).toFixed(2)
+                                : '14.50'
+                            }
+                            <span className="text-xs text-slate-600"> / 20</span>
+                        </p>
                         <button className="w-full mt-6 py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all flex items-center justify-center shadow-lg">
                             <ClipboardList className="w-4 h-4 mr-2" /> BULLETIN PDF
                         </button>
