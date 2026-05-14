@@ -24,9 +24,18 @@ export interface ElectronAPI {
   getSetting: (key: string) => Promise<string | null>;
   setSetting: (data: { key: string, value: string }) => Promise<any>;
   saveAttendance: (data: any) => Promise<any>;
-  getAttendance: (data: { studentId: number, term: number }) => Promise<any>;
+  getAttendance: (data: { classId?: number, date?: string, studentId?: number, term?: number }) => Promise<any>;
   getSchools: () => Promise<any[]>;
   addSchool: (school: any) => Promise<any>;
+  updateSchool: (school: any) => Promise<any>;
+  getGlobalSubjects: () => Promise<any[]>;
+  addGlobalSubject: (subject: any) => Promise<any>;
+  deleteGlobalSubject: (id: number) => Promise<any>;
+  getSchoolSubjects: (schoolId: number) => Promise<any[]>;
+  toggleSchoolSubject: (data: { schoolId: number, subjectId: number, isActive: boolean }) => Promise<any>;
+  getClassSubjects: (classId: number) => Promise<any[]>;
+  assignSubjectToClass: (data: { classId: number, subjectId: number, coefficient: number, isOptional: boolean }) => Promise<any>;
+  removeSubjectFromClass: (data: { classId: number, subjectId: number }) => Promise<any>;
   getBusRoutes: (schoolId: number) => Promise<any[]>;
   getRouteStudents: (routeId: number) => Promise<any[]>;
   logTransport: (log: any) => Promise<any>;
@@ -35,6 +44,11 @@ export interface ElectronAPI {
   getMobileKeys: () => Promise<any[]>;
   generateMobileKey: (data: { name: string, userId: number | null }) => Promise<any>;
   revokeMobileKey: (id: number) => Promise<any>;
+  getStudentDetails: (studentId: number) => Promise<any>;
+  updateStudent: (student: any) => Promise<any>;
+  assignStudentToBus: (data: { studentId: number, routeId: number }) => Promise<any>;
+  getTransportPoints: (routeId: number) => Promise<any[]>;
+  deletePayment: (id: number) => Promise<any>;
 }
 
 declare global {

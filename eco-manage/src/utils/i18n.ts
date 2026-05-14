@@ -211,7 +211,8 @@ i18n
           parent_portal: 'Portail Parent',
           pedagogy_advisor: 'Conseiller Pédagogique',
           transport_driver: 'Portail Chauffeur',
-          system_admin: 'Admin Système'
+          system_admin: 'Admin Système',
+          stats: 'Statistiques'
         }
       },
       en: {
@@ -413,7 +414,8 @@ i18n
           parent_portal: 'Parent Portal',
           pedagogy_advisor: 'Pedagogical Advisor',
           transport_driver: 'Driver Portal',
-          system_admin: 'System Admin'
+          system_admin: 'System Admin',
+          stats: 'Statistics'
         }
       }
     }

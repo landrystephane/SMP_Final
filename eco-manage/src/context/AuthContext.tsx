@@ -7,6 +7,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (roles: Role[]) => boolean;
+  switchSchool: (schoolId: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,6 +74,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('impersonated_school_id');
+  };
+
+  const switchSchool = (schoolId: number) => {
+      if (user?.role === 'SUPERADMIN') {
+          const updatedUser = { ...user, schoolId };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          localStorage.setItem('impersonated_school_id', schoolId.toString());
+      }
   };
 
   const [isSgActingDirector, setIsSgActingDirector] = useState(false);
@@ -102,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole, switchSchool }}>
       {children}
     </AuthContext.Provider>
   );

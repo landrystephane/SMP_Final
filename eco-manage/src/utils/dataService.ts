@@ -42,7 +42,6 @@ class DataService {
 
   async getUnsyncedGrades() {
     if (Capacitor.getPlatform() === 'web') {
-        // Fallback to localStorage for mobile browsers
         const allPending: any[] = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -58,35 +57,60 @@ class DataService {
     return res.values || [];
   }
 
+  async getUnsyncedAttendance() {
+      if (Capacitor.getPlatform() === 'web') {
+          const allPending: any[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key?.startsWith('pending_attendance_')) {
+                  const data = JSON.parse(localStorage.getItem(key) || '[]');
+                  allPending.push(...data);
+              }
+          }
+          return allPending;
+      }
+      if (!this.db) return [];
+      const res = await this.db.query('SELECT * FROM local_attendance WHERE synced = 0');
+      return res.values || [];
+  }
+
   async sync(serverIp: string, activationKey: string) {
     const grades = await this.getUnsyncedGrades();
-    if (grades.length === 0) return { success: true, count: 0 };
+    const attendance = await this.getUnsyncedAttendance();
+
+    if (grades.length === 0 && attendance.length === 0) return { success: true, count: 0 };
 
     try {
-      const response = await fetch(`http://${serverIp}:3001/api/grades`, {
+      const response = await fetch(`http://${serverIp}:3001/api/sync/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-activation-key': activationKey
         },
-        body: JSON.stringify(grades)
+        body: JSON.stringify({ grades, attendance })
       });
 
       if (response.ok) {
-        // Mark as synced
         if (Capacitor.getPlatform() === 'web') {
-            // Clean up localStorage
+            const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key?.startsWith('pending_grades_')) {
-                    localStorage.removeItem(key);
+                if (key?.startsWith('pending_grades_') || key?.startsWith('pending_attendance_')) {
+                    keysToRemove.push(key);
                 }
             }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
         } else {
-            const ids = grades.map((g: any) => g.id).join(',');
-            await this.db.run(`UPDATE local_grades SET synced = 1 WHERE id IN (${ids})`);
+            if (grades.length > 0) {
+                const gIds = grades.map((g: any) => g.id).join(',');
+                await this.db.run(`UPDATE local_grades SET synced = 1 WHERE id IN (${gIds})`);
+            }
+            if (attendance.length > 0) {
+                const aIds = attendance.map((a: any) => a.id).join(',');
+                await this.db.run(`UPDATE local_attendance SET synced = 1 WHERE id IN (${aIds})`);
+            }
         }
-        return { success: true, count: grades.length };
+        return { success: true, count: grades.length + attendance.length };
       } else {
         const error = await response.text();
         throw new Error(error);

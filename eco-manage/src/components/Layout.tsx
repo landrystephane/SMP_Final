@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, Settings, GraduationCap, Building2, Calendar, Bus, HeartHandshake } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, Settings, GraduationCap, Building2, Calendar, Bus, HeartHandshake, TrendingUp } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -15,23 +15,25 @@ const Layout: React.FC = () => {
     navigate('/login');
   };
 
+  const isImpersonating = localStorage.getItem('impersonated_school_id') !== null;
+
   const menuItems = [
-    { key: 'dashboard', path: '/', icon: LayoutDashboard, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SECRETARY', 'BURSAR', 'TEACHER', 'SG', 'ADVISOR'] },
-    { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['SUPERADMIN', 'PARENT'] },
-    { key: 'students', path: '/students', icon: Users, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] },
-    { key: 'subjects', path: '/subjects', icon: BookOpen, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'] },
-    { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'TEACHER', 'SG', 'ADVISOR'] },
-    { key: 'finance', path: '/finance', icon: CreditCard, roles: ['SUPERADMIN', 'FOUNDER', 'BURSAR', 'SG'] },
-    { key: 'tuition_config', path: '/tuition-config', icon: Settings, roles: ['SUPERADMIN', 'FOUNDER', 'BURSAR'] },
-    { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'] },
-    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] },
-    { key: 'users', path: '/users', icon: UserCheck, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'] },
-    { key: 'transport', path: '/transport', icon: Bus, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'] },
-    { key: 'pedagogy_advisor', path: '/advisor', icon: Calendar, roles: ['SUPERADMIN', 'ADVISOR'] },
-    { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['SUPERADMIN', 'DRIVER'] },
-    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE', 'SG'] },
+    { key: 'dashboard', path: '/', icon: LayoutDashboard, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'BURSAR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'students', path: '/students', icon: Users, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'subjects', path: '/subjects', icon: BookOpen, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'finance', path: '/finance', icon: CreditCard, roles: ['FOUNDER', 'BURSAR', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'tuition_config', path: '/tuition-config', icon: Settings, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'stats', path: '/stats', icon: TrendingUp, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'users', path: '/users', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'transport', path: '/transport', icon: Bus, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
-    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['SUPERADMIN', 'TEACHER', 'DIRECTOR', 'SECRETARY'] },
+    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
+    { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['DRIVER'] },
+    { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['PARENT'] },
   ];
 
   return (

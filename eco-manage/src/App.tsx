@@ -22,6 +22,7 @@ import SystemAdmin from './pages/SystemAdmin';
 import AdvisorPortal from './pages/AdvisorPortal';
 import DriverPortal from './pages/DriverPortal';
 import ParentPortal from './pages/ParentPortal';
+import Statistics from './pages/Statistics';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -62,6 +63,7 @@ function App() {
             <Route path="advisor" element={<AdvisorPortal />} />
             <Route path="driver-portal" element={<DriverPortal />} />
             <Route path="parent-portal" element={<ParentPortal />} />
+            <Route path="stats" element={<Statistics />} />
           </Route>
         </Routes>
       </BrowserRouter>

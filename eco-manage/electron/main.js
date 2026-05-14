@@ -322,6 +322,11 @@ handleIPC('db:getBusRoutes', async (event, schoolId) => {
     return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(sid);
 });
 
+handleIPC('db:getTransportPoints', async (event, routeId) => {
+    if (!routeId) return [];
+    return db.prepare('SELECT * FROM transport_points WHERE route_id = ? ORDER BY estimated_time_from_start').all(routeId);
+});
+
 handleIPC('db:getRouteStudents', async (event, routeId) => {
     return db.prepare('SELECT * FROM students WHERE bus_route_id = ?').all(routeId);
 });

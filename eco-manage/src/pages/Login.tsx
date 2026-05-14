@@ -15,6 +15,8 @@ const Login: React.FC = () => {
     if (isAuthenticated) {
       if (user?.role === 'SUPERADMIN') {
           navigate('/system-admin');
+      } else if (user?.role === 'DRIVER') {
+          navigate('/driver-portal');
       } else {
           navigate('/');
       }

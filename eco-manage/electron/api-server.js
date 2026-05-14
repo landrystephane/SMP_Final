@@ -26,11 +26,11 @@ function startApiServer() {
     res.json(students);
   });
 
-  app.post('/api/grades', validateMobileKey, (req, res) => {
-    const grades = req.body; // Expecting an array of grades
+  app.post('/api/sync/bulk', validateMobileKey, (req, res) => {
+    const { grades = [], attendance = [] } = req.body;
 
-    const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
-    const upsert = db.prepare(`
+    const checkGradeLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
+    const upsertGrade = db.prepare(`
       INSERT INTO grades (student_id, subject_id, class_id, term, month, score, teacher_id, locked)
       VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @teacher_id, 1)
       ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
@@ -40,19 +40,29 @@ function startApiServer() {
       WHERE locked = 0
     `);
 
-    const transaction = db.transaction((gradesList) => {
-      for (const g of gradesList) {
-        const existing = checkLock.get(g.student_id, g.subject_id, g.term, g.month);
-        if (existing && existing.locked === 1) {
-          throw new Error(`Grade for student ${g.student_id} is locked.`);
-        }
-        upsert.run(g);
+    const upsertAttendance = db.prepare(`
+      INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(student_id, date) DO UPDATE SET
+          status = excluded.status,
+          hours_absent = excluded.hours_absent,
+          recorded_by = excluded.recorded_by
+    `);
+
+    const transaction = db.transaction(() => {
+      for (const g of grades) {
+        const existing = checkGradeLock.get(g.student_id, g.subject_id, g.term, g.month);
+        if (existing && existing.locked === 1) continue; // Skip locked grades instead of failing entire batch
+        upsertGrade.run(g);
+      }
+      for (const a of attendance) {
+          upsertAttendance.run(a.student_id, a.date, a.status, a.hours_absent, a.recorded_by);
       }
     });
 
     try {
-      transaction(grades);
-      res.json({ success: true });
+      transaction();
+      res.json({ success: true, processedGrades: grades.length, processedAttendance: attendance.length });
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
     }

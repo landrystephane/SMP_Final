@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const SystemAdmin: React.FC = () => {
-  const { user } = useAuth();
+  const { user, switchSchool } = useAuth();
   const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH'>('INSTANCES');
   const [schools, setSchools] = useState<any[]>([]);
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
@@ -219,9 +219,15 @@ const SystemAdmin: React.FC = () => {
                   <div className="pt-4 flex gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}
-                      className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
                     >
-                      <Settings className="w-3.5 h-3.5" /> Configure
+                      <Settings className="w-3.5 h-3.5" /> Config
+                    </button>
+                    <button
+                      onClick={() => switchSchool(s.id)}
+                      className="flex-1 py-3 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Access
                     </button>
                     <button className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
                       <Trash2 className="w-4 h-4" />
