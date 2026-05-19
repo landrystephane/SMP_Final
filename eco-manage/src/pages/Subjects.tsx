@@ -16,8 +16,8 @@ const Subjects: React.FC = () => {
   });
 
   const { hasRole, user } = useAuth();
-  const isSuperAdmin = hasRole(['SUPERADMIN']);
-  const canConfigClass = hasRole(['ADVISOR', 'DIRECTOR', 'FOUNDER']);
+  const canManageRegistry = hasRole(['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG']);
+  const canConfigClass = hasRole(['ADVISOR', 'DIRECTOR', 'FOUNDER', 'SG']);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -104,7 +104,7 @@ const Subjects: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">Programmes & Matières</h1>
           <p className="text-slate-400 mt-1 text-sm">Configuration pédagogique par classe</p>
         </div>
-        {isSuperAdmin && (
+        {canManageRegistry && (
           <button
             onClick={() => setIsAddingGlobal(true)}
             className="btn-primary flex items-center"

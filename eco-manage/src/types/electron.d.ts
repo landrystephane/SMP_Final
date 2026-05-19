@@ -1,20 +1,27 @@
 export interface ElectronAPI {
   login: (credentials: any) => Promise<any>;
   getStudents: (schoolId?: number) => Promise<any[]>;
+  getParentStudents: (parentPhone: string) => Promise<any[]>;
   addStudent: (student: any) => Promise<any>;
   getGrades: (filters: any) => Promise<any[]>;
   saveGrades: (grades: any[]) => Promise<any>;
   unlockGrades: (params: { classId: number; term: number; month: string }) => Promise<any>;
+  getClassSubjectsValidationStatus: (params: { classId: number; term: number; month: string }) => Promise<any[]>;
+  validateSubjectGrades: (params: { classId: number; subjectId: number; term: number; month: string }) => Promise<any>;
   getPayments: (schoolId?: number) => Promise<any[]>;
   addPayment: (payment: any) => Promise<any>;
   sendTicket: (ticket: any) => Promise<any>;
-  getTickets: () => Promise<any[]>;
-  getDashboardStats: (params: { schoolId: number, section?: string }) => Promise<any>;
+  getTickets: (params?: any) => Promise<any[]>;
+  getAnnouncements: (schoolId?: number) => Promise<any[]>;
+  sendAnnouncement: (announcement: any) => Promise<any>;
+  getDashboardStats: (params: { schoolId: number, section?: string, level?: string }) => Promise<any>;
   getSubjects: (schoolId?: number) => Promise<any[]>;
   addSubject: (subject: any) => Promise<any>;
   getClasses: (schoolId?: number) => Promise<any[]>;
   getUsers: (schoolId?: number) => Promise<any[]>;
   addUser: (user: any) => Promise<any>;
+  updateUser: (user: any) => Promise<any>;
+  deleteUser: (id: number) => Promise<any>;
   changePassword: (data: { userId: number, newPassword: string }) => Promise<any>;
   getTuitionFees: (schoolId?: number) => Promise<any[]>;
   updateTuitionFee: (data: { classId: number, totalFee: number, registrationFee?: number }) => Promise<any>;
@@ -49,6 +56,9 @@ export interface ElectronAPI {
   assignStudentToBus: (data: { studentId: number, routeId: number }) => Promise<any>;
   getTransportPoints: (routeId: number) => Promise<any[]>;
   deletePayment: (id: number) => Promise<any>;
+  updateSchoolSettings: (data: any) => Promise<any>;
+  getSchoolArchives: (schoolId?: number) => Promise<any[]>;
+  createSchoolYearArchive: (data: { schoolId: number; yearName: string }) => Promise<any>;
 }
 
 declare global {

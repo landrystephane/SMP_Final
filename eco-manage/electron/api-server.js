@@ -15,14 +15,20 @@ function startApiServer() {
     const key = req.headers['x-activation-key'];
     if (!key) return res.status(401).send('Missing activation key');
 
-    const keyExists = db.prepare('SELECT * FROM mobile_access_keys WHERE access_key = ? AND status != "REVOKED"').get(key);
-    if (!keyExists) return res.status(403).send('Invalid or revoked key');
+    const keyData = db.prepare('SELECT * FROM mobile_access_keys WHERE access_key = ? AND status != "REVOKED"').get(key);
+    if (!keyData) return res.status(403).send('Invalid or revoked key');
+    
+    // Attach user context based on the key ownership
+    const user = db.prepare('SELECT school_id, id as user_id FROM users WHERE id = ?').get(keyData.assigned_to_user_id);
+    if (!user) return res.status(403).send('Associated user not found or deleted');
+    
+    req.userContext = user;
     next();
   };
 
   // Mobile endpoints
   app.get('/api/students', validateMobileKey, (req, res) => {
-    const students = db.prepare('SELECT * FROM students').all();
+    const students = db.prepare('SELECT * FROM students WHERE school_id = ?').all(req.userContext.school_id);
     res.json(students);
   });
 
@@ -51,12 +57,15 @@ function startApiServer() {
 
     const transaction = db.transaction(() => {
       for (const g of grades) {
+        if (g.score == null) continue;
         const existing = checkGradeLock.get(g.student_id, g.subject_id, g.term, g.month);
-        if (existing && existing.locked === 1) continue; // Skip locked grades instead of failing entire batch
+        if (existing && existing.locked === 1) continue; // Skip locked grades
+        // Override teacher_id and class_id to ensure integrity
+        g.teacher_id = req.userContext.user_id; 
         upsertGrade.run(g);
       }
       for (const a of attendance) {
-          upsertAttendance.run(a.student_id, a.date, a.status, a.hours_absent, a.recorded_by);
+          upsertAttendance.run(a.student_id, a.date, a.status, a.hours_absent, req.userContext.user_id); // Override recorded_by
       }
     });
 

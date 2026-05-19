@@ -13,7 +13,11 @@ const Users: React.FC = () => {
     password: '',
     fullName: '',
     role: 'TEACHER' as Role,
-    classId: ''
+    classId: '',
+    civility: 'M.',
+    section: 'FRANCOPHONE',
+    cycle: 'PRIMAIRE',
+    gender: 'M'
   });
 
   const loadData = async () => {
@@ -37,7 +41,17 @@ const Users: React.FC = () => {
           schoolId: currentUser.schoolId,
           assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : []
       });
-      setNewUser({ username: '', password: '', fullName: '', role: 'TEACHER', classId: '' });
+      setNewUser({ 
+          username: '', 
+          password: '', 
+          fullName: '', 
+          role: 'TEACHER', 
+          classId: '', 
+          civility: 'M.', 
+          section: 'FRANCOPHONE', 
+          cycle: 'PRIMAIRE',
+          gender: 'M' 
+      });
       loadData();
     }
   };
@@ -69,16 +83,32 @@ const Users: React.FC = () => {
                     <h2 className="text-2xl font-black tracking-tight text-white uppercase italic">Recrutement Agent</h2>
                 </div>
                 <form onSubmit={handleAddUser} className="space-y-5">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nom Complet</label>
-                        <input
-                            type="text"
-                            className="input-field w-full"
-                            value={newUser.fullName}
-                            onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
-                            required
-                            placeholder="Mballa Joseph"
-                        />
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-1 space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Civilité</label>
+                            <select
+                                className="input-field w-full appearance-none cursor-pointer"
+                                value={newUser.civility}
+                                onChange={(e) => {
+                                    const civ = e.target.value;
+                                    setNewUser({...newUser, civility: civ, gender: civ === 'M.' ? 'M' : 'F'});
+                                }}
+                            >
+                                <option value="M.">M.</option>
+                                <option value="Mme">Mme</option>
+                            </select>
+                        </div>
+                        <div className="col-span-2 space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nom Complet</label>
+                            <input
+                                type="text"
+                                className="input-field w-full"
+                                value={newUser.fullName}
+                                onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
+                                required
+                                placeholder="Joseph Mballa"
+                            />
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -120,16 +150,44 @@ const Users: React.FC = () => {
                     </div>
 
                     {newUser.role === 'TEACHER' && (
-                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                            <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Classe Assignée</label>
-                            <select
-                                className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
-                                value={newUser.classId}
-                                onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
-                            >
-                                <option value="">Aucune affectation...</option>
-                                {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.section})</option>)}
-                            </select>
+                        <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Section</label>
+                                    <select
+                                        className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
+                                        value={newUser.section}
+                                        onChange={(e) => setNewUser({...newUser, section: e.target.value, classId: ''})}
+                                    >
+                                        <option value="FRANCOPHONE">FRANCOPHONE</option>
+                                        <option value="ANGLOPHONE">ANGLOPHONE</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Cycle</label>
+                                    <select
+                                        className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
+                                        value={newUser.cycle || 'PRIMAIRE'}
+                                        onChange={(e) => setNewUser({...newUser, cycle: e.target.value, classId: ''})}
+                                    >
+                                        <option value="PRIMAIRE">Primaire</option>
+                                        <option value="MATERNELLE">Maternelle</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Classe Assignée</label>
+                                <select
+                                    className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
+                                    value={newUser.classId}
+                                    onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
+                                >
+                                    <option value="">Aucune affectation...</option>
+                                    {classes
+                                        .filter(c => c.section === newUser.section && c.level === (newUser.cycle || 'PRIMAIRE'))
+                                        .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
                         </div>
                     )}
 
@@ -179,8 +237,18 @@ const Users: React.FC = () => {
                           {u.fullName.charAt(0)}
                         </div>
                         <div>
-                            <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">{u.fullName}</div>
-                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Agent ID: #{u.id.toString().padStart(3, '0')}</div>
+                            <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
+                                {u.civility ? `${u.civility} ` : ''}{u.fullName}
+                            </div>
+                            <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                                <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>
+                                {u.role === 'TEACHER' && u.section && (
+                                    <>
+                                        <span>•</span>
+                                        <span>{u.section}</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
                       </div>
                     </td>

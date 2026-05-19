@@ -5,23 +5,41 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getPrimaryAppreciation } from '../utils/pedagogy';
+import { generateHonorCertificate } from '../utils/reports';
 
 const Statistics: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
+  const [activeCycle, setActiveCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
+  const [school, setSchool] = useState<any>(null);
+
+  useEffect(() => {
+    const loadSchool = async () => {
+      if (window.electronAPI && user) {
+        const schoolsList = await window.electronAPI.getSchools();
+        const curSchool = schoolsList.find((s: any) => s.id === user.schoolId);
+        setSchool(curSchool);
+      }
+    };
+    loadSchool();
+  }, [user]);
 
   useEffect(() => {
     const loadStats = async () => {
       if (window.electronAPI && user) {
-        const data = await window.electronAPI.getDashboardStats({ schoolId: user.schoolId, section: activeSection });
+        const data = await window.electronAPI.getDashboardStats({ 
+            schoolId: user.schoolId, 
+            section: activeSection,
+            level: activeCycle
+        });
         setStats(data);
         setLoading(false);
       }
     };
     loadStats();
-  }, [user, activeSection]);
+  }, [user, activeSection, activeCycle]);
 
   if (loading) return (
     <div className="h-[70vh] flex flex-col items-center justify-center space-y-4">
@@ -39,19 +57,42 @@ const Statistics: React.FC = () => {
           <p className="text-slate-500 mt-2 uppercase text-[10px] font-black tracking-[0.4em]">Indicateurs de Performance Pédagogique & Financière</p>
         </div>
 
-        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
-            <button
-                onClick={() => setActiveSection('FRANCOPHONE')}
-                className={`flex items-center px-8 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeSection === 'FRANCOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
-            >
-                FRANCOPHONE
-            </button>
-            <button
-                onClick={() => setActiveSection('ANGLOPHONE')}
-                className={`flex items-center px-8 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeSection === 'ANGLOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
-            >
-                ANGLOPHONE
-            </button>
+        <div className="flex flex-wrap gap-4">
+            <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+                <button
+                    onClick={() => setActiveSection('FRANCOPHONE')}
+                    className={`flex items-center px-8 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeSection === 'FRANCOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+                >
+                    FRANCOPHONE
+                </button>
+                <button
+                    onClick={() => setActiveSection('ANGLOPHONE')}
+                    className={`flex items-center px-8 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeSection === 'ANGLOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+                >
+                    ANGLOPHONE
+                </button>
+            </div>
+
+            <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+                <button
+                    onClick={() => setActiveCycle('ALL')}
+                    className={`flex items-center px-6 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeCycle === 'ALL' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+                >
+                    Tous Cycles
+                </button>
+                <button
+                    onClick={() => setActiveCycle('PRIMAIRE')}
+                    className={`flex items-center px-6 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeCycle === 'PRIMAIRE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+                >
+                    Primaire
+                </button>
+                <button
+                    onClick={() => setActiveCycle('MATERNELLE')}
+                    className={`flex items-center px-6 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${activeCycle === 'MATERNELLE' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'}`}
+                >
+                    Maternelle
+                </button>
+            </div>
         </div>
       </div>
 
@@ -67,7 +108,7 @@ const Statistics: React.FC = () => {
           </div>
           <div className="glass-card p-8 bg-slate-900/40 border-none relative overflow-hidden group">
               <TrendingUp className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 group-hover:text-emerald-500/10 transition-all" />
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Moyenne Section</p>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Moyenne du Cycle</p>
               <h3 className="text-4xl font-black text-white">{(stats.classStats.reduce((acc: number, c: any) => acc + c.avg, 0) / (stats.classStats.length || 1)).toFixed(2)}</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-slate-500">
                   Sur 20 points
@@ -172,7 +213,21 @@ const Statistics: React.FC = () => {
                       ))}
                   </div>
 
-                  <button className="w-full mt-10 py-4 bg-slate-950 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-xl">
+                  <button 
+                      onClick={() => {
+                          const honorRoll = [
+                            { name: 'KAMGANG Landry', class: 'CM2', avg: 18.45 },
+                            { name: 'NGONO Michelle', class: 'SIL', avg: 17.80 },
+                            { name: 'TCHATCHOUA Paul', class: 'CM1', avg: 17.25 },
+                            { name: 'MBARGA Cédric', class: 'CE2', avg: 16.90 },
+                          ];
+                          honorRoll.forEach(student => {
+                            generateHonorCertificate(student.name, student.class, student.avg, school);
+                          });
+                          alert("Certificats d'honneur générés avec succès.");
+                      }}
+                      className="w-full mt-10 py-4 bg-slate-950 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-xl"
+                  >
                       Générer Certificats
                   </button>
               </div>

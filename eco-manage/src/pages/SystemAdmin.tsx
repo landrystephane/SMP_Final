@@ -5,9 +5,11 @@ import {
   Activity, Server, Database, Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const SystemAdmin: React.FC = () => {
   const { user, switchSchool } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH'>('INSTANCES');
   const [schools, setSchools] = useState<any[]>([]);
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
@@ -17,6 +19,21 @@ const SystemAdmin: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [isAddingFounder, setIsAddingFounder] = useState(false);
+
+  // School metadata editing states
+  const [editSchoolName, setEditSchoolName] = useState('');
+  const [editSchoolMotto, setEditSchoolMotto] = useState('');
+  const [editSchoolAddress, setEditSchoolAddress] = useState('');
+  const [editSchoolBp, setEditSchoolBp] = useState('');
+  const [editSchoolEmail, setEditSchoolEmail] = useState('');
+  const [editSchoolPhone, setEditSchoolPhone] = useState('');
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
+
+  // Founder editing states
+  const [editingFounder, setEditingFounder] = useState<any | null>(null);
+  const [editFounderUsername, setEditFounderUsername] = useState('');
+  const [editFounderFullName, setEditFounderFullName] = useState('');
+  const [editFounderPassword, setEditFounderPassword] = useState('');
 
   const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
   const [newSubject, setNewSubject] = useState({ name: '', domain: 'Science', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
@@ -65,21 +82,70 @@ const SystemAdmin: React.FC = () => {
       e.preventDefault();
       if (!selectedSchool || !window.electronAPI) return;
 
-      await window.electronAPI.addUser({
-          ...newFounder,
-          role: 'FOUNDER',
-          schoolId: selectedSchool.id
-      });
+      try {
+          const res = await window.electronAPI.addUser({
+              ...newFounder,
+              role: 'FOUNDER',
+              schoolId: selectedSchool.id
+          });
+          
+          if (res && res.error) {
+              alert(`Erreur de création: ${res.error}`);
+              return;
+          }
 
-      setNewFounder({ username: '', password: '', fullName: '' });
-      setIsAddingFounder(false);
-      // Reload users for this school
-      const users = await window.electronAPI.getUsers(selectedSchool.id);
-      setSchoolUsers(users || []);
+          setNewFounder({ username: '', password: '', fullName: '' });
+          setIsAddingFounder(false);
+          // Reload users for this school
+          const users = await window.electronAPI.getUsers(selectedSchool.id);
+          setSchoolUsers(users || []);
+      } catch (err: any) {
+          alert(`Erreur: ${err.message}`);
+      }
   }
+
+  const startEditFounder = (founder: any) => {
+      setEditingFounder(founder);
+      setEditFounderUsername(founder.username || '');
+      setEditFounderFullName(founder.fullName || '');
+      setEditFounderPassword('');
+  };
+
+  const handleUpdateFounder = async () => {
+      if (!editingFounder || !selectedSchool || !window.electronAPI) return;
+      try {
+          const res = await window.electronAPI.updateUser({
+              id: editingFounder.id,
+              username: editFounderUsername,
+              fullName: editFounderFullName,
+              password: editFounderPassword || undefined
+          });
+
+          if (res && res.error) {
+              alert(`Erreur de modification: ${res.error}`);
+              return;
+          }
+
+          setEditingFounder(null);
+          // Reload users for this school
+          const users = await window.electronAPI.getUsers(selectedSchool.id);
+          setSchoolUsers(users || []);
+          alert("Compte fondateur modifié avec succès !");
+      } catch (err: any) {
+          alert(`Erreur: ${err.message}`);
+      }
+  };
 
   const openSchoolDetail = async (school: any) => {
       setSelectedSchool(school);
+      setEditSchoolName(school.name || '');
+      setEditSchoolMotto(school.motto || '');
+      setEditSchoolAddress(school.address || '');
+      setEditSchoolBp(school.bp || '');
+      setEditSchoolEmail(school.contact_email || '');
+      setEditSchoolPhone(school.contact_phone || '');
+      setIsEditingMetadata(false);
+
       if (window.electronAPI) {
           const activeSubs = await window.electronAPI.getSchoolSubjects(school.id);
           setSchoolSubjects(activeSubs.filter((s: any) => s.is_active).map((s: any) => s.id));
@@ -88,6 +154,52 @@ const SystemAdmin: React.FC = () => {
           setSchoolUsers(users || []);
       }
   }
+
+  const handleSaveMetadata = async () => {
+      if (!selectedSchool || !window.electronAPI) return;
+      try {
+          const res = await window.electronAPI.updateSchoolSettings({
+              id: selectedSchool.id,
+              name: editSchoolName,
+              motto: editSchoolMotto,
+              address: editSchoolAddress,
+              bp: editSchoolBp,
+              contact_email: editSchoolEmail,
+              contact_phone: editSchoolPhone,
+              primary_color: selectedSchool.primary_color || '#1e293b',
+              secondary_color: selectedSchool.secondary_color || '#f59e0b',
+              receipt_sig_title: selectedSchool.receipt_sig_title || "Signature de l'Économe",
+              bulletin_sig_left: selectedSchool.bulletin_sig_left || "L'ENSEIGNANT (TEACHER)",
+              bulletin_sig_middle: selectedSchool.bulletin_sig_middle || "PARENT / GUARDIAN",
+              bulletin_sig_right: selectedSchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)",
+              header_french: selectedSchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE",
+              header_english: selectedSchool.header_english || "MINISTRY OF BASIC EDUCATION",
+              bulletin_pdf_use_custom: selectedSchool.bulletin_pdf_use_custom || 0,
+              bulletin_pdf_template: selectedSchool.bulletin_pdf_template || '',
+              bulletin_pdf_mapping: selectedSchool.bulletin_pdf_mapping || '{}'
+          });
+
+          if (res && res.error) {
+              throw new Error(res.error);
+          }
+
+          const updatedSchool = {
+              ...selectedSchool,
+              name: editSchoolName,
+              motto: editSchoolMotto,
+              address: editSchoolAddress,
+              bp: editSchoolBp,
+              contact_email: editSchoolEmail,
+              contact_phone: editSchoolPhone
+          };
+          setSelectedSchool(updatedSchool);
+          setIsEditingMetadata(false);
+          loadSchools();
+          alert("Métadonnées de l'établissement enregistrées avec succès !");
+      } catch (err: any) {
+          alert("Erreur lors de l'enregistrement des métadonnées: " + err.message);
+      }
+  };
 
   const toggleSchoolSubject = async (subjectId: number) => {
       if (!selectedSchool || !window.electronAPI) return;
@@ -100,6 +212,35 @@ const SystemAdmin: React.FC = () => {
           setSchoolSubjects([...schoolSubjects, subjectId]);
       }
   }
+
+  const handleDeleteSchool = async (id: number) => {
+      if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement cette école ? Cette action est irréversible.")) return;
+      if (window.electronAPI) {
+          try {
+              await window.electronAPI.deleteSchool(id);
+              loadSchools();
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
+  };
+
+  const handleDeleteSubject = async (id: number) => {
+      if (!window.confirm("Supprimer ce module du registre global ?")) return;
+      if (window.electronAPI) {
+          await window.electronAPI.deleteGlobalSubject(id);
+          loadGlobalSubjects();
+      }
+  };
+
+  const handleDeleteFounder = async (id: number) => {
+      if (!window.confirm("Retirer cet accès fondateur ?")) return;
+      if (window.electronAPI && selectedSchool) {
+          await window.electronAPI.deleteUser(id);
+          const users = await window.electronAPI.getUsers(selectedSchool.id);
+          setSchoolUsers(users || []);
+      }
+  };
 
   if (user?.role !== 'SUPERADMIN') return (
     <div className="p-20 text-center bg-slate-950 h-screen flex flex-col items-center justify-center">
@@ -224,12 +365,15 @@ const SystemAdmin: React.FC = () => {
                       <Settings className="w-3.5 h-3.5" /> Config
                     </button>
                     <button
-                      onClick={() => switchSchool(s.id)}
+                      onClick={async () => {
+                          await switchSchool(s.id);
+                          navigate('/');
+                      }}
                       className="flex-1 py-3 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
                     >
                       <ExternalLink className="w-3.5 h-3.5" /> Access
                     </button>
-                    <button className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
+                    <button onClick={() => handleDeleteSchool(s.id)} className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -284,7 +428,7 @@ const SystemAdmin: React.FC = () => {
                                   </span>
                               </td>
                               <td className="px-10 py-6 text-right">
-                                  <button className="p-3 text-slate-600 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDeleteSubject(subj.id)} className="p-3 text-slate-600 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                               </td>
                           </tr>
                       ))}
@@ -331,24 +475,102 @@ const SystemAdmin: React.FC = () => {
                             <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
                               <Building2 className="w-6 h-6 text-amber-500" /> Metadata
                             </h3>
-                            <button className="p-2 text-slate-500 hover:text-white transition-colors"><Edit className="w-4 h-4" /></button>
+                            {isEditingMetadata ? (
+                              <div className="flex gap-2">
+                                <button onClick={() => setIsEditingMetadata(false)} className="px-3 py-1.5 bg-white/5 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest hover:text-white transition-all">
+                                  Annuler
+                                </button>
+                                <button onClick={handleSaveMetadata} className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all">
+                                  Enregistrer
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setIsEditingMetadata(true)} className="p-2 text-slate-500 hover:text-white transition-colors">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
-                          <div className="space-y-6">
-                            {[
-                              { icon: MapPin, label: 'Headquarters', value: selectedSchool.address },
-                              { icon: Globe, label: 'Contact Email', value: selectedSchool.contact_email },
-                              { icon: Phone, label: 'System Phone', value: selectedSchool.contact_phone },
-                              { icon: Mail, label: 'BP / Mailbox', value: selectedSchool.bp || 'N/A' },
-                            ].map((item, i) => (
-                              <div key={i}>
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{item.label}</p>
-                                <div className="flex items-center gap-3 text-white font-black text-sm">
-                                  <item.icon className="w-4 h-4 text-amber-500/50" />
-                                  {item.value}
+                          {isEditingMetadata ? (
+                            <div className="space-y-4">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nom de l'école</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolName}
+                                  onChange={(e) => setEditSchoolName(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Devise</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolMotto}
+                                  onChange={(e) => setEditSchoolMotto(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Siège (Adresse)</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolAddress}
+                                  onChange={(e) => setEditSchoolAddress(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Email de contact</label>
+                                <input
+                                  type="email"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolEmail}
+                                  onChange={(e) => setEditSchoolEmail(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Téléphone</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolPhone}
+                                  onChange={(e) => setEditSchoolPhone(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Boîte Postale (B.P.)</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                  value={editSchoolBp}
+                                  onChange={(e) => setEditSchoolBp(e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-6">
+                              <div>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Motto / Devise</p>
+                                <div className="flex items-center gap-3 text-white font-black text-sm italic">
+                                  {selectedSchool.motto || 'N/A'}
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                              {[
+                                { icon: MapPin, label: 'Headquarters', value: selectedSchool.address },
+                                { icon: Globe, label: 'Contact Email', value: selectedSchool.contact_email },
+                                { icon: Phone, label: 'System Phone', value: selectedSchool.contact_phone },
+                                { icon: Mail, label: 'BP / Mailbox', value: selectedSchool.bp || 'N/A' },
+                              ].map((item, i) => (
+                                <div key={i}>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{item.label}</p>
+                                  <div className="flex items-center gap-3 text-white font-black text-sm">
+                                    <item.icon className="w-4 h-4 text-amber-500/50" />
+                                    {item.value}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </section>
 
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
@@ -365,20 +587,65 @@ const SystemAdmin: React.FC = () => {
                           </div>
                           <div className="space-y-4">
                             {schoolUsers.filter(u => u.role === 'FOUNDER').map(u => (
-                              <div key={u.id} className="p-5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between group">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-slate-400 group-hover:text-amber-500 transition-colors">
-                                    F
+                              <div key={u.id} className="p-5 bg-slate-950 rounded-2xl border border-white/5">
+                                {editingFounder?.id === u.id ? (
+                                  <form onSubmit={(e) => { e.preventDefault(); handleUpdateFounder(); }} className="space-y-4">
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nom complet</label>
+                                      <input
+                                        type="text"
+                                        className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                        value={editFounderFullName}
+                                        onChange={(e) => setEditFounderFullName(e.target.value)}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nom d'utilisateur</label>
+                                      <input
+                                        type="text"
+                                        className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                        value={editFounderUsername}
+                                        onChange={(e) => setEditFounderUsername(e.target.value)}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nouveau mot de passe (laisser vide si inchangé)</label>
+                                      <input
+                                        type="password"
+                                        className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                        value={editFounderPassword}
+                                        onChange={(e) => setEditFounderPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                      />
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-2">
+                                      <button type="button" onClick={() => setEditingFounder(null)} className="px-3 py-1.5 bg-white/5 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest hover:text-white transition-all">
+                                        Annuler
+                                      </button>
+                                      <button type="submit" className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all">
+                                        Enregistrer
+                                      </button>
+                                    </div>
+                                  </form>
+                                ) : (
+                                  <div className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-slate-400 group-hover:text-amber-500 transition-colors">
+                                        F
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-black text-white uppercase">{u.fullName}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold">@{u.username}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => startEditFounder(u)} className="p-2 text-slate-500 hover:text-white"><Edit className="w-3.5 h-3.5" /></button>
+                                      <button onClick={() => handleDeleteFounder(u.id)} className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="text-sm font-black text-white uppercase">{u.fullName}</p>
-                                    <p className="text-[10px] text-slate-500 font-bold">@{u.username}</p>
-                                  </div>
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button className="p-2 text-slate-500 hover:text-white"><Edit className="w-3.5 h-3.5" /></button>
-                                  <button className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                                </div>
+                                )}
                               </div>
                             ))}
                             {schoolUsers.filter(u => u.role === 'FOUNDER').length === 0 && (
@@ -532,11 +799,11 @@ const SystemAdmin: React.FC = () => {
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domain</label>
                             <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
-                                <option>Science</option>
-                                <option>Langue</option>
-                                <option>Art & Culture</option>
-                                <option>Sport</option>
-                                <option>Vie Pratique</option>
+                                <option value="Science">Science</option>
+                                <option value="Langue">Langue</option>
+                                <option value="Art & Culture">Art & Culture</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Vie Pratique">Vie Pratique</option>
                             </select>
                         </div>
                         <div className="space-y-2">

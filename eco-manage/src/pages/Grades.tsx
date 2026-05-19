@@ -23,7 +23,22 @@ const Grades: React.FC = () => {
   const loadData = async () => {
       if (window.electronAPI) {
         const c = await window.electronAPI.getClasses(user?.schoolId);
-        setClasses(c);
+        if (user?.role === 'TEACHER') {
+            let assignedIds: number[] = [];
+            try {
+                if (typeof user.assignedClasses === 'string') {
+                    assignedIds = JSON.parse(user.assignedClasses);
+                } else if (Array.isArray(user.assignedClasses)) {
+                    assignedIds = user.assignedClasses;
+                }
+            } catch (e) {
+                console.error('Failed to parse assigned classes:', e);
+            }
+            const filtered = c.filter((cls: any) => assignedIds.includes(cls.id));
+            setClasses(filtered);
+        } else {
+            setClasses(c);
+        }
       }
   }
 
@@ -79,8 +94,7 @@ const Grades: React.FC = () => {
     if (window.electronAPI) {
       const result = await window.electronAPI.saveGrades(formattedGrades);
       if (result.success) {
-        setIsLocked(true);
-        alert(t('grades_locked_msg'));
+        alert(t('grades_saved_draft_msg') || 'Notes sauvegardées (Brouillon)');
         handleLoadContext();
       } else {
         alert('Erreur: ' + result.error);
@@ -104,17 +118,45 @@ const Grades: React.FC = () => {
 
   const printStudentReport = async (student: any) => {
       if (window.electronAPI) {
-          const details = await window.electronAPI.getStudentDetails(student.id);
           const classObj = classes.find(c => c.id.toString() === selectedClass);
-          const school = (await window.electronAPI.getSchools())[0];
-          generateReportCard({
-              student,
-              classObj,
-              school,
-              grades: details.grades.filter((g: any) => g.term === selectedTerm),
-              attendance: details.attendance,
-              term: selectedTerm
-          });
+          const schools = await window.electronAPI.getSchools();
+          const school = schools.find((s: any) => s.id === user?.schoolId) || schools[0];
+          
+          // Fetch all students in this class
+          const allStudents = await window.electronAPI.getStudents(user?.schoolId);
+          const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
+
+          // Calculate averages for all students in the class based on validated grades
+          const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
+              const details = await window.electronAPI.getStudentDetails(s.id);
+              const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && g.validated === 1);
+              const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
+              const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
+              const avg = totalCoef > 0 ? (totalPoints / totalCoef) : 0;
+              return { id: s.id, avg, details };
+          }));
+
+          // Sort descending by average
+          studentsWithAverages.sort((a, b) => b.avg - a.avg);
+
+          // Find student rank
+          const rankIndex = studentsWithAverages.findIndex(s => s.id === student.id);
+          const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
+          const totalStudents = studentsWithAverages.length;
+
+          const studentData = studentsWithAverages.find(s => s.id === student.id);
+          if (studentData) {
+              generateReportCard({
+                  student,
+                  classObj,
+                  school,
+                  grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
+                  attendance: studentData.details.attendance,
+                  term: selectedTerm,
+                  rank,
+                  totalStudents
+              });
+          }
       }
   }
 
@@ -199,7 +241,7 @@ const Grades: React.FC = () => {
                             onClick={handleSave}
                             className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
                         >
-                            <Save className="w-4 h-4 mr-2" /> {t('save_and_lock')}
+                            <Save className="w-4 h-4 mr-2" /> {t('save_grades') || 'Sauvegarder'}
                         </button>
                     ) : (
                         hasRole(['DIRECTOR', 'FOUNDER']) && (
@@ -235,24 +277,58 @@ const Grades: React.FC = () => {
                         <div className="text-white font-black uppercase text-sm tracking-tight">{student.last_name}</div>
                         <div className="text-[10px] text-slate-500 font-bold">{student.first_name}</div>
                       </td>
-                      {subjects.map(subject => (
-                        <td key={subject.id} className="px-4 py-4">
-                          <input
-                            type="number"
-                            step="0.25"
-                            min="0"
-                            max="20"
-                            disabled={isLocked}
-                            value={grades[`${student.id}-${subject.id}`] || ''}
-                            onChange={(e) => setGrades({
-                                ...grades,
-                                [`${student.id}-${subject.id}`]: parseFloat(e.target.value)
-                            })}
-                            placeholder="0.00"
-                            className="w-20 bg-slate-900/50 border border-slate-800 rounded-xl py-2 text-center text-white text-sm font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                          />
-                        </td>
-                      ))}
+                      {subjects.map(subject => {
+                        const classObj = classes.find(c => c.id.toString() === selectedClass);
+                        const isNursery = classObj?.level === 'MATERNELLE';
+                        return (
+                          <td key={subject.id} className="px-4 py-4">
+                            {isNursery ? (
+                              <select
+                                disabled={isLocked}
+                                value={grades[`${student.id}-${subject.id}`] ?? ''}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    const updated = { ...grades };
+                                    if (isNaN(val)) {
+                                        delete updated[`${student.id}-${subject.id}`];
+                                    } else {
+                                        updated[`${student.id}-${subject.id}`] = val;
+                                    }
+                                    setGrades(updated);
+                                }}
+                                className="w-28 bg-slate-900/50 border border-slate-800 rounded-xl py-2 px-1 text-center text-white text-xs font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                              >
+                                <option value="">--</option>
+                                <option value="19">A+ (Expert)</option>
+                                <option value="15">A (Acquis)</option>
+                                <option value="11">ECA (En cours)</option>
+                                <option value="5">NA (Non acquis)</option>
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                step="0.25"
+                                min="0"
+                                max="20"
+                                disabled={isLocked}
+                                value={grades[`${student.id}-${subject.id}`] ?? ''}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    const updated = { ...grades };
+                                    if (isNaN(val)) {
+                                        delete updated[`${student.id}-${subject.id}`];
+                                    } else {
+                                        updated[`${student.id}-${subject.id}`] = val;
+                                    }
+                                    setGrades(updated);
+                                }}
+                                placeholder="0.00"
+                                className="w-20 bg-slate-900/50 border border-slate-800 rounded-xl py-2 text-center text-white text-sm font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}

@@ -7,7 +7,8 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (roles: Role[]) => boolean;
-  switchSchool: (schoolId: number) => void;
+  switchSchool: (schoolId: number) => Promise<void>;
+  exitImpersonation: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,18 +72,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (window.electronAPI) {
+        await window.electronAPI.logout();
+    }
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('impersonated_school_id');
   };
 
-  const switchSchool = (schoolId: number) => {
-      if (user?.role === 'SUPERADMIN') {
-          const updatedUser = { ...user, schoolId };
-          setUser(updatedUser);
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-          localStorage.setItem('impersonated_school_id', schoolId.toString());
+  const switchSchool = async (schoolId: number) => {
+      if (user?.role === 'SUPERADMIN' && window.electronAPI) {
+          try {
+              await window.electronAPI.switchSchool(schoolId);
+              const updatedUser = { ...user, schoolId };
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              localStorage.setItem('impersonated_school_id', schoolId.toString());
+          } catch (err) {
+              console.error("Erreur de changement d'école", err);
+          }
+      }
+  };
+
+  const exitImpersonation = async () => {
+      if (user?.role === 'SUPERADMIN' && window.electronAPI) {
+          try {
+              await window.electronAPI.switchSchool(0);
+              const updatedUser = { ...user, schoolId: undefined };
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              localStorage.removeItem('impersonated_school_id');
+          } catch (err) {
+              console.error("Erreur de sortie d'impersonation", err);
+          }
       }
   };
 
@@ -113,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole, switchSchool }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole, switchSchool, exitImpersonation }}>
       {children}
     </AuthContext.Provider>
   );

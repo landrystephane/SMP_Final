@@ -16,6 +16,7 @@ const Finance: React.FC = () => {
 
   const [installments, setInstallments] = useState<any[]>([]);
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -25,12 +26,14 @@ const Finance: React.FC = () => {
       const t_fees = await window.electronAPI.getTuitionFees();
       const inst = await window.electronAPI.getInstallments();
       const cif = await window.electronAPI.getClassInstallmentFees();
+      const schs = await window.electronAPI.getSchools();
       setPayments(p);
       setStudents(s);
       setClasses(c);
       setTuitionFees(t_fees);
       setInstallments(inst);
       setClassInstallmentFees(cif);
+      setSchools(schs);
     }
   };
 
@@ -43,20 +46,31 @@ const Finance: React.FC = () => {
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (window.electronAPI) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        await window.electronAPI.addPayment({
-            ...newPayment,
-            amount: parseFloat(newPayment.amount),
-            userId: user.id,
-            installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
-        });
-        setIsAddingPayment(false);
-        setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
-        loadData();
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await window.electronAPI.addPayment({
+                ...newPayment,
+                amount: parseFloat(newPayment.amount),
+                userId: user.id,
+                installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
+            });
+            
+            if (res && res.error) {
+                alert(`Erreur de paiement: ${res.error}`);
+                return;
+            }
+
+            setIsAddingPayment(false);
+            setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
+            loadData();
+        } catch (err: any) {
+            alert(`Erreur: ${err.message}`);
+        }
     }
   };
 
   const getStudentFinancials = (student: any) => {
+      if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
       const classConfig = tuitionFees.find(f => f.classId === student.class_id);
       const scholarship = student.scholarship_reduction || 0;
       const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
@@ -198,8 +212,10 @@ const Finance: React.FC = () => {
                                             onClick={() => {
                                                 const s = students.find(stud => stud.id === p.student_id);
                                                 const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id });
+                                                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                                const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
                                                 // @ts-ignore
-                                                import('../utils/reports').then(m => m.generatePaymentReceipt(p, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials));
+                                                import('../utils/reports').then(m => m.generatePaymentReceipt(p, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials, activeSchool));
                                             }}
                                             className="p-2.5 text-slate-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-xl transition-all"
                                             title={t('reprint_receipt')}
@@ -282,7 +298,7 @@ const Finance: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <div className="w-full max-w-[100px] h-1.5 bg-slate-900 rounded-full overflow-hidden p-[1px] border border-white/5 shadow-inner">
-                                                    <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/50 rounded-full transition-all duration-700" style={{ width: `${(fin.totalPaid/fin.totalDue)*100}%` }} />
+                                                    <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/50 rounded-full transition-all duration-700" style={{ width: `${fin.totalDue > 0 ? (fin.totalPaid/fin.totalDue)*100 : 0}%` }} />
                                                 </div>
                                             )}
                                         </td>
@@ -348,7 +364,7 @@ const Finance: React.FC = () => {
                               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-amber-500"
-                                    style={{ width: `${(getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue) * 100}%` }}
+                                    style={{ width: `${getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue > 0 ? (getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue) * 100 : 0}%` }}
                                   />
                               </div>
                           </div>

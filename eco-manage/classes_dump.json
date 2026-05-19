@@ -1,0 +1,125 @@
+{
+  "classes": [
+    {
+      "id": 1,
+      "school_id": 1,
+      "name": "SIL",
+      "code": "SIL",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 2,
+      "school_id": 1,
+      "name": "CP",
+      "code": "CP1",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 3,
+      "school_id": 1,
+      "name": "CE1",
+      "code": "CE1",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 4,
+      "school_id": 1,
+      "name": "CE2",
+      "code": "CE2",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 5,
+      "school_id": 1,
+      "name": "CM1",
+      "code": "CM1",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 6,
+      "school_id": 1,
+      "name": "CM2",
+      "code": "CM2",
+      "section": "FRANCOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 7,
+      "school_id": 1,
+      "name": "Class 1",
+      "code": "CL1",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 8,
+      "school_id": 1,
+      "name": "Class 2",
+      "code": "CL2",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 9,
+      "school_id": 1,
+      "name": "Class 3",
+      "code": "CL3",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 10,
+      "school_id": 1,
+      "name": "Class 4",
+      "code": "CL4",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 11,
+      "school_id": 1,
+      "name": "Class 5",
+      "code": "CL5",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    },
+    {
+      "id": 12,
+      "school_id": 1,
+      "name": "Class 6",
+      "code": "CL6",
+      "section": "ANGLOPHONE",
+      "level": "PRIMAIRE",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null
+    }
+  ],
+  "students": []
+}

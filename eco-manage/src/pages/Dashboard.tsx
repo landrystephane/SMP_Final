@@ -2,19 +2,29 @@ import React, { useEffect, useState } from 'react';
 import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import SystemAdmin from './SystemAdmin';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
+  const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
 
   useEffect(() => {
     const loadStats = async () => {
+      const isImpersonating = localStorage.getItem('impersonated_school_id') !== null;
+      if (user?.role === 'SUPERADMIN' && !isImpersonating) {
+        return;
+      }
       try {
         if (window.electronAPI && user) {
-          const data = await window.electronAPI.getDashboardStats({ schoolId: user.schoolId, section: selectedSection });
+          const data = await window.electronAPI.getDashboardStats({ 
+              schoolId: user.schoolId, 
+              section: selectedSection,
+              level: selectedCycle
+          });
           setStats(data);
         } else if (!window.electronAPI) {
           // Fallback for demo/web context
@@ -40,7 +50,17 @@ const Dashboard: React.FC = () => {
       }
     };
     loadStats();
-  }, [selectedSection, user]);
+  }, [selectedSection, selectedCycle, user]);
+
+  useEffect(() => {
+    setSelectedDiagnosticClass('ALL');
+  }, [selectedSection, selectedCycle]);
+
+  const isImpersonating = localStorage.getItem('impersonated_school_id') !== null;
+
+  if (user?.role === 'SUPERADMIN' && !isImpersonating) {
+      return <SystemAdmin />;
+  }
 
   if (!stats) return (
     <div className="flex items-center justify-center h-[70vh] bg-slate-950">
@@ -66,19 +86,42 @@ const Dashboard: React.FC = () => {
           <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('diagnostic_bilingual')}</p>
         </div>
 
-        <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
-          <button
-            onClick={() => setSelectedSection('FRANCOPHONE')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedSection === 'FRANCOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
-          >
-            {t('section_francophone')}
-          </button>
-          <button
-            onClick={() => setSelectedSection('ANGLOPHONE')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedSection === 'ANGLOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
-          >
-            {t('section_anglophone')}
-          </button>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
+            <button
+              onClick={() => setSelectedSection('FRANCOPHONE')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedSection === 'FRANCOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              {t('section_francophone')}
+            </button>
+            <button
+              onClick={() => setSelectedSection('ANGLOPHONE')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedSection === 'ANGLOPHONE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              {t('section_anglophone')}
+            </button>
+          </div>
+
+          <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
+            <button
+              onClick={() => setSelectedCycle('ALL')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'ALL' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Tous Cycles
+            </button>
+            <button
+              onClick={() => setSelectedCycle('PRIMAIRE')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'PRIMAIRE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Primaire
+            </button>
+            <button
+              onClick={() => setSelectedCycle('MATERNELLE')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'MATERNELLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Maternelle
+            </button>
+          </div>
         </div>
       </div>
 

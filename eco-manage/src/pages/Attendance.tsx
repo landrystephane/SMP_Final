@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, UserCheck, Clock, Save, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 const Attendance: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedSection, setSelectedSection] = useState('');
@@ -14,12 +16,27 @@ const Attendance: React.FC = () => {
   useEffect(() => {
     const loadClasses = async () => {
       if (window.electronAPI) {
-        const c = await window.electronAPI.getClasses();
-        setClasses(c);
+        const c = await window.electronAPI.getClasses(user?.schoolId);
+        if (user?.role === 'TEACHER') {
+            let assignedIds: number[] = [];
+            try {
+                if (typeof user.assignedClasses === 'string') {
+                    assignedIds = JSON.parse(user.assignedClasses);
+                } else if (Array.isArray(user.assignedClasses)) {
+                    assignedIds = user.assignedClasses;
+                }
+            } catch (e) {
+                console.error('Failed to parse assigned classes:', e);
+            }
+            const filtered = c.filter((cls: any) => assignedIds.includes(cls.id));
+            setClasses(filtered);
+        } else {
+            setClasses(c);
+        }
       }
     };
     loadClasses();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -34,15 +51,26 @@ const Attendance: React.FC = () => {
   const handleSave = async () => {
       if (window.electronAPI) {
           const user = JSON.parse(localStorage.getItem('user') || '{}');
-          for (const studentId of Object.keys(absences)) {
-              await window.electronAPI.saveAttendance({
-                  studentId: parseInt(studentId),
-                  date: currentDate,
-                  hours: absences[studentId],
-                  userId: user.id
-              });
+          const records = Object.keys(absences).map(studentId => ({
+              studentId: parseInt(studentId),
+              date: currentDate,
+              hours: absences[studentId]
+          }));
+
+          if (records.length > 0) {
+              try {
+                  const res = await window.electronAPI.saveAttendanceBulk({ records, userId: user.id });
+                  if (res && res.error) {
+                      alert(`Erreur: ${res.error}`);
+                      return;
+                  }
+                  alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString());
+              } catch (err: any) {
+                  alert(err.message);
+              }
+          } else {
+              alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString());
           }
-          alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString());
       }
   };
 
@@ -53,13 +81,13 @@ const Attendance: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">{t('attendance_sheet')}</h1>
           <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest">{t('attendance_desc')}</p>
         </div>
-        <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl shadow-sm text-slate-900 dark:text-white">
-            <Calendar className="w-5 h-5 mr-3 text-blue-600" />
+        <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl shadow-sm text-white focus-within:ring-2 focus-within:ring-amber-500 transition-all">
+            <Calendar className="w-5 h-5 mr-3 text-amber-500" />
             <input
                 type="date"
                 value={currentDate}
                 onChange={(e) => setCurrentDate(e.target.value)}
-                className="bg-transparent outline-none text-sm font-black"
+                className="bg-transparent outline-none text-sm font-black text-white"
             />
         </div>
       </div>
@@ -68,7 +96,7 @@ const Attendance: React.FC = () => {
         <div className="space-y-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('select_section')}</label>
           <select
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-all font-bold"
+            className="input-field w-full mt-1"
             value={selectedSection}
             onChange={(e) => {
                 setSelectedSection(e.target.value);
@@ -83,7 +111,7 @@ const Attendance: React.FC = () => {
         <div className="space-y-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('choose_classroom')}</label>
           <select
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-all font-bold disabled:opacity-50"
+            className="input-field w-full mt-1"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
             disabled={!selectedSection}
@@ -146,7 +174,7 @@ const Attendance: React.FC = () => {
                                             <div className="flex items-center justify-center space-x-3">
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.max(0, h - 1)})}
-                                                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black hover:bg-rose-500 hover:text-white transition-all"
+                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-rose-500 hover:text-white transition-all"
                                                 >
                                                     -
                                                 </button>
@@ -154,11 +182,11 @@ const Attendance: React.FC = () => {
                                                     type="number"
                                                     value={h}
                                                     onChange={(e) => setAbsences({...absences, [student.id]: parseInt(e.target.value) || 0})}
-                                                    className="w-16 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-lg p-2 text-center text-slate-900 dark:text-white font-black focus:border-blue-600 outline-none"
+                                                    className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none"
                                                 />
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: h + 1})}
-                                                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black hover:bg-blue-600 hover:text-white transition-all"
+                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all"
                                                 >
                                                     +
                                                 </button>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trash2, MapPin, Truck } from 'lucide-react';
+import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+const MONTHS = ['Septembre', 'Octobre', 'Novembre', 'Décembre', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai'];
 
 const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
@@ -10,6 +12,15 @@ const AdvisorPortal: React.FC = () => {
     const [students, setStudents] = useState<any[]>([]);
 
     const [selectedRoute, setSelectedRoute] = useState<string>('');
+
+    // Evaluation Validation states
+    const [selectedClass, setSelectedClass] = useState<string>('');
+    const [selectedTerm, setSelectedTerm] = useState<number>(1);
+    const [selectedMonth, setSelectedMonth] = useState<string>('Septembre');
+    const [subjectStatuses, setSubjectStatuses] = useState<any[]>([]);
+    const [selectedSubjectForDetail, setSelectedSubjectForDetail] = useState<any>(null);
+    const [detailGrades, setDetailGrades] = useState<any[]>([]);
+    const [showDetailModal, setShowDetailModal] = useState(false);
 
     const loadData = async () => {
         if (window.electronAPI && user) {
@@ -21,12 +32,78 @@ const AdvisorPortal: React.FC = () => {
             setClasses(c);
             setRoutes(r);
             setStudents(studs);
+            if (c && c.length > 0) {
+                setSelectedClass(c[0].id.toString());
+            }
+        }
+    };
+
+    const loadValidationStatuses = async () => {
+        if (window.electronAPI && selectedClass) {
+            const data = await window.electronAPI.getClassSubjectsValidationStatus({
+                classId: parseInt(selectedClass),
+                term: selectedTerm,
+                month: selectedMonth
+            });
+            setSubjectStatuses(data);
         }
     };
 
     useEffect(() => {
         loadData();
     }, [user]);
+
+    useEffect(() => {
+        if (selectedClass) {
+            loadValidationStatuses();
+        }
+    }, [selectedClass, selectedTerm, selectedMonth]);
+
+    const handleViewSubjectDetails = async (subj: any) => {
+        if (!window.electronAPI || !selectedClass) return;
+        
+        // Fetch grades for this class, term, month
+        const allGrades = await window.electronAPI.getGrades({
+            classId: parseInt(selectedClass),
+            term: selectedTerm,
+            month: selectedMonth
+        });
+        
+        // Filter grades for this subject
+        const subjectGrades = allGrades.filter((g: any) => g.subject_id === subj.id);
+        
+        // Map to students names
+        const gradesList = students
+            .filter((s: any) => s.class_id.toString() === selectedClass)
+            .map((s: any) => {
+                const gr = subjectGrades.find((g: any) => g.student_id === s.id);
+                return {
+                    studentName: `${s.last_name} ${s.first_name}`,
+                    matricule: s.matricule,
+                    score: gr ? gr.score : null
+                };
+            });
+            
+        setDetailGrades(gradesList);
+        setSelectedSubjectForDetail(subj);
+        setShowDetailModal(true);
+    };
+
+    const handleValidateSubject = async (subjId: number) => {
+        if (!window.electronAPI || !selectedClass) return;
+        try {
+            await window.electronAPI.validateSubjectGrades({
+                classId: parseInt(selectedClass),
+                subjectId: subjId,
+                term: selectedTerm,
+                month: selectedMonth
+            });
+            alert("Notes validées avec succès ! Cette matière est désormais visible sur les bulletins.");
+            loadValidationStatuses();
+        } catch (err: any) {
+            alert("Erreur lors de la validation: " + err.message);
+        }
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -69,6 +146,139 @@ const AdvisorPortal: React.FC = () => {
                                     <div className="text-[9px] text-white/50 mt-1 uppercase font-bold">Ngo J.</div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'EVALUATIONS' && (
+                <div className="space-y-6">
+                    {/* Filters Bar */}
+                    <div className="glass-card p-6 flex flex-wrap gap-4 items-center justify-between">
+                        <div className="flex flex-wrap gap-4 items-center">
+                            <div>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Classe</label>
+                                <select
+                                    value={selectedClass}
+                                    onChange={(e) => setSelectedClass(e.target.value)}
+                                    className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-44"
+                                >
+                                    {classes.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Trimestre</label>
+                                <select
+                                    value={selectedTerm}
+                                    onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
+                                    className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-32"
+                                >
+                                    <option value={1}>1er Trimestre</option>
+                                    <option value={2}>2e Trimestre</option>
+                                    <option value={3}>3e Trimestre</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Mois d'Évaluation</label>
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-40"
+                                >
+                                    {MONTHS.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/50 px-4 py-3.5 rounded-xl border border-white/5 flex items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            <ShieldAlert className="w-4 h-4 text-amber-500 mr-2" />
+                            Seules les matières validées apparaîtront sur le bulletin de l'élève.
+                        </div>
+                    </div>
+
+                    {/* Subject validation status list */}
+                    <div className="glass-card overflow-hidden">
+                        <div className="p-6 border-b border-white/5 flex items-center">
+                            <Award className="w-5 h-5 text-amber-500 mr-2" />
+                            <h2 className="text-lg font-black text-white uppercase tracking-tight">Validation des notes par matière</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
+                                        <th className="px-6 py-4">Matière</th>
+                                        <th className="px-6 py-4">Domaine / Bloc</th>
+                                        <th className="px-6 py-4 text-center">Coefficient</th>
+                                        <th className="px-6 py-4">Statut Saisie</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 bg-slate-900/30">
+                                    {subjectStatuses.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="text-center py-8 text-slate-500 font-bold text-xs">
+                                                Aucune matière programmée pour cette classe.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        subjectStatuses.map(subj => {
+                                            let statusBadge = (
+                                                <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/5 rounded-full text-[9px] font-black uppercase tracking-wider">Pas de notes</span>
+                                            );
+                                            if (subj.hasGrades) {
+                                                if (subj.isValidated) {
+                                                    statusBadge = (
+                                                        <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[9px] font-black uppercase tracking-wider inline-flex items-center">
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" /> Validé
+                                                        </span>
+                                                    );
+                                                } else if (subj.isLocked) {
+                                                    statusBadge = (
+                                                        <span className="px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">En attente de validation</span>
+                                                    );
+                                                } else {
+                                                    statusBadge = (
+                                                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">Brouillon</span>
+                                                    );
+                                                }
+                                            }
+
+                                            return (
+                                                <tr key={subj.id} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-6 py-4 font-black text-white uppercase text-sm tracking-tight">{subj.name}</td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">{subj.domain || 'Général'}</td>
+                                                    <td className="px-6 py-4 text-center text-xs font-bold text-white">{subj.coefficient}</td>
+                                                    <td className="px-6 py-4">{statusBadge}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            {subj.hasGrades && (
+                                                                <button
+                                                                    onClick={() => handleViewSubjectDetails(subj)}
+                                                                    className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all inline-flex items-center text-[10px] font-black uppercase tracking-wider"
+                                                                >
+                                                                    <Eye className="w-3.5 h-3.5 mr-1" /> Inspecter
+                                                                </button>
+                                                            )}
+                                                            {subj.hasGrades && !subj.isValidated && (
+                                                                <button
+                                                                    onClick={() => handleValidateSubject(subj.id)}
+                                                                    className="bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale-105 active:scale-95 transition-all"
+                                                                >
+                                                                    Valider les notes
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -141,6 +351,63 @@ const AdvisorPortal: React.FC = () => {
                                 <p className="text-xl font-black uppercase tracking-widest">Sélectionnez une route pour gérer les passagers</p>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Grades Inspection Slide-over Drawer / Modal */}
+            {showDetailModal && selectedSubjectForDetail && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
+                            <div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-tight">{selectedSubjectForDetail.name}</h3>
+                                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Revue des notes de la classe</p>
+                            </div>
+                            <button
+                                onClick={() => setShowDetailModal(false)}
+                                className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 text-slate-400 hover:text-white transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                            <table className="w-full text-left text-sm">
+                                <thead>
+                                    <tr className="text-slate-500 text-[9px] font-black uppercase tracking-widest border-b border-white/5">
+                                        <th className="pb-3">Élève</th>
+                                        <th className="pb-3">Matricule</th>
+                                        <th className="pb-3 text-right">Note/20</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 font-bold">
+                                    {detailGrades.map((g, i) => (
+                                        <tr key={i} className="hover:bg-white/5 transition-colors">
+                                            <td className="py-3 text-white uppercase tracking-tight">{g.studentName}</td>
+                                            <td className="py-3 text-slate-400 text-xs">{g.matricule}</td>
+                                            <td className="py-3 text-right">
+                                                <span className={`px-3 py-1.5 rounded-lg text-xs font-black ${g.score === null ? 'bg-slate-800 text-slate-500' : g.score >= 10 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                                    {g.score !== null ? g.score.toFixed(2) : 'Abs/Non saisi'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-white/5 bg-slate-950/50 flex justify-end">
+                            <button
+                                onClick={() => setShowDetailModal(false)}
+                                className="bg-slate-800 text-white hover:bg-slate-700 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                            >
+                                Fermer
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

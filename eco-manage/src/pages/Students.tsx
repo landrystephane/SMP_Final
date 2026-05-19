@@ -2,18 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
 import { generateRegistrationSheet } from '../utils/reports';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 const Students: React.FC = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | 'ALL'>('ALL');
+  const [selectedCycle, setSelectedCycle] = useState<'PRIMAIRE' | 'MATERNELLE' | 'ALL'>('ALL');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   const loadData = async () => {
     if (window.electronAPI) {
-      const s = await window.electronAPI.getStudents();
-      const c = await window.electronAPI.getClasses();
+      const s = await window.electronAPI.getStudents(user?.schoolId);
+      const c = await window.electronAPI.getClasses(user?.schoolId);
       setStudents(s);
       setClasses(c);
     }
@@ -23,25 +29,42 @@ const Students: React.FC = () => {
     loadData();
   }, []);
 
+  const handleDeleteStudent = async (id: number) => {
+      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet élève ? Toutes ses données financières et scolaires seront perdues.")) return;
+      if (window.electronAPI) {
+          try {
+              await window.electronAPI.deleteStudent(id);
+              loadData();
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
+  };
+
   const filteredStudents = students.filter(s => {
     const matchSection = selectedSection === 'ALL' || s.section === selectedSection;
     const matchClass = selectedClass === 'ALL' || s.class_id.toString() === selectedClass;
-    return matchSection && matchClass;
+    const classObj = classes.find(c => c.id === s.class_id);
+    const matchCycle = selectedCycle === 'ALL' || (classObj && classObj.level === selectedCycle);
+    const matchSearch = s.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        s.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        s.matricule.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchSection && matchClass && matchCycle && matchSearch;
   });
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Gestion des Élèves</h1>
-          <p className="text-slate-400 mt-1">Base de données des effectifs par classe et section</p>
+          <h1 className="text-3xl font-bold text-white">{t('student_management')}</h1>
+          <p className="text-slate-400 mt-1">{t('student_management')} - {t('global_effectif')}</p>
         </div>
         <button
           onClick={() => setIsAdding(true)}
           className="flex items-center justify-center py-2 px-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
         >
           <UserPlus className="w-4 h-4 mr-2" />
-          Nouvelle Inscription
+          {t('new_student')}
         </button>
       </div>
 
@@ -51,8 +74,10 @@ const Students: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Rechercher un élève (Nom ou Matricule)..."
+            placeholder={t('search')}
+            value={searchQuery}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
@@ -66,8 +91,21 @@ const Students: React.FC = () => {
                 }}
             >
                 <option value="ALL">Toutes Sections</option>
-                <option value="FRANCOPHONE">Francophone</option>
-                <option value="ANGLOPHONE">Anglophone</option>
+                <option value="FRANCOPHONE">{t('section_francophone')}</option>
+                <option value="ANGLOPHONE">{t('section_anglophone')}</option>
+            </select>
+
+            <select
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-bold uppercase"
+                value={selectedCycle}
+                onChange={(e) => {
+                    setSelectedCycle(e.target.value as any);
+                    setSelectedClass('ALL');
+                }}
+            >
+                <option value="ALL">Tous les Cycles</option>
+                <option value="PRIMAIRE">Primaire</option>
+                <option value="MATERNELLE">Maternelle</option>
             </select>
 
             <select
@@ -75,9 +113,9 @@ const Students: React.FC = () => {
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
             >
-                <option value="ALL">Toutes les Classes</option>
+                <option value="ALL">{t('all_classes')}</option>
                 {classes
-                    .filter(c => selectedSection === 'ALL' || c.section === selectedSection)
+                    .filter(c => (selectedSection === 'ALL' || c.section === selectedSection) && (selectedCycle === 'ALL' || c.level === selectedCycle))
                     .map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                     ))
@@ -99,12 +137,12 @@ const Students: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-white/5 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-white/5">
-                <th className="px-6 py-4">Matricule</th>
-                <th className="px-6 py-4">Nom Complet</th>
-                <th className="px-6 py-4">Section</th>
-                <th className="px-6 py-4">Classe</th>
+                <th className="px-6 py-4">{t('matricule')}</th>
+                <th className="px-6 py-4">{t('full_name')}</th>
+                <th className="px-6 py-4">{t('section')}</th>
+                <th className="px-6 py-4">{t('class')}</th>
                 <th className="px-6 py-4">Sexe</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4 text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="text-slate-300 divide-y divide-white/5">
@@ -137,7 +175,10 @@ const Students: React.FC = () => {
                     <button className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all">
+                    <button
+                        onClick={() => handleDeleteStudent(s.id)}
+                        className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
+                    >
                         <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
@@ -159,9 +200,17 @@ const Students: React.FC = () => {
             onClose={() => setIsAdding(false)}
             onSubmit={async (data) => {
                 if (window.electronAPI) {
-                    await window.electronAPI.addStudent(data);
-                    loadData();
-                    setIsAdding(false);
+                    try {
+                        const res = await window.electronAPI.addStudent({ ...data, schoolId: user?.schoolId });
+                        if (res && res.error) {
+                            alert(`Error: ${res.error}`);
+                            return;
+                        }
+                        loadData();
+                        setIsAdding(false);
+                    } catch (err: any) {
+                        alert(err.message);
+                    }
                 }
             }}
         />

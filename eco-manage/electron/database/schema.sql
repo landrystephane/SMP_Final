@@ -10,6 +10,17 @@ CREATE TABLE IF NOT EXISTS schools (
     contact_email TEXT,
     contact_phone TEXT,
     logo TEXT,
+    primary_color TEXT DEFAULT '#1e293b',
+    secondary_color TEXT DEFAULT '#f59e0b',
+    receipt_sig_title TEXT DEFAULT 'Signature de l''Économe',
+    bulletin_sig_left TEXT DEFAULT 'L''ENSEIGNANT (TEACHER)',
+    bulletin_sig_middle TEXT DEFAULT 'PARENT / GUARDIAN',
+    bulletin_sig_right TEXT DEFAULT 'LE DIRECTEUR (HEADMASTER)',
+    header_french TEXT DEFAULT 'MINISTÈRE DE L''ÉDUCATION DE BASE',
+    header_english TEXT DEFAULT 'MINISTRY OF BASIC EDUCATION',
+    bulletin_pdf_use_custom INTEGER DEFAULT 0,
+    bulletin_pdf_template TEXT DEFAULT '',
+    bulletin_pdf_mapping TEXT DEFAULT '{}',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -84,6 +95,7 @@ CREATE TABLE IF NOT EXISTS students (
     birth_date DATE NOT NULL,
     birth_place TEXT,
     gender TEXT,
+    parent_name TEXT,
     parent_contact TEXT,
     emergency_contact TEXT,
     medical_info TEXT,
@@ -238,11 +250,28 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Ticketing
 CREATE TABLE IF NOT EXISTS tickets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER,
     sender_id INTEGER,
     receiver_role TEXT,
+    receiver_id INTEGER,
     subject TEXT NOT NULL,
     message TEXT NOT NULL,
     status TEXT DEFAULT 'OPEN',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+
+-- Announcements / Communiqués
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER,
+    sender_id INTEGER,
+    target TEXT NOT NULL, -- 'STAFF', 'PARENTS', 'ALL'
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );

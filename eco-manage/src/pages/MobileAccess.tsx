@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Copy, ShieldCheck, RefreshCw, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const MobileAccess: React.FC = () => {
+  const { user } = useAuth();
   const [keys, setKeys] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [enteredMatricule, setEnteredMatricule] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const loadKeys = async () => {
-    if (window.electronAPI) {
+  const loadData = async () => {
+    if (window.electronAPI && user) {
       const data = await window.electronAPI.getMobileKeys();
       setKeys(data);
+      const u = await window.electronAPI.getUsers(user.schoolId);
+      setUsers(u || []);
     } else {
       // Fallback
       setKeys([
@@ -19,18 +26,29 @@ const MobileAccess: React.FC = () => {
   };
 
   useEffect(() => {
-    loadKeys();
-  }, []);
+    loadData();
+  }, [user]);
 
-  const handleGenerateKey = async () => {
-    const name = prompt("Nom de l'enseignant ou du personnel :");
-    if (!name) return;
+  const handleGenerateKeySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!enteredMatricule.trim()) return;
+
+    const foundUser = users.find(u => u.matricule === enteredMatricule);
+    if (!foundUser) {
+      alert(`Erreur : Le matricule "${enteredMatricule}" n'existe pas parmi le personnel de cet établissement.`);
+      return;
+    }
 
     if (window.electronAPI) {
       setIsLoading(true);
       try {
-        await window.electronAPI.generateMobileKey({ name, userId: null });
-        await loadKeys();
+        await window.electronAPI.generateMobileKey({ 
+          name: `[${foundUser.matricule}] ${foundUser.fullName}`, 
+          userId: foundUser.id 
+        });
+        setEnteredMatricule('');
+        setIsModalOpen(false);
+        await loadData();
       } finally {
         setIsLoading(false);
       }
@@ -43,7 +61,7 @@ const MobileAccess: React.FC = () => {
     if (!confirm("Voulez-vous révoquer cette clé ?")) return;
     if (window.electronAPI) {
       await window.electronAPI.revokeMobileKey(id);
-      await loadKeys();
+      await loadData();
     }
   };
 
@@ -55,7 +73,7 @@ const MobileAccess: React.FC = () => {
           <p className="text-slate-400 mt-1 font-bold uppercase text-xs tracking-widest italic opacity-70">Gérez les clés d'activation uniques pour les terminaux mobiles</p>
         </div>
         <button
-          onClick={handleGenerateKey}
+          onClick={() => setIsModalOpen(true)}
           disabled={isLoading}
           className="flex items-center px-8 py-4 bg-amber-500 text-slate-950 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-amber-400 active:scale-95 transition-all shadow-xl shadow-amber-500/10"
         >
@@ -149,6 +167,47 @@ const MobileAccess: React.FC = () => {
             </div>
         </div>
       </div>
+
+      {/* Modern Modal Dialog for Generating Key */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md p-8 glass-card border border-white/10 rounded-3xl shadow-2xl relative animate-in zoom-in-95 duration-300">
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Générer une Clé Mobile</h3>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6 opacity-70">
+              Saisissez le matricule d'un membre du personnel pour lui générer et associer sa clé d'accès mobile.
+            </p>
+            <form onSubmit={handleGenerateKeySubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Matricule du Personnel</label>
+                <input
+                  type="text"
+                  className="input-field w-full bg-slate-900 border-slate-700 text-white"
+                  placeholder="Ex: 26ENS0001"
+                  value={enteredMatricule}
+                  onChange={(e) => setEnteredMatricule(e.target.value.trim().toUpperCase())}
+                  required
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => { setIsModalOpen(false); setEnteredMatricule(''); }}
+                  className="flex-1 px-6 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-white/10 active:scale-95 transition-all"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 px-6 py-4 bg-amber-500 text-slate-950 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-amber-400 active:scale-95 transition-all shadow-xl shadow-amber-500/10"
+                >
+                  {isLoading ? 'Génération...' : 'Confirmer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

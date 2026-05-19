@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, ShieldCheck, CheckCircle2, UserCheck } from 'lucide-react';
+import { Calendar, Clock, ShieldCheck, CheckCircle2, UserCheck, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
+import { generateClassReportCards } from '../utils/reports';
 
 const AdminWorkflow: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [isSgActing, setIsSgActing] = useState(false);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [school, setSchool] = useState<any>(null);
+  const [printingClassId, setPrintingClassId] = useState<number | null>(null);
+
   const [period, _setPeriod] = useState({
     term: 1,
     start: '2026-04-20',
@@ -12,6 +19,17 @@ const AdminWorkflow: React.FC = () => {
     active: true,
     editingAllowed: true
   });
+
+  const loadData = async () => {
+    if (window.electronAPI && user) {
+        const cls = await window.electronAPI.getClasses(user.schoolId);
+        setClasses(cls || []);
+
+        const schoolsList = await window.electronAPI.getSchools();
+        const curSchool = schoolsList.find((s: any) => s.id === user.schoolId);
+        setSchool(curSchool);
+    }
+  };
 
   const loadActingStatus = async () => {
     if (window.electronAPI) {
@@ -21,14 +39,98 @@ const AdminWorkflow: React.FC = () => {
   };
 
   useEffect(() => {
+    loadData();
     loadActingStatus();
-  }, []);
+  }, [user]);
 
   const toggleSgActing = async () => {
     if (window.electronAPI) {
         const newValue = !isSgActing;
         await window.electronAPI.setSetting({ key: 'sg_acting_director', value: newValue.toString() });
         setIsSgActing(newValue);
+    }
+  };
+
+  const handlePrintClassReportCards = async (classId: number) => {
+    if (!window.electronAPI || !school) return;
+    setPrintingClassId(classId);
+    try {
+        const classObj = classes.find(c => c.id === classId);
+        if (!classObj) return;
+
+        // Fetch all students of this class
+        const allStudents = await window.electronAPI.getStudents(user?.schoolId);
+        const classStudents = allStudents.filter((s: any) => s.class_id === classId);
+
+        if (classStudents.length === 0) {
+            alert("Aucun élève dans cette classe.");
+            return;
+        }
+
+        // Fetch details (grades & attendance) for each student
+        const studentsData: any[] = [];
+        for (const student of classStudents) {
+            const details = await window.electronAPI.getStudentDetails(student.id);
+            studentsData.push({
+                student,
+                grades: details.grades || [],
+                attendance: details.attendance || []
+            });
+        }
+
+        // Calculate averages for rank calculation
+        const studentsWithAverages = studentsData.map(sData => {
+            const validatedGrades = sData.grades.filter((g: any) => g.validated === 1);
+            if (validatedGrades.length === 0) {
+                return { ...sData, average: null };
+            }
+            const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
+            const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
+            return {
+                ...sData,
+                average: totalPoints / (totalCoef || 1)
+            };
+        });
+
+        // Sort students to assign rank
+        const sortedStudents = [...studentsWithAverages]
+            .filter(s => s.average !== null)
+            .sort((a, b) => (b.average || 0) - (a.average || 0));
+
+        const finalStudentsData = studentsWithAverages.map(sData => {
+            if (sData.average === null) {
+                return {
+                    student: sData.student,
+                    grades: sData.grades,
+                    attendance: sData.attendance,
+                    rank: undefined,
+                    totalStudents: classStudents.length
+                };
+            }
+            const rankIndex = sortedStudents.findIndex(s => s.student.id === sData.student.id);
+            return {
+                student: sData.student,
+                grades: sData.grades,
+                attendance: sData.attendance,
+                rank: rankIndex !== -1 ? rankIndex + 1 : undefined,
+                totalStudents: classStudents.length
+            };
+        });
+
+        // Call report generator
+        generateClassReportCards({
+            classObj,
+            school,
+            term: period.term,
+            studentsData: finalStudentsData
+        });
+
+        alert("Impression lancée avec succès (le fichier PDF a été généré).");
+    } catch (err: any) {
+        console.error(err);
+        alert("Erreur lors de la génération: " + err.message);
+    } finally {
+        setPrintingClassId(null);
     }
   };
 
@@ -95,31 +197,21 @@ const AdminWorkflow: React.FC = () => {
         </div>
 
         {/* Validation Status */}
-        <div className="glass-card p-6 space-y-4">
+        <div className="glass-card p-6 space-y-4 md:col-span-2">
           <div className="flex items-center space-x-3 text-blue-400">
             <ShieldCheck className="w-6 h-6" />
             <h2 className="text-xl font-semibold">{t('report_validation')}</h2>
           </div>
-          <div className="space-y-3">
-            {[
-              { class: 'SIL A', status: 'READY', progress: 100 },
-              { class: 'SIL B', status: 'IN_PROGRESS', progress: 75 },
-              { class: 'CP', status: 'PENDING', progress: 10 },
-            ].map((item) => (
-              <div key={item.class} className="flex items-center justify-between p-3 border border-slate-700 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {classes.slice(0, 6).map((cls) => (
+              <div key={cls.id} className="flex items-center justify-between p-4 border border-slate-800 rounded-xl bg-slate-900/30">
                 <div>
-                  <span className="text-white font-medium">{item.class}</span>
-                  <div className="w-32 h-1 bg-slate-700 rounded-full mt-1">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${item.progress}%` }} />
-                  </div>
+                  <span className="text-white font-medium block">{cls.name}</span>
+                  <span className="text-[9px] text-slate-500 font-bold uppercase">{cls.section}</span>
                 </div>
-                {item.status === 'READY' ? (
-                  <button className="flex items-center text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded border border-green-500/20">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> {t('validate')}
-                  </button>
-                ) : (
-                  <span className="text-[10px] text-slate-500 font-bold uppercase italic">{t('pending')}</span>
-                )}
+                <span className="flex items-center text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded border border-green-500/20 font-bold uppercase">
+                  <CheckCircle2 className="w-3 h-3 mr-1" /> VALIDÉ
+                </span>
               </div>
             ))}
           </div>
@@ -129,7 +221,7 @@ const AdminWorkflow: React.FC = () => {
       {/* Secretary Print Authorization */}
       <div className="glass-card p-6">
         <div className="flex items-center space-x-3 text-purple-400 mb-6">
-          <Clock className="w-6 h-6" />
+          <Printer className="w-6 h-6" />
           <h2 className="text-xl font-semibold">{t('print_auth')}</h2>
         </div>
         <div className="overflow-x-auto">
@@ -137,22 +229,31 @@ const AdminWorkflow: React.FC = () => {
             <thead className="text-slate-500 text-xs uppercase">
               <tr>
                 <th className="pb-4">{t('class')}</th>
-                <th className="pb-4">{t('section')}</th>
-                <th className="pb-4">{t('status_director')}</th>
-                <th className="pb-4">{t('action_secretary')}</th>
+                <th className="pb-4">Niveau / Section</th>
+                <th className="pb-4">Statut Validation</th>
+                <th className="pb-4">Action</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              <tr className="border-t border-slate-800">
-                <td className="py-4 font-bold">SIL A</td>
-                <td className="py-4">{t('section')}</td>
-                <td className="py-4">
-                  <span className="px-2 py-1 bg-green-500/10 text-green-500 rounded-full text-[10px] font-bold">{t('approved')}</span>
-                </td>
-                <td className="py-4">
-                  <button className="text-slate-gold-gold hover:underline text-sm font-semibold">{t('start_printing')}</button>
-                </td>
-              </tr>
+              {classes.map((c) => (
+                <tr key={c.id} className="border-t border-slate-850 hover:bg-slate-900/20">
+                  <td className="py-4 font-bold text-white">{c.name}</td>
+                  <td className="py-4 text-xs font-semibold text-slate-400">{c.level} • {c.section}</td>
+                  <td className="py-4">
+                    <span className="px-2 py-1 bg-green-500/10 text-green-500 rounded-full text-[10px] font-bold uppercase tracking-wider">APROUVÉ</span>
+                  </td>
+                  <td className="py-4">
+                    <button
+                      onClick={() => handlePrintClassReportCards(c.id)}
+                      disabled={printingClassId === c.id}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Printer className="w-4 h-4" />
+                      {printingClassId === c.id ? "Impression..." : t('start_printing')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

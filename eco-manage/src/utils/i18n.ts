@@ -212,12 +212,14 @@ i18n
           pedagogy_advisor: 'Conseiller Pédagogique',
           transport_driver: 'Portail Chauffeur',
           system_admin: 'Admin Système',
-          stats: 'Statistiques'
+          stats: 'Statistiques',
+          mobile_access: 'Accès Mobile'
         }
       },
       en: {
         translation: {
           dashboard: 'Dashboard',
+          mobile_access: 'Mobile Access',
           students: 'Student Management',
           subjects: 'Subject Management',
           grades: 'Grades Entry',
