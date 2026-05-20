@@ -19,6 +19,8 @@ const SystemAdmin: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [isAddingFounder, setIsAddingFounder] = useState(false);
+  const [errorLogs, setErrorLogs] = useState<string>('');
+  const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
 
   // School metadata editing states
   const [editSchoolName, setEditSchoolName] = useState('');
@@ -57,6 +59,38 @@ const SystemAdmin: React.FC = () => {
     loadSchools();
     loadGlobalSubjects();
   }, []);
+
+  const loadErrorLogs = async () => {
+      if (window.electronAPI) {
+          setIsLoadingLogs(true);
+          try {
+              const logs = await (window.electronAPI as any).getErrorLogs();
+              setErrorLogs(logs || 'Aucun journal d\'erreurs détecté.');
+          } catch (err: any) {
+              setErrorLogs('Erreur lors du chargement des logs: ' + err.message);
+          } finally {
+              setIsLoadingLogs(false);
+          }
+      }
+  };
+
+  const clearErrorLogs = async () => {
+      if (!window.confirm("Êtes-vous sûr de vouloir vider le journal d'erreurs ?")) return;
+      if (window.electronAPI) {
+          try {
+              await (window.electronAPI as any).clearErrorLogs();
+              setErrorLogs('Journal d\'erreurs vidé.');
+          } catch (err: any) {
+              alert('Erreur lors de la réinitialisation des logs: ' + err.message);
+          }
+      }
+  };
+
+  useEffect(() => {
+      if (activeTab === 'HEALTH') {
+          loadErrorLogs();
+      }
+  }, [activeTab]);
 
   const handleAddSchool = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -438,6 +472,75 @@ const SystemAdmin: React.FC = () => {
                       ))}
                   </tbody>
               </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'HEALTH' && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-3xl font-black text-white tracking-tighter italic">Status & Diagnostic Système</h2>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2">Suivi de santé de la flotte et diagnostic de pannes</p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={loadErrorLogs}
+                disabled={isLoadingLogs}
+                className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-white/10 transition-all animate-none"
+              >
+                {isLoadingLogs ? 'Chargement...' : 'Rafraîchir les Logs'}
+              </button>
+              <button
+                onClick={clearErrorLogs}
+                className="px-6 py-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-rose-500/20 transition-all"
+              >
+                Vider le Journal
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 space-y-6">
+              <div className="glass-card p-8 bg-slate-900 border-white/5">
+                <h3 className="font-black text-white uppercase tracking-widest text-xs mb-6 text-amber-500">Informations Système</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase">Statut Base de Données</p>
+                    <p className="text-sm font-bold text-white mt-1">Connecté (SQLite3)</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase">Sécurité et Isolation</p>
+                    <p className="text-sm font-bold text-emerald-500 mt-1">Actif (Multi-établissements)</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase">Version d'Environnement</p>
+                    <p className="text-sm font-bold text-white mt-1">Electron v29.1.0 • Node v20</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card p-8 bg-slate-900 border-white/5">
+                <h3 className="font-black text-white uppercase tracking-widest text-xs mb-6 text-amber-500">Assistance à distance</h3>
+                <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-6 uppercase">
+                  Pour dépanner une école à distance en cas de panne complexe, demandez-lui d'exporter son fichier de base de données <strong>school.db</strong>. Vous pourrez ensuite le charger localement pour effectuer vos diagnostics.
+                </p>
+                <div className="pt-2">
+                  <span className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                    Diagnostic Prêt
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <div className="glass-card p-8 bg-slate-900 border-white/5 flex flex-col h-[500px]">
+                <h3 className="font-black text-white uppercase tracking-widest text-xs mb-6 text-amber-500">Journal d'erreurs en temps réel (error.log)</h3>
+                <div className="flex-1 bg-slate-950/80 rounded-2xl border border-white/5 p-6 font-mono text-[10px] text-slate-400 overflow-y-auto whitespace-pre-wrap select-text">
+                  {errorLogs || 'Aucune erreur consignée pour le moment.'}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

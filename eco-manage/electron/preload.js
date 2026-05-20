@@ -80,4 +80,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateSchoolSettings: (data) => ipcRenderer.invoke('db:updateSchoolSettings', data),
   getSchoolArchives: (schoolId) => ipcRenderer.invoke('db:getSchoolArchives', schoolId),
   createSchoolYearArchive: (data) => ipcRenderer.invoke('db:createSchoolYearArchive', data),
+  getErrorLogs: () => ipcRenderer.invoke('db:getErrorLogs'),
+  clearErrorLogs: () => ipcRenderer.invoke('db:clearErrorLogs'),
 });

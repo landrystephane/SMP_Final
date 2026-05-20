@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { initDb, db, dbPath } = require('./database/db');
@@ -128,6 +129,30 @@ app.whenReady().then(() => {
   createWindow();
 });
 
+const userDataPath = app.getPath('userData');
+const logPath = path.join(userDataPath, 'error.log');
+
+const logErrorToFile = (channel, error, args) => {
+  const timestamp = new Date().toISOString();
+  let safeArgs = '';
+  try {
+    safeArgs = JSON.stringify(args, (key, value) => {
+      if (key.toLowerCase().includes('password') || key.toLowerCase().includes('hash')) {
+        return '***';
+      }
+      return value;
+    });
+  } catch (e) {
+    safeArgs = '[Unable to stringify args]';
+  }
+  const logMessage = `[${timestamp}] [Channel: ${channel}] Args: ${safeArgs} | Error: ${error.stack || error.message}\n`;
+  try {
+    fs.appendFileSync(logPath, logMessage, 'utf8');
+  } catch (err) {
+    console.error('Failed to write to error log:', err);
+  }
+};
+
 // IPC Handlers wrapper for logging
 const handleIPC = (channel, handler) => {
   ipcMain.handle(channel, async (event, ...args) => {
@@ -135,10 +160,27 @@ const handleIPC = (channel, handler) => {
       return await handler(event, ...args);
     } catch (error) {
       console.error(`[IPC Error] ${channel}:`, error.message);
+      logErrorToFile(channel, error, args);
       return { error: error.message };
     }
   });
 };
+
+handleIPC('db:getErrorLogs', async () => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    if (fs.existsSync(logPath)) {
+        return fs.readFileSync(logPath, 'utf8');
+    }
+    return 'Aucun journal d\'erreurs détecté.';
+});
+
+handleIPC('db:clearErrorLogs', async () => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    if (fs.existsSync(logPath)) {
+        fs.writeFileSync(logPath, '', 'utf8');
+    }
+    return true;
+});
 
 // Auth
 handleIPC('auth:login', async (event, { username, password }) => {
