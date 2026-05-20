@@ -9,6 +9,13 @@ const isDev = !app.isPackaged;
 
 let loggedInUser = null;
 
+function getActiveSchoolId(schoolId) {
+  if (schoolId && schoolId !== 0) return Number(schoolId);
+  if (loggedInUser && loggedInUser.schoolId) return Number(loggedInUser.schoolId);
+  return 1;
+}
+
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -315,15 +322,13 @@ handleIPC('db:deleteSchool', async (event, id) => {
 
 // Students
 handleIPC('db:getStudents', async (event, schoolId) => {
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare('SELECT * FROM students WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:addStudent', async (event, student) => {
   const { firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId, entryYear } = student;
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   const year = entryYear || new Date().getFullYear();
   const yearShort = year.toString().slice(-2);
 
@@ -368,8 +373,7 @@ handleIPC('db:deleteStudent', async (event, id) => {
 
 // Announcements / Communiqués
 handleIPC('db:getAnnouncements', async (event, schoolId) => {
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
     SELECT a.*, u.full_name as sender_name 
     FROM announcements a 
@@ -381,8 +385,7 @@ handleIPC('db:getAnnouncements', async (event, schoolId) => {
 
 handleIPC('db:sendAnnouncement', async (event, announcement) => {
   const { sender_id, target, title, content, school_id } = announcement;
-  let sid = school_id || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(school_id);
   return db.prepare(`
     INSERT INTO announcements (school_id, sender_id, target, title, content) 
     VALUES (?, ?, ?, ?, ?)
@@ -465,8 +468,7 @@ handleIPC('db:validateSubjectGrades', async (event, { classId, subjectId, term, 
 
 // Finance
 handleIPC('db:getPayments', async (event, schoolId) => {
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
     SELECT p.*, s.first_name, s.last_name, s.class_id, i.name as installment_name
     FROM payments p
@@ -725,14 +727,13 @@ handleIPC('db:getAttendance', async (event, { classId, date }) => {
 });
 
 handleIPC('db:getUsers', async (event, schoolId) => {
-  const sid = schoolId || 1;
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:addUser', async (event, user) => {
   const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender } = user;
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   
   const hash = bcrypt.hashSync(password, 10);
   
@@ -799,15 +800,13 @@ handleIPC('db:changePassword', async (event, { userId, newPassword }) => {
 // Ticketing
 handleIPC('db:sendTicket', async (event, ticket) => {
   const { sender_id, receiver_role, receiver_id, subject, message, school_id } = ticket;
-  let sid = school_id || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(school_id);
   return db.prepare('INSERT INTO tickets (sender_id, receiver_role, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?, ?)')
     .run(sender_id, receiver_role, receiver_id, subject, message, sid);
 });
 
 handleIPC('db:getTickets', async (event, { userId, role, schoolId }) => {
-  let sid = schoolId || 1;
-  if (loggedInUser && loggedInUser.role !== 'SUPERADMIN') sid = loggedInUser.schoolId;
+  const sid = getActiveSchoolId(schoolId);
   if (role === 'SUPERADMIN' || role === 'FOUNDER') {
       return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ? ORDER BY t.created_at DESC').all(sid);
   }

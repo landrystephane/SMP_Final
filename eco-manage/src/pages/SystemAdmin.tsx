@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Building2, Plus, Globe, Shield, Trash2, Edit, CheckCircle, Search,
   Mail, Phone, MapPin, BookOpen, X, Settings, UserPlus, ExternalLink,
-  Activity, Server, Database, Lock
+  Activity, Server, Database, Lock, ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -566,12 +566,24 @@ const SystemAdmin: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setSelectedSchool(null)}
-                        className="p-5 bg-white/5 hover:bg-white/10 rounded-3xl text-slate-500 hover:text-white transition-all flex items-center gap-3 font-black text-[10px] uppercase tracking-widest border border-white/5"
-                      >
-                        <X className="w-6 h-6" /> Close Instance View
-                      </button>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={async () => {
+                              await switchSchool(selectedSchool.id);
+                              setSelectedSchool(null);
+                              navigate('/');
+                          }}
+                          className="px-6 py-5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 shadow-lg shadow-amber-500/10 active:scale-95"
+                        >
+                          <ExternalLink className="w-5 h-5" /> Se Connecter comme Fondateur
+                        </button>
+                        <button
+                          onClick={() => setSelectedSchool(null)}
+                          className="p-5 bg-white/5 hover:bg-white/10 rounded-3xl text-slate-400 hover:text-white transition-all flex items-center gap-3 font-black text-[10px] uppercase tracking-widest border border-white/5"
+                        >
+                          <ArrowLeft className="w-5 h-5" /> Retour aux Écoles
+                        </button>
+                      </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 flex-1">
