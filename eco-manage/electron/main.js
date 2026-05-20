@@ -573,11 +573,27 @@ handleIPC('db:getSchoolSubjects', async (event, schoolId) => {
 });
 
 handleIPC('db:toggleSchoolSubject', async (event, { schoolId, subjectId, isActive }) => {
-  return db.prepare(`
+  const result = db.prepare(`
     INSERT INTO school_subjects (school_id, subject_id, is_active)
     VALUES (?, ?, ?)
     ON CONFLICT(school_id, subject_id) DO UPDATE SET is_active = excluded.is_active
   `).run(schoolId, subjectId, isActive ? 1 : 0);
+
+  if (isActive) {
+    const subject = db.prepare('SELECT name, level, section FROM subjects WHERE id = ?').get(subjectId);
+    if (subject) {
+      db.prepare(`
+        INSERT INTO announcements (school_id, sender_id, target, title, content)
+        VALUES (?, ?, 'STAFF', 'Nouvelle Matière Autorisée', ?)
+      `).run(
+        schoolId,
+        loggedInUser ? loggedInUser.id : null,
+        `La matière globale "${subject.name}" (${subject.level} - ${subject.section}) a été autorisée pour votre établissement. Vous pouvez dès à présent l'associer à vos classes.`
+      );
+    }
+  }
+
+  return result;
 });
 
 handleIPC('db:getClassSubjects', async (event, classId) => {
