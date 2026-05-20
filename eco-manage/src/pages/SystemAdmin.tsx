@@ -217,8 +217,12 @@ const SystemAdmin: React.FC = () => {
       if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement cette école ? Cette action est irréversible.")) return;
       if (window.electronAPI) {
           try {
-              await window.electronAPI.deleteSchool(id);
-              loadSchools();
+              const res = await window.electronAPI.deleteSchool(id);
+              if (res && res.error) {
+                  alert("Erreur lors de la suppression de l'établissement : " + res.error);
+              } else {
+                  loadSchools();
+              }
           } catch (err: any) {
               alert(err.message);
           }
@@ -713,38 +717,38 @@ const SystemAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-2xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
                   <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Deploy New Node</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Provisioning fresh isolated resources for the fleet</p>
+                      <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Déployer un Nouvel Établissement</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Création d'une nouvelle instance d'école isolée dans la base de données</p>
                   </div>
                   <form onSubmit={handleAddSchool} className="p-10 space-y-8">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">School Full Name</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet de l'Établissement</label>
                           <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Groupe Scolaire Bilingue..." />
                       </div>
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">City / Location</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ville / Quartier</label>
                             <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Douala, Bonamoussadi" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">P.O Box (BP)</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Boîte Postale (BP)</label>
                             <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="BP 450..." />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Support Email</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Email de Contact</label>
                             <input type="email" className="input-field w-full" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Support Phone</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Téléphone de Contact</label>
                             <input className="input-field w-full" value={newSchool.contact_phone} onChange={e => setNewSchool({...newSchool, contact_phone: e.target.value})} />
                         </div>
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-5 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">Cancel</button>
+                          <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-5 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">Annuler</button>
                           <button type="submit" className="btn-primary flex-[2] py-5 flex items-center justify-center gap-3">
-                              <ExternalLink className="w-5 h-5" /> INITIALIZE INSTANCE
+                              <ExternalLink className="w-5 h-5" /> INITIALISER L'ÉCOLE
                           </button>
                       </div>
                   </form>
@@ -757,25 +761,25 @@ const SystemAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-md bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
                   <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Create Founder</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Primary owner for {selectedSchool?.name}</p>
+                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Créer le Fondateur</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Propriétaire principal pour {selectedSchool?.name}</p>
                   </div>
                   <form onSubmit={handleAddFounder} className="p-10 space-y-6">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Full Name</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet</label>
                           <input required className="input-field w-full" value={newFounder.fullName} onChange={e => setNewFounder({...newFounder, fullName: e.target.value})} placeholder="John Doe" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Login Username</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom d'Utilisateur (Identifiant pour la connexion)</label>
                           <input required className="input-field w-full" value={newFounder.username} onChange={e => setNewFounder({...newFounder, username: e.target.value})} placeholder="admin_name" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Access Password</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mot de Passe de Connexion</label>
                           <input required type="password" className="input-field w-full font-mono" value={newFounder.password} onChange={e => setNewFounder({...newFounder, password: e.target.value})} />
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Cancel</button>
-                          <button type="submit" className="btn-primary flex-[2] py-4">DEPLOY FOUNDER</button>
+                          <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">CRÉER LE FONDATEUR</button>
                       </div>
                   </form>
               </div>
@@ -787,17 +791,17 @@ const SystemAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
                   <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Registry Entry</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Add new educational module to the central repository</p>
+                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Ajouter une Matière Globale</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Ajouter un nouveau module d'enseignement au registre général</p>
                   </div>
                   <form onSubmit={handleAddSubject} className="p-10 space-y-6">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Module Title</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la Matière</label>
                           <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domain</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
                             <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
                                 <option value="Science">Science</option>
                                 <option value="Langue">Langue</option>
@@ -815,15 +819,15 @@ const SystemAdmin: React.FC = () => {
                         </div>
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target Cycle</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau Scolaire</label>
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
                               <option value="MATERNELLE">Maternelle</option>
                               <option value="PRIMAIRE">Primaire</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Discard</button>
-                          <button type="submit" className="btn-primary flex-[2] py-4">REGISTER MODULE</button>
+                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">ENREGISTRER LA MATIÈRE</button>
                       </div>
                   </form>
               </div>

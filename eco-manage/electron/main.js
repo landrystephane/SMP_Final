@@ -236,7 +236,39 @@ handleIPC('db:updateSchool', async (event, school) => {
 
 handleIPC('db:deleteSchool', async (event, id) => {
     if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
-    return db.prepare('DELETE FROM schools WHERE id = ?').run(id);
+    
+    const deleteSchoolTx = db.transaction((schoolId) => {
+        // 1. Delete grandchild records referencing route_id (from bus_routes)
+        db.prepare('DELETE FROM transport_points WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(schoolId);
+        db.prepare('DELETE FROM transport_logs WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(schoolId);
+
+        // 2. Delete grandchild records referencing class_id (from classes)
+        db.prepare('DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
+        db.prepare('DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
+        db.prepare('DELETE FROM tuition_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
+
+        // 3. Delete grandchild records referencing user_id (from users)
+        db.prepare('DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)').run(schoolId);
+
+        // 4. Delete child records directly containing school_id or referencing students/users/classes
+        db.prepare('DELETE FROM grades WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM payments WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(schoolId);
+        db.prepare('DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(schoolId);
+        db.prepare('DELETE FROM schedules WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM tickets WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM announcements WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM bus_routes WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM students WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM classes WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM school_subjects WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM users WHERE school_id = ?').run(schoolId);
+        db.prepare('DELETE FROM school_year_archives WHERE school_id = ?').run(schoolId);
+
+        // 5. Finally delete the school
+        return db.prepare('DELETE FROM schools WHERE id = ?').run(schoolId);
+    });
+
+    return deleteSchoolTx(id);
 });
 
 // Students

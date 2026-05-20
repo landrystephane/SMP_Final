@@ -33,6 +33,7 @@ const Login: React.FC = () => {
       console.log('Tentative de connexion pour:', username);
       await login(username, password);
       console.log('Connexion réussie, redirection...');
+      setIsLoading(false);
     } catch (err: any) {
       setError('Identifiants invalides ou erreur de connexion');
       console.error('Erreur login:', err);
