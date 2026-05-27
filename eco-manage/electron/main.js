@@ -77,6 +77,39 @@ function createWindow() {
 app.whenReady().then(() => {
   initDb();
 
+  // Self-healing / Seeding of default administration accounts to avoid lockouts
+  try {
+    // 1. SuperAdmin
+    const superadmin = db.prepare('SELECT * FROM users WHERE username = ?').get('superadmin');
+    const superadminHash = bcrypt.hashSync('superadmin', 10);
+    if (!superadmin) {
+      console.log("[Seeding] Superadmin user does not exist. Creating...");
+      db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run('superadmin', superadminHash, 'Super Développeur', 'SUPERADMIN', 1);
+    } else {
+      if (!bcrypt.compareSync('superadmin', superadmin.password)) {
+        console.log("[Security] Resetting superadmin password to default 'superadmin'");
+        db.prepare('UPDATE users SET password = ? WHERE username = ?').run(superadminHash, 'superadmin');
+      }
+    }
+
+    // 2. Founder (admin)
+    const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
+    const adminHash = bcrypt.hashSync('admin', 10);
+    if (!admin) {
+      console.log("[Seeding] Admin (founder) user does not exist. Creating...");
+      db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run('admin', adminHash, 'Fondateur École', 'FOUNDER', 1);
+    } else {
+      if (!bcrypt.compareSync('admin', admin.password)) {
+        console.log("[Security] Resetting admin password to default 'admin'");
+        db.prepare('UPDATE users SET password = ? WHERE username = ?').run(adminHash, 'admin');
+      }
+    }
+  } catch (err) {
+    console.error("Failed to verify/reset default administrative credentials:", err.message);
+  }
+
   // Automatic clean up of soft-deleted schools older than 30 days
   try {
     const expiredSchools = db.prepare("SELECT id FROM schools WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')").all();

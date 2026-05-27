@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Archive, Download, Calendar, Search, DollarSign, Users, Award, ShieldAlert, FolderOpen, ArrowUpRight, BarChart3, Database } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const AnnualArchives: React.FC = () => {
+    const { t, i18n } = useTranslation();
     const { user } = useAuth();
     const [archives, setArchives] = useState<any[]>([]);
     const [payments, setPayments] = useState<any[]>([]);
@@ -214,7 +216,7 @@ const AnnualArchives: React.FC = () => {
                                                             {p.payment_type}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 text-slate-500 text-[10px]">{new Date(p.payment_date).toLocaleDateString()}</td>
+                                                     <td className="py-4 text-slate-500 text-[10px]">{new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}</td>
                                                     <td className="py-4 text-right font-black text-white text-xs">{p.amount.toLocaleString()}</td>
                                                 </tr>
                                             );

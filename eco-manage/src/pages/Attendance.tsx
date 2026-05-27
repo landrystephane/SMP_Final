@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 const Attendance: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -64,12 +64,12 @@ const Attendance: React.FC = () => {
                       alert(`Erreur: ${res.error}`);
                       return;
                   }
-                  alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString());
+                  alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
               } catch (err: any) {
                   alert(err.message);
               }
           } else {
-              alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString());
+              alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
           }
       }
   };

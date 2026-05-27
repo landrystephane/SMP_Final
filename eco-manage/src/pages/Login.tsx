@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const Login: React.FC = () => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +38,7 @@ const Login: React.FC = () => {
       console.log('Connexion réussie, redirection...');
       setIsLoading(false);
     } catch (err: any) {
-      setError('Identifiants invalides ou erreur de connexion');
+      setError(t('invalid_credentials_error'));
       console.error('Erreur login:', err);
       setIsLoading(false);
     }
@@ -43,6 +46,11 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+        {/* Language switch at top right */}
+        <div className="absolute top-6 right-6 z-50 w-48">
+            <LanguageSwitcher />
+        </div>
+
         {/* Background blobs for visual appeal without white glare */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full" />
@@ -53,7 +61,7 @@ const Login: React.FC = () => {
                 <LogIn className="w-12 h-12 text-slate-950" />
             </div>
             <h1 className="text-5xl font-black text-white tracking-tighter mb-2">ECO-MANAGE</h1>
-            <p className="text-amber-500 font-black uppercase text-xs tracking-[0.3em]">Système de Gestion Scolaire Intégré</p>
+            <p className="text-amber-500 font-black uppercase text-xs tracking-[0.3em]">{t('school_management_system')}</p>
         </div>
 
         <div className="glass-card p-10 border-slate-700/50 shadow-2xl">
@@ -66,7 +74,7 @@ const Login: React.FC = () => {
 
             <div className="space-y-5">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Utilisateur</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">{t('user_field')}</label>
                 <input
                     type="text"
                     required
@@ -79,7 +87,7 @@ const Login: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Mot de passe</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">{t('password_field')}</label>
                 <input
                     type="password"
                     required
@@ -100,7 +108,7 @@ const Login: React.FC = () => {
               {isLoading ? (
                 <div className="w-6 h-6 border-4 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
               ) : (
-                'Accéder au Portail'
+                t('access_portal')
               )}
             </button>
           </form>

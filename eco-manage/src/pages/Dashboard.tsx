@@ -107,19 +107,19 @@ const Dashboard: React.FC = () => {
               onClick={() => setSelectedCycle('ALL')}
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'ALL' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-              Tous Cycles
+              {t('all_cycles')}
             </button>
             <button
               onClick={() => setSelectedCycle('PRIMAIRE')}
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'PRIMAIRE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-              Primaire
+              {t('primary_cycle')}
             </button>
             <button
               onClick={() => setSelectedCycle('MATERNELLE')}
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedCycle === 'MATERNELLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-              Maternelle
+              {t('nursery_cycle')}
             </button>
           </div>
         </div>
@@ -243,7 +243,7 @@ const Dashboard: React.FC = () => {
                 ) : (
                     <div className="col-span-full py-16 text-center glass-card border-2 border-dashed border-slate-700">
                         <School className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Aucune donnée disponible</p>
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">{t('no_data')}</p>
                     </div>
                 )}
             </div>

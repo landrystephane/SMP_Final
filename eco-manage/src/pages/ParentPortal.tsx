@@ -5,8 +5,10 @@ import {
     Printer, CheckCircle, TrendingUp, Coins, Calendar 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const ParentPortal: React.FC = () => {
+    const { t, i18n } = useTranslation();
     const { user } = useAuth();
     const [children, setChildren] = useState<any[]>([]);
     const [selectedChild, setSelectedChild] = useState<any>(null);
@@ -420,7 +422,7 @@ const ParentPortal: React.FC = () => {
                                                 <td className="px-6 py-4">
                                                     <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/20">{p.payment_type}</span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-500">{new Date(p.payment_date).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4 text-slate-500">{new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}</td>
                                                 <td className="px-6 py-4 text-right">
                                                     <button 
                                                         onClick={() => handlePrintReceipt(p)}

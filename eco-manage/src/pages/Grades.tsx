@@ -299,10 +299,10 @@ const Grades: React.FC = () => {
                                 className="w-28 bg-slate-900/50 border border-slate-800 rounded-xl py-2 px-1 text-center text-white text-xs font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
                               >
                                 <option value="">--</option>
-                                <option value="19">A+ (Expert)</option>
-                                <option value="15">A (Acquis)</option>
-                                <option value="11">ECA (En cours)</option>
-                                <option value="5">NA (Non acquis)</option>
+                                <option value="19">{t('appreciation_expert_label')}</option>
+                                <option value="15">{t('appreciation_acquired_label')}</option>
+                                <option value="11">{t('appreciation_progress_label')}</option>
+                                <option value="5">{t('appreciation_not_acquired_label')}</option>
                               </select>
                             ) : (
                               <input

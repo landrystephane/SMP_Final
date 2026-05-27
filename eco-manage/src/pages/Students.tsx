@@ -31,7 +31,7 @@ const Students: React.FC = () => {
   }, []);
 
   const handleDeleteStudent = async (id: number) => {
-      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet élève ? Toutes ses données financières et scolaires seront perdues.")) return;
+      if (!window.confirm(t('confirm_delete_student'))) return;
       if (window.electronAPI) {
           try {
               await window.electronAPI.deleteStudent(id);
@@ -91,7 +91,7 @@ const Students: React.FC = () => {
                     setSelectedClass('ALL');
                 }}
             >
-                <option value="ALL">Toutes Sections</option>
+                <option value="ALL">{t('all_sections')}</option>
                 <option value="FRANCOPHONE">{t('section_francophone')}</option>
                 <option value="ANGLOPHONE">{t('section_anglophone')}</option>
             </select>
@@ -104,9 +104,9 @@ const Students: React.FC = () => {
                     setSelectedClass('ALL');
                 }}
             >
-                <option value="ALL">Tous les Cycles</option>
-                <option value="PRIMAIRE">Primaire</option>
-                <option value="MATERNELLE">Maternelle</option>
+                <option value="ALL">{t('all_cycles')}</option>
+                <option value="PRIMAIRE">{t('cycle_primary')}</option>
+                <option value="MATERNELLE">{t('cycle_nursery')}</option>
             </select>
 
             <select
@@ -142,7 +142,7 @@ const Students: React.FC = () => {
                 <th className="px-6 py-4">{t('full_name')}</th>
                 <th className="px-6 py-4">{t('section')}</th>
                 <th className="px-6 py-4">{t('class')}</th>
-                <th className="px-6 py-4">Sexe</th>
+                <th className="px-6 py-4">{t('gender_header')}</th>
                 <th className="px-6 py-4 text-right">{t('actions')}</th>
               </tr>
             </thead>
@@ -169,7 +169,7 @@ const Students: React.FC = () => {
                     <button
                         onClick={() => generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name })}
                         className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-500/20 rounded-md transition-all"
-                        title="Fiche d'enregistrement"
+                        title={t('registration_sheet_title')}
                     >
                         <FileText className="w-4 h-4" />
                     </button>
@@ -187,7 +187,7 @@ const Students: React.FC = () => {
               )) : (
                 <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic">
-                        Aucun élève trouvé pour cette sélection.
+                        {t('no_students_found')}
                     </td>
                 </tr>
               )}
