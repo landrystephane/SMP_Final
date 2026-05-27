@@ -180,11 +180,13 @@ const Attendance: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     value={h}
-                                                    onChange={(e) => setAbsences({...absences, [student.id]: parseInt(e.target.value) || 0})}
+                                                    onChange={(e) => setAbsences({...absences, [student.id]: Math.min(8, Math.max(0, parseInt(e.target.value) || 0))})}
                                                     className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none"
+                                                    max="8"
+                                                    min="0"
                                                 />
                                                 <button
-                                                    onClick={() => setAbsences({...absences, [student.id]: h + 1})}
+                                                    onClick={() => setAbsences({...absences, [student.id]: Math.min(8, h + 1)})}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all"
                                                 >
                                                     +

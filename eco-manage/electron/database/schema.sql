@@ -250,6 +250,34 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT
 );
 
+-- Expenses (Décaissements)
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER DEFAULT 1,
+    amount REAL NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'PENDING', -- 'PENDING', 'VALIDATED', 'REJECTED'
+    requested_by INTEGER,
+    validated_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (requested_by) REFERENCES users(id),
+    FOREIGN KEY (validated_by) REFERENCES users(id)
+);
+
+-- System Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER DEFAULT 1,
+    user_id INTEGER,
+    message TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    type TEXT DEFAULT 'INFO', -- 'INFO', 'WARNING', 'ACTION_REQUIRED'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- Ticketing
 CREATE TABLE IF NOT EXISTS tickets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

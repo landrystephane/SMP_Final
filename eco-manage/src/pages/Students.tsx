@@ -176,12 +176,14 @@ const Students: React.FC = () => {
                     <button onClick={() => setEditingStudent(s)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>
-                    <button
-                        onClick={() => handleDeleteStudent(s.id)}
-                        className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {user?.role === 'DIRECTOR' && (
+                        <button
+                            onClick={() => handleDeleteStudent(s.id)}
+                            className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
                   </td>
                 </tr>
               )) : (

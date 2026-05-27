@@ -51,11 +51,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleUserActive: (data) => ipcRenderer.invoke('db:toggleUserActive', data),
   changePassword: (data) => ipcRenderer.invoke('db:changePassword', data),
 
-  // Communication
+  // Communication & Notifications
   sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),
   getTickets: (params) => ipcRenderer.invoke('db:getTickets', params),
   getAnnouncements: (schoolId) => ipcRenderer.invoke('db:getAnnouncements', schoolId),
   sendAnnouncement: (announcement) => ipcRenderer.invoke('db:sendAnnouncement', announcement),
+  createNotification: (notification) => ipcRenderer.invoke('db:createNotification', notification),
+  getNotifications: (params) => ipcRenderer.invoke('db:getNotifications', params),
+  markNotificationRead: (id) => ipcRenderer.invoke('db:markNotificationRead', id),
+
+  // Finance
+  getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
+  addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
+  deletePayment: (id) => ipcRenderer.invoke('db:deletePayment', id),
+  getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
+  updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
+  getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
+  getClassInstallmentFees: (schoolId) => ipcRenderer.invoke('db:getClassInstallmentFees', schoolId),
+  updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
+  createExpense: (expense) => ipcRenderer.invoke('db:createExpense', expense),
+  getExpenses: (schoolId) => ipcRenderer.invoke('db:getExpenses', schoolId),
+  updateExpenseStatus: (data) => ipcRenderer.invoke('db:updateExpenseStatus', data),
 
   // Transport
   getBusRoutes: (schoolId) => ipcRenderer.invoke('db:getBusRoutes', schoolId),

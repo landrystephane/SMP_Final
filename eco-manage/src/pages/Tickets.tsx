@@ -10,8 +10,11 @@ const Tickets: React.FC = () => {
   
   // States for tickets/requests
   const [tickets, setTickets] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [newTicketSubject, setNewTicketSubject] = useState(t('internal_message_default', 'Message interne'));
+  const [receiverRole, setReceiverRole] = useState('DIRECTOR');
+  const [receiverId, setReceiverId] = useState<number | ''>('');
 
   // States for announcements
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -26,6 +29,9 @@ const Tickets: React.FC = () => {
         try {
             const ticketData = await window.electronAPI.getTickets({ userId: user.id, role: user.role, schoolId: user.schoolId });
             setTickets(ticketData || []);
+
+            const userData = await window.electronAPI.getUsers(user.schoolId);
+            setUsersList(userData || []);
 
             const annData = await window.electronAPI.getAnnouncements(user.schoolId);
             setAnnouncements(annData || []);
@@ -44,14 +50,28 @@ const Tickets: React.FC = () => {
       try {
           await window.electronAPI.sendTicket({
               sender_id: user.id,
-              receiver_role: 'DIRECTOR',
+              receiver_role: receiverId ? null : receiverRole,
+              receiver_id: receiverId ? receiverId : null,
               subject: newTicketSubject,
               message: newTicketMessage,
               school_id: user.schoolId
           });
+          
+          if (receiverId) {
+             await window.electronAPI.createNotification({
+                 user_id: receiverId,
+                 message: `Nouvelle requête de ${user.fullName || user.username} : ${newTicketSubject}`,
+                 type: 'INFO',
+                 school_id: user.schoolId
+             });
+          }
+
           setNewTicketMessage('');
           setNewTicketSubject('Message interne');
+          setReceiverId('');
+          setReceiverRole('DIRECTOR');
           loadData();
+          alert("Message envoyé !");
       } catch (err: any) {
           alert(err.message);
       }
@@ -288,6 +308,40 @@ const Tickets: React.FC = () => {
                   placeholder={t('request_subject_placeholder', 'Ex: Problème d\'accès informatique')}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cible (Rôle)</label>
+                    <select
+                        value={receiverRole}
+                        onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); }}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                    >
+                        <option value="FOUNDER">Le Fondateur</option>
+                        <option value="DIRECTOR">La Direction</option>
+                        <option value="SG">Secrétariat Général</option>
+                        <option value="BURSAR">Économat</option>
+                        <option value="ADVISOR">Conseiller Pédagogique</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ou Personne précise</label>
+                    <select
+                        value={receiverId}
+                        onChange={(e) => { 
+                            const val = e.target.value;
+                            setReceiverId(val ? Number(val) : ''); 
+                            if (val) setReceiverRole('');
+                        }}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                    >
+                        <option value="">-- Ignorer (utiliser le rôle) --</option>
+                        {usersList.map(u => (
+                            <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                        ))}
+                    </select>
+                  </div>
               </div>
 
               <div className="space-y-1">

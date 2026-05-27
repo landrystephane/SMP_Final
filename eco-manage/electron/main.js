@@ -392,6 +392,11 @@ handleIPC('db:addSchool', async (event, school) => {
         for (const cls of standardClasses) {
             insertClass.run(newSchoolId, cls.name, cls.code, cls.section, cls.level);
         }
+        
+        // Create a default founder for this school
+        const hash = bcrypt.hashSync('admin', 10);
+        db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+          .run(`admin_${newSchoolId}`, hash, `Fondateur ${name}`, 'FOUNDER', newSchoolId);
     });
     transaction();
 
@@ -614,13 +619,13 @@ handleIPC('db:getPayments', async (event, schoolId) => {
 });
 
 handleIPC('db:addPayment', async (event, payment) => {
-  const { studentId, amount, type, userId, installmentId } = payment;
+  const { studentId, amount, type, userId, installmentId, depositorName } = payment;
   const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
   const result = db.prepare(`
-    INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(studentId, amount, type, userId, receiptNumber, installmentId);
+    INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(studentId, amount, type, userId, receiptNumber, installmentId, depositorName || '');
 
   if (result.changes > 0) {
       if (type === 'Transport') {
@@ -655,6 +660,16 @@ handleIPC('db:getTuitionFees', async (event, schoolId) => {
 
 handleIPC('db:getInstallments', async () => {
     return db.prepare('SELECT * FROM installments ORDER BY display_order').all();
+});
+
+handleIPC('db:addInstallment', async (event, name) => {
+    const count = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
+    return db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run(name, count + 1);
+});
+
+handleIPC('db:deleteInstallment', async (event, id) => {
+    db.prepare('DELETE FROM class_installment_fees WHERE installment_id = ?').run(id);
+    return db.prepare('DELETE FROM installments WHERE id = ?').run(id);
 });
 
 handleIPC('db:getClassInstallmentFees', async (event, schoolId) => {
@@ -985,11 +1000,53 @@ handleIPC('db:getTickets', async (event, { userId, role, schoolId }) => {
     .all(sid, userId, role, userId);
 });
 
+// Expenses (Décaissements)
+handleIPC('db:createExpense', async (event, expense) => {
+  const { amount, reason, requested_by, school_id } = expense;
+  const sid = getActiveSchoolId(school_id);
+  return db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
+    .run(amount, reason, requested_by, sid);
+});
+
+handleIPC('db:getExpenses', async (event, schoolId) => {
+  const sid = getActiveSchoolId(schoolId);
+  return db.prepare('SELECT e.*, u.full_name as requester_name, v.full_name as validator_name FROM expenses e JOIN users u ON e.requested_by = u.id LEFT JOIN users v ON e.validated_by = v.id WHERE e.school_id = ? ORDER BY e.created_at DESC').all(sid);
+});
+
+handleIPC('db:updateExpenseStatus', async (event, { expenseId, status, validatedBy }) => {
+  return db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ?').run(status, validatedBy, expenseId);
+});
+
+// Notifications mapping to Messaging System
+handleIPC('db:createNotification', async (event, notification) => {
+  const { user_id, role, message, type, school_id } = notification;
+  const sid = getActiveSchoolId(school_id);
+  const systemId = 1; // System or superadmin
+
+  if (role) {
+      // Send as ticket to role
+      return db.prepare('INSERT INTO tickets (sender_id, receiver_role, subject, message, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run(systemId, role, 'Alerte Système', message, sid);
+  } else {
+      // Send as ticket to specific user
+      return db.prepare('INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run(systemId, user_id, 'Notification Système', message, sid);
+  }
+});
+
+handleIPC('db:getNotifications', async (event, { userId, schoolId }) => {
+  return []; // Deprecated, mapped to tickets
+});
+
+handleIPC('db:markNotificationRead', async (event, notificationId) => {
+  return null;
+});
+
 handleIPC('db:getStudentDetails', async (event, studentId) => {
   const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ?').get(studentId);
   const payments = db.prepare('SELECT p.*, i.name as installmentName FROM payments p LEFT JOIN installments i ON p.installment_id = i.id WHERE p.student_id = ?').all(studentId);
   const attendance = db.prepare('SELECT * FROM attendance WHERE student_id = ?').all(studentId);
-  const grades = db.prepare('SELECT g.*, s.name as subjectName FROM grades g JOIN subjects s ON g.subject_id = s.id WHERE g.student_id = ?').all(studentId);
+  const grades = db.prepare('SELECT g.*, s.name as subjectName, s.domain FROM grades g JOIN subjects s ON g.subject_id = s.id WHERE g.student_id = ?').all(studentId);
 
   return { student, payments, attendance, grades };
 });
@@ -1029,6 +1086,31 @@ handleIPC('db:updateStudent', async (event, student) => {
       }
   }
   return runResult;
+});
+
+handleIPC('db:getReportTemplate', async (event, schoolId) => {
+  if (!schoolId) return null;
+  return db.prepare('SELECT * FROM report_templates WHERE school_id = ?').get(schoolId);
+});
+
+handleIPC('db:saveReportTemplate', async (event, data) => {
+  const { schoolId, headerImage, watermarkImage, footerImage, primaryColor, secondaryColor } = data;
+  if (!schoolId) return { success: false, error: 'No school ID' };
+  
+  const existing = db.prepare('SELECT id FROM report_templates WHERE school_id = ?').get(schoolId);
+  if (existing) {
+    db.prepare(`
+      UPDATE report_templates SET 
+        header_image = ?, watermark_image = ?, footer_image = ?, primary_color = ?, secondary_color = ?
+      WHERE school_id = ?
+    `).run(headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b', schoolId);
+  } else {
+    db.prepare(`
+      INSERT INTO report_templates (school_id, header_image, watermark_image, footer_image, primary_color, secondary_color)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(schoolId, headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
+  }
+  return { success: true };
 });
 
 handleIPC('db:getDashboardStats', async (event, params) => {

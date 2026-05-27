@@ -152,6 +152,28 @@ function initDb() {
         console.error(`[Migration] Schools deletion and active columns migration failed:`, e.message);
     }
 
+    // 6.7. Payments Table Migration: Add depositor_name if missing
+    try {
+        const paymentCols = db.prepare(`PRAGMA table_info(payments)`).all();
+        if (!paymentCols.find(c => c.name === 'depositor_name')) {
+            console.log(`[Migration] Adding depositor_name to payments`);
+            db.prepare(`ALTER TABLE payments ADD COLUMN depositor_name TEXT DEFAULT ''`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Payments depositor_name column migration failed:`, e.message);
+    }
+
+    // 6.8. Tickets Table Migration: Add receiver_id if missing
+    try {
+        const ticketCols = db.prepare(`PRAGMA table_info(tickets)`).all();
+        if (!ticketCols.find(c => c.name === 'receiver_id')) {
+            console.log(`[Migration] Adding receiver_id to tickets`);
+            db.prepare(`ALTER TABLE tickets ADD COLUMN receiver_id INTEGER`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Tickets receiver_id column migration failed:`, e.message);
+    }
+
     // 7. Archives Table Migration
     try {
         db.exec(`
@@ -170,6 +192,26 @@ function initDb() {
         console.log(`[Migration] Archives table verified/created`);
     } catch (e) {
         console.error(`[Migration] Archives table failed:`, e.message);
+    }
+
+    // 7.1. Report Templates Table Migration
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS report_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_id INTEGER UNIQUE,
+                header_image TEXT,
+                watermark_image TEXT,
+                footer_image TEXT,
+                primary_color TEXT DEFAULT '#0f172a',
+                secondary_color TEXT DEFAULT '#f59e0b',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (school_id) REFERENCES schools(id)
+            );
+        `);
+        console.log(`[Migration] Report Templates table verified/created`);
+    } catch (e) {
+        console.error(`[Migration] Report Templates table failed:`, e.message);
     }
 
     // 8. Seed default global subjects if none exist in the database, and link them to school 1

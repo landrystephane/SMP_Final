@@ -94,7 +94,15 @@ const Grades: React.FC = () => {
     if (window.electronAPI) {
       const result = await window.electronAPI.saveGrades(formattedGrades);
       if (result.success) {
-        alert(t('grades_saved_draft_msg') || 'Notes sauvegardées (Brouillon)');
+        // Notify ADVISOR that grades were saved
+        await window.electronAPI.createNotification({
+            role: 'ADVISOR',
+            message: `Des notes ont été enregistrées pour la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) par ${user?.fullName || 'un enseignant'}.`,
+            type: 'INFO',
+            school_id: user?.schoolId
+        });
+
+        alert("✅ Les notes ont été enregistrées avec succès !\n\nNote : Actuellement en mode 'Brouillon'. N'oubliez pas de les VALIDER pour qu'elles apparaissent sur le bulletin de l'élève.");
         handleLoadContext();
       } else {
         alert('Erreur: ' + result.error);
@@ -126,10 +134,11 @@ const Grades: React.FC = () => {
           const allStudents = await window.electronAPI.getStudents(user?.schoolId);
           const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
 
-          // Calculate averages for all students in the class based on validated grades
+          const isDirector = user?.role === 'DIRECTOR';
+          // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)
           const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
               const details = await window.electronAPI.getStudentDetails(s.id);
-              const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && g.validated === 1);
+              const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && (g.validated === 1 || isDirector));
               const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
               const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
               const avg = totalCoef > 0 ? (totalPoints / totalCoef) : 0;
@@ -146,15 +155,21 @@ const Grades: React.FC = () => {
 
           const studentData = studentsWithAverages.find(s => s.id === student.id);
           if (studentData) {
+              let template = null;
+              if (window.electronAPI) {
+                  template = await window.electronAPI.getReportTemplate(user.schoolId);
+              }
               generateReportCard({
                   student,
                   classObj,
                   school,
+                  template,
                   grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
                   attendance: studentData.details.attendance,
                   term: selectedTerm,
                   rank,
-                  totalStudents
+                  totalStudents,
+                  ignoreValidation: isDirector
               });
           }
       }

@@ -87,8 +87,13 @@ const Users: React.FC = () => {
     e.preventDefault();
 
     // Name validation
-    if (/\d/.test(newUser.fullName)) {
-        alert(t('alert_agent_name_no_digits'));
+    const nameRegex = /^[A-Za-zÀ-ÿ]/;
+    if (!nameRegex.test(newUser.fullName.trim())) {
+        alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent doit obligatoirement commencer par une lettre.");
+        return;
+    }
+    if (!nameRegex.test(newUser.username.trim())) {
+        alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) doit obligatoirement commencer par une lettre.");
         return;
     }
 
@@ -133,8 +138,13 @@ const Users: React.FC = () => {
       e.preventDefault();
       if (!editingUser) return;
 
-      if (/\d/.test(editUserForm.fullName)) {
-          alert(t('alert_agent_name_no_digits'));
+      const nameRegex = /^[A-Za-zÀ-ÿ]/;
+      if (!nameRegex.test(editUserForm.fullName.trim())) {
+          alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent doit obligatoirement commencer par une lettre.");
+          return;
+      }
+      if (!nameRegex.test(editUserForm.username.trim())) {
+          alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) doit obligatoirement commencer par une lettre.");
           return;
       }
 
@@ -287,6 +297,9 @@ const Users: React.FC = () => {
                             value={newUser.role}
                             onChange={(e) => setNewUser({...newUser, role: e.target.value as Role})}
                         >
+                            {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && (
+                                <option value="FOUNDER">{t('role_FOUNDER')}</option>
+                            )}
                             <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
                             <option value="SECRETARY">{t('role_SG')}</option>
                             <option value="BURSAR">{t('role_BURSAR')}</option>
@@ -416,12 +429,16 @@ const Users: React.FC = () => {
                     </td>
                      <td className="px-8 py-6 text-right">
                        <div className="flex items-center justify-end space-x-2">
-                         <button onClick={() => setEditingUser(u)} className="p-3 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all shadow-md" title={t('save')}>
-                             <Edit className="w-4 h-4" />
-                         </button>
-                         <button onClick={() => handleDeleteUser(u.id, u.fullName)} className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-transparent hover:border-rose-500/20 transition-all" title={t('cancel')}>
-                             <Trash2 className="w-4 h-4" />
-                         </button>
+                         {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
+                             <button onClick={() => setEditingUser(u)} className="p-3 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all shadow-md" title={t('save')}>
+                                 <Edit className="w-4 h-4" />
+                             </button>
+                         )}
+                         {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
+                             <button onClick={() => handleDeleteUser(u.id, u.fullName)} className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-transparent hover:border-rose-500/20 transition-all" title={t('cancel')}>
+                                 <Trash2 className="w-4 h-4" />
+                             </button>
+                         )}
                        </div>
                      </td>
                   </tr>
@@ -492,20 +509,23 @@ const Users: React.FC = () => {
                           </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('role_label')}</label>
-                              <select
-                                  className="input-field w-full appearance-none cursor-pointer"
-                                  value={editUserForm.role}
-                                  onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value as Role})}
-                              >
-                                  <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
-                                  <option value="SECRETARY">{t('role_SG')}</option>
-                                  <option value="BURSAR">{t('role_BURSAR')}</option>
-                                  <option value="TEACHER">{t('role_TEACHER')}</option>
-                                  <option value="ADVISOR">{t('role_ADVISOR')}</option>
-                                  <option value="DRIVER">{t('role_DRIVER')}</option>
-                              </select>
+                          <div className="space-y-1">
+                                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('role_label')}</label>
+                                  <select
+                                      className="input-field w-full appearance-none"
+                                      value={editUserForm.role}
+                                      onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value as Role})}
+                                  >
+                                    {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && (
+                                        <option value="FOUNDER">{t('role_FOUNDER')}</option>
+                                    )}
+                                    <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
+                                    <option value="SECRETARY">{t('role_SG')}</option>
+                                    <option value="BURSAR">{t('role_BURSAR')}</option>
+                                    <option value="TEACHER">{t('role_TEACHER')}</option>
+                                    <option value="ADVISOR">{t('role_ADVISOR')}</option>
+                                    <option value="DRIVER">{t('role_DRIVER')}</option>
+                                  </select>
                           </div>
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('new_password_optional')}</label>

@@ -46,6 +46,23 @@ const TuitionConfig: React.FC = () => {
       }
   };
 
+  const handleAddInstallment = async () => {
+      const name = window.prompt("Nom de la nouvelle tranche (ex: 4E TRANCHE):");
+      if (!name) return;
+      if (window.electronAPI) {
+          await window.electronAPI.addInstallment(name.toUpperCase());
+          loadData();
+      }
+  };
+
+  const handleDeleteInstallment = async (id: number, name: string) => {
+      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la tranche : ${name} ? Cela supprimera également les configurations de paiement associées.`)) return;
+      if (window.electronAPI) {
+          await window.electronAPI.deleteInstallment(id);
+          loadData();
+      }
+  };
+
   if (loading) return (
     <div className="h-[70vh] flex flex-col items-center justify-center space-y-4">
         <CreditCard className="w-12 h-12 text-amber-500 animate-pulse" />
@@ -91,7 +108,7 @@ const TuitionConfig: React.FC = () => {
                   </h2>
                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('global_installments_desc', 'Définition des paliers de paiement pour l\'année scolaire')}</p>
               </div>
-              <button className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest border border-white/10 transition-all">
+              <button onClick={handleAddInstallment} className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest border border-white/10 transition-all">
                   {t('add_installment', 'Ajouter une tranche')}
               </button>
           </div>
@@ -100,7 +117,7 @@ const TuitionConfig: React.FC = () => {
                   <div key={inst.id} className="p-8 bg-slate-950/80 rounded-[2rem] border border-white/5 flex flex-col justify-between items-start group/card hover:border-amber-500/30 transition-all shadow-2xl">
                       <div className="flex justify-between w-full items-start mb-6">
                         <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t('installment', 'Tranche')} {idx + 1}</span>
-                        <button className="text-slate-700 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteInstallment(inst.id, inst.name)} className="text-slate-700 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </div>
                       <span className="font-black text-xl text-white uppercase tracking-tighter">{inst.name}</span>
                   </div>

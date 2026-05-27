@@ -27,22 +27,9 @@ const CustomizationSettings: React.FC = () => {
     const [headerEnglish, setHeaderEnglish] = useState("MINISTRY OF BASIC EDUCATION");
 
     // Custom PDF template fields
-    const [bulletinPdfUseCustom, setBulletinPdfUseCustom] = useState(0);
-    const [bulletinPdfTemplate, setBulletinPdfTemplate] = useState('');
-    const [bulletinPdfMapping, setBulletinPdfMapping] = useState<any>({
-        studentName: { x: 80, y: 80 },
-        matricule: { x: 80, y: 87 },
-        class: { x: 80, y: 94 },
-        year: { x: 175, y: 80 },
-        section: { x: 175, y: 87 },
-        absences: { x: 25, y: 195 },
-        conduct: { x: 25, y: 202 },
-        average: { x: 120, y: 195 },
-        rank: { x: 120, y: 202 },
-        decision: { x: 120, y: 209 },
-        table: { x: 20, y: 115, width: 170 },
-        signatures: { y: 230, leftX: 25, middleX: 85, rightX: 140 }
-    });
+    const [headerImage, setHeaderImage] = useState('');
+    const [watermarkImage, setWatermarkImage] = useState('');
+    const [footerImage, setFooterImage] = useState('');
 
     const loadSettings = async () => {
         setLoading(true);
@@ -64,20 +51,14 @@ const CustomizationSettings: React.FC = () => {
                 setBulletinSigRight(mySchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)");
                 setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
                 setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
-                setBulletinPdfUseCustom(mySchool.bulletin_pdf_use_custom || 0);
-                setBulletinPdfTemplate(mySchool.bulletin_pdf_template || '');
                 
-                if (mySchool.bulletin_pdf_mapping) {
-                    try {
-                        const parsed = typeof mySchool.bulletin_pdf_mapping === 'string'
-                            ? JSON.parse(mySchool.bulletin_pdf_mapping)
-                            : mySchool.bulletin_pdf_mapping;
-                        if (parsed && Object.keys(parsed).length > 0) {
-                            setBulletinPdfMapping(parsed);
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse mapping:', e);
-                    }
+                const template = await window.electronAPI.getReportTemplate(user.schoolId);
+                if (template) {
+                    setHeaderImage(template.header_image || '');
+                    setWatermarkImage(template.watermark_image || '');
+                    setFooterImage(template.footer_image || '');
+                    setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
+                    setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
                 }
             }
         }
@@ -108,10 +89,16 @@ const CustomizationSettings: React.FC = () => {
                 bulletin_sig_middle: bulletinSigMiddle,
                 bulletin_sig_right: bulletinSigRight,
                 header_french: headerFrench,
-                header_english: headerEnglish,
-                bulletin_pdf_use_custom: bulletinPdfUseCustom,
-                bulletin_pdf_template: bulletinPdfTemplate,
-                bulletin_pdf_mapping: JSON.stringify(bulletinPdfMapping)
+                header_english: headerEnglish
+            });
+
+            await window.electronAPI.saveReportTemplate({
+                schoolId: activeSchool.id,
+                headerImage,
+                watermarkImage,
+                footerImage,
+                primaryColor,
+                secondaryColor
             });
             if (res && res.error) {
                 throw new Error(res.error);
@@ -127,7 +114,7 @@ const CustomizationSettings: React.FC = () => {
         }
     };
 
-    const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 3 * 1024 * 1024) {
@@ -137,20 +124,10 @@ const CustomizationSettings: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
             if (event.target?.result) {
-                setBulletinPdfTemplate(event.target.result as string);
+                setter(event.target.result as string);
             }
         };
         reader.readAsDataURL(file);
-    };
-
-    const updateMapField = (field: string, key: string, val: number) => {
-        setBulletinPdfMapping((prev: any) => ({
-            ...prev,
-            [field]: {
-                ...prev[field],
-                [key]: val
-            }
-        }));
     };
 
     if (loading) return (
@@ -363,213 +340,78 @@ const CustomizationSettings: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Custom PDF Bulletin Mapping Settings */}
+                    {/* Hybrid Report Template Configuration */}
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center justify-between border-b border-white/5 pb-4">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <Sliders className="w-5 h-5" />
-                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pdf_template_title', 'Bulletin Personnalisé (Gabarit PDF)')}</h2>
-                            </div>
-                            <div className="flex items-center space-x-3 bg-slate-950 p-1.5 rounded-xl border border-white/5">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">{t('cust_enable_custom_pdf', 'Activer')}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setBulletinPdfUseCustom(bulletinPdfUseCustom === 1 ? 0 : 1)}
-                                    className={`w-12 h-6 rounded-full transition-colors relative ${bulletinPdfUseCustom === 1 ? 'bg-amber-500' : 'bg-slate-700'}`}
-                                >
-                                    <span className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${bulletinPdfUseCustom === 1 ? 'right-1' : 'left-1'}`} />
-                                </button>
+                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pdf_template_title', 'Bulletin Personnalisé (Gabarit Hybride)')}</h2>
                             </div>
                         </div>
 
-                        {bulletinPdfUseCustom === 1 && (
-                            <div className="space-y-8 animate-in fade-in duration-300">
-                                {/* Template File Uploader */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_background_image', 'Image de fond du bulletin (JPG / PNG - Max 3 Mo)')}</label>
-                                    <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
-                                        {bulletinPdfTemplate ? (
-                                            <div className="space-y-4">
-                                                <img src={bulletinPdfTemplate} alt="Gabarit" className="max-h-48 mx-auto rounded-lg shadow-lg" />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setBulletinPdfTemplate('')}
-                                                    className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all"
-                                                >
-                                                    {t('cust_delete', 'Supprimer')}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <p className="text-sm font-bold text-slate-400">{t('cust_drag_or_select', 'Glissez ou sélectionnez le fichier image du bulletin vierge')}</p>
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleTemplateUpload}
-                                                    className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
-                                                />
-                                                <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                        <div className="space-y-8 animate-in fade-in duration-300">
+                            <div className="space-y-2 text-slate-400 text-xs font-bold">
+                                <p>Le système hybride permet à l'application de générer le tableau central des notes de façon dynamique (avec pagination automatique si besoin) tout en conservant le design de votre établissement.</p>
+                            </div>
 
-                                {/* Coordinate Mapping Inputs */}
-                                <div className="space-y-6">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-amber-500/80">{t('cust_placement_coords', 'Coordonnées de placement (en millimètres sur page A4 : 210 x 297 mm)')}</h3>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-950 p-6 rounded-2xl border border-white/5">
-                                        {/* Coordinates group 1: Student info */}
+                            {/* Header Image Uploader */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Image de l'En-tête (JPG / PNG - Max 3 Mo)</label>
+                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
+                                    {headerImage ? (
                                         <div className="space-y-4">
-                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_student_info', 'Informations Élève')}</h4>
-                                            
-                                            {[
-                                                { label: t('cust_full_names', "Nom & Prénoms"), field: "studentName" },
-                                                { label: t('cust_matricule', "Matricule"), field: "matricule" },
-                                                { label: t('cust_class', "Classe"), field: "class" },
-                                                { label: t('cust_academic_year', "Année Académique"), field: "year" },
-                                                { label: t('cust_section', "Section (FR/EN)"), field: "section" }
-                                            ].map((item) => (
-                                                <div key={item.field} className="flex items-center justify-between gap-4 text-xs font-bold text-slate-400">
-                                                    <span>{item.label}</span>
-                                                    <div className="flex gap-2">
-                                                        <div className="flex items-center space-x-1 bg-slate-900 border border-white/5 rounded-xl px-2">
-                                                            <span className="text-[9px] font-bold text-slate-500 uppercase">X:</span>
-                                                            <input
-                                                                type="number"
-                                                                value={bulletinPdfMapping[item.field]?.x || 0}
-                                                                onChange={(e) => updateMapField(item.field, 'x', parseFloat(e.target.value) || 0)}
-                                                                className="w-12 bg-transparent text-white font-black text-center border-none outline-none py-1.5"
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center space-x-1 bg-slate-900 border border-white/5 rounded-xl px-2">
-                                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Y:</span>
-                                                            <input
-                                                                type="number"
-                                                                value={bulletinPdfMapping[item.field]?.y || 0}
-                                                                onChange={(e) => updateMapField(item.field, 'y', parseFloat(e.target.value) || 0)}
-                                                                className="w-12 bg-transparent text-white font-black text-center border-none outline-none py-1.5"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                            <img src={headerImage} alt="Header" className="max-h-32 mx-auto rounded-lg shadow-lg" />
+                                            <button type="button" onClick={() => setHeaderImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer l'En-tête</button>
                                         </div>
-
-                                        {/* Coordinates group 2: Performance metrics */}
-                                        <div className="space-y-4">
-                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_performance_absences', 'Performances & Absences')}</h4>
-                                            
-                                            {[
-                                                { label: t('cust_general_average', "Moyenne Générale"), field: "average" },
-                                                { label: t('cust_student_rank', "Rang de l'Élève"), field: "rank" },
-                                                { label: t('cust_council_decision', "Décision du Conseil"), field: "decision" },
-                                                { label: t('cust_absences_hours', "Heures d'Absences"), field: "absences" },
-                                                { label: t('cust_conduct_obs', "Observation Conduite"), field: "conduct" }
-                                            ].map((item) => (
-                                                <div key={item.field} className="flex items-center justify-between gap-4 text-xs font-bold text-slate-400">
-                                                    <span>{item.label}</span>
-                                                    <div className="flex gap-2">
-                                                        <div className="flex items-center space-x-1 bg-slate-900 border border-white/5 rounded-xl px-2">
-                                                            <span className="text-[9px] font-bold text-slate-500 uppercase">X:</span>
-                                                            <input
-                                                                type="number"
-                                                                value={bulletinPdfMapping[item.field]?.x || 0}
-                                                                onChange={(e) => updateMapField(item.field, 'x', parseFloat(e.target.value) || 0)}
-                                                                className="w-12 bg-transparent text-white font-black text-center border-none outline-none py-1.5"
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center space-x-1 bg-slate-900 border border-white/5 rounded-xl px-2">
-                                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Y:</span>
-                                                            <input
-                                                                type="number"
-                                                                value={bulletinPdfMapping[item.field]?.y || 0}
-                                                                onChange={(e) => updateMapField(item.field, 'y', parseFloat(e.target.value) || 0)}
-                                                                className="w-12 bg-transparent text-white font-black text-center border-none outline-none py-1.5"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image large pour l'en-tête</p>
+                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setHeaderImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
+                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
                                         </div>
-                                    </div>
-
-                                    {/* Table and signatures layout configuration */}
-                                    <div className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
-                                        <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_grades_table_sigs', 'Tableau des notes & Signatures')}</h4>
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_x', 'Tableau - X (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.table?.x || 20}
-                                                    onChange={(e) => updateMapField('table', 'x', parseFloat(e.target.value) || 20)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_y', 'Tableau - Y (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.table?.y || 115}
-                                                    onChange={(e) => updateMapField('table', 'y', parseFloat(e.target.value) || 115)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_width', 'Tableau - Largeur (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.table?.width || 170}
-                                                    onChange={(e) => updateMapField('table', 'width', parseFloat(e.target.value) || 170)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_sigs_y', 'Signatures - Y (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.signatures?.y || 230}
-                                                    onChange={(e) => updateMapField('signatures', 'y', parseFloat(e.target.value) || 230)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_teacher', 'X Enseignant (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.signatures?.leftX || 25}
-                                                    onChange={(e) => updateMapField('signatures', 'leftX', parseFloat(e.target.value) || 25)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_parent', 'X Parent (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.signatures?.middleX || 85}
-                                                    onChange={(e) => updateMapField('signatures', 'middleX', parseFloat(e.target.value) || 85)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                            <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_principal', 'X Directeur (mm)')}</label>
-                                                <input
-                                                    type="number"
-                                                    value={bulletinPdfMapping.signatures?.rightX || 140}
-                                                    onChange={(e) => updateMapField('signatures', 'rightX', parseFloat(e.target.value) || 140)}
-                                                    className="w-full bg-slate-950 text-white font-black py-1.5 rounded text-center border border-white/5"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
-                        )}
+
+                            {/* Watermark Image Uploader */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Filigrane / Watermark de Fond (JPG / PNG - Translucide)</label>
+                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
+                                    {watermarkImage ? (
+                                        <div className="space-y-4">
+                                            <img src={watermarkImage} alt="Watermark" className="max-h-32 mx-auto rounded-lg shadow-lg opacity-50" />
+                                            <button type="button" onClick={() => setWatermarkImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer le Filigrane</button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image de fond (logo de l'école estompé)</p>
+                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setWatermarkImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
+                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Footer Image Uploader */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Image de Pied de Page / Cachets & Signatures (JPG / PNG)</label>
+                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
+                                    {footerImage ? (
+                                        <div className="space-y-4">
+                                            <img src={footerImage} alt="Footer" className="max-h-32 mx-auto rounded-lg shadow-lg" />
+                                            <button type="button" onClick={() => setFooterImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer le Pied de page</button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image contenant les cachets et signatures</p>
+                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setFooterImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
+                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
 
                     {/* Actions bar */}

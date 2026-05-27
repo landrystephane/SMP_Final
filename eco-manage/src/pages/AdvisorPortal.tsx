@@ -103,10 +103,35 @@ const AdvisorPortal: React.FC = () => {
                 term: selectedTerm,
                 month: selectedMonth
             });
+            
+            await window.electronAPI.createNotification({
+                role: 'SECRETARY',
+                message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées. Les bulletins sont prêts pour l'impression.`,
+                type: 'ACTION_REQUIRED',
+                school_id: user?.schoolId
+            });
+
             alert(t('grades_validated_success', "Notes validées avec succès ! Cette matière est désormais visible sur les bulletins."));
             loadValidationStatuses();
         } catch (err: any) {
             alert(t('validation_error', "Erreur lors de la validation: ") + err.message);
+        }
+    };
+
+    const handleLaunchGradeEntry = async () => {
+        if (!window.electronAPI) return;
+        if (confirm("Voulez-vous notifier tous les enseignants que la période de saisie des notes pour le " + selectedMonth + " (Trimestre " + selectedTerm + ") est ouverte ?")) {
+            try {
+                await window.electronAPI.createNotification({
+                    role: 'TEACHER',
+                    message: `La période de saisie des notes pour ${selectedMonth} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
+                    type: 'ACTION_REQUIRED',
+                    school_id: user?.schoolId
+                });
+                alert("Tous les enseignants ont été notifiés !");
+            } catch (err: any) {
+                alert("Erreur lors de l'envoi de la notification: " + err.message);
+            }
         }
     };
 
@@ -196,6 +221,16 @@ const AdvisorPortal: React.FC = () => {
                                         <option key={m} value={m}>{m}</option>
                                     ))}
                                 </select>
+                            </div>
+                            
+                            <div className="flex flex-col justify-end h-full">
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">Action</label>
+                                <button
+                                    onClick={handleLaunchGradeEntry}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase tracking-wider"
+                                >
+                                    Lancer la Saisie
+                                </button>
                             </div>
                         </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock } from 'lucide-react';
+import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,15 +10,17 @@ const Finance: React.FC = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [tuitionFees, setTuitionFees] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS'>('MANAGEMENT');
+  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS' | 'EXPENSES'>('MANAGEMENT');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
+  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
+  const [newExpense, setNewExpense] = useState({ amount: '', reason: '' });
   const [filterDate, setFilterDate] = useState('');
 
   const [installments, setInstallments] = useState<any[]>([]);
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -30,6 +32,7 @@ const Finance: React.FC = () => {
       const inst = await window.electronAPI.getInstallments();
       const cif = await window.electronAPI.getClassInstallmentFees(sid);
       const schs = await window.electronAPI.getSchools();
+      const exp = await window.electronAPI.getExpenses(sid);
       setPayments(p || []);
       setStudents(s || []);
       setClasses(c || []);
@@ -37,6 +40,7 @@ const Finance: React.FC = () => {
       setInstallments(inst || []);
       setClassInstallmentFees(cif || []);
       setSchools(schs || []);
+      setExpenses(exp || []);
     }
   };
 
@@ -44,7 +48,9 @@ const Finance: React.FC = () => {
     loadData();
   }, [user]);
 
-  const totalReceived = payments.reduce((acc, p) => acc + p.amount, 0);
+  const totalCollected = payments.reduce((acc, p) => acc + p.amount, 0);
+  const totalValidatedExpenses = expenses.filter(e => e.status === 'VALIDATED').reduce((acc, e) => acc + e.amount, 0);
+  const totalReceived = totalCollected - totalValidatedExpenses;
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,11 +69,66 @@ const Finance: React.FC = () => {
                 return;
             }
 
+            // Generate receipt automatically
+            if (res.receiptNumber) {
+                const s = students.find(stud => stud.id.toString() === newPayment.studentId);
+                const financials = getStudentFinancials(s);
+                const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
+                const paymentData = {
+                    ...newPayment,
+                    receipt_number: res.receiptNumber,
+                    payment_date: new Date().toISOString(),
+                    amount: parseFloat(newPayment.amount),
+                    payment_type: newPayment.type
+                };
+                // @ts-ignore
+                import('../utils/reports').then(m => m.generatePaymentReceipt(paymentData, s, financials, activeSchool));
+            }
+
             setIsAddingPayment(false);
-            setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '' });
+            setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
             loadData();
         } catch (err: any) {
-            alert(`Erreur: ${err.message}`);
+            console.error(err);
+            alert("Erreur: " + err.message);
+        }
+    }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (window.electronAPI) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            await window.electronAPI.createExpense({
+                amount: parseFloat(newExpense.amount),
+                reason: newExpense.reason,
+                requested_by: user.id,
+                school_id: user.schoolId
+            });
+            setNewExpense({ amount: '', reason: '' });
+            alert("Demande de décaissement soumise pour validation.");
+            loadData();
+        } catch (err: any) {
+            console.error(err);
+            alert("Erreur: " + err.message);
+        }
+    }
+  };
+
+  const handleValidateExpense = async (expenseId: number, status: 'VALIDATED' | 'REJECTED') => {
+    if (window.electronAPI) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            await window.electronAPI.updateExpenseStatus({
+                expenseId,
+                status,
+                validatedBy: user.id
+            });
+            loadData();
+        } catch (err: any) {
+            console.error(err);
+            alert("Erreur: " + err.message);
         }
     }
   };
@@ -122,6 +183,12 @@ const Finance: React.FC = () => {
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PAYMENTS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
                 {t('student_collection')}
+            </button>
+            <button
+                onClick={() => setActiveTab('EXPENSES')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXPENSES' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+                {t('expenses_tab', 'Décaissements')}
             </button>
         </div>
       </div>
@@ -407,6 +474,19 @@ const Finance: React.FC = () => {
                         </div>
                       </div>
 
+                      <div className="space-y-2 pt-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                              <User className="w-3 h-3 mr-2" /> NOM DU DÉPOSANT / PAYEUR
+                          </label>
+                          <input
+                              type="text"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                              value={newPayment.depositorName}
+                              onChange={(e) => setNewPayment({...newPayment, depositorName: e.target.value.toUpperCase()})}
+                              placeholder="Ex: TCHATCHOUANG PAUL"
+                          />
+                      </div>
+
                       {newPayment.type === 'Scolarité' && (
                         <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
@@ -434,6 +514,100 @@ const Finance: React.FC = () => {
                   </form>
               </div>
           </div>
+      )}
+
+      {activeTab === 'EXPENSES' && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              <h2 className="text-xl font-black text-white flex items-center tracking-tight">
+                <Wallet className="w-6 h-6 mr-3 text-rose-500" />
+                HISTORIQUE DES DÉCAISSEMENTS
+              </h2>
+              <div className="space-y-4">
+                {expenses.map((exp) => (
+                  <div key={exp.id} className="glass-card p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group hover:bg-white/[0.02] transition-colors border-l-4" style={{ borderColor: exp.status === 'VALIDATED' ? '#10b981' : exp.status === 'REJECTED' ? '#f43f5e' : '#f59e0b' }}>
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-black text-white">{exp.amount.toLocaleString()} FCFA</h3>
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${exp.status === 'VALIDATED' ? 'bg-emerald-500/10 text-emerald-500' : exp.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                          {exp.status === 'PENDING' ? 'EN ATTENTE' : exp.status === 'VALIDATED' ? 'APPROUVÉ' : 'REJETÉ'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-slate-300">{exp.reason}</p>
+                      <div className="flex gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">
+                        <span>Demandé par: <span className="text-amber-500">{exp.requester_name}</span></span>
+                        <span>Le: {new Date(exp.created_at).toLocaleString('fr-FR')}</span>
+                      </div>
+                      {exp.validator_name && (
+                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">
+                           Traité par: <span className={exp.status === 'VALIDATED' ? 'text-emerald-500' : 'text-rose-500'}>{exp.validator_name}</span>
+                         </div>
+                      )}
+                    </div>
+                    {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && exp.status === 'PENDING' && (
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button onClick={() => handleValidateExpense(exp.id, 'VALIDATED')} className="flex-1 md:flex-none px-4 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                          Approuver
+                        </button>
+                        <button onClick={() => handleValidateExpense(exp.id, 'REJECTED')} className="flex-1 md:flex-none px-4 py-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                          Rejeter
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {expenses.length === 0 && (
+                  <div className="p-8 text-center text-slate-500 italic text-sm">
+                    Aucune demande de décaissement enregistrée.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="text-xl font-black text-white flex items-center tracking-tight">
+                <Plus className="w-6 h-6 mr-3 text-amber-500" />
+                NOUVELLE DEMANDE
+              </h2>
+              <form onSubmit={handleAddExpense} className="glass-card p-6 space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-rose-500" />
+                
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                    <Wallet className="w-3 h-3 mr-2" /> Montant (FCFA)
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                    placeholder="0"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                    <FileText className="w-3 h-3 mr-2" /> Motif de la dépense
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={newExpense.reason}
+                    onChange={(e) => setNewExpense({...newExpense, reason: e.target.value})}
+                    placeholder="Ex: Achat de fournitures, Paiement prestataire..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm text-slate-300 outline-none focus:ring-2 focus:ring-amber-500 transition-all resize-none"
+                  />
+                </div>
+
+                <button type="submit" className="w-full py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-400 active:scale-95 transition-all shadow-lg shadow-amber-500/20">
+                  Soumettre au Fondateur
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

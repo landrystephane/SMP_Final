@@ -187,11 +187,16 @@ const ParentPortal: React.FC = () => {
 
                 const studentData = studentsWithAverages.find(s => s.id === selectedChild.id);
                 if (studentData) {
+                    let template = null;
+                    if (window.electronAPI && school.id) {
+                        template = await window.electronAPI.getReportTemplate(school.id);
+                    }
                     const { generateReportCard } = await import('../utils/reports');
                     generateReportCard({
                         student: selectedChild,
                         classObj,
                         school,
+                        template,
                         grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
                         attendance: studentData.details.attendance,
                         term: selectedTerm,
