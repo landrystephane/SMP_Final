@@ -106,6 +106,16 @@ const Finance: React.FC = () => {
                 requested_by: user.id,
                 school_id: user.schoolId
             });
+            
+            // Notify FOUNDER
+            await window.electronAPI.createNotification({
+                school_id: user.schoolId,
+                recipient_role: 'FOUNDER',
+                title: 'Nouvelle demande de décaissement',
+                message: `Une demande de ${newExpense.amount} FCFA a été soumise par l'Économe pour: ${newExpense.reason}.`,
+                type: 'FINANCE'
+            });
+
             setNewExpense({ amount: '', reason: '' });
             alert("Demande de décaissement soumise pour validation.");
             loadData();
@@ -125,6 +135,19 @@ const Finance: React.FC = () => {
                 status,
                 validatedBy: user.id
             });
+
+            // Notify requester
+            const exp = expenses.find(e => e.id === expenseId);
+            if (exp) {
+                await window.electronAPI.createNotification({
+                    school_id: user.schoolId,
+                    recipient_id: exp.requested_by,
+                    title: `Décaissement ${status === 'VALIDATED' ? 'Approuvé' : 'Rejeté'}`,
+                    message: `Votre demande de ${exp.amount} FCFA a été ${status === 'VALIDATED' ? 'approuvée' : 'rejetée'} par ${user.fullName}.`,
+                    type: 'FINANCE'
+                });
+            }
+
             loadData();
         } catch (err: any) {
             console.error(err);

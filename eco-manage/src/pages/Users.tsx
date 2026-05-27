@@ -87,13 +87,13 @@ const Users: React.FC = () => {
     e.preventDefault();
 
     // Name validation
-    const nameRegex = /^[A-Za-zÀ-ÿ]/;
+    const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
     if (!nameRegex.test(newUser.fullName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent doit obligatoirement commencer par une lettre.");
+        alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
         return;
     }
     if (!nameRegex.test(newUser.username.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) doit obligatoirement commencer par une lettre.");
+        alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
         return;
     }
 
@@ -138,13 +138,13 @@ const Users: React.FC = () => {
       e.preventDefault();
       if (!editingUser) return;
 
-      const nameRegex = /^[A-Za-zÀ-ÿ]/;
+      const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
       if (!nameRegex.test(editUserForm.fullName.trim())) {
-          alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent doit obligatoirement commencer par une lettre.");
+          alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
           return;
       }
       if (!nameRegex.test(editUserForm.username.trim())) {
-          alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) doit obligatoirement commencer par une lettre.");
+          alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
           return;
       }
 
@@ -203,9 +203,9 @@ const Users: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u =>
-    u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.role.toLowerCase().includes(searchQuery.toLowerCase())
+    (u.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.role || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

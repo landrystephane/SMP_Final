@@ -19,6 +19,7 @@ const Grades: React.FC = () => {
 
   const [grades, setGrades] = useState<Record<string, number>>({});
   const [isLocked, setIsLocked] = useState(false);
+  const [isPastDeadline, setIsPastDeadline] = useState(false);
 
   const loadData = async () => {
       if (window.electronAPI) {
@@ -68,6 +69,34 @@ const Grades: React.FC = () => {
         });
         setGrades(gradeMap);
         setIsLocked(locked);
+
+        // Check deadline
+        let pastDeadline = false;
+        if (user?.role === 'TEACHER') {
+            const periodEnd = await window.electronAPI.getSetting('period_end');
+            if (periodEnd) {
+                const endDate = new Date(periodEnd);
+                endDate.setHours(23, 59, 59, 999);
+                if (new Date() > endDate) {
+                    pastDeadline = true;
+                    // Check for override
+                    const override = await window.electronAPI.getGradeOverrides({
+                        teacherId: user.id,
+                        classId: parseInt(selectedClass),
+                        term: selectedTerm,
+                        month: selectedMonth
+                    });
+                    if (override) {
+                        const overrideDate = new Date(override.deadline);
+                        overrideDate.setHours(23, 59, 59, 999);
+                        if (new Date() <= overrideDate) {
+                            pastDeadline = false;
+                        }
+                    }
+                }
+            }
+        }
+        setIsPastDeadline(pastDeadline);
     }
   };
 
@@ -124,6 +153,44 @@ const Grades: React.FC = () => {
     }
   };
 
+  const handleGrantOverride = async () => {
+    if (window.electronAPI) {
+        const days = prompt("Combien de jours supplémentaires souhaitez-vous accorder à l'enseignant de cette classe pour la saisie ? (ex: 3)", "3");
+        if (days && !isNaN(parseInt(days))) {
+            const classObj = classes.find(c => c.id.toString() === selectedClass);
+            if (!classObj || !classObj.teacher_id) {
+                alert("Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation.");
+                return;
+            }
+            
+            const newDeadline = new Date();
+            newDeadline.setDate(newDeadline.getDate() + parseInt(days));
+            const formattedDate = newDeadline.toISOString().split('T')[0];
+
+            await window.electronAPI.addGradeOverride({
+                teacherId: classObj.teacher_id,
+                classId: parseInt(selectedClass),
+                term: selectedTerm,
+                month: selectedMonth,
+                deadline: formattedDate,
+                grantedBy: user?.id
+            });
+
+            // Notify the teacher
+            await window.electronAPI.createNotification({
+                school_id: user?.schoolId,
+                recipient_id: classObj.teacher_id,
+                title: 'Dérogation accordée',
+                message: `Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe ${classObj.name} jusqu'au ${formattedDate}.`,
+                type: 'SYSTEM'
+            });
+
+            alert(`Dérogation accordée jusqu'au ${formattedDate}.`);
+            handleLoadContext();
+        }
+    }
+  };
+
   const printStudentReport = async (student: any) => {
       if (window.electronAPI) {
           const classObj = classes.find(c => c.id.toString() === selectedClass);
@@ -134,7 +201,7 @@ const Grades: React.FC = () => {
           const allStudents = await window.electronAPI.getStudents(user?.schoolId);
           const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
 
-          const isDirector = user?.role === 'DIRECTOR';
+          const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
           // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)
           const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
               const details = await window.electronAPI.getStudentDetails(s.id);
@@ -248,12 +315,27 @@ const Grades: React.FC = () => {
                             <Unlock className="w-3 h-3 mr-2" /> {t('unlocked_status')}
                         </span>
                     )}
+                    {isPastDeadline && (
+                        <span className="flex items-center text-[10px] font-black text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-amber-500/20">
+                            <AlertCircle className="w-3 h-3 mr-2" /> DÉLAI DÉPASSÉ
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center space-x-4">
+                    {hasRole(['DIRECTOR', 'FOUNDER', 'ADVISOR']) && (
+                        <button
+                            onClick={handleGrantOverride}
+                            className="bg-indigo-500/20 text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-500/30 transition-all border border-indigo-500/30 flex items-center"
+                            title="Accorder une dérogation de délai à l'enseignant"
+                        >
+                            DÉROGATION
+                        </button>
+                    )}
                     {!isLocked ? (
                         <button
                             onClick={handleSave}
-                            className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
+                            disabled={isLocked || isPastDeadline}
+                            className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             <Save className="w-4 h-4 mr-2" /> {t('save_grades') || 'Sauvegarder'}
                         </button>
@@ -298,7 +380,7 @@ const Grades: React.FC = () => {
                           <td key={subject.id} className="px-4 py-4">
                             {isNursery ? (
                               <select
-                                disabled={isLocked}
+                                disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
                                     const val = parseFloat(e.target.value);
@@ -324,7 +406,7 @@ const Grades: React.FC = () => {
                                 step="0.25"
                                 min="0"
                                 max="20"
-                                disabled={isLocked}
+                                disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
                                     const val = parseFloat(e.target.value);

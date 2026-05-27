@@ -137,7 +137,28 @@ function initDb() {
         console.error(`[Migration] Grades validation column migration failed:`, e.message);
     }
 
-    // 6.6. Schools Table Migration: Add deleted_at and is_active if missing
+    // 6.6. Grade overrides Table Migration
+    try {
+        db.prepare(`
+            CREATE TABLE IF NOT EXISTS grade_overrides (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                teacher_id INTEGER,
+                class_id INTEGER,
+                term INTEGER,
+                month TEXT,
+                deadline DATE NOT NULL,
+                granted_by INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (teacher_id) REFERENCES users(id),
+                FOREIGN KEY (class_id) REFERENCES classes(id),
+                FOREIGN KEY (granted_by) REFERENCES users(id)
+            )
+        `).run();
+    } catch (e) {
+        console.error(`[Migration] grade_overrides migration failed:`, e.message);
+    }
+
+    // 6.7. Schools Table Migration: Add deleted_at and is_active if missing
     try {
         const schoolCols = db.prepare(`PRAGMA table_info(schools)`).all();
         if (!schoolCols.find(c => c.name === 'deleted_at')) {

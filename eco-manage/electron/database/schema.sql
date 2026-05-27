@@ -244,6 +244,21 @@ CREATE TABLE IF NOT EXISTS mobile_access_keys (
     FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
 );
 
+-- Grade overrides (Derogations for deadline)
+CREATE TABLE IF NOT EXISTS grade_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    teacher_id INTEGER,
+    class_id INTEGER,
+    term INTEGER,
+    month TEXT,
+    deadline DATE NOT NULL,
+    granted_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (teacher_id) REFERENCES users(id),
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (granted_by) REFERENCES users(id)
+);
+
 -- System Settings
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

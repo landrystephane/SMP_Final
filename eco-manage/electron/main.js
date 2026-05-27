@@ -328,6 +328,35 @@ handleIPC('auth:login', async (event, { username, password }) => {
   if (isValid) {
       delete user.hash;
       loggedInUser = user;
+
+      // Deadline notification check
+      try {
+          if (user.role === 'TEACHER') {
+              const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('period_end');
+              if (periodEndSetting && periodEndSetting.value) {
+                  const endDate = new Date(periodEndSetting.value);
+                  endDate.setHours(23, 59, 59, 999);
+                  const now = new Date();
+                  const diffTime = endDate.getTime() - now.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  
+                  if (diffDays >= 0 && diffDays <= 3) {
+                      // Only insert if not already warned today
+                      const todayDateStr = now.toISOString().split('T')[0];
+                      const recentNotif = db.prepare("SELECT id FROM notifications WHERE recipient_id = ? AND title = 'Délai de saisie imminent' AND DATE(created_at) = ?").get(user.id, todayDateStr);
+                      if (!recentNotif) {
+                          db.prepare(`
+                              INSERT INTO notifications (school_id, recipient_id, title, message, type)
+                              VALUES (?, ?, ?, ?, ?)
+                          `).run(user.schoolId, user.id, 'Délai de saisie imminent', `Attention: Il vous reste ${diffDays} jour(s) pour terminer la saisie de vos notes (jusqu'au ${periodEndSetting.value}).`, 'SYSTEM');
+                      }
+                  }
+              }
+          }
+      } catch (err) {
+          console.error("Erreur check deadline login:", err);
+      }
+
       return user;
   }
   return null;
@@ -361,38 +390,7 @@ handleIPC('db:addSchool', async (event, school) => {
     const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto) VALUES (?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto);
     const newSchoolId = info.lastInsertRowid;
 
-    // Auto-seed standard classes for the new instance
-    const standardClasses = [
-        // Francophone Maternelle
-        { name: 'Petite Section', code: 'PS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-        { name: 'Moyenne Section', code: 'MS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-        { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-        // Francophone Primaire
-        { name: 'SIL', code: 'SIL', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CP', code: 'CP', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CE1', code: 'CE1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CE2', code: 'CE2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CM1', code: 'CM1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CM2', code: 'CM2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        // Anglophone Nursery
-        { name: 'Nursery 1', code: 'N1', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-        { name: 'Nursery 2', code: 'N2', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-        { name: 'Nursery 3', code: 'N3', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-        // Anglophone Primaire
-        { name: 'Class 1', code: 'CL1', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-        { name: 'Class 2', code: 'CL2', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-        { name: 'Class 3', code: 'CL3', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-        { name: 'Class 4', code: 'CL4', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-        { name: 'Class 5', code: 'CL5', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-        { name: 'Class 6', code: 'CL6', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-    ];
-    
-    const insertClass = db.prepare('INSERT INTO classes (school_id, name, code, section, level) VALUES (?, ?, ?, ?, ?)');
     const transaction = db.transaction(() => {
-        for (const cls of standardClasses) {
-            insertClass.run(newSchoolId, cls.name, cls.code, cls.section, cls.level);
-        }
-        
         // Create a default founder for this school
         const hash = bcrypt.hashSync('admin', 10);
         db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
@@ -1299,5 +1297,13 @@ handleIPC('db:createSchoolYearArchive', async (event, { schoolId, yearName }) =>
     return { success: true, id: result.lastInsertRowid, backupFilePath };
 });
 
+// Grade Overrides
+handleIPC('db:getGradeOverrides', async (event, { teacherId, classId, term, month }) => {
+    return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(teacherId, classId, term, month);
+});
+
+handleIPC('db:addGradeOverride', async (event, { teacherId, classId, term, month, deadline, grantedBy }) => {
+    return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(teacherId, classId, term, month, deadline, grantedBy);
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

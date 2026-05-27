@@ -12,7 +12,7 @@ const AdminWorkflow: React.FC = () => {
   const [school, setSchool] = useState<any>(null);
   const [printingClassId, setPrintingClassId] = useState<number | null>(null);
 
-  const [period, _setPeriod] = useState({
+  const [period, setPeriod] = useState({
     term: 1,
     start: '2026-04-20',
     end: '2026-05-15',
@@ -38,10 +38,40 @@ const AdminWorkflow: React.FC = () => {
     }
   };
 
+  const loadPeriodSettings = async () => {
+    if (window.electronAPI) {
+        const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';
+        const end = await window.electronAPI.getSetting('period_end') || '2026-05-15';
+        const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
+        setPeriod(prev => ({ ...prev, start, end, editingAllowed }));
+    }
+  };
+
   useEffect(() => {
     loadData();
     loadActingStatus();
+    loadPeriodSettings();
   }, [user]);
+
+  const handleUpdatePeriod = async () => {
+    if (window.electronAPI) {
+        await window.electronAPI.setSetting({ key: 'period_start', value: period.start });
+        await window.electronAPI.setSetting({ key: 'period_end', value: period.end });
+        await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: period.editingAllowed.toString() });
+        
+        if (period.editingAllowed) {
+            await window.electronAPI.createNotification({
+                school_id: user?.schoolId,
+                recipient_role: 'TEACHER',
+                title: 'Période de saisie des notes ouverte',
+                message: `La période de saisie des notes est ouverte du ${period.start} au ${period.end}. Veuillez procéder au remplissage.`,
+                type: 'SYSTEM'
+            });
+        }
+
+        alert(t('period_updated_success'));
+    }
+  };
 
   const toggleSgActing = async () => {
     if (window.electronAPI) {
@@ -115,6 +145,11 @@ const AdminWorkflow: React.FC = () => {
                 rank: rankIndex !== -1 ? rankIndex + 1 : undefined,
                 totalStudents: classStudents.length
             };
+        }).sort((a, b) => {
+            if (a.rank === undefined && b.rank === undefined) return 0;
+            if (a.rank === undefined) return 1;
+            if (b.rank === undefined) return -1;
+            return a.rank - b.rank;
         });
 
         // Call report generator
@@ -152,20 +187,23 @@ const AdminWorkflow: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase text-slate-500 font-bold">{t('start')}</label>
-                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.start} readOnly />
+                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.start} onChange={(e) => setPeriod(prev => ({...prev, start: e.target.value}))} />
               </div>
               <div>
                 <label className="text-xs uppercase text-slate-500 font-bold">{t('end')}</label>
-                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.end} readOnly />
+                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.end} onChange={(e) => setPeriod(prev => ({...prev, end: e.target.value}))} />
               </div>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
               <span className="text-slate-300">{t('allow_grade_entry')}</span>
-              <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${period.editingAllowed ? 'bg-green-500' : 'bg-slate-600'}`}>
+              <div 
+                  onClick={() => setPeriod(prev => ({...prev, editingAllowed: !prev.editingAllowed}))}
+                  className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${period.editingAllowed ? 'bg-green-500' : 'bg-slate-600'}`}
+              >
                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${period.editingAllowed ? 'translate-x-6' : ''}`} />
               </div>
             </div>
-            <button className="w-full py-2 bg-slate-gold-gold text-slate-900 rounded font-bold hover:bg-yellow-500 transition-colors">
+            <button onClick={handleUpdatePeriod} className="w-full py-2 bg-slate-gold-gold text-slate-900 rounded font-bold hover:bg-yellow-500 transition-colors">
               {t('update_period')}
             </button>
           </div>
@@ -209,8 +247,8 @@ const AdminWorkflow: React.FC = () => {
                   <span className="text-white font-medium block">{cls.name}</span>
                   <span className="text-[9px] text-slate-500 font-bold uppercase">{cls.section}</span>
                 </div>
-                <span className="flex items-center text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded border border-green-500/20 font-bold uppercase">
-                  <CheckCircle2 className="w-3 h-3 mr-1" /> VALIDÉ
+                <span className="flex items-center text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded border border-amber-500/20 font-bold uppercase">
+                  <Clock className="w-3 h-3 mr-1" /> EN ATTENTE
                 </span>
               </div>
             ))}
@@ -240,7 +278,7 @@ const AdminWorkflow: React.FC = () => {
                   <td className="py-4 font-bold text-white">{c.name}</td>
                   <td className="py-4 text-xs font-semibold text-slate-400">{c.level} • {c.section}</td>
                   <td className="py-4">
-                    <span className="px-2 py-1 bg-green-500/10 text-green-500 rounded-full text-[10px] font-bold uppercase tracking-wider">APROUVÉ</span>
+                    <span className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-bold uppercase tracking-wider">EN ATTENTE</span>
                   </td>
                   <td className="py-4">
                     <button

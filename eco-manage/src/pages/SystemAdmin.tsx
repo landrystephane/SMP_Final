@@ -305,11 +305,15 @@ const SystemAdmin: React.FC = () => {
           title: "Supprimer l'école",
           description: `Veuillez confirmer la mise à la corbeille de l'établissement "${name}". Ses utilisateurs n'auront plus accès à l'application.`,
           onConfirm: async (password) => {
+              if (!password || password.trim() === '') {
+                  setConfirmPasswordError('Le mot de passe ne peut pas être vide.');
+                  return;
+              }
               if (window.electronAPI) {
                   try {
-                      const res = await window.electronAPI.deleteSchool({ id, password });
+                      const res = await window.electronAPI.deleteSchool({ id, password: password.trim() });
                       if (res && res.error) {
-                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect.' : res.error);
+                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect. Assurez-vous de taper "superadmin".' : res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
                           loadSchools();
@@ -331,11 +335,15 @@ const SystemAdmin: React.FC = () => {
           title: "Suppression Définitive",
           description: `ATTENTION : Vous êtes sur le point de détruire DEFINITIVEMENT l'établissement "${name}" ainsi que toutes ses dépendances (élèves, classes, paiements, notes, enseignants, historiques). Cette action est irréversible !`,
           onConfirm: async (password) => {
+              if (!password || password.trim() === '') {
+                  setConfirmPasswordError('Le mot de passe ne peut pas être vide.');
+                  return;
+              }
               if (window.electronAPI && window.electronAPI.permanentlyDeleteSchool) {
                   try {
-                      const res = await window.electronAPI.permanentlyDeleteSchool({ id, password });
+                      const res = await window.electronAPI.permanentlyDeleteSchool({ id, password: password.trim() });
                       if (res && res.error) {
-                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect.' : res.error);
+                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect. Assurez-vous de taper "superadmin".' : res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
                           loadDeletedSchools();

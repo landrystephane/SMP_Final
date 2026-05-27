@@ -60,14 +60,14 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         return;
     }
 
-    // Name validations (Must start with a letter)
-    const nameRegex = /^[A-Za-zÀ-ÿ]/;
+    // Name validations (Must contain only letters, spaces, hyphens)
+    const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
     if (!nameRegex.test(formData.firstName.trim()) || !nameRegex.test(formData.lastName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe Nom et le Prénom de l'élève doivent obligatoirement commencer par une lettre.");
+        alert("🚨 ERREUR DE SAISIE :\nLe Nom et le Prénom de l'élève ne doivent contenir que des lettres.");
         return;
     }
     if (formData.parentName && !nameRegex.test(formData.parentName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe nom du parent/tuteur doit commencer par une lettre.");
+        alert("🚨 ERREUR DE SAISIE :\nLe nom du parent/tuteur ne doit contenir que des lettres.");
         return;
     }
 

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unlockGrades: (params) => ipcRenderer.invoke('db:unlockGrades', params),
   getClassSubjectsValidationStatus: (params) => ipcRenderer.invoke('db:getClassSubjectsValidationStatus', params),
   validateSubjectGrades: (params) => ipcRenderer.invoke('db:validateSubjectGrades', params),
+  getGradeOverrides: (params) => ipcRenderer.invoke('db:getGradeOverrides', params),
+  addGradeOverride: (params) => ipcRenderer.invoke('db:addGradeOverride', params),
 
   // Finance
   getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
@@ -29,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
   getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
+  addInstallment: (name) => ipcRenderer.invoke('db:addInstallment', name),
+  deleteInstallment: (id) => ipcRenderer.invoke('db:deleteInstallment', id),
   getClassInstallmentFees: (schoolId) => ipcRenderer.invoke('db:getClassInstallmentFees', schoolId),
   updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
 
@@ -67,6 +71,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
   getInstallments: () => ipcRenderer.invoke('db:getInstallments'),
+  addInstallment: (name) => ipcRenderer.invoke('db:addInstallment', name),
+  deleteInstallment: (id) => ipcRenderer.invoke('db:deleteInstallment', id),
   getClassInstallmentFees: (schoolId) => ipcRenderer.invoke('db:getClassInstallmentFees', schoolId),
   updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
   createExpense: (expense) => ipcRenderer.invoke('db:createExpense', expense),
