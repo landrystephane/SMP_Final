@@ -41,12 +41,12 @@ const Attendance: React.FC = () => {
   useEffect(() => {
     const loadStudents = async () => {
       if (window.electronAPI && selectedClass) {
-        const allStudents = await window.electronAPI.getStudents();
+        const allStudents = await window.electronAPI.getStudents(user?.schoolId);
         setStudents(allStudents.filter((s: any) => s.class_id.toString() === selectedClass));
       }
     };
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, user]);
 
   const handleSave = async () => {
       if (window.electronAPI) {

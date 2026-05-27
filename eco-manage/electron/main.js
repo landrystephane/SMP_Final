@@ -89,99 +89,113 @@ app.whenReady().then(() => {
   }
   startApiServer();
 
-  // Seed initial school
-  const school = db.prepare('SELECT * FROM schools WHERE id = 1').get();
-  if (!school) {
+  // Check if seeding has already been completed once
+  let isSeeded = false;
+  try {
+    const seededSetting = db.prepare("SELECT value FROM settings WHERE key = 'initial_seeding_done'").get();
+    isSeeded = seededSetting ? seededSetting.value === 'true' : false;
+  } catch (e) {
+    console.error("Error reading initial_seeding_done setting:", e.message);
+  }
+
+  // Check overall counts to avoid re-seeding school 1 if database is already in use
+  const schoolCount = db.prepare('SELECT COUNT(*) as count FROM schools').get().count;
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+
+  if (!isSeeded && schoolCount === 0 && userCount === 0) {
+    // Seed initial school
     db.prepare('INSERT INTO schools (id, name, address) VALUES (1, ?, ?)').run('Complexe Scolaire Bilingue Eco-Manage', 'Yaoundé, Cameroun');
-  }
 
-  // Seed default classes for the initial school if none exist
-  const classCountForSchool1 = db.prepare('SELECT COUNT(*) as count FROM classes WHERE school_id = 1').get().count;
-  if (classCountForSchool1 === 0) {
-      const standardClasses = [
-          // Francophone Maternelle
-          { name: 'Petite Section', code: 'PS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          { name: 'Moyenne Section', code: 'MS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          // Francophone Primaire
-          { name: 'SIL', code: 'SIL', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          { name: 'CP', code: 'CP1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          { name: 'CE1', code: 'CE1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          { name: 'CE2', code: 'CE2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          { name: 'CM1', code: 'CM1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          { name: 'CM2', code: 'CM2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-          // Anglophone Nursery
-          { name: 'Nursery 1', code: 'N1', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-          { name: 'Nursery 2', code: 'N2', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-          { name: 'Nursery 3', code: 'N3', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-          // Anglophone Primaire
-          { name: 'Class 1', code: 'CL1', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-          { name: 'Class 2', code: 'CL2', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-          { name: 'Class 3', code: 'CL3', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-          { name: 'Class 4', code: 'CL4', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-          { name: 'Class 5', code: 'CL5', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-          { name: 'Class 6', code: 'CL6', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
-      ];
-      const insertClass = db.prepare('INSERT INTO classes (school_id, name, code, section, level) VALUES (1, ?, ?, ?, ?)');
-      const classTx = db.transaction(() => {
-          for (const cls of standardClasses) {
-              insertClass.run(cls.name, cls.code, cls.section, cls.level);
-          }
-      });
-      classTx();
-      console.log('Seeded standard classes for School 1');
-  }
+    // Seed default classes for the initial school if none exist
+    const classCountForSchool1 = db.prepare('SELECT COUNT(*) as count FROM classes WHERE school_id = 1').get().count;
+    if (classCountForSchool1 === 0) {
+        const standardClasses = [
+            // Francophone Maternelle
+            { name: 'Petite Section', code: 'PS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            { name: 'Moyenne Section', code: 'MS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            // Francophone Primaire
+            { name: 'SIL', code: 'SIL', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            { name: 'CP', code: 'CP', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            { name: 'CE1', code: 'CE1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            { name: 'CE2', code: 'CE2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            { name: 'CM1', code: 'CM1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            { name: 'CM2', code: 'CM2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+            // Anglophone Nursery
+            { name: 'Nursery 1', code: 'N1', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+            { name: 'Nursery 2', code: 'N2', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+            { name: 'Nursery 3', code: 'N3', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+            // Anglophone Primaire
+            { name: 'Class 1', code: 'CL1', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+            { name: 'Class 2', code: 'CL2', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+            { name: 'Class 3', code: 'CL3', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+            { name: 'Class 4', code: 'CL4', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+            { name: 'Class 5', code: 'CL5', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+            { name: 'Class 6', code: 'CL6', section: 'ANGLOPHONE', level: 'PRIMAIRE' },
+        ];
+        const insertClass = db.prepare('INSERT INTO classes (school_id, name, code, section, level) VALUES (1, ?, ?, ?, ?)');
+        const classTx = db.transaction(() => {
+            for (const cls of standardClasses) {
+                insertClass.run(cls.name, cls.code, cls.section, cls.level);
+            }
+        });
+        classTx();
+        console.log('Seeded standard classes for School 1');
+    }
 
-  // Seed default Maternelle classes for School 1 if they don't exist in existing database
-  const maternelCount = db.prepare("SELECT COUNT(*) as count FROM classes WHERE school_id = 1 AND level = 'MATERNELLE'").get().count;
-  if (maternelCount === 0) {
-      const nurseryClasses = [
-          { name: 'Petite Section', code: 'PS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          { name: 'Moyenne Section', code: 'MS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
-          { name: 'Nursery 1', code: 'N1', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-          { name: 'Nursery 2', code: 'N2', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-          { name: 'Nursery 3', code: 'N3', section: 'ANGLOPHONE', level: 'MATERNELLE' },
-      ];
-      const insertClass = db.prepare('INSERT INTO classes (school_id, name, code, section, level) VALUES (1, ?, ?, ?, ?)');
-      const nurseryTx = db.transaction(() => {
-          for (const cls of nurseryClasses) {
-              insertClass.run(cls.name, cls.code, cls.section, cls.level);
-          }
-      });
-      nurseryTx();
-      console.log('Seeded default Maternelle classes for School 1');
-  }
+    // Seed default Maternelle classes for School 1 if they don't exist in existing database
+    const maternelCount = db.prepare("SELECT COUNT(*) as count FROM classes WHERE school_id = 1 AND level = 'MATERNELLE'").get().count;
+    if (maternelCount === 0) {
+        const nurseryClasses = [
+            { name: 'Petite Section', code: 'PS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            { name: 'Moyenne Section', code: 'MS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
+            { name: 'Nursery 1', code: 'N1', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+            { name: 'Nursery 2', code: 'N2', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+            { name: 'Nursery 3', code: 'N3', section: 'ANGLOPHONE', level: 'MATERNELLE' },
+        ];
+        const insertClass = db.prepare('INSERT INTO classes (school_id, name, code, section, level) VALUES (1, ?, ?, ?, ?)');
+        const nurseryTx = db.transaction(() => {
+            for (const cls of nurseryClasses) {
+                insertClass.run(cls.name, cls.code, cls.section, cls.level);
+            }
+        });
+        nurseryTx();
+        console.log('Seeded default Maternelle classes for School 1');
+    }
 
-  // Seed SuperAdmin
-  const superadmin = db.prepare('SELECT * FROM users WHERE username = ?').get('superadmin');
-  if (!superadmin) {
-    const hash = bcrypt.hashSync('superadmin', 10);
-    db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
-      .run('superadmin', hash, 'Super Développeur', 'SUPERADMIN', 1);
-  }
+    // Seed SuperAdmin
+    const superadmin = db.prepare('SELECT * FROM users WHERE username = ?').get('superadmin');
+    if (!superadmin) {
+      const hash = bcrypt.hashSync('superadmin', 10);
+      db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run('superadmin', hash, 'Super Développeur', 'SUPERADMIN', 1);
+    }
 
-  // Seed Founder
-  const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
-  if (!admin) {
-    const hash = bcrypt.hashSync('admin', 10);
-    db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
-      .run('admin', hash, 'Fondateur École', 'FOUNDER', 1);
-  }
+    // Seed Founder
+    const admin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
+    if (!admin) {
+      const hash = bcrypt.hashSync('admin', 10);
+      db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+        .run('admin', hash, 'Fondateur École', 'FOUNDER', 1);
+    }
 
-  // Seed Installments
-  const instCount = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
-  if (instCount === 0) {
-      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('1ERE TRANCHE', 1);
-      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('2E TRANCHE', 2);
-      db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('3E TRANCHE', 3);
-  }
+    // Seed Installments
+    const instCount = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
+    if (instCount === 0) {
+        db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('1ERE TRANCHE', 1);
+        db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('2E TRANCHE', 2);
+        db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run('3E TRANCHE', 3);
+    }
 
-  // Seed Bus Routes
-  const routeCount = db.prepare('SELECT COUNT(*) as count FROM bus_routes WHERE school_id = 1').get().count;
-  if (routeCount === 0) {
-      db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Nord (Bastos/Golf)', 'BUS-001-CE', 1);
-      db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Sud (Ahala/Mvan)', 'BUS-002-CE', 1);
+    // Seed Bus Routes
+    const routeCount = db.prepare('SELECT COUNT(*) as count FROM bus_routes WHERE school_id = 1').get().count;
+    if (routeCount === 0) {
+        db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Nord (Bastos/Golf)', 'BUS-001-CE', 1);
+        db.prepare('INSERT INTO bus_routes (name, bus_number, school_id) VALUES (?, ?, ?)').run('Route Sud (Ahala/Mvan)', 'BUS-002-CE', 1);
+    }
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seeding_done', 'true')").run();
   }
 
   createWindow();
@@ -322,7 +336,7 @@ handleIPC('db:addSchool', async (event, school) => {
         { name: 'Grande Section', code: 'GS', section: 'FRANCOPHONE', level: 'MATERNELLE' },
         // Francophone Primaire
         { name: 'SIL', code: 'SIL', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
-        { name: 'CP', code: 'CP1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
+        { name: 'CP', code: 'CP', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
         { name: 'CE1', code: 'CE1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
         { name: 'CE2', code: 'CE2', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
         { name: 'CM1', code: 'CM1', section: 'FRANCOPHONE', level: 'PRIMAIRE' },
@@ -413,13 +427,25 @@ handleIPC('db:addStudent', async (event, student) => {
   if (!classObj) throw new Error('Classe introuvable ou non autorisée');
   const classCode = classObj.code;
 
-  // Generate order number securely using transaction
+  // Generate order number securely using transaction (global per school/year)
   let matricule = '';
   let orderNumber = 1;
   
   const transaction = db.transaction(() => {
-    const lastStudent = db.prepare('SELECT MAX(order_number) as maxOrder FROM students WHERE class_id = ? AND registration_year = ?').get(classId, year);
-    orderNumber = (lastStudent && lastStudent.maxOrder ? lastStudent.maxOrder : 0) + 1;
+    const existingStudents = db.prepare("SELECT order_number, matricule FROM students WHERE school_id = ? AND registration_year = ?").all(sid, year);
+    let maxOrder = 0;
+    for (const s of existingStudents) {
+        if (s.order_number && s.order_number > maxOrder) {
+            maxOrder = s.order_number;
+        }
+        if (s.matricule && s.matricule.length > 4) {
+            const suffix = parseInt(s.matricule.slice(-4));
+            if (!isNaN(suffix) && suffix > maxOrder) {
+                maxOrder = suffix;
+            }
+        }
+    }
+    orderNumber = maxOrder + 1;
     matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
 
     db.prepare(`
@@ -808,12 +834,12 @@ handleIPC('db:getUsers', async (event, schoolId) => {
 });
 
 handleIPC('db:addUser', async (event, user) => {
-  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender } = user;
+  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone } = user;
   const sid = getActiveSchoolId(schoolId);
   
   const hash = bcrypt.hashSync(password, 10);
   
-  // Auto-generate staff matricule
+  // Auto-generate staff matricule (incremental and duplicate-safe)
   const yearShort = new Date().getFullYear().toString().slice(-2);
   const roleCodes = {
       TEACHER: 'ENS',
@@ -825,15 +851,24 @@ handleIPC('db:addUser', async (event, user) => {
   };
   const roleCode = roleCodes[role] || 'STF';
   
-  // Count current staff of this role in this school to get order number
-  const countObj = db.prepare("SELECT COUNT(*) as count FROM users WHERE school_id = ? AND role = ?").get(sid, role);
-  const order = (countObj ? countObj.count : 0) + 1;
+  const pattern = `${yearShort}${roleCode}%`;
+  const existingUsers = db.prepare("SELECT matricule FROM users WHERE school_id = ? AND role = ? AND matricule LIKE ?").all(sid, role, pattern);
+  let maxOrder = 0;
+  for (const u of existingUsers) {
+      if (u.matricule) {
+          const suffix = parseInt(u.matricule.slice(5)); // after Year(2) + RoleCode(3)
+          if (!isNaN(suffix) && suffix > maxOrder) {
+              maxOrder = suffix;
+          }
+      }
+  }
+  const order = maxOrder + 1;
   const matricule = `${yearShort}${roleCode}${order.toString().padStart(4, '0')}`;
 
   db.prepare(`
-    INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender);
+    INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null);
   
   return { success: true, matricule };
 });
@@ -843,7 +878,7 @@ handleIPC('db:deleteUser', async (event, id) => {
 });
 
 handleIPC('db:updateUser', async (event, userToUpdate) => {
-  const { id, username, fullName, password } = userToUpdate;
+  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
 
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -857,14 +892,41 @@ handleIPC('db:updateUser', async (event, userToUpdate) => {
 
   const finalUsername = username || existing.username;
   const finalFullName = fullName || existing.full_name;
+  const finalRole = role || existing.role;
+  const finalPhone = phone !== undefined ? phone : existing.phone;
+  const finalAssignedClasses = assignedClasses !== undefined ? JSON.stringify(assignedClasses) : existing.assigned_classes;
+  const finalCivility = civility || existing.civility;
+  const finalSection = section || existing.section;
+  const finalGender = gender || existing.gender;
 
   if (password && password.trim()) {
       const hash = bcrypt.hashSync(password.trim(), 10);
-      return db.prepare('UPDATE users SET username = ?, full_name = ?, password = ? WHERE id = ?')
-        .run(finalUsername, finalFullName, hash, id);
+      return db.prepare(`
+        UPDATE users SET 
+          username = ?, 
+          full_name = ?, 
+          role = ?, 
+          phone = ?, 
+          assigned_classes = ?, 
+          civility = ?, 
+          section = ?, 
+          gender = ?, 
+          password = ? 
+        WHERE id = ?
+      `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id);
   } else {
-      return db.prepare('UPDATE users SET username = ?, full_name = ? WHERE id = ?')
-        .run(finalUsername, finalFullName, id);
+      return db.prepare(`
+        UPDATE users SET 
+          username = ?, 
+          full_name = ?, 
+          role = ?, 
+          phone = ?, 
+          assigned_classes = ?, 
+          civility = ?, 
+          section = ?, 
+          gender = ? 
+        WHERE id = ?
+      `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id);
   }
 });
 
@@ -900,7 +962,7 @@ handleIPC('db:getStudentDetails', async (event, studentId) => {
 });
 
 handleIPC('db:updateStudent', async (event, student) => {
-  const { id, firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire } = student;
+  const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire } = student;
   const runResult = db.prepare(`
     UPDATE students SET
       first_name = COALESCE(?, first_name), 
@@ -908,6 +970,7 @@ handleIPC('db:updateStudent', async (event, student) => {
       birth_date = COALESCE(?, birth_date), 
       birth_place = COALESCE(?, birth_place), 
       gender = COALESCE(?, gender),
+      parent_name = COALESCE(?, parent_name),
       parent_contact = COALESCE(?, parent_contact), 
       emergency_contact = COALESCE(?, emergency_contact), 
       medical_info = COALESCE(?, medical_info), 
@@ -918,7 +981,7 @@ handleIPC('db:updateStudent', async (event, student) => {
       scholarship_reduction = COALESCE(?, scholarship_reduction), 
       has_moratoire = COALESCE(?, has_moratoire)
     WHERE id = ?
-  `).run(firstName, lastName, birthDate, birthPlace, gender, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire ? 1 : 0, id);
+  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire ? 1 : 0, id);
 
   if (runResult.changes > 0 && parentContact && parentContact.trim()) {
       const studentInDb = db.prepare('SELECT parent_name, school_id FROM students WHERE id = ?').get(id);

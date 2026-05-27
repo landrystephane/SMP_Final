@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Shield, Trash2, CheckCircle, Lock, Search } from 'lucide-react';
+import { UserPlus, Shield, Trash2, CheckCircle, Lock, Search, Edit, X } from 'lucide-react';
 import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,7 +17,21 @@ const Users: React.FC = () => {
     civility: 'M.',
     section: 'FRANCOPHONE',
     cycle: 'PRIMAIRE',
-    gender: 'M'
+    gender: 'M',
+    phone: ''
+  });
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    civility: 'M.',
+    fullName: '',
+    username: '',
+    phone: '',
+    role: 'TEACHER' as Role,
+    password: '',
+    section: 'FRANCOPHONE',
+    cycle: 'PRIMAIRE',
+    gender: 'M',
+    classId: ''
   });
 
   const loadData = async () => {
@@ -33,14 +47,70 @@ const Users: React.FC = () => {
     loadData();
   }, [currentUser]);
 
+  useEffect(() => {
+    if (editingUser) {
+        let assignedClassId = '';
+        let classLevel = 'PRIMAIRE';
+        if (editingUser.assignedClasses) {
+            try {
+                const parsed = typeof editingUser.assignedClasses === 'string' ? JSON.parse(editingUser.assignedClasses) : editingUser.assignedClasses;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    assignedClassId = parsed[0].toString();
+                    const cls = classes.find(c => c.id.toString() === assignedClassId);
+                    if (cls) {
+                        classLevel = cls.level || 'PRIMAIRE';
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to parse assigned classes:", e);
+            }
+        }
+
+        setEditUserForm({
+            civility: editingUser.civility || 'M.',
+            fullName: editingUser.fullName || '',
+            username: editingUser.username || '',
+            phone: editingUser.phone || '',
+            role: editingUser.role || 'TEACHER',
+            password: '',
+            section: editingUser.section || 'FRANCOPHONE',
+            cycle: classLevel,
+            gender: editingUser.gender || 'M',
+            classId: assignedClassId
+        });
+    }
+  }, [editingUser, classes]);
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Name validation
+    if (/\d/.test(newUser.fullName)) {
+        alert('Le nom de l\'agent ne doit pas contenir de chiffres.');
+        return;
+    }
+
+    // Phone validation
+    let cleanPhone = newUser.phone.replace(/[\s\-\(\)\+]/g, '');
+    if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
+        cleanPhone = cleanPhone.slice(3);
+    }
+    if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
+        alert('Numéro de téléphone invalide. Veuillez renseigner un numéro camerounais à 9 chiffres commençant par 2 ou 6.');
+        return;
+    }
+
     if (window.electronAPI && currentUser) {
-      await window.electronAPI.addUser({
+      const res = await window.electronAPI.addUser({
           ...newUser,
+          phone: cleanPhone,
           schoolId: currentUser.schoolId,
           assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : []
       });
+      if (res && res.error) {
+          alert(`Erreur: ${res.error}`);
+          return;
+      }
       setNewUser({ 
           username: '', 
           password: '', 
@@ -50,10 +120,74 @@ const Users: React.FC = () => {
           civility: 'M.', 
           section: 'FRANCOPHONE', 
           cycle: 'PRIMAIRE',
-          gender: 'M' 
+          gender: 'M',
+          phone: ''
       });
       loadData();
     }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingUser) return;
+
+      if (/\d/.test(editUserForm.fullName)) {
+          alert('Le nom de l\'agent ne doit pas contenir de chiffres.');
+          return;
+      }
+
+      let cleanPhone = editUserForm.phone.replace(/[\s\-\(\)\+]/g, '');
+      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
+          cleanPhone = cleanPhone.slice(3);
+      }
+      if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
+          alert('Numéro de téléphone invalide. Veuillez renseigner un numéro camerounais à 9 chiffres commençant par 2 ou 6.');
+          return;
+      }
+
+      if (window.electronAPI) {
+          try {
+              const res = await window.electronAPI.updateUser({
+                  id: editingUser.id,
+                  civility: editUserForm.civility,
+                  fullName: editUserForm.fullName,
+                  username: editUserForm.username,
+                  phone: cleanPhone,
+                  role: editUserForm.role,
+                  password: editUserForm.password || undefined,
+                  section: editUserForm.section,
+                  gender: editUserForm.gender,
+                  assignedClasses: editUserForm.classId ? [parseInt(editUserForm.classId)] : []
+              });
+
+              if (res && res.error) {
+                  alert(`Erreur de modification: ${res.error}`);
+                  return;
+              }
+
+              setEditingUser(null);
+              loadData();
+              alert("Informations de l'agent mises à jour !");
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
+  };
+
+  const handleDeleteUser = async (id: number, name: string) => {
+      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le compte de l'agent "${name}" ? Cette action est définitive.`)) return;
+      if (window.electronAPI) {
+          try {
+              const res = await window.electronAPI.deleteUser(id);
+              if (res && res.error) {
+                  alert(res.error);
+              } else {
+                  loadData();
+              }
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
   };
 
   const filteredUsers = users.filter(u =>
@@ -98,18 +232,29 @@ const Users: React.FC = () => {
                                 <option value="Mme">Mme</option>
                             </select>
                         </div>
-                        <div className="col-span-2 space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nom Complet</label>
-                            <input
-                                type="text"
-                                className="input-field w-full"
-                                value={newUser.fullName}
-                                onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
-                                required
-                                placeholder="Joseph Mballa"
-                            />
-                        </div>
-                    </div>
+                         <div className="col-span-2 space-y-2">
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nom Complet</label>
+                             <input
+                                 type="text"
+                                 className="input-field w-full"
+                                 value={newUser.fullName}
+                                 onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
+                                 required
+                                 placeholder="Joseph Mballa"
+                             />
+                         </div>
+                     </div>
+                     <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Téléphone Camerounais</label>
+                         <input
+                             type="text"
+                             className="input-field w-full text-amber-500 font-mono"
+                             value={newUser.phone}
+                             onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
+                             required
+                             placeholder="Ex: 699000000"
+                         />
+                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
@@ -240,15 +385,16 @@ const Users: React.FC = () => {
                             <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
                                 {u.civility ? `${u.civility} ` : ''}{u.fullName}
                             </div>
-                            <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-                                <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>
-                                {u.role === 'TEACHER' && u.section && (
-                                    <>
-                                        <span>•</span>
-                                        <span>{u.section}</span>
-                                    </>
-                                )}
-                            </div>
+                             <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                                 <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>
+                                 {u.phone && <span className="text-slate-400">• TÉL: {u.phone}</span>}
+                                 {u.role === 'TEACHER' && u.section && (
+                                     <>
+                                         <span>•</span>
+                                         <span>{u.section}</span>
+                                     </>
+                                 )}
+                             </div>
                         </div>
                       </div>
                     </td>
@@ -266,16 +412,16 @@ const Users: React.FC = () => {
                             Actif
                         </div>
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button className="p-3 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all" title="Sécurité">
-                            <Lock className="w-4 h-4" />
-                        </button>
-                        <button className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-transparent hover:border-rose-500/20 transition-all">
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                     <td className="px-8 py-6 text-right">
+                       <div className="flex items-center justify-end space-x-2">
+                         <button onClick={() => setEditingUser(u)} className="p-3 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all shadow-md" title="Modifier">
+                             <Edit className="w-4 h-4" />
+                         </button>
+                         <button onClick={() => handleDeleteUser(u.id, u.fullName)} className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-transparent hover:border-rose-500/20 transition-all" title="Supprimer">
+                             <Trash2 className="w-4 h-4" />
+                         </button>
+                       </div>
+                     </td>
                   </tr>
                 ))}
               </tbody>
@@ -283,6 +429,144 @@ const Users: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Edit User Modal */}
+      {editingUser && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in zoom-in duration-300">
+              <div className="glass-card w-full max-w-lg bg-slate-900 border border-white/10 shadow-2xl p-0 overflow-hidden">
+                  <div className="p-6 border-b border-white/5 bg-slate-950/50 flex justify-between items-center">
+                      <div>
+                        <h2 className="text-xl font-black text-white tracking-tight">Modifier l'Agent</h2>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Mettre à jour le profil de {editingUser.fullName}</p>
+                      </div>
+                      <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-white/5 rounded-full transition-all"><X className="w-6 h-6 text-slate-500" /></button>
+                  </div>
+                  <form onSubmit={handleUpdateUser} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                      <div className="grid grid-cols-3 gap-4">
+                          <div className="col-span-1 space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Civilité</label>
+                              <select
+                                  className="input-field w-full appearance-none cursor-pointer"
+                                  value={editUserForm.civility}
+                                  onChange={(e) => {
+                                      const civ = e.target.value;
+                                      setEditUserForm({...editUserForm, civility: civ, gender: civ === 'M.' ? 'M' : 'F'});
+                                  }}
+                              >
+                                  <option value="M.">M.</option>
+                                  <option value="Mme">Mme</option>
+                              </select>
+                          </div>
+                          <div className="col-span-2 space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nom Complet</label>
+                              <input
+                                  type="text"
+                                  className="input-field w-full"
+                                  value={editUserForm.fullName}
+                                  onChange={(e) => setEditUserForm({...editUserForm, fullName: e.target.value})}
+                                  required
+                              />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
+                              <input
+                                  type="text"
+                                  className="input-field w-full text-amber-500 font-mono"
+                                  value={editUserForm.username}
+                                  onChange={(e) => setEditUserForm({...editUserForm, username: e.target.value.toLowerCase()})}
+                                  required
+                              />
+                          </div>
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Téléphone Camerounais</label>
+                              <input
+                                  type="text"
+                                  className="input-field w-full text-amber-500 font-mono"
+                                  value={editUserForm.phone}
+                                  onChange={(e) => setEditUserForm({...editUserForm, phone: e.target.value})}
+                                  required
+                              />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Fonction / Rôle</label>
+                              <select
+                                  className="input-field w-full appearance-none cursor-pointer"
+                                  value={editUserForm.role}
+                                  onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value as Role})}
+                              >
+                                  <option value="DIRECTOR">Directeur</option>
+                                  <option value="SECRETARY">Secrétaire Général</option>
+                                  <option value="BURSAR">Économe</option>
+                                  <option value="TEACHER">Enseignant</option>
+                                  <option value="ADVISOR">Conseiller Pédagogique</option>
+                                  <option value="DRIVER">Chauffeur</option>
+                              </select>
+                          </div>
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nouveau mot de passe (optionnel)</label>
+                              <input
+                                  type="password"
+                                  className="input-field w-full"
+                                  value={editUserForm.password}
+                                  onChange={(e) => setEditUserForm({...editUserForm, password: e.target.value})}
+                                  placeholder="Laisser vide pour inchangé"
+                              />
+                          </div>
+                      </div>
+
+                      {editUserForm.role === 'TEACHER' && (
+                          <div className="space-y-4 pt-2">
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Section</label>
+                                      <select
+                                          className="input-field w-full bg-amber-500/5 appearance-none"
+                                          value={editUserForm.section}
+                                          onChange={(e) => setEditUserForm({...editUserForm, section: e.target.value, classId: ''})}
+                                      >
+                                          <option value="FRANCOPHONE">FRANCOPHONE</option>
+                                          <option value="ANGLOPHONE">ANGLOPHONE</option>
+                                      </select>
+                                  </div>
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Cycle</label>
+                                      <select
+                                          className="input-field w-full bg-amber-500/5 appearance-none"
+                                          value={editUserForm.cycle}
+                                          onChange={(e) => setEditUserForm({...editUserForm, cycle: e.target.value, classId: ''})}
+                                      >
+                                          <option value="PRIMAIRE">Primaire</option>
+                                          <option value="MATERNELLE">Maternelle</option>
+                                      </select>
+                                  </div>
+                              </div>
+                              <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Classe Assignée</label>
+                                  <select
+                                      className="input-field w-full bg-amber-500/5 appearance-none"
+                                      value={editUserForm.classId}
+                                      onChange={(e) => setEditUserForm({...editUserForm, classId: e.target.value})}
+                                  >
+                                      <option value="">Aucune affectation...</option>
+                                      {classes
+                                          .filter(c => c.section === editUserForm.section && c.level === editUserForm.cycle)
+                                          .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                  </select>
+                              </div>
+                          </div>
+                      )}
+
+                      <div className="pt-6 flex justify-end space-x-3">
+                          <button type="button" onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
+                          <button type="submit" className="btn-primary py-2.5 px-8">Enregistrer les Modifications</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

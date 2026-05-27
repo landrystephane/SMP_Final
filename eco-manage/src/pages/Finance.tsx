@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 const Finance: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [payments, setPayments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -20,26 +22,27 @@ const Finance: React.FC = () => {
 
   const loadData = async () => {
     if (window.electronAPI) {
-      const p = await window.electronAPI.getPayments();
-      const s = await window.electronAPI.getStudents();
-      const c = await window.electronAPI.getClasses();
-      const t_fees = await window.electronAPI.getTuitionFees();
+      const sid = user?.schoolId;
+      const p = await window.electronAPI.getPayments(sid);
+      const s = await window.electronAPI.getStudents(sid);
+      const c = await window.electronAPI.getClasses(sid);
+      const t_fees = await window.electronAPI.getTuitionFees(sid);
       const inst = await window.electronAPI.getInstallments();
-      const cif = await window.electronAPI.getClassInstallmentFees();
+      const cif = await window.electronAPI.getClassInstallmentFees(sid);
       const schs = await window.electronAPI.getSchools();
-      setPayments(p);
-      setStudents(s);
-      setClasses(c);
-      setTuitionFees(t_fees);
-      setInstallments(inst);
-      setClassInstallmentFees(cif);
-      setSchools(schs);
+      setPayments(p || []);
+      setStudents(s || []);
+      setClasses(c || []);
+      setTuitionFees(t_fees || []);
+      setInstallments(inst || []);
+      setClassInstallmentFees(cif || []);
+      setSchools(schs || []);
     }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   const totalReceived = payments.reduce((acc, p) => acc + p.amount, 0);
 

@@ -15,6 +15,7 @@ const Students: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any | null>(null);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -172,7 +173,7 @@ const Students: React.FC = () => {
                     >
                         <FileText className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
+                    <button onClick={() => setEditingStudent(s)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>
                     <button
@@ -195,19 +196,26 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {isAdding && (
+      {(isAdding || editingStudent) && (
         <StudentForm
-            onClose={() => setIsAdding(false)}
+            student={editingStudent}
+            onClose={() => { setIsAdding(false); setEditingStudent(null); }}
             onSubmit={async (data) => {
                 if (window.electronAPI) {
                     try {
-                        const res = await window.electronAPI.addStudent({ ...data, schoolId: user?.schoolId });
+                        let res;
+                        if (editingStudent) {
+                            res = await window.electronAPI.updateStudent({ ...data, id: editingStudent.id });
+                        } else {
+                            res = await window.electronAPI.addStudent({ ...data, schoolId: user?.schoolId });
+                        }
                         if (res && res.error) {
                             alert(`Error: ${res.error}`);
                             return;
                         }
                         loadData();
                         setIsAdding(false);
+                        setEditingStudent(null);
                     } catch (err: any) {
                         alert(err.message);
                     }

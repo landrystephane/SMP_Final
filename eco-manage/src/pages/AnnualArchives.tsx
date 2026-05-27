@@ -20,15 +20,15 @@ const AnnualArchives: React.FC = () => {
         if (window.electronAPI && user) {
             const sid = user.schoolId || 1;
             const arch = await window.electronAPI.getSchoolArchives(sid);
-            const p = await window.electronAPI.getPayments();
-            const s = await window.electronAPI.getStudents();
-            const c = await window.electronAPI.getClasses();
+            const p = await window.electronAPI.getPayments(sid);
+            const s = await window.electronAPI.getStudents(sid);
+            const c = await window.electronAPI.getClasses(sid);
             const schs = await window.electronAPI.getSchools();
-            setArchives(arch);
-            setPayments(p.filter((x: any) => x.school_id === sid || !x.school_id));
-            setStudents(s.filter((x: any) => x.school_id === sid || !x.school_id));
-            setClasses(c.filter((x: any) => x.school_id === sid || !x.school_id));
-            setSchools(schs);
+            setArchives(arch || []);
+            setPayments(p || []);
+            setStudents(s || []);
+            setClasses(c || []);
+            setSchools(schs || []);
         }
         setLoading(false);
     };

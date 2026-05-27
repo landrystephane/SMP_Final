@@ -1,42 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface StudentFormProps {
   onClose: () => void;
   onSubmit: (data: any) => void;
+  student?: any;
 }
 
-const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
-
+const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student }) => {
+  const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    birthDate: '',
-    birthPlace: '',
-    gender: 'M',
-    parentName: '',
-    parentContact: '',
-    emergencyContact: '',
-    medicalInfo: '',
-    address: '',
-    neighborhood: '',
-    section: 'FRANCOPHONE',
-    cycle: 'PRIMAIRE',
-    classId: '',
-    scholarshipReduction: 0,
-    hasMoratoire: false,
+    firstName: student?.first_name || '',
+    lastName: student?.last_name || '',
+    birthDate: student?.birth_date || '',
+    birthPlace: student?.birth_place || '',
+    gender: student?.gender || 'M',
+    parentName: student?.parent_name || '',
+    parentContact: student?.parent_contact || '',
+    emergencyContact: student?.emergency_contact || '',
+    medicalInfo: student?.medical_info || '',
+    address: student?.address || '',
+    neighborhood: student?.neighborhood || '',
+    section: student?.section || 'FRANCOPHONE',
+    cycle: student?.level || 'PRIMAIRE',
+    classId: student?.class_id?.toString() || '',
+    scholarshipReduction: student?.scholarship_reduction || 0,
+    hasMoratoire: student?.has_moratoire === 1 || student?.has_moratoire === true || false,
   });
 
   useEffect(() => {
     const loadClasses = async () => {
         if (window.electronAPI) {
-            const data = await window.electronAPI.getClasses();
-            setClasses(data);
+            const data = await window.electronAPI.getClasses(user?.schoolId);
+            setClasses(data || []);
+
+            // Auto-detect correct cycle if editing a student
+            if (student && student.class_id && data) {
+                const studentClass = data.find((c: any) => c.id === student.class_id);
+                if (studentClass) {
+                    setFormData(prev => ({
+                        ...prev,
+                        cycle: studentClass.level || 'PRIMAIRE'
+                    }));
+                }
+            }
         }
     };
     loadClasses();
-  }, []);
+  }, [user, student]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +57,47 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit }) => {
         alert('Veuillez sélectionner une classe');
         return;
     }
-    onSubmit(formData);
+
+    // Name validations (no digits)
+    if (/\d/.test(formData.firstName) || /\d/.test(formData.lastName)) {
+        alert('Le nom et le prénom de l\'élève ne doivent pas contenir de chiffres.');
+        return;
+    }
+    if (formData.parentName && /\d/.test(formData.parentName)) {
+        alert('Le nom du parent ne doit pas contenir de chiffres.');
+        return;
+    }
+
+    // Cameroonian phone validation for parentContact
+    let cleanPhone = formData.parentContact.replace(/[\s\-\(\)\+]/g, '');
+    if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
+        cleanPhone = cleanPhone.slice(3);
+    }
+    if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
+        alert('Numéro de téléphone du parent invalide. Il doit être un numéro camerounais à 9 chiffres commençant par 2 ou 6 (ex: 699000000).');
+        return;
+    }
+
+    // Secondary emergency contact validation if provided
+    if (formData.emergencyContact && formData.emergencyContact.trim()) {
+        const matches = formData.emergencyContact.match(/\d+/g);
+        if (matches) {
+            const digitStr = matches.join('');
+            let cleanUrgence = digitStr;
+            if (cleanUrgence.startsWith('237') && cleanUrgence.length > 9) {
+                cleanUrgence = cleanUrgence.slice(3);
+            }
+            if (!/^(2|6)\d{8}$/.test(cleanUrgence)) {
+                alert('Le numéro de contact d\'urgence doit être un numéro camerounais valide à 9 chiffres.');
+                return;
+            }
+        }
+    }
+
+    onSubmit({
+        ...formData,
+        parentContact: cleanPhone
+    });
   };
 
   const filteredClasses = classes.filter(c => c.section === formData.section);

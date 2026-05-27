@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT NOT NULL,
     full_name TEXT NOT NULL,
     role TEXT NOT NULL,
+    phone TEXT,
     assigned_classes TEXT, -- JSON string of class IDs for teachers
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

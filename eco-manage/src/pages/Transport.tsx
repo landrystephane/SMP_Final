@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Clock, Users, Shield, Radio, Activity } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Transport: React.FC = () => {
+  const { user } = useAuth();
   const [routes, setRoutes] = useState<any[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
 
   const loadData = async () => {
     if (window.electronAPI) {
-      const r = await window.electronAPI.getBusRoutes();
-      setRoutes(r);
-      if (r.length > 0) {
+      const r = await window.electronAPI.getBusRoutes(user?.schoolId);
+      setRoutes(r || []);
+      if (r && r.length > 0) {
         setSelectedRoute(r[0]);
       }
     }
@@ -22,7 +24,7 @@ const Transport: React.FC = () => {
         // In a real app, we would fetch fresh logs here
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

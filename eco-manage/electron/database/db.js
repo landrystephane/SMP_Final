@@ -51,6 +51,9 @@ function initDb() {
             console.log(`[Migration] Adding level to classes`);
             db.prepare(`ALTER TABLE classes ADD COLUMN level TEXT DEFAULT 'PRIMAIRE'`).run();
         }
+        // Harmonize class code CP1 to CP
+        db.prepare("UPDATE classes SET code = 'CP' WHERE code = 'CP1'").run();
+        console.log(`[Migration] Harmonized class code CP1 to CP`);
     } catch (e) {
         console.error(`[Migration] Classes table migration failed:`, e.message);
     }
@@ -71,7 +74,7 @@ function initDb() {
         console.error(`[Migration] Student table migration failed:`, e.message);
     }
 
-    // 5. User Table Migration: Add matricule, civility, section, gender if missing
+    // 5. User Table Migration: Add matricule, civility, section, gender, phone if missing
     try {
         const userCols = db.prepare(`PRAGMA table_info(users)`).all();
         if (!userCols.find(c => c.name === 'matricule')) {
@@ -89,6 +92,10 @@ function initDb() {
         if (!userCols.find(c => c.name === 'gender')) {
             console.log(`[Migration] Adding gender to users`);
             db.prepare(`ALTER TABLE users ADD COLUMN gender TEXT`).run();
+        }
+        if (!userCols.find(c => c.name === 'phone')) {
+            console.log(`[Migration] Adding phone to users`);
+            db.prepare(`ALTER TABLE users ADD COLUMN phone TEXT`).run();
         }
     } catch (e) {
         console.error(`[Migration] User additional columns failed:`, e.message);
@@ -167,79 +174,88 @@ function initDb() {
 
     // 8. Seed default global subjects if none exist in the database, and link them to school 1
     try {
-        // Ensure school 1 exists first to avoid FK constraint failures
-        const school = db.prepare('SELECT * FROM schools WHERE id = 1').get();
-        if (!school) {
+        const seededSetting = db.prepare("SELECT value FROM settings WHERE key = 'initial_seeding_done'").get();
+        const isSeeded = seededSetting ? seededSetting.value === 'true' : false;
+
+        // Check overall counts to avoid re-seeding school 1 if database is already in use
+        const schoolCount = db.prepare('SELECT COUNT(*) as count FROM schools').get().count;
+        const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+
+        if (!isSeeded && schoolCount === 0 && userCount === 0) {
             console.log(`[Migration] Seeding default School 1`);
             db.prepare('INSERT INTO schools (id, name, address) VALUES (1, ?, ?)').run('Complexe Scolaire Bilingue Eco-Manage', 'Yaoundé, Cameroun');
-        }
 
-        const subjectCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
-        if (subjectCount === 0) {
-            console.log(`[Migration] Seeding default subjects`);
-            const defaultSubjects = [
-                // Francophone Primaire
-                { name: 'Mathématiques', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Français (Récitation, Dictée)', domain: 'Langues et Communication', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Sciences de la Vie et de la Terre', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Histoire & Géographie', domain: 'Sciences Humaines', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Éducation Civique & Morale', domain: 'Développement Personnel', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Arts Plastiques & Musique', domain: 'Culture & Arts', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Éducation Physique & Sportive', domain: 'Bien-être', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'Anglais', domain: 'Langues et Communication', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
-                { name: 'T.I.C.', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+            const subjectCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
+            if (subjectCount === 0) {
+                console.log(`[Migration] Seeding default subjects`);
+                const defaultSubjects = [
+                    // Francophone Primaire
+                    { name: 'Mathématiques', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Français (Récitation, Dictée)', domain: 'Langues et Communication', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Sciences de la Vie et de la Terre', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Histoire & Géographie', domain: 'Sciences Humaines', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Éducation Civique & Morale', domain: 'Développement Personnel', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Arts Plastiques & Musique', domain: 'Culture & Arts', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Éducation Physique & Sportive', domain: 'Bien-être', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'Anglais', domain: 'Langues et Communication', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                    { name: 'T.I.C.', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
 
-                // Anglophone Primaire
-                { name: 'Mathematics', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'English Language', domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'General Science', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'Social Studies & History', domain: 'Human Sciences', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'Citizenship Education & Morals', domain: 'Personal Development', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'Creative Arts & Music', domain: 'Culture & Arts', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'Physical Education & Sports', domain: 'Well-being', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'French Language', domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                { name: 'I.C.T.', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    // Anglophone Primaire
+                    { name: 'Mathematics', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'English Language', domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'General Science', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'Social Studies & History', domain: 'Human Sciences', level: 'ANGLOPHONE' },
+                    { name: 'Citizenship Education & Morals', domain: 'Personal Development', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'Creative Arts & Music', domain: 'Culture & Arts', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'Physical Education & Sports', domain: 'Well-being', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'French Language', domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                    { name: 'I.C.T.', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
 
-                // Francophone Maternelle
-                { name: 'Activités Sensorielles & Cognitives', domain: 'Éveil', level: 'MATERNELLE', section: 'FRANCOPHONE' },
-                { name: 'Activités Langagières & Graphisme', domain: 'Langage & Communication', level: 'MATERNELLE', section: 'FRANCOPHONE' },
-                { name: 'Activités Physiques & Artistiques', domain: 'Culture & Mouvement', level: 'MATERNELLE', section: 'FRANCOPHONE' },
-                { name: 'Activités Socio-affectives', domain: 'Autonomie', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                    // Francophone Maternelle
+                    { name: 'Activités Sensorielles & Cognitives', domain: 'Éveil', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                    { name: 'Activités Langagières & Graphisme', domain: 'Langage & Communication', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                    { name: 'Activités Physiques & Artistiques', domain: 'Culture & Mouvement', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                    { name: 'Activités Socio-affectives', domain: 'Autonomie', level: 'MATERNELLE', section: 'FRANCOPHONE' },
 
-                // Anglophone Nursery
-                { name: 'Mathematical & Cognitive Activities', domain: 'Eveil', level: 'MATERNELLE', section: 'ANGLOPHONE' },
-                { name: 'Language & Pre-Writing Skills', domain: 'Language & Communication', level: 'MATERNELLE', section: 'ANGLOPHONE' },
-                { name: 'Physical & Creative Arts', domain: 'Culture & Movement', level: 'MATERNELLE', section: 'ANGLOPHONE' },
-                { name: 'Social & Emotional Activities', domain: 'Autonomy', level: 'MATERNELLE', section: 'ANGLOPHONE' }
-            ];
+                    // Anglophone Nursery
+                    { name: 'Mathematical & Cognitive Activities', domain: 'Eveil', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                    { name: 'Language & Pre-Writing Skills', domain: 'Language & Communication', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                    { name: 'Physical & Creative Arts', domain: 'Culture & Movement', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                    { name: 'Social & Emotional Activities', domain: 'Autonomy', level: 'MATERNELLE', section: 'ANGLOPHONE' }
+                ];
 
-            const insertSubj = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)');
-            const insertSchoolSubj = db.prepare('INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active) VALUES (1, ?, 1)');
-            
-            const subjTx = db.transaction(() => {
-                for (const s of defaultSubjects) {
-                    const res = insertSubj.run(s.name, s.domain, s.level, s.section);
-                    insertSchoolSubj.run(res.lastInsertRowid);
-                }
-            });
-            subjTx();
-            console.log(`[Migration] Seeded default subjects`);
-        } else {
-            // Check if existing subjects are linked to School 1, if not link them active
-            const unlinked = db.prepare(`
-                SELECT s.id FROM subjects s
-                LEFT JOIN school_subjects ss ON s.id = ss.subject_id AND ss.school_id = 1
-                WHERE ss.subject_id IS NULL
-            `).all();
-            if (unlinked.length > 0) {
+                const insertSubj = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)');
                 const insertSchoolSubj = db.prepare('INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active) VALUES (1, ?, 1)');
-                const linkTx = db.transaction(() => {
-                    for (const row of unlinked) {
-                        insertSchoolSubj.run(row.id);
+                
+                const subjTx = db.transaction(() => {
+                    for (const s of defaultSubjects) {
+                        const res = insertSubj.run(s.name, s.domain, s.level, s.section);
+                        insertSchoolSubj.run(res.lastInsertRowid);
                     }
                 });
-                linkTx();
-                console.log(`[Migration] Auto-linked ${unlinked.length} unlinked subjects to School 1`);
+                subjTx();
+                console.log(`[Migration] Seeded default subjects`);
+            }
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seeding_done', 'true')").run();
+        } else {
+            // Check if existing subjects are linked to School 1, if not link them active
+            const schoolCount = db.prepare('SELECT COUNT(*) as count FROM schools WHERE id = 1 AND deleted_at IS NULL').get().count;
+            if (schoolCount > 0) {
+                const unlinked = db.prepare(`
+                    SELECT s.id FROM subjects s
+                    LEFT JOIN school_subjects ss ON s.id = ss.subject_id AND ss.school_id = 1
+                    WHERE ss.subject_id IS NULL
+                `).all();
+                if (unlinked.length > 0) {
+                    const insertSchoolSubj = db.prepare('INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active) VALUES (1, ?, 1)');
+                    const linkTx = db.transaction(() => {
+                        for (const row of unlinked) {
+                            insertSchoolSubj.run(row.id);
+                        }
+                    });
+                    linkTx();
+                    console.log(`[Migration] Auto-linked ${unlinked.length} unlinked subjects to School 1`);
+                }
             }
         }
     } catch (e) {

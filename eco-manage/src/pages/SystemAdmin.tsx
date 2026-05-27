@@ -115,8 +115,25 @@ const SystemAdmin: React.FC = () => {
 
   const handleAddSchool = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!newSchool.name.trim() || !newSchool.address.trim()) {
+          alert("Le nom et l'adresse de l'établissement sont requis.");
+          return;
+      }
+
+      let cleanPhone = newSchool.contact_phone.replace(/[\s\-\(\)\+]/g, '');
+      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
+          cleanPhone = cleanPhone.slice(3);
+      }
+      if (cleanPhone && !/^(2|6)\d{8}$/.test(cleanPhone)) {
+          alert('Numéro de téléphone invalide. Veuillez renseigner un numéro camerounais à 9 chiffres commençant par 2 ou 6 (ex: 699000000).');
+          return;
+      }
+
       if (window.electronAPI) {
-          await window.electronAPI.addSchool(newSchool);
+          await window.electronAPI.addSchool({
+              ...newSchool,
+              contact_phone: cleanPhone
+          });
           setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
           setIsAdding(false);
           loadSchools();
@@ -212,6 +229,16 @@ const SystemAdmin: React.FC = () => {
 
   const handleSaveMetadata = async () => {
       if (!selectedSchool || !window.electronAPI) return;
+
+      let cleanPhone = editSchoolPhone.replace(/[\s\-\(\)\+]/g, '');
+      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
+          cleanPhone = cleanPhone.slice(3);
+      }
+      if (cleanPhone && !/^(2|6)\d{8}$/.test(cleanPhone)) {
+          alert('Numéro de téléphone de contact invalide. Veuillez renseigner un numéro camerounais à 9 chiffres commençant par 2 ou 6 (ex: 699000000).');
+          return;
+      }
+
       try {
           const res = await window.electronAPI.updateSchoolSettings({
               id: selectedSchool.id,
@@ -220,7 +247,7 @@ const SystemAdmin: React.FC = () => {
               address: editSchoolAddress,
               bp: editSchoolBp,
               contact_email: editSchoolEmail,
-              contact_phone: editSchoolPhone,
+              contact_phone: cleanPhone,
               primary_color: selectedSchool.primary_color || '#1e293b',
               secondary_color: selectedSchool.secondary_color || '#f59e0b',
               receipt_sig_title: selectedSchool.receipt_sig_title || "Signature de l'Économe",
@@ -245,7 +272,7 @@ const SystemAdmin: React.FC = () => {
               address: editSchoolAddress,
               bp: editSchoolBp,
               contact_email: editSchoolEmail,
-              contact_phone: editSchoolPhone
+              contact_phone: cleanPhone
           };
           setSelectedSchool(updatedSchool);
           setIsEditingMetadata(false);
@@ -457,19 +484,19 @@ const SystemAdmin: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                     <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
                   </div>
-                  <div className="pt-4 flex flex-wrap gap-3">
+                  <div className="pt-4 grid grid-cols-2 gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}
-                      className="flex-1 py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
                     >
-                      <Settings className="w-3.5 h-3.5" /> Config
+                      <Settings className="w-3.5 h-3.5 text-amber-500" /> Config
                     </button>
                     <button
                       onClick={async () => {
                           await switchSchool(s.id);
                           navigate('/');
                       }}
-                      className="flex-1 py-3 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
                     >
                       <ExternalLink className="w-3.5 h-3.5" /> Access
                     </button>
@@ -481,12 +508,15 @@ const SystemAdmin: React.FC = () => {
                               loadSchools();
                           }
                       }}
-                      className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border ${s.is_active !== 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950'}`}
+                      className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border ${s.is_active !== 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950'}`}
                     >
                       {s.is_active !== 0 ? 'Suspendre' : 'Activer'}
                     </button>
-                    <button onClick={() => handleDeleteSchool(s.id, s.name)} className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
-                      <Trash2 className="w-4 h-4" />
+                    <button 
+                      onClick={() => handleDeleteSchool(s.id, s.name)} 
+                      className="w-full py-3 bg-rose-500/10 hover:bg-rose-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-rose-400 hover:text-white border border-rose-500/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Supprimer
                     </button>
                   </div>
                 </div>
