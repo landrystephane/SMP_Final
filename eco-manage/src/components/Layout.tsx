@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, Settings, GraduationCap, Building2, Calendar, Bus, HeartHandshake, TrendingUp, Palette, Archive } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, Settings, GraduationCap, Building2, Calendar, Bus, HeartHandshake, TrendingUp, Palette, Archive, Menu, X } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -11,6 +11,7 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
 
   const [schoolName, setSchoolName] = useState('Eco-Manage');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const loadActiveSchool = async () => {
@@ -22,9 +23,19 @@ const Layout: React.FC = () => {
         try {
           const schools = await window.electronAPI.getSchools();
           const currentSchool = schools.find((s: any) => s.id === user.schoolId);
-          if (currentSchool && currentSchool.name) {
+          if (currentSchool) {
+            if (currentSchool.is_active === 0 && user.role !== 'SUPERADMIN') {
+              alert("L'accès de votre établissement a été suspendu par l'administrateur.");
+              handleLogout();
+              return;
+            }
             setSchoolName(currentSchool.name);
           } else {
+            if (user.schoolId && user.role !== 'SUPERADMIN') {
+              alert("Cet établissement a été supprimé ou désactivé. Accès déconnecté.");
+              handleLogout();
+              return;
+            }
             setSchoolName('Eco-Manage');
           }
         } catch (e) {
@@ -70,17 +81,53 @@ const Layout: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 overflow-hidden">
+      {/* Mobile Header Bar */}
+      <header className="md:hidden bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between z-40">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-amber-500 rounded-xl">
+            <GraduationCap className="w-5 h-5 text-slate-950" />
+          </div>
+          <h2 className="text-sm font-black text-white leading-none tracking-tight truncate max-w-[180px]">{schoolName}</h2>
+        </div>
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      </header>
+
+      {/* Sidebar Mobile Backdrop */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[45] md:hidden animate-in fade-in duration-200"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-full md:w-72 bg-slate-900/40 border-r border-white/5 flex flex-col z-50 flex-shrink-0">
+      <aside
+        className={`fixed md:relative inset-y-0 left-0 w-72 bg-slate-900 md:bg-slate-900/40 border-r border-white/5 flex flex-col z-50 transform transition-transform duration-300 md:translate-x-0 ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:flex-shrink-0`}
+      >
         <div className="p-8">
-          <div className="flex items-center space-x-4 mb-10">
-            <div className="p-3 bg-amber-500 rounded-2xl shadow-2xl shadow-amber-500/20">
-                <GraduationCap className="w-8 h-8 text-slate-950" />
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center space-x-4 min-w-0 flex-1">
+              <div className="p-3 bg-amber-500 rounded-2xl shadow-2xl shadow-amber-500/20">
+                  <GraduationCap className="w-8 h-8 text-slate-950" />
+              </div>
+              <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-black text-white leading-none tracking-tight truncate" title={schoolName}>{schoolName}</h2>
+                  <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest mt-1 opacity-80">{t(`role_${user?.role}`)}</p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-black text-white leading-none tracking-tight truncate" title={schoolName}>{schoolName}</h2>
-                <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest mt-1 opacity-80">{t(`role_${user?.role}`)}</p>
-            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden p-2 bg-white/5 rounded-xl text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <LanguageSwitcher />
         </div>
@@ -93,6 +140,7 @@ const Layout: React.FC = () => {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={() => setIsSidebarOpen(false)}
               className={({ isActive }) =>
                 `flex items-center px-5 py-3.5 rounded-2xl transition-all text-xs font-black uppercase tracking-widest border border-transparent ${
                   isActive
@@ -109,7 +157,7 @@ const Layout: React.FC = () => {
 
         <div className="p-6 border-t border-white/5 bg-slate-900/20">
           <button
-            onClick={handleLogout}
+            onClick={() => { setIsSidebarOpen(false); handleLogout(); }}
             className="flex items-center w-full px-5 py-4 text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 rounded-2xl transition-all text-xs font-black uppercase tracking-widest"
           >
             <LogOut className="w-5 h-5 mr-4" />

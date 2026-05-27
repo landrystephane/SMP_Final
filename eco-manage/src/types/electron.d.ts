@@ -1,5 +1,8 @@
 export interface ElectronAPI {
   login: (credentials: any) => Promise<any>;
+  logout: () => Promise<any>;
+  switchSchool: (schoolId: number) => Promise<any>;
+  restoreSession: (user: any) => Promise<any>;
   getStudents: (schoolId?: number) => Promise<any[]>;
   getParentStudents: (parentPhone: string) => Promise<any[]>;
   addStudent: (student: any) => Promise<any>;
@@ -33,8 +36,13 @@ export interface ElectronAPI {
   saveAttendance: (data: any) => Promise<any>;
   getAttendance: (data: { classId?: number, date?: string, studentId?: number, term?: number }) => Promise<any>;
   getSchools: () => Promise<any[]>;
+  getDeletedSchools: () => Promise<any[]>;
   addSchool: (school: any) => Promise<any>;
   updateSchool: (school: any) => Promise<any>;
+  deleteSchool: (data: { id: number, password: string }) => Promise<any>;
+  restoreSchool: (id: number) => Promise<any>;
+  permanentlyDeleteSchool: (data: { id: number, password: string }) => Promise<any>;
+  toggleSchoolStatus: (data: { id: number, isActive: boolean }) => Promise<any>;
   getGlobalSubjects: () => Promise<any[]>;
   addGlobalSubject: (subject: any) => Promise<any>;
   deleteGlobalSubject: (id: number) => Promise<any>;

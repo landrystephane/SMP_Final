@@ -10,8 +10,9 @@ import { useNavigate } from 'react-router-dom';
 const SystemAdmin: React.FC = () => {
   const { user, switchSchool } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH'>('INSTANCES');
+  const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH' | 'TRASH'>('INSTANCES');
   const [schools, setSchools] = useState<any[]>([]);
+  const [deletedSchools, setDeletedSchools] = useState<any[]>([]);
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
   const [schoolSubjects, setSchoolSubjects] = useState<number[]>([]);
@@ -21,6 +22,16 @@ const SystemAdmin: React.FC = () => {
   const [isAddingFounder, setIsAddingFounder] = useState(false);
   const [errorLogs, setErrorLogs] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+
+  // Password confirmation state
+  const [confirmPasswordModal, setConfirmPasswordModal] = useState<{
+      isOpen: boolean;
+      title: string;
+      description: string;
+      onConfirm: (password: string) => void;
+  }>({ isOpen: false, title: '', description: '', onConfirm: () => {} });
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   // School metadata editing states
   const [editSchoolName, setEditSchoolName] = useState('');
@@ -48,6 +59,13 @@ const SystemAdmin: React.FC = () => {
     }
   };
 
+  const loadDeletedSchools = async () => {
+    if (window.electronAPI && window.electronAPI.getDeletedSchools) {
+      const data = await window.electronAPI.getDeletedSchools();
+      setDeletedSchools(data || []);
+    }
+  };
+
   const loadGlobalSubjects = async () => {
     if (window.electronAPI) {
         const data = await window.electronAPI.getGlobalSubjects();
@@ -58,6 +76,7 @@ const SystemAdmin: React.FC = () => {
   useEffect(() => {
     loadSchools();
     loadGlobalSubjects();
+    loadDeletedSchools();
   }, []);
 
   const loadErrorLogs = async () => {
@@ -89,6 +108,8 @@ const SystemAdmin: React.FC = () => {
   useEffect(() => {
       if (activeTab === 'HEALTH') {
           loadErrorLogs();
+      } else if (activeTab === 'TRASH') {
+          loadDeletedSchools();
       }
   }, [activeTab]);
 
@@ -247,20 +268,55 @@ const SystemAdmin: React.FC = () => {
       }
   }
 
-  const handleDeleteSchool = async (id: number) => {
-      if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement cette école ? Cette action est irréversible.")) return;
-      if (window.electronAPI) {
-          try {
-              const res = await window.electronAPI.deleteSchool(id);
-              if (res && res.error) {
-                  alert("Erreur lors de la suppression de l'établissement : " + res.error);
-              } else {
-                  loadSchools();
+  const handleDeleteSchool = (id: number, name: string) => {
+      setConfirmPasswordInput('');
+      setConfirmPasswordError('');
+      setConfirmPasswordModal({
+          isOpen: true,
+          title: "Supprimer l'école",
+          description: `Veuillez confirmer la mise à la corbeille de l'établissement "${name}". Ses utilisateurs n'auront plus accès à l'application.`,
+          onConfirm: async (password) => {
+              if (window.electronAPI) {
+                  try {
+                      const res = await window.electronAPI.deleteSchool({ id, password });
+                      if (res && res.error) {
+                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect.' : res.error);
+                      } else {
+                          setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
+                          loadSchools();
+                          loadDeletedSchools();
+                      }
+                  } catch (err: any) {
+                      setConfirmPasswordError(err.message);
+                  }
               }
-          } catch (err: any) {
-              alert(err.message);
           }
-      }
+      });
+  };
+
+  const handlePermanentlyDeleteSchool = (id: number, name: string) => {
+      setConfirmPasswordInput('');
+      setConfirmPasswordError('');
+      setConfirmPasswordModal({
+          isOpen: true,
+          title: "Suppression Définitive",
+          description: `ATTENTION : Vous êtes sur le point de détruire DEFINITIVEMENT l'établissement "${name}" ainsi que toutes ses dépendances (élèves, classes, paiements, notes, enseignants, historiques). Cette action est irréversible !`,
+          onConfirm: async (password) => {
+              if (window.electronAPI && window.electronAPI.permanentlyDeleteSchool) {
+                  try {
+                      const res = await window.electronAPI.permanentlyDeleteSchool({ id, password });
+                      if (res && res.error) {
+                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect.' : res.error);
+                      } else {
+                          setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
+                          loadDeletedSchools();
+                      }
+                  } catch (err: any) {
+                      setConfirmPasswordError(err.message);
+                  }
+              }
+          }
+      });
   };
 
   const handleDeleteSubject = async (id: number) => {
@@ -299,15 +355,16 @@ const SystemAdmin: React.FC = () => {
             <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">System Core v2.4.0</div>
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <h1 className="text-6xl font-black text-white tracking-tighter italic">ECO-HUB <span className="text-amber-500">ROOT</span></h1>
+          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter italic">ECO-HUB <span className="text-amber-500">ROOT</span></h1>
           <p className="text-slate-500 mt-2 uppercase text-[10px] font-black tracking-[0.4em]">Infrastructure Management & Fleet Monitoring</p>
         </div>
 
-        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+        <div className="flex flex-wrap bg-slate-900 p-1.5 rounded-2xl border border-white/5 shadow-2xl gap-1">
             {[
               { id: 'INSTANCES', label: 'Instances', icon: Server },
               { id: 'REGISTRY', label: 'Global Registry', icon: Database },
-              { id: 'HEALTH', label: 'Status', icon: Activity }
+              { id: 'HEALTH', label: 'Status', icon: Activity },
+              { id: 'TRASH', label: 'Corbeille', icon: Trash2 }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -384,8 +441,13 @@ const SystemAdmin: React.FC = () => {
                       <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-1">ID: HUB-SC-{s.id.toString().padStart(3, '0')}</p>
                     </div>
                   </div>
-                  <div className="p-2 bg-emerald-500/10 rounded-lg">
-                    <Activity className="w-4 h-4 text-emerald-500" />
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg">
+                      <Activity className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${s.is_active !== 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                        {s.is_active !== 0 ? 'Actif' : 'Suspendu'}
+                    </span>
                   </div>
                 </div>
                 <div className="p-8 space-y-4">
@@ -395,7 +457,7 @@ const SystemAdmin: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                     <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
                   </div>
-                  <div className="pt-4 flex gap-3">
+                  <div className="pt-4 flex flex-wrap gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}
                       className="flex-1 py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
@@ -411,7 +473,19 @@ const SystemAdmin: React.FC = () => {
                     >
                       <ExternalLink className="w-3.5 h-3.5" /> Access
                     </button>
-                    <button onClick={() => handleDeleteSchool(s.id)} className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
+                    <button
+                      onClick={async () => {
+                          const nextActive = s.is_active === 0 ? 1 : 0;
+                          if (window.electronAPI && (window.electronAPI as any).toggleSchoolStatus) {
+                              await (window.electronAPI as any).toggleSchoolStatus({ id: s.id, isActive: nextActive });
+                              loadSchools();
+                          }
+                      }}
+                      className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border ${s.is_active !== 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950'}`}
+                    >
+                      {s.is_active !== 0 ? 'Suspendre' : 'Activer'}
+                    </button>
+                    <button onClick={() => handleDeleteSchool(s.id, s.name)} className="p-3 bg-white/5 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -542,6 +616,82 @@ const SystemAdmin: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'TRASH' && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div>
+            <h2 className="text-3xl font-black text-white tracking-tighter italic">Corbeille des Établissements</h2>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2">
+              Récupérez les instances d'écoles supprimées. Elles disparaitront après 30 jours si vous ne faites pas de récupération.
+            </p>
+          </div>
+
+          {deletedSchools.length === 0 ? (
+            <div className="text-center py-20 bg-slate-900/30 border-2 border-dashed border-white/5 rounded-3xl text-slate-500">
+              <Trash2 className="w-12 h-12 mx-auto mb-4 text-slate-600 opacity-50" />
+              <p className="font-black uppercase text-xs tracking-widest">La corbeille est vide</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {deletedSchools.map(s => {
+                  const deletedDate = s.deleted_at ? new Date(s.deleted_at) : new Date();
+                  const expireDate = new Date(deletedDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                  const diffTime = expireDate.getTime() - new Date().getTime();
+                  const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+                  return (
+                    <div key={s.id} className="glass-card group border-rose-500/10 hover:border-rose-500/30 bg-slate-900/50 p-0 overflow-hidden">
+                      <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
+                        <div className="flex items-center gap-5">
+                          <div className="w-14 h-14 rounded-2xl bg-rose-950 border border-rose-800 text-rose-400 flex items-center justify-center text-2xl font-black shadow-lg">
+                            {s.name.charAt(0)}
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-white uppercase tracking-tight">{s.name}</h3>
+                            <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-1">ID: HUB-SC-{s.id.toString().padStart(3, '0')}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-8 space-y-4">
+                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
+                          Suppression automatique dans {diffDays} {diffDays > 1 ? 'jours' : 'jour'}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
+                          <MapPin className="w-4 h-4 text-slate-600" /> {s.address}
+                        </div>
+                        <div className="pt-4 flex gap-3">
+                          <button
+                            onClick={async () => {
+                              if (window.electronAPI && (window.electronAPI as any).restoreSchool) {
+                                  try {
+                                      await (window.electronAPI as any).restoreSchool(s.id);
+                                      loadSchools();
+                                      loadDeletedSchools();
+                                      alert(`L'établissement "${s.name}" a été restauré avec succès !`);
+                                  } catch (err: any) {
+                                      alert("Erreur de restauration: " + err.message);
+                                  }
+                              }
+                            }}
+                            className="flex-1 py-3 bg-emerald-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
+                          >
+                            Restaurer
+                          </button>
+                          <button
+                            onClick={() => handlePermanentlyDeleteSchool(s.id, s.name)}
+                            className="flex-1 py-3 bg-rose-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all flex items-center justify-center gap-2"
+                          >
+                            Détruire
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -829,18 +979,18 @@ const SystemAdmin: React.FC = () => {
 
       {/* Add School Modal */}
       {isAdding && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-2xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
-                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Déployer un Nouvel Établissement</h2>
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-2xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+                  <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
+                      <h2 className="text-2xl md:text-4xl font-black text-white tracking-tighter uppercase italic">Déployer un Nouvel Établissement</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Création d'une nouvelle instance d'école isolée dans la base de données</p>
                   </div>
-                  <form onSubmit={handleAddSchool} className="p-10 space-y-8">
+                  <form onSubmit={handleAddSchool} className="p-6 md:p-10 space-y-6 md:space-y-8 overflow-y-auto flex-1">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet de l'Établissement</label>
                           <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Groupe Scolaire Bilingue..." />
                       </div>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ville / Quartier</label>
                             <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Douala, Bonamoussadi" />
@@ -850,7 +1000,7 @@ const SystemAdmin: React.FC = () => {
                             <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="BP 450..." />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Email de Contact</label>
                             <input type="email" className="input-field w-full" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
@@ -873,13 +1023,13 @@ const SystemAdmin: React.FC = () => {
 
       {/* Add Founder Modal */}
       {isAddingFounder && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-md bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
-                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Créer le Fondateur</h2>
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+                  <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
+                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic">Créer le Fondateur</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Propriétaire principal pour {selectedSchool?.name}</p>
                   </div>
-                  <form onSubmit={handleAddFounder} className="p-10 space-y-6">
+                  <form onSubmit={handleAddFounder} className="p-6 md:p-10 space-y-6 overflow-y-auto flex-1">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet</label>
                           <input required className="input-field w-full" value={newFounder.fullName} onChange={e => setNewFounder({...newFounder, fullName: e.target.value})} placeholder="John Doe" />
@@ -903,18 +1053,18 @@ const SystemAdmin: React.FC = () => {
 
       {/* Add Subject Modal */}
       {isAddingSubject && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-xl bg-slate-900 border-white/10 shadow-2xl p-0 overflow-hidden">
-                  <div className="p-10 border-b border-white/5 bg-slate-900/50">
-                      <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Ajouter une Matière Globale</h2>
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+                  <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
+                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Ajouter une Matière Globale</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Ajouter un nouveau module d'enseignement au registre général</p>
                   </div>
-                  <form onSubmit={handleAddSubject} className="p-10 space-y-6">
+                  <form onSubmit={handleAddSubject} className="p-6 md:p-10 space-y-6 overflow-y-auto flex-1">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la Matière</label>
                           <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
                             <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
@@ -943,6 +1093,63 @@ const SystemAdmin: React.FC = () => {
                       <div className="pt-8 flex gap-4">
                           <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
                           <button type="submit" className="btn-primary flex-[2] py-4">ENREGISTRER LA MATIÈRE</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Password Confirmation Modal */}
+      {confirmPasswordModal.isOpen && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[300] p-4 md:p-6 animate-in zoom-in-95 duration-300">
+              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+                  <div className="p-6 md:p-8 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
+                      <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic text-rose-500">{confirmPasswordModal.title}</h2>
+                      <p className="text-slate-400 text-xs font-bold mt-2 leading-relaxed">{confirmPasswordModal.description}</p>
+                  </div>
+                  <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!confirmPasswordInput.trim()) return;
+                      confirmPasswordModal.onConfirm(confirmPasswordInput);
+                  }} className="p-6 md:p-8 space-y-6 overflow-y-auto flex-1">
+                      {confirmPasswordError && (
+                          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-xs font-bold uppercase tracking-wide">
+                              {confirmPasswordError}
+                          </div>
+                      )}
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Saisir votre mot de passe Admin</label>
+                          <input
+                              required
+                              type="password"
+                              className="input-field w-full font-mono text-center text-lg"
+                              value={confirmPasswordInput}
+                              onChange={e => {
+                                  setConfirmPasswordInput(e.target.value);
+                                  setConfirmPasswordError('');
+                              }}
+                              placeholder="••••••••"
+                              autoFocus
+                          />
+                      </div>
+                      <div className="flex gap-4 pt-4">
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  setConfirmPasswordModal({ ...confirmPasswordModal, isOpen: false });
+                                  setConfirmPasswordInput('');
+                                  setConfirmPasswordError('');
+                              }}
+                              className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all"
+                          >
+                              Annuler
+                          </button>
+                          <button
+                              type="submit"
+                              className="btn-primary flex-[2] py-4 bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/10"
+                          >
+                              CONFIRMER
+                          </button>
                       </div>
                   </form>
               </div>

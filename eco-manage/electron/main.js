@@ -12,9 +12,49 @@ let loggedInUser = null;
 function getActiveSchoolId(schoolId) {
   if (schoolId && schoolId !== 0) return Number(schoolId);
   if (loggedInUser && loggedInUser.schoolId) return Number(loggedInUser.schoolId);
+  
+  try {
+    const firstSchool = db.prepare('SELECT id FROM schools WHERE deleted_at IS NULL ORDER BY id ASC LIMIT 1').get();
+    if (firstSchool) return firstSchool.id;
+  } catch (e) {
+    console.error("Error fetching fallback school:", e.message);
+  }
   return 1;
 }
 
+function permanentlyDeleteSchool(schoolId) {
+  const deleteSchoolTx = db.transaction((id) => {
+      // 1. Delete grandchild records referencing route_id (from bus_routes)
+      db.prepare('DELETE FROM transport_points WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM transport_logs WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(id);
+
+      // 2. Delete grandchild records referencing class_id (from classes)
+      db.prepare('DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM tuition_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
+
+      // 3. Delete grandchild records referencing user_id (from users)
+      db.prepare('DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)').run(id);
+
+      // 4. Delete child records directly containing school_id or referencing students/users/classes
+      db.prepare('DELETE FROM grades WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM payments WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM schedules WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM tickets WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM announcements WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM bus_routes WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM students WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM classes WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM school_subjects WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM users WHERE school_id = ? AND role != "SUPERADMIN"').run(id);
+      db.prepare('DELETE FROM school_year_archives WHERE school_id = ?').run(id);
+
+      // 5. Finally delete the school
+      return db.prepare('DELETE FROM schools WHERE id = ?').run(id);
+  });
+  deleteSchoolTx(schoolId);
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -36,6 +76,17 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDb();
+
+  // Automatic clean up of soft-deleted schools older than 30 days
+  try {
+    const expiredSchools = db.prepare("SELECT id FROM schools WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')").all();
+    for (const school of expiredSchools) {
+        console.log(`[CleanUp] Permanently deleting expired school ID: ${school.id}`);
+        permanentlyDeleteSchool(school.id);
+    }
+  } catch (err) {
+      console.error('Failed to run automatic cleanup of deleted schools:', err);
+  }
   startApiServer();
 
   // Seed initial school
@@ -190,10 +241,28 @@ handleIPC('db:clearErrorLogs', async () => {
 });
 
 // Auth
+handleIPC('auth:restoreSession', async (event, user) => {
+    loggedInUser = user;
+    return true;
+});
+
 handleIPC('auth:login', async (event, { username, password }) => {
   const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR matricule = ?').get(username, username);
   
   if (!user) return null;
+
+  // Block login if school is deleted or suspended
+  if (user.role !== 'SUPERADMIN') {
+      const school = db.prepare('SELECT deleted_at, is_active FROM schools WHERE id = ?').get(user.schoolId);
+      if (school) {
+          if (school.deleted_at !== null) {
+              throw new Error("Cet établissement a été supprimé. Accès refusé.");
+          }
+          if (school.is_active === 0) {
+              throw new Error("L'accès de cet établissement a été temporairement suspendu. Veuillez contacter l'administrateur.");
+          }
+      }
+  }
 
   // Fallback for existing SHA256 passwords
   let isValid = false;
@@ -232,7 +301,12 @@ handleIPC('auth:switchSchool', async (event, schoolId) => {
 
 // System Admin
 handleIPC('db:getSchools', async () => {
-    return db.prepare('SELECT * FROM schools').all();
+    return db.prepare('SELECT * FROM schools WHERE deleted_at IS NULL').all();
+});
+
+handleIPC('db:getDeletedSchools', async () => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    return db.prepare('SELECT * FROM schools WHERE deleted_at IS NOT NULL').all();
 });
 
 handleIPC('db:addSchool', async (event, school) => {
@@ -283,41 +357,43 @@ handleIPC('db:updateSchool', async (event, school) => {
         .run(name, address, contact_email, contact_phone, bp, motto, id);
 });
 
-handleIPC('db:deleteSchool', async (event, id) => {
+handleIPC('db:deleteSchool', async (event, { id, password }) => {
     if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     
-    const deleteSchoolTx = db.transaction((schoolId) => {
-        // 1. Delete grandchild records referencing route_id (from bus_routes)
-        db.prepare('DELETE FROM transport_points WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(schoolId);
-        db.prepare('DELETE FROM transport_logs WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)').run(schoolId);
+    // Verify password
+    const superadmin = db.prepare('SELECT password FROM users WHERE id = ?').get(loggedInUser.id);
+    if (!superadmin || !bcrypt.compareSync(password, superadmin.password)) {
+        return { error: 'Mot de passe incorrect' };
+    }
 
-        // 2. Delete grandchild records referencing class_id (from classes)
-        db.prepare('DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
-        db.prepare('DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
-        db.prepare('DELETE FROM tuition_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(schoolId);
+    // Soft delete
+    db.prepare("UPDATE schools SET deleted_at = datetime('now') WHERE id = ?").run(id);
+    return { success: true };
+});
 
-        // 3. Delete grandchild records referencing user_id (from users)
-        db.prepare('DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)').run(schoolId);
+handleIPC('db:restoreSchool', async (event, id) => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    db.prepare("UPDATE schools SET deleted_at = NULL WHERE id = ?").run(id);
+    return { success: true };
+});
 
-        // 4. Delete child records directly containing school_id or referencing students/users/classes
-        db.prepare('DELETE FROM grades WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM payments WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(schoolId);
-        db.prepare('DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(schoolId);
-        db.prepare('DELETE FROM schedules WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM tickets WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM announcements WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM bus_routes WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM students WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM classes WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM school_subjects WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM users WHERE school_id = ?').run(schoolId);
-        db.prepare('DELETE FROM school_year_archives WHERE school_id = ?').run(schoolId);
+handleIPC('db:permanentlyDeleteSchool', async (event, { id, password }) => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    
+    // Verify password
+    const superadmin = db.prepare('SELECT password FROM users WHERE id = ?').get(loggedInUser.id);
+    if (!superadmin || !bcrypt.compareSync(password, superadmin.password)) {
+        return { error: 'Mot de passe incorrect' };
+    }
 
-        // 5. Finally delete the school
-        return db.prepare('DELETE FROM schools WHERE id = ?').run(schoolId);
-    });
+    permanentlyDeleteSchool(id);
+    return { success: true };
+});
 
-    return deleteSchoolTx(id);
+handleIPC('db:toggleSchoolStatus', async (event, { id, isActive }) => {
+    if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
+    db.prepare('UPDATE schools SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, id);
+    return { success: true };
 });
 
 // Students
@@ -509,7 +585,7 @@ handleIPC('db:deletePayment', async (event, id) => {
 });
 
 handleIPC('db:getTuitionFees', async (event, schoolId) => {
-  const sid = schoolId || 1;
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
     SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee
     FROM classes c
@@ -523,7 +599,7 @@ handleIPC('db:getInstallments', async () => {
 });
 
 handleIPC('db:getClassInstallmentFees', async (event, schoolId) => {
-    const sid = schoolId || 1;
+    const sid = getActiveSchoolId(schoolId);
     return db.prepare('SELECT cif.* FROM class_installment_fees cif JOIN classes c ON cif.class_id = c.id WHERE c.school_id = ?').all(sid);
 });
 
@@ -565,7 +641,7 @@ handleIPC('db:deleteGlobalSubject', async (event, id) => {
 });
 
 handleIPC('db:getSchoolSubjects', async (event, schoolId) => {
-  const sid = schoolId || 1;
+  const sid = getActiveSchoolId(schoolId);
   // Use LEFT JOIN to ensure we see all subjects even if not yet mapped to this school
   return db.prepare(`
     SELECT s.*, COALESCE(ss.is_active, 0) as is_active
@@ -623,18 +699,18 @@ handleIPC('db:removeSubjectFromClass', async (event, { classId, subjectId }) => 
 });
 
 handleIPC('db:getClasses', async (event, schoolId) => {
-  const sid = schoolId || (loggedInUser ? loggedInUser.schoolId : 1);
+  const sid = getActiveSchoolId(schoolId);
   return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:getSchedules', async (event, schoolId) => {
-    const sid = schoolId || 1;
+    const sid = getActiveSchoolId(schoolId);
     return db.prepare('SELECT * FROM schedules WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:updateSchedule', async (event, schedule) => {
     const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id } = schedule;
-    const sid = school_id || 1;
+    const sid = getActiveSchoolId(school_id);
     if (id) {
         return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, id);
     } else {
@@ -644,7 +720,7 @@ handleIPC('db:updateSchedule', async (event, schedule) => {
 
 // Transport
 handleIPC('db:getBusRoutes', async (event, schoolId) => {
-    const sid = schoolId || 1;
+    const sid = getActiveSchoolId(schoolId);
     return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(sid);
 });
 
@@ -852,7 +928,7 @@ handleIPC('db:updateStudent', async (event, student) => {
           if (!existingParent) {
               const hash = bcrypt.hashSync(parentUsername, 10);
               db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
-                .run(parentUsername, hash, studentInDb.parent_name || 'Parent', 'PARENT', studentInDb.school_id || 1);
+                .run(parentUsername, hash, studentInDb.parent_name || 'Parent', 'PARENT', studentInDb.school_id || getActiveSchoolId());
           }
       }
   }
@@ -860,7 +936,7 @@ handleIPC('db:updateStudent', async (event, student) => {
 });
 
 handleIPC('db:getDashboardStats', async (event, params) => {
-  const schoolId = (params && params.schoolId) ? params.schoolId : 1;
+  const schoolId = getActiveSchoolId(params ? params.schoolId : null);
   const section = (params && params.section) ? params.section : null;
   const level = (params && params.level) ? params.level : null;
 
@@ -1005,12 +1081,12 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
 
 // Yearly Archiving & Backups
 handleIPC('db:getSchoolArchives', async (event, schoolId) => {
-    const sid = schoolId || 1;
+    const sid = getActiveSchoolId(schoolId);
     return db.prepare('SELECT * FROM school_year_archives WHERE school_id = ? ORDER BY created_at DESC').all(sid);
 });
 
 handleIPC('db:createSchoolYearArchive', async (event, { schoolId, yearName }) => {
-    const sid = schoolId || 1;
+    const sid = getActiveSchoolId(schoolId);
     const totalStudents = db.prepare('SELECT COUNT(*) as count FROM students WHERE school_id = ?').get(sid).count;
     const totalRevenue = db.prepare(`
         SELECT SUM(p.amount) as total

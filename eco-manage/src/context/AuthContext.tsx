@@ -31,6 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  useEffect(() => {
+    if (user && window.electronAPI) {
+      window.electronAPI.restoreSession(user).catch(err => {
+        console.error("Failed to restore main process session:", err);
+      });
+    }
+  }, [user]);
+
   const login = async (username: string, password: string) => {
     if (window.electronAPI) {
         try {

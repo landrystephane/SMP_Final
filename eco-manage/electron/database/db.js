@@ -130,6 +130,21 @@ function initDb() {
         console.error(`[Migration] Grades validation column migration failed:`, e.message);
     }
 
+    // 6.6. Schools Table Migration: Add deleted_at and is_active if missing
+    try {
+        const schoolCols = db.prepare(`PRAGMA table_info(schools)`).all();
+        if (!schoolCols.find(c => c.name === 'deleted_at')) {
+            console.log(`[Migration] Adding deleted_at to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN deleted_at TEXT DEFAULT NULL`).run();
+        }
+        if (!schoolCols.find(c => c.name === 'is_active')) {
+            console.log(`[Migration] Adding is_active to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN is_active INTEGER DEFAULT 1`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Schools deletion and active columns migration failed:`, e.message);
+    }
+
     // 7. Archives Table Migration
     try {
         db.exec(`

@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
   logout: () => ipcRenderer.invoke('auth:logout'),
   switchSchool: (schoolId) => ipcRenderer.invoke('auth:switchSchool', schoolId),
+  restoreSession: (user) => ipcRenderer.invoke('auth:restoreSession', user),
 
   // Students
   getStudents: (schoolId) => ipcRenderer.invoke('db:getStudents', schoolId),
@@ -75,8 +76,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateMobileKey: (data) => ipcRenderer.invoke('db:generateMobileKey', data),
   revokeMobileKey: (id) => ipcRenderer.invoke('db:revokeMobileKey', id),
   getSchools: () => ipcRenderer.invoke('db:getSchools'),
+  getDeletedSchools: () => ipcRenderer.invoke('db:getDeletedSchools'),
   addSchool: (school) => ipcRenderer.invoke('db:addSchool', school),
-  deleteSchool: (id) => ipcRenderer.invoke('db:deleteSchool', id),
+  deleteSchool: (data) => ipcRenderer.invoke('db:deleteSchool', data),
+  restoreSchool: (id) => ipcRenderer.invoke('db:restoreSchool', id),
+  permanentlyDeleteSchool: (data) => ipcRenderer.invoke('db:permanentlyDeleteSchool', data),
+  toggleSchoolStatus: (data) => ipcRenderer.invoke('db:toggleSchoolStatus', data),
   updateSchoolSettings: (data) => ipcRenderer.invoke('db:updateSchoolSettings', data),
   getSchoolArchives: (schoolId) => ipcRenderer.invoke('db:getSchoolArchives', schoolId),
   createSchoolYearArchive: (data) => ipcRenderer.invoke('db:createSchoolYearArchive', data),

@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS schools (
     bulletin_pdf_use_custom INTEGER DEFAULT 0,
     bulletin_pdf_template TEXT DEFAULT '',
     bulletin_pdf_mapping TEXT DEFAULT '{}',
+    deleted_at TEXT DEFAULT NULL,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
