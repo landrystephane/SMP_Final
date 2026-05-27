@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Clock, Users, Shield, Radio, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Transport: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [routes, setRoutes] = useState<any[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
@@ -30,13 +32,13 @@ const Transport: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Gestion du Transport</h1>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Supervision de la flotte scolaire</p>
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">{t('transport_management', 'Gestion du Transport')}</h1>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">{t('transport_supervision', 'Supervision de la flotte scolaire')}</p>
         </div>
         <div className="flex space-x-2">
             <span className="flex items-center px-4 py-2 bg-emerald-500/10 text-emerald-500 rounded-2xl text-[10px] font-black uppercase border border-emerald-500/20">
                 <Radio className="w-3 h-3 mr-2 animate-pulse" />
-                Serveur GPS Connecté
+                {t('gps_server_connected', 'Serveur GPS Connecté')}
             </span>
         </div>
       </div>
@@ -47,7 +49,7 @@ const Transport: React.FC = () => {
             <div className="glass-card p-6">
                 <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center">
                     <Navigation className="w-4 h-4 mr-2" />
-                    Lignes Actives
+                    {t('active_lines', 'Lignes Actives')}
                 </h2>
                 <div className="space-y-3">
                     {routes.map(r => (
@@ -66,7 +68,7 @@ const Transport: React.FC = () => {
                             <div className="flex justify-between mt-2 text-[10px] text-slate-500 font-bold">
                                 <span>{r.bus_number}</span>
                                 <span className="flex items-center text-emerald-500">
-                                    <Activity className="w-3 h-3 mr-1" /> EN ROUTE
+                                    <Activity className="w-3 h-3 mr-1" /> {t('en_route', 'EN ROUTE')}
                                 </span>
                             </div>
                         </button>
@@ -74,19 +76,19 @@ const Transport: React.FC = () => {
                 </div>
 
                 <button className="w-full mt-6 py-3 bg-white/5 text-white rounded-xl font-black text-[10px] uppercase border border-white/5 hover:bg-white/10 transition-all">
-                    + Ajouter une ligne
+                    + {t('add_line', 'Ajouter une ligne')}
                 </button>
             </div>
 
             <div className="glass-card p-6">
-                <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Statistiques Flotte</h2>
+                <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">{t('fleet_stats', 'Statistiques Flotte')}</h2>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                        <p className="text-slate-500 font-black text-[10px] uppercase">Bus</p>
+                        <p className="text-slate-500 font-black text-[10px] uppercase">{t('buses', 'Bus')}</p>
                         <p className="text-white text-xl font-black">04</p>
                     </div>
                     <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                        <p className="text-slate-500 font-black text-[10px] uppercase">Élèves</p>
+                        <p className="text-slate-500 font-black text-[10px] uppercase">{t('students', 'Élèves')}</p>
                         <p className="text-white text-xl font-black">156</p>
                     </div>
                 </div>
@@ -108,7 +110,7 @@ const Transport: React.FC = () => {
                             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 border-4 border-slate-950">
                                 <Shield className="w-5 h-5 text-white" />
                             </div>
-                            <span className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">Campus Eco-Manage</span>
+                            <span className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('campus', 'Campus Eco-Manage')}</span>
                         </div>
 
                         {/* Bus Icon */}
@@ -131,11 +133,11 @@ const Transport: React.FC = () => {
                 {/* Overlays */}
                 <div className="absolute top-6 left-6 flex space-x-4">
                     <div className="bg-slate-950/80 backdrop-blur p-4 rounded-2xl border border-white/5">
-                        <p className="text-slate-500 font-black text-[10px] uppercase">Vitesse Actuelle</p>
+                        <p className="text-slate-500 font-black text-[10px] uppercase">{t('current_speed', 'Vitesse Actuelle')}</p>
                         <p className="text-white text-lg font-black">42 km/h</p>
                     </div>
                     <div className="bg-slate-950/80 backdrop-blur p-4 rounded-2xl border border-white/5">
-                        <p className="text-slate-500 font-black text-[10px] uppercase">Prochain Arrêt</p>
+                        <p className="text-slate-500 font-black text-[10px] uppercase">{t('next_stop', 'Prochain Arrêt')}</p>
                         <p className="text-amber-500 text-lg font-black italic">Carrefour Bastos</p>
                     </div>
                 </div>
@@ -143,7 +145,7 @@ const Transport: React.FC = () => {
                 <div className="absolute bottom-6 right-6">
                     <div className="bg-slate-950/80 backdrop-blur px-4 py-2 rounded-full border border-white/5 flex items-center space-x-2">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        <p className="text-white font-black text-[10px] uppercase tracking-widest">En direct de Yaoundé</p>
+                        <p className="text-white font-black text-[10px] uppercase tracking-widest">{t('live_from_yaounde', 'En direct de Yaoundé')}</p>
                     </div>
                 </div>
             </div>
@@ -152,15 +154,15 @@ const Transport: React.FC = () => {
                 <div className="glass-card p-6">
                     <h3 className="text-white font-black text-sm uppercase mb-4 flex items-center">
                         <Users className="w-4 h-4 mr-2 text-blue-400" />
-                        Aperçu Passagers
+                        {t('passengers_overview', 'Aperçu Passagers')}
                     </h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/5">
-                            <span className="text-slate-300">Capacité Bus</span>
-                            <span className="text-white uppercase">24 / 30 PLACES</span>
+                            <span className="text-slate-300">{t('bus_capacity', 'Capacité Bus')}</span>
+                            <span className="text-white uppercase">24 / 30 {t('seats', 'PLACES')}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/5">
-                            <span className="text-slate-300">Embarquement terminé</span>
+                            <span className="text-slate-300">{t('boarding_completed', 'Embarquement terminé')}</span>
                             <span className="text-emerald-500 uppercase">95%</span>
                         </div>
                     </div>
@@ -168,15 +170,15 @@ const Transport: React.FC = () => {
                 <div className="glass-card p-6">
                     <h3 className="text-white font-black text-sm uppercase mb-4 flex items-center">
                         <Clock className="w-4 h-4 mr-2 text-amber-500" />
-                        Ponctualité
+                        {t('punctuality', 'Ponctualité')}
                     </h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/5">
-                            <span className="text-slate-300">Retard Moyen</span>
-                            <span className="text-rose-500 uppercase">+4 MINUTES</span>
+                            <span className="text-slate-300">{t('average_delay', 'Retard Moyen')}</span>
+                            <span className="text-rose-500 uppercase">+4 {t('minutes', 'MINUTES')}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/5">
-                            <span className="text-slate-300">Arrivée estimée École</span>
+                            <span className="text-slate-300">{t('eta_school', 'Arrivée estimée École')}</span>
                             <span className="text-white uppercase">07:42 AM</span>
                         </div>
                     </div>

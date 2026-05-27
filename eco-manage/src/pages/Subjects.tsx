@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Subjects: React.FC = () => {
+  const { t } = useTranslation();
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
@@ -101,8 +103,8 @@ const Subjects: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Programmes & Matières</h1>
-          <p className="text-slate-400 mt-1 text-sm">Configuration pédagogique par classe</p>
+          <h1 className="text-3xl font-bold text-white">{t('subjects_title', 'Programmes & Matières')}</h1>
+          <p className="text-slate-400 mt-1 text-sm">{t('subjects_subtitle', 'Configuration pédagogique par classe')}</p>
         </div>
         {canManageRegistry && (
           <button
@@ -110,7 +112,7 @@ const Subjects: React.FC = () => {
             className="btn-primary flex items-center"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Répertoire Global
+            {t('global_directory', 'Répertoire Global')}
           </button>
         )}
       </div>
@@ -118,7 +120,7 @@ const Subjects: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Liste des Classes */}
         <div className="glass-card p-6">
-          <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider">Classes</h2>
+          <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider">{t('classes')}</h2>
           <div className="space-y-2">
             {classes.map(c => (
               <button
@@ -132,7 +134,7 @@ const Subjects: React.FC = () => {
               >
                 {c.name}
                 <span className={`block text-[10px] uppercase mt-1 ${selectedClassId === c.id ? 'text-slate-800' : 'text-slate-600'}`}>
-                    {c.section} • {c.level}
+                    {t(`section_${c.section?.toLowerCase()}`)} • {t(`cycle_${c.level?.toLowerCase()}`)}
                 </span>
               </button>
             ))}
@@ -144,13 +146,13 @@ const Subjects: React.FC = () => {
           {!selectedClassId ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 py-12">
               <Globe className="w-16 h-16 opacity-20" />
-              <p className="font-medium">Sélectionnez une classe pour configurer son programme</p>
+              <p className="font-medium">{t('select_class_for_program', 'Sélectionnez une classe pour configurer son programme')}</p>
             </div>
           ) : (
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-black text-white uppercase tracking-tighter">
-                  Matières : {classes.find(c => c.id === selectedClassId)?.name}
+                  {t('subjects')} : {classes.find(c => c.id === selectedClassId)?.name}
                 </h2>
               </div>
 
@@ -188,7 +190,7 @@ const Subjects: React.FC = () => {
                         {isAssigned && (
                           <div className="flex items-center justify-between pt-3 border-t border-slate-800">
                             <div className="flex items-center space-x-2">
-                                <span className="text-[10px] font-black text-slate-500 uppercase">Coef:</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase">{t('coef', 'Coef:')}</span>
                                 <input
                                     type="number"
                                     className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-xs text-amber-500 font-black"
@@ -204,7 +206,7 @@ const Subjects: React.FC = () => {
                                     : 'bg-slate-900 text-slate-500 border border-slate-800'
                                 }`}
                             >
-                                {classSub?.is_optional ? 'OPTIONNELLE' : 'OBLIGATOIRE'}
+                                {classSub?.is_optional ? t('optional', 'OPTIONNELLE') : t('mandatory', 'OBLIGATOIRE')}
                             </button>
                           </div>
                         )}
@@ -222,55 +224,55 @@ const Subjects: React.FC = () => {
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md animate-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white uppercase">Répertoire Global</h2>
+              <h2 className="text-xl font-bold text-white uppercase">{t('global_directory', 'Répertoire Global')}</h2>
               <button onClick={() => setIsAddingGlobal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
             <form onSubmit={handleAddGlobalSubject} className="p-6 space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la matière</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_name', 'Nom de la matière')}</label>
                 <input
                     required
                     type="text"
                     className="input-field w-full mt-1"
-                    placeholder="Ex: Mathématiques"
+                    placeholder={t('subject_name_placeholder', 'Ex: Mathématiques')}
                     value={newSubject.name}
                     onChange={(e) => setNewSubject({...newSubject, name: e.target.value})}
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Compétence</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_domain', 'Domaine / Compétence')}</label>
                 <input
                     required
                     type="text"
                     className="input-field w-full mt-1"
-                    placeholder="Ex: Sciences et Technologie"
+                    placeholder={t('subject_domain_placeholder', 'Ex: Sciences et Technologie')}
                     value={newSubject.domain}
                     onChange={(e) => setNewSubject({...newSubject, domain: e.target.value})}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('section', 'Section')}</label>
                     <select
                         className="input-field w-full mt-1"
                         value={newSubject.section}
                         onChange={(e) => setNewSubject({...newSubject, section: e.target.value})}
                     >
-                        <option value="FRANCOPHONE">Francophone</option>
-                        <option value="ANGLOPHONE">Anglophone</option>
+                        <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                        <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cycle', 'Niveau')}</label>
                     <select
                         className="input-field w-full mt-1"
                         value={newSubject.level}
                         onChange={(e) => setNewSubject({...newSubject, level: e.target.value})}
                     >
-                        <option value="PRIMAIRE">Primaire</option>
-                        <option value="MATERNELLE">Maternelle</option>
+                        <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
+                        <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
                     </select>
                   </div>
               </div>
@@ -280,14 +282,14 @@ const Subjects: React.FC = () => {
                   onClick={() => setIsAddingGlobal(false)}
                   className="flex-1 py-3 border border-slate-700 rounded-xl text-slate-400 font-bold hover:bg-slate-900 transition-all"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary flex-1 flex items-center justify-center"
                 >
                   <Save className="w-5 h-5 mr-2" />
-                  Ajouter au Répertoire
+                  {t('add_to_directory', 'Ajouter au Répertoire')}
                 </button>
               </div>
             </form>

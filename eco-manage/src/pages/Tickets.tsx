@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Send, MessageSquare, History, Megaphone, Users, Award, ShieldAlert, CheckCircle, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Tickets: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'announcements' | 'tickets'>('announcements');
   
   // States for tickets/requests
   const [tickets, setTickets] = useState<any[]>([]);
   const [newTicketMessage, setNewTicketMessage] = useState('');
-  const [newTicketSubject, setNewTicketSubject] = useState('Message interne');
+  const [newTicketSubject, setNewTicketSubject] = useState(t('internal_message_default', 'Message interne'));
 
   // States for announcements
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -69,7 +71,7 @@ const Tickets: React.FC = () => {
           setNewAnnTitle('');
           setNewAnnContent('');
           setNewAnnTarget('ALL');
-          alert('Communiqué diffusé avec succès !');
+          alert(t('announcement_success', 'Communiqué diffusé avec succès !'));
           loadData();
       } catch (err: any) {
           alert(err.message);
@@ -94,9 +96,9 @@ const Tickets: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <Bell className="w-8 h-8 text-amber-500" />
-            Centre de Communication
+            {t('communication_center', 'Centre de Communication')}
           </h1>
-          <p className="text-slate-400 mt-1 text-sm">Diffusez des communiqués ciblés ou envoyez vos requêtes administratives</p>
+          <p className="text-slate-400 mt-1 text-sm">{t('communication_desc', 'Diffusez des communiqués ciblés ou envoyez vos requêtes administratives')}</p>
         </div>
       </div>
 
@@ -111,7 +113,7 @@ const Tickets: React.FC = () => {
           }`}
         >
           <Megaphone className="w-4 h-4" />
-          Communiqués & Diffusions
+          {t('tab_announcements', 'Communiqués & Diffusions')}
         </button>
         <button
           onClick={() => setActiveTab('tickets')}
@@ -122,7 +124,7 @@ const Tickets: React.FC = () => {
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          Tickets & Requêtes internes
+          {t('tab_tickets', 'Tickets & Requêtes internes')}
         </button>
       </div>
 
@@ -133,12 +135,12 @@ const Tickets: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-amber-500" />
-              Flux d'Annonces & Communiqués
+              {t('announcements_feed', 'Flux d\'Annonces & Communiqués')}
             </h2>
 
             {visibleAnnouncements.length === 0 ? (
               <div className="glass-card p-12 text-center text-slate-500 italic rounded-2xl border border-white/5">
-                Aucun communiqué n'a été publié pour le moment.
+                {t('no_announcements', 'Aucun communiqué n\'a été publié pour le moment.')}
               </div>
             ) : (
               <div className="space-y-4">
@@ -148,7 +150,7 @@ const Tickets: React.FC = () => {
                       <div>
                         <h3 className="text-lg font-bold text-white">{a.title}</h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Diffusé par <span className="text-amber-500 font-semibold">{a.sender_name || 'Administration'}</span>
+                          {t('published_by', 'Diffusé par')} <span className="text-amber-500 font-semibold">{a.sender_name || t('administration')}</span>
                         </p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -158,7 +160,7 @@ const Tickets: React.FC = () => {
                           ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
                           : 'bg-green-500/10 text-green-400 border border-green-500/20'
                       }`}>
-                        Cible : {a.target === 'ALL' ? 'Tous' : a.target === 'STAFF' ? 'Personnels' : 'Parents'}
+                        {t('target_audience', 'Cible')} : {a.target === 'ALL' ? t('target_all', 'Tous') : a.target === 'STAFF' ? t('target_staff', 'Personnels') : t('target_parents', 'Parents')}
                       </span>
                     </div>
 
@@ -178,43 +180,43 @@ const Tickets: React.FC = () => {
           <div className="space-y-6">
             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
               <Award className="w-5 h-5 text-amber-500" />
-              Diffusion Administrative
+              {t('admin_broadcast', 'Diffusion Administrative')}
             </h2>
 
             {canPublish ? (
               <form onSubmit={handleSendAnnouncement} className="glass-card p-6 space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Titre du Communiqué</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('announcement_title', 'Titre du Communiqué')}</label>
                   <input
                     required
                     value={newAnnTitle}
                     onChange={(e) => setNewAnnTitle(e.target.value)}
-                    placeholder="Ex: Réunion de rentrée scolaire"
+                    placeholder={t('ann_title_placeholder', 'Ex: Réunion de rentrée scolaire')}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Audience Cible</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('target_audience_label', 'Audience Cible')}</label>
                   <select
                     value={newAnnTarget}
                     onChange={(e) => setNewAnnTarget(e.target.value as any)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                   >
-                    <option value="ALL">Tout le monde (Personnels & Parents)</option>
-                    <option value="STAFF">Personnels de l'école uniquement</option>
-                    <option value="PARENTS">Parents d'élèves uniquement</option>
+                    <option value="ALL">{t('target_all_option', 'Tout le monde (Personnels & Parents)')}</option>
+                    <option value="STAFF">{t('target_staff_option', 'Personnels de l\'école uniquement')}</option>
+                    <option value="PARENTS">{t('target_parents_option', 'Parents d\'élèves uniquement')}</option>
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contenu du message</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('message_content', 'Contenu du message')}</label>
                   <textarea
                     required
                     rows={6}
                     value={newAnnContent}
                     onChange={(e) => setNewAnnContent(e.target.value)}
-                    placeholder="Saisissez ici le texte officiel à communiquer..."
+                    placeholder={t('message_content_placeholder', 'Saisissez ici le texte officiel à communiquer...')}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500 resize-none"
                   />
                 </div>
@@ -224,14 +226,14 @@ const Tickets: React.FC = () => {
                   className="w-full flex items-center justify-center py-2.5 px-4 bg-amber-500 text-slate-900 rounded-lg font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 active:scale-95 text-xs uppercase tracking-widest"
                 >
                   <Megaphone className="w-4 h-4 mr-2" />
-                  Diffuser le Communiqué
+                  {t('broadcast_announcement', 'Diffuser le Communiqué')}
                 </button>
               </form>
             ) : (
               <div className="glass-card p-6 border-l-4 border-yellow-500/30 text-slate-400 text-xs leading-relaxed space-y-2">
                 <ShieldAlert className="w-5 h-5 text-yellow-500" />
-                <p className="font-bold text-white">Lecture seule</p>
-                <p>Votre rôle ne vous autorise pas à émettre de communiqués officiels. Vous pouvez cependant consulter toutes les diffusions qui vous concernent.</p>
+                <p className="font-bold text-white">{t('read_only', 'Lecture seule')}</p>
+                <p>{t('read_only_desc', 'Votre rôle ne vous autorise pas à émettre de communiqués officiels. Vous pouvez cependant consulter toutes les diffusions qui vous concernent.')}</p>
               </div>
             )}
           </div>
@@ -242,12 +244,12 @@ const Tickets: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
               <History className="w-5 h-5 text-amber-500" />
-              Historique des requêtes
+              {t('requests_history', 'Historique des requêtes')}
             </h2>
 
             {tickets.length === 0 ? (
               <div className="glass-card p-12 text-center text-slate-500 italic rounded-2xl border border-white/5">
-                Aucune requête administrative envoyée pour l'instant.
+                {t('no_requests', 'Aucune requête administrative envoyée pour l\'instant.')}
               </div>
             ) : (
               <div className="space-y-4">
@@ -263,7 +265,7 @@ const Tickets: React.FC = () => {
                         ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
                         : 'bg-green-500/10 text-green-500 border border-green-500/20'
                     }`}>
-                      {t.status === 'OPEN' ? 'EN ATTENTE' : 'RÉSOLU'}
+                      {t.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
                     </span>
                   </div>
                 ))}
@@ -275,26 +277,26 @@ const Tickets: React.FC = () => {
           <div className="space-y-4">
             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-400" />
-              Nouvelle requête
+              {t('new_request', 'Nouvelle requête')}
             </h2>
             <div className="glass-card p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sujet de la Requête</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('request_subject', 'Sujet de la Requête')}</label>
                 <input
                   value={newTicketSubject}
                   onChange={(e) => setNewTicketSubject(e.target.value)}
-                  placeholder="Ex: Problème d'accès informatique"
+                  placeholder={t('request_subject_placeholder', 'Ex: Problème d\'accès informatique')}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Message pour la direction</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('message_for_direction', 'Message pour la direction')}</label>
                 <textarea
                   rows={4}
                   value={newTicketMessage}
                   onChange={(e) => setNewTicketMessage(e.target.value)}
-                  placeholder="Expliquez en détail votre demande ou votre problème..."
+                  placeholder={t('message_direction_placeholder', 'Expliquez en détail votre demande ou votre problème...')}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500 resize-none"
                 />
               </div>
@@ -304,7 +306,7 @@ const Tickets: React.FC = () => {
                 className="w-full flex items-center justify-center py-2.5 px-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-xs uppercase tracking-widest"
               >
                 <Send className="w-4 h-4 mr-2" />
-                Envoyer la Requête
+                {t('send_request', 'Envoyer la Requête')}
               </button>
             </div>
           </div>

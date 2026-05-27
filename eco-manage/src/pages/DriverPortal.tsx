@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Clock, Users, Phone, Bell, CheckCircle2, AlertCircle, Play, Square, Map as MapIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const DriverPortal: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeRoute, setActiveRoute] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [currentPointIndex, setCurrentPointIndex] = useState(0);
@@ -54,7 +56,7 @@ const DriverPortal: React.FC = () => {
       });
 
       if (newState) {
-          alert("Tournée ACTIVÉE. Les parents sont notifiés de votre départ.");
+          alert(t('tour_started_alert', "Tournée ACTIVÉE. Les parents sont notifiés de votre départ."));
       }
     }
   };
@@ -75,7 +77,7 @@ const DriverPortal: React.FC = () => {
       }
     } else {
       toggleActivity();
-      alert('Tournée terminée ! Arrivée au terminus.');
+      alert(t('tour_ended_alert', 'Tournée terminée ! Arrivée au terminus.'));
     }
   };
 
@@ -87,9 +89,9 @@ const DriverPortal: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic">PORTAIL <span className="text-amber-500">CHAUFFEUR</span></h1>
+          <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic">{t('portal', 'PORTAIL')} <span className="text-amber-500">{t('driver', 'CHAUFFEUR')}</span></h1>
           <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-            {activeRoute?.name || 'Aucune ligne assignée'} • {activeRoute?.bus_number}
+            {activeRoute?.name || t('no_assigned_route', 'Aucune ligne assignée')} • {activeRoute?.bus_number}
           </p>
         </div>
         <button
@@ -101,9 +103,9 @@ const DriverPortal: React.FC = () => {
             }`}
         >
             {isDriving ? (
-                <><Square className="w-5 h-5 mr-3" /> ARRÊTER LA TOURNÉE</>
+                <><Square className="w-5 h-5 mr-3" /> {t('stop_tour', 'ARRÊTER LA TOURNÉE')}</>
             ) : (
-                <><Play className="w-5 h-5 mr-3" /> DÉMARRER LA TOURNÉE</>
+                <><Play className="w-5 h-5 mr-3" /> {t('start_tour', 'DÉMARRER LA TOURNÉE')}</>
             )}
         </button>
       </div>
@@ -112,7 +114,7 @@ const DriverPortal: React.FC = () => {
         {/* Navigation & Points */}
         <div className="glass-card p-8 space-y-8 bg-slate-900/40 border-none">
             <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4 flex items-center">
-                <MapIcon className="w-4 h-4 mr-3 text-amber-500" /> Itinéraire
+                <MapIcon className="w-4 h-4 mr-3 text-amber-500" /> {t('itinerary', 'Itinéraire')}
             </h2>
             <div className="relative space-y-10 pl-10">
                 <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-800" />
@@ -128,14 +130,14 @@ const DriverPortal: React.FC = () => {
                         <div className="flex justify-between items-start">
                             <div>
                                 <p className={`font-black uppercase text-sm tracking-tight ${idx === currentPointIndex ? 'text-amber-500' : 'text-slate-400'}`}>{p.name}</p>
-                                <p className="text-[10px] text-slate-600 font-bold uppercase mt-1">Passage : {p.estimated_time_from_start} mins</p>
+                                <p className="text-[10px] text-slate-600 font-bold uppercase mt-1">{t('passage', 'Passage')} : {p.estimated_time_from_start} mins</p>
                             </div>
                             {idx === currentPointIndex && isDriving && (
                                 <button
                                     onClick={nextStop}
                                     className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-amber-500/20 hover:bg-yellow-400 transition-all"
                                 >
-                                    STOP SUIVANT
+                                    {t('next_stop', 'STOP SUIVANT')}
                                 </button>
                             )}
                         </div>
@@ -149,8 +151,8 @@ const DriverPortal: React.FC = () => {
                         <Bell className="text-blue-400 w-6 h-6 animate-bounce" />
                     </div>
                     <div>
-                        <p className="text-blue-400 font-black text-[10px] uppercase tracking-widest">Notification Parents</p>
-                        <p className="text-white text-xs font-bold mt-0.5">Alerte Proximité : {points[currentPointIndex]?.name}</p>
+                        <p className="text-blue-400 font-black text-[10px] uppercase tracking-widest">{t('parents_notification', 'Notification Parents')}</p>
+                        <p className="text-white text-xs font-bold mt-0.5">{t('proximity_alert', 'Alerte Proximité')} : {points[currentPointIndex]?.name}</p>
                     </div>
                 </div>
             )}
@@ -163,12 +165,12 @@ const DriverPortal: React.FC = () => {
                     <div>
                         <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center italic">
                             <Users className="w-6 h-6 mr-4 text-amber-500" />
-                            Liste d'Appel Bus
+                            {t('bus_roll_call', 'Liste d\'Appel Bus')}
                         </h2>
-                        <p className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Identification des passagers à l'embarquement</p>
+                        <p className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">{t('boarding_identification', 'Identification des passagers à l\'embarquement')}</p>
                     </div>
                     <div className="bg-slate-950 px-5 py-3 rounded-2xl border border-white/5">
-                        <span className="text-[10px] font-black text-slate-500 uppercase block tracking-widest mb-1">Présents</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase block tracking-widest mb-1">{t('present', 'Présents')}</span>
                         <span className="text-xl font-black text-amber-500">{Object.values(attendance).filter(v => v).length} <span className="text-xs text-slate-700">/ {students.length}</span></span>
                     </div>
                 </div>
@@ -183,7 +185,7 @@ const DriverPortal: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-white font-black uppercase text-base tracking-tight">{s.last_name} {s.first_name}</p>
-                                    <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1 italic">{s.neighborhood || 'Quartier non défini'}</p>
+                                    <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1 italic">{s.neighborhood || t('undefined_neighborhood', 'Quartier non défini')}</p>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-3">
@@ -205,7 +207,7 @@ const DriverPortal: React.FC = () => {
                     ))}
                     {students.length === 0 && (
                         <div className="col-span-full py-20 text-center text-slate-600 font-black uppercase text-xs tracking-[0.3em] italic">
-                            Aucun élève assigné à cette ligne
+                            {t('no_students_assigned_route', 'Aucun élève assigné à cette ligne')}
                         </div>
                     )}
                 </div>
@@ -214,12 +216,12 @@ const DriverPortal: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="glass-card p-8 bg-rose-500/5 border-none shadow-xl">
                     <h3 className="rose-500 font-black text-[10px] uppercase mb-6 flex items-center tracking-widest text-rose-500">
-                        <AlertCircle className="w-4 h-4 mr-3" /> Rappel Sécurité
+                        <AlertCircle className="w-4 h-4 mr-3" /> {t('security_reminder', 'Rappel Sécurité')}
                     </h3>
                     <ul className="text-xs text-slate-400 space-y-4 font-bold">
-                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> Vérifiez les ceintures de sécurité</li>
-                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> Comptez les élèves à chaque arrêt</li>
-                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> Maintenez le GPS actif pour les parents</li>
+                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> {t('check_seatbelts', 'Vérifiez les ceintures de sécurité')}</li>
+                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> {t('count_students_stops', 'Comptez les élèves à chaque arrêt')}</li>
+                        <li className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-3" /> {t('keep_gps_active', 'Maintenez le GPS actif pour les parents')}</li>
                     </ul>
                 </div>
                 <div className="glass-card p-8 flex flex-col justify-center items-center text-center space-y-4 border-none shadow-xl bg-slate-900/40">
@@ -227,8 +229,8 @@ const DriverPortal: React.FC = () => {
                         <Clock className="w-12 h-12 text-amber-500" />
                     </div>
                     <div>
-                        <p className="text-white font-black text-sm uppercase tracking-widest">Estimation Prochain Point</p>
-                        <p className="text-slate-500 text-[10px] font-black uppercase mt-2 tracking-widest italic">± 8 minutes (Trafic Fluide)</p>
+                        <p className="text-white font-black text-sm uppercase tracking-widest">{t('next_point_estimation', 'Estimation Prochain Point')}</p>
+                        <p className="text-slate-500 text-[10px] font-black uppercase mt-2 tracking-widest italic">{t('estimated_time', '± 8 minutes (Trafic Fluide)')}</p>
                     </div>
                 </div>
             </div>

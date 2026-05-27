@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const CustomizationSettings: React.FC = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [schools, setSchools] = useState<any[]>([]);
     const [activeSchool, setActiveSchool] = useState<any>(null);
@@ -119,7 +121,7 @@ const CustomizationSettings: React.FC = () => {
             loadSettings();
         } catch (err: any) {
             console.error(err);
-            alert("Erreur lors de la sauvegarde des paramètres: " + err.message);
+            alert(t('alert_update_error', 'Erreur lors de la sauvegarde des paramètres: ') + err.message);
         } finally {
             setSaving(false);
         }
@@ -129,7 +131,7 @@ const CustomizationSettings: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 3 * 1024 * 1024) {
-            alert("L'image est trop volumineuse (maximum 3 Mo).");
+            alert(t('cust_upload_max_size', "L'image est trop volumineuse (maximum 3 Mo)."));
             return;
         }
         const reader = new FileReader();
@@ -154,7 +156,7 @@ const CustomizationSettings: React.FC = () => {
     if (loading) return (
         <div className="h-[50vh] flex flex-col items-center justify-center space-y-4">
             <Palette className="w-12 h-12 text-amber-500 animate-pulse" />
-            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">Chargement des templates personnalisables...</p>
+            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">{t('cust_loading_templates', 'Chargement des templates personnalisables...')}</p>
         </div>
     );
 
@@ -168,9 +170,9 @@ const CustomizationSettings: React.FC = () => {
                         <Palette className="w-8 h-8" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">Personnalisation des Documents</h1>
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">{t('cust_title', 'Personnalisation des Documents')}</h1>
                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-                            Configurez la charte graphique et les signatures de votre établissement ({activeSchool?.name})
+                            {t('cust_subtitle', 'Configurez la charte graphique et les signatures de votre établissement')} ({activeSchool?.name})
                         </p>
                     </div>
                 </div>
@@ -183,12 +185,12 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
                             <Sliders className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Identité de l'Établissement</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_school_identity', 'Identité de l\'Établissement')}</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nom de l'École</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_name', 'Nom de l\'École')}</label>
                                 <input
                                     type="text"
                                     value={schoolName}
@@ -199,7 +201,7 @@ const CustomizationSettings: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Devise de l'École</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_motto', 'Devise de l\'École')}</label>
                                 <input
                                     type="text"
                                     value={schoolMotto}
@@ -210,7 +212,7 @@ const CustomizationSettings: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Adresse Physique</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_physical_address', 'Adresse Physique')}</label>
                                 <input
                                     type="text"
                                     value={schoolAddress}
@@ -221,7 +223,7 @@ const CustomizationSettings: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Boîte Postale (B.P.)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_bp', 'Boîte Postale (B.P.)')}</label>
                                 <input
                                     type="text"
                                     value={schoolBp}
@@ -237,13 +239,13 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
                             <Palette className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Palette Graphique de l'École</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_color_palette', 'Palette Graphique de l\'École')}</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Primary color */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Couleur Primaire (Cadres et En-têtes)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_primary_color', 'Couleur Primaire (Cadres et En-têtes)')}</label>
                                 <div className="flex items-center space-x-3 bg-slate-950 p-3.5 rounded-2xl border border-white/5">
                                     <input
                                         type="color"
@@ -262,7 +264,7 @@ const CustomizationSettings: React.FC = () => {
 
                             {/* Secondary color */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Couleur Secondaire (Accents et Textes clés)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_secondary_color', 'Couleur Secondaire (Accents et Textes clés)')}</label>
                                 <div className="flex items-center space-x-3 bg-slate-950 p-3.5 rounded-2xl border border-white/5">
                                     <input
                                         type="color"
@@ -285,12 +287,12 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
                             <Type className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">En-têtes Ministériels / Subdivisions</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_ministerial_headers', 'En-têtes Ministériels / Subdivisions')}</h2>
                         </div>
 
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Sous-titre En-tête (Français)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_french', 'Sous-titre En-tête (Français)')}</label>
                                 <input
                                     type="text"
                                     value={headerFrench}
@@ -301,7 +303,7 @@ const CustomizationSettings: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Sous-titre En-tête (Anglais)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_english', 'Sous-titre En-tête (Anglais)')}</label>
                                 <input
                                     type="text"
                                     value={headerEnglish}
@@ -317,12 +319,12 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
                             <Edit3 className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Intitulés des Signataires Officiels</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_signatories', 'Intitulés des Signataires Officiels')}</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Bloc Gauche (Bulletin)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_left', 'Bloc Gauche (Bulletin)')}</label>
                                 <input
                                     type="text"
                                     value={bulletinSigLeft}
@@ -331,7 +333,7 @@ const CustomizationSettings: React.FC = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Bloc Milieu (Bulletin)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_middle', 'Bloc Milieu (Bulletin)')}</label>
                                 <input
                                     type="text"
                                     value={bulletinSigMiddle}
@@ -340,7 +342,7 @@ const CustomizationSettings: React.FC = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Bloc Droit (Bulletin)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_right', 'Bloc Droit (Bulletin)')}</label>
                                 <input
                                     type="text"
                                     value={bulletinSigRight}
@@ -351,7 +353,7 @@ const CustomizationSettings: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Signature sur les Reçus de Caisse</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_receipt', 'Signature sur les Reçus de Caisse')}</label>
                             <input
                                 type="text"
                                 value={receiptSigTitle}
@@ -366,10 +368,10 @@ const CustomizationSettings: React.FC = () => {
                         <div className="flex items-center justify-between border-b border-white/5 pb-4">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <Sliders className="w-5 h-5" />
-                                <h2 className="text-lg font-black uppercase text-white tracking-wide">Bulletin Personnalisé (Gabarit PDF)</h2>
+                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pdf_template_title', 'Bulletin Personnalisé (Gabarit PDF)')}</h2>
                             </div>
                             <div className="flex items-center space-x-3 bg-slate-950 p-1.5 rounded-xl border border-white/5">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">Activer</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">{t('cust_enable_custom_pdf', 'Activer')}</span>
                                 <button
                                     type="button"
                                     onClick={() => setBulletinPdfUseCustom(bulletinPdfUseCustom === 1 ? 0 : 1)}
@@ -384,7 +386,7 @@ const CustomizationSettings: React.FC = () => {
                             <div className="space-y-8 animate-in fade-in duration-300">
                                 {/* Template File Uploader */}
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Image de fond du bulletin (JPG / PNG - Max 3 Mo)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_background_image', 'Image de fond du bulletin (JPG / PNG - Max 3 Mo)')}</label>
                                     <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
                                         {bulletinPdfTemplate ? (
                                             <div className="space-y-4">
@@ -394,19 +396,19 @@ const CustomizationSettings: React.FC = () => {
                                                     onClick={() => setBulletinPdfTemplate('')}
                                                     className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all"
                                                 >
-                                                    Supprimer
+                                                    {t('cust_delete', 'Supprimer')}
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
-                                                <p className="text-sm font-bold text-slate-400">Glissez ou sélectionnez le fichier image du bulletin vierge</p>
+                                                <p className="text-sm font-bold text-slate-400">{t('cust_drag_or_select', 'Glissez ou sélectionnez le fichier image du bulletin vierge')}</p>
                                                 <input
                                                     type="file"
                                                     accept="image/*"
                                                     onChange={handleTemplateUpload}
                                                     className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                                                 />
-                                                <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">Parcourir</span>
+                                                <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
                                             </div>
                                         )}
                                     </div>
@@ -414,19 +416,19 @@ const CustomizationSettings: React.FC = () => {
 
                                 {/* Coordinate Mapping Inputs */}
                                 <div className="space-y-6">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-amber-500/80">Coordonnées de placement (en millimètres sur page A4 : 210 x 297 mm)</h3>
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-amber-500/80">{t('cust_placement_coords', 'Coordonnées de placement (en millimètres sur page A4 : 210 x 297 mm)')}</h3>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-950 p-6 rounded-2xl border border-white/5">
                                         {/* Coordinates group 1: Student info */}
                                         <div className="space-y-4">
-                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">Informations Élève</h4>
+                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_student_info', 'Informations Élève')}</h4>
                                             
                                             {[
-                                                { label: "Nom & Prénoms", field: "studentName" },
-                                                { label: "Matricule", field: "matricule" },
-                                                { label: "Classe", field: "class" },
-                                                { label: "Année Académique", field: "year" },
-                                                { label: "Section (FR/EN)", field: "section" }
+                                                { label: t('cust_full_names', "Nom & Prénoms"), field: "studentName" },
+                                                { label: t('cust_matricule', "Matricule"), field: "matricule" },
+                                                { label: t('cust_class', "Classe"), field: "class" },
+                                                { label: t('cust_academic_year', "Année Académique"), field: "year" },
+                                                { label: t('cust_section', "Section (FR/EN)"), field: "section" }
                                             ].map((item) => (
                                                 <div key={item.field} className="flex items-center justify-between gap-4 text-xs font-bold text-slate-400">
                                                     <span>{item.label}</span>
@@ -456,14 +458,14 @@ const CustomizationSettings: React.FC = () => {
 
                                         {/* Coordinates group 2: Performance metrics */}
                                         <div className="space-y-4">
-                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">Performances & Absences</h4>
+                                            <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_performance_absences', 'Performances & Absences')}</h4>
                                             
                                             {[
-                                                { label: "Moyenne Générale", field: "average" },
-                                                { label: "Rang de l'Élève", field: "rank" },
-                                                { label: "Décision du Conseil", field: "decision" },
-                                                { label: "Heures d'Absences", field: "absences" },
-                                                { label: "Observation Conduite", field: "conduct" }
+                                                { label: t('cust_general_average', "Moyenne Générale"), field: "average" },
+                                                { label: t('cust_student_rank', "Rang de l'Élève"), field: "rank" },
+                                                { label: t('cust_council_decision', "Décision du Conseil"), field: "decision" },
+                                                { label: t('cust_absences_hours', "Heures d'Absences"), field: "absences" },
+                                                { label: t('cust_conduct_obs', "Observation Conduite"), field: "conduct" }
                                             ].map((item) => (
                                                 <div key={item.field} className="flex items-center justify-between gap-4 text-xs font-bold text-slate-400">
                                                     <span>{item.label}</span>
@@ -494,11 +496,11 @@ const CustomizationSettings: React.FC = () => {
 
                                     {/* Table and signatures layout configuration */}
                                     <div className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
-                                        <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">Tableau des notes & Signatures</h4>
+                                        <h4 className="text-[10px] font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">{t('cust_grades_table_sigs', 'Tableau des notes & Signatures')}</h4>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Tableau - X (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_x', 'Tableau - X (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.table?.x || 20}
@@ -507,7 +509,7 @@ const CustomizationSettings: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Tableau - Y (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_y', 'Tableau - Y (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.table?.y || 115}
@@ -516,7 +518,7 @@ const CustomizationSettings: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Tableau - Largeur (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_table_width', 'Tableau - Largeur (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.table?.width || 170}
@@ -528,7 +530,7 @@ const CustomizationSettings: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Signatures - Y (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_sigs_y', 'Signatures - Y (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.signatures?.y || 230}
@@ -537,7 +539,7 @@ const CustomizationSettings: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">X Enseignant (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_teacher', 'X Enseignant (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.signatures?.leftX || 25}
@@ -546,7 +548,7 @@ const CustomizationSettings: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">X Parent (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_parent', 'X Parent (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.signatures?.middleX || 85}
@@ -555,7 +557,7 @@ const CustomizationSettings: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="bg-slate-900 p-3.5 rounded-xl border border-white/5">
-                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">X Directeur (mm)</label>
+                                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cust_x_principal', 'X Directeur (mm)')}</label>
                                                 <input
                                                     type="number"
                                                     value={bulletinPdfMapping.signatures?.rightX || 140}
@@ -574,7 +576,7 @@ const CustomizationSettings: React.FC = () => {
                     <div className="flex justify-end items-center gap-4">
                         {success && (
                             <span className="text-emerald-500 text-xs font-black uppercase tracking-widest flex items-center gap-2 animate-bounce">
-                                <CheckCircle2 className="w-4 h-4" /> Changements Appliqués !
+                                <CheckCircle2 className="w-4 h-4" /> {t('cust_changes_applied', 'Changements Appliqués !')}
                             </span>
                         )}
                         <button
@@ -582,7 +584,7 @@ const CustomizationSettings: React.FC = () => {
                             disabled={saving}
                             className="bg-amber-500 text-slate-950 px-10 py-4.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                         >
-                            {saving ? 'Sauvegarde...' : 'Enregistrer la Configuration'}
+                            {saving ? t('cust_saving', 'Sauvegarde...') : t('cust_save_config', 'Enregistrer la Configuration')}
                         </button>
                     </div>
                 </form>
@@ -592,13 +594,13 @@ const CustomizationSettings: React.FC = () => {
                     <div className="sticky top-8 space-y-6">
                         <div className="flex items-center space-x-2 text-slate-400 font-black text-xs uppercase tracking-widest">
                             <Layout className="w-4 h-4 text-amber-500" />
-                            <span>Aperçu du Rendu Direct</span>
+                            <span>{t('cust_live_preview', 'Aperçu du Rendu Direct')}</span>
                         </div>
 
                         {/* Bulletin Mockup Card */}
                         <div className="bg-white p-6 rounded-[24px] shadow-2xl border border-slate-200 text-slate-900 space-y-4">
                             <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
-                                Bulletin Scolaire Officiel
+                                {t('cust_official_report', 'Bulletin Scolaire Officiel')}
                             </span>
 
                             {/* Header */}
@@ -632,16 +634,16 @@ const CustomizationSettings: React.FC = () => {
                             {/* Signatures mockup */}
                             <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-[5px] font-black uppercase tracking-wider text-slate-400">
                                 <div className="border-r border-slate-100 pr-1">
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigLeft || "L'ENSEIGNANT"}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">Signature</p>
+                                    <p className="font-bold text-slate-500 truncate">{bulletinSigLeft || t('cust_sig_left_default', "L'ENSEIGNANT")}</p>
+                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
                                 </div>
                                 <div className="border-r border-slate-100 pr-1">
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigMiddle || "PARENT"}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">Signature</p>
+                                    <p className="font-bold text-slate-500 truncate">{bulletinSigMiddle || t('cust_sig_middle_default', "PARENT")}</p>
+                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
                                 </div>
                                 <div>
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigRight || "LE DIRECTEUR"}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">Signature</p>
+                                    <p className="font-bold text-slate-500 truncate">{bulletinSigRight || t('cust_sig_right_default', "LE DIRECTEUR")}</p>
+                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
                                 </div>
                             </div>
                         </div>
@@ -650,28 +652,28 @@ const CustomizationSettings: React.FC = () => {
                         <div className="bg-white p-6 rounded-[24px] shadow-2xl border border-slate-200 text-slate-900 space-y-4 relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: `${secondaryColor}15` }} />
                             <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
-                                Reçu Financier de Caisse
+                                {t('cust_receipt_badge', 'Reçu Financier de Caisse')}
                             </span>
 
                             <h4 className="text-center text-xs font-black uppercase tracking-widest border-b border-slate-100 pb-3" style={{ color: primaryColor }}>
-                                Reçu de Paiement
+                                {t('cust_receipt_title', 'Reçu de Paiement')}
                             </h4>
 
                             <div className="space-y-1.5 text-[7px] text-slate-600">
                                 <div className="flex justify-between border-b border-slate-100 pb-1">
-                                    <span className="font-black">Montant versé</span>
+                                    <span className="font-black">{t('cust_receipt_amount', 'Montant versé')}</span>
                                     <span className="font-black text-slate-900">75 000 FCFA</span>
                                 </div>
                                 <div className="flex justify-between border-b border-slate-100 pb-1">
-                                    <span className="font-black">Motif</span>
-                                    <span className="font-black text-slate-900">2e Tranche Pension</span>
+                                    <span className="font-black">{t('cust_receipt_reason', 'Motif')}</span>
+                                    <span className="font-black text-slate-900">{t('cust_receipt_reason_val', '2e Tranche Pension')}</span>
                                 </div>
                             </div>
 
                             {/* Receipt Signature */}
                             <div className="text-right text-[5px] font-black uppercase tracking-wider text-slate-400 pt-2">
-                                <p className="font-bold text-slate-600 truncate">{receiptSigTitle || "L'Économe / Bursar"}</p>
-                                <p className="text-[4px] text-slate-300 italic mt-4">Cachet & Signature</p>
+                                <p className="font-bold text-slate-600 truncate">{receiptSigTitle || t('cust_receipt_sig_default', "L'Économe / Bursar")}</p>
+                                <p className="text-[4px] text-slate-300 italic mt-4">{t('cust_stamp_sig', 'Cachet & Signature')}</p>
                             </div>
                         </div>
                     </div>

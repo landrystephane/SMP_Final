@@ -12,7 +12,7 @@ const Grades: React.FC = () => {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
 
-  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | ''>('FRANCOPHONE');
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState('month_oct');
@@ -187,7 +187,6 @@ const Grades: React.FC = () => {
             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all disabled:opacity-30"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            disabled={!selectedSection}
           >
             <option value="">{t('select_classroom')}</option>
             {classes.filter(c => c.section === selectedSection).map(c => (

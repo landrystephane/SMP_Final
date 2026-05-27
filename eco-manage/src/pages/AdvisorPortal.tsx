@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const MONTHS = ['Septembre', 'Octobre', 'Novembre', 'Décembre', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai'];
+import { useTranslation } from 'react-i18next';
 
 const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
+    const MONTHS = [
+        t('september', 'Septembre'), t('october', 'Octobre'), t('november', 'Novembre'),
+        t('december', 'Décembre'), t('january', 'Janvier'), t('february', 'Février'),
+        t('march', 'Mars'), t('april', 'Avril'), t('may', 'Mai')
+    ];
     const [activeTab, setActiveTab] = useState<'PLANNING' | 'TRANSPORT' | 'EVALUATIONS'>('PLANNING');
     const [classes, setClasses] = useState<any[]>([]);
     const [routes, setRoutes] = useState<any[]>([]);
@@ -98,10 +103,10 @@ const AdvisorPortal: React.FC = () => {
                 term: selectedTerm,
                 month: selectedMonth
             });
-            alert("Notes validées avec succès ! Cette matière est désormais visible sur les bulletins.");
+            alert(t('grades_validated_success', "Notes validées avec succès ! Cette matière est désormais visible sur les bulletins."));
             loadValidationStatuses();
         } catch (err: any) {
-            alert("Erreur lors de la validation: " + err.message);
+            alert(t('validation_error', "Erreur lors de la validation: ") + err.message);
         }
     };
 
@@ -109,13 +114,13 @@ const AdvisorPortal: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-500 pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Conseiller Pédagogique</h1>
-                    <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest italic">Pilotage de la qualité et logistique scolaire</p>
+                    <h1 className="text-4xl font-black text-white tracking-tight">{t('advisor_portal', 'Conseiller Pédagogique')}</h1>
+                    <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest italic">{t('advisor_desc', 'Pilotage de la qualité et logistique scolaire')}</p>
                 </div>
                 <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
-                    <button onClick={() => setActiveTab('PLANNING')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PLANNING' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Plannings</button>
-                    <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Évaluations</button>
-                    <button onClick={() => setActiveTab('TRANSPORT')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'TRANSPORT' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Transport</button>
+                    <button onClick={() => setActiveTab('PLANNING')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PLANNING' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_planning', 'Plannings')}</button>
+                    <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_evaluations', 'Évaluations')}</button>
+                    <button onClick={() => setActiveTab('TRANSPORT')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'TRANSPORT' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_transport', 'Transport')}</button>
                 </div>
             </div>
 
@@ -126,13 +131,13 @@ const AdvisorPortal: React.FC = () => {
                             <div className="flex justify-between items-center mb-8">
                                 <h2 className="text-xl font-black text-white flex items-center">
                                     <Calendar className="w-6 h-6 mr-3 text-amber-500" />
-                                    Emploi du Temps Hebdomadaire
+                                    {t('weekly_schedule', 'Emploi du Temps Hebdomadaire')}
                                 </h2>
-                                <button className="btn-primary text-[10px]">PROGRAMMER COURS</button>
+                                <button className="btn-primary text-[10px]">{t('schedule_class', 'PROGRAMMER COURS')}</button>
                             </div>
                             <div className="grid grid-cols-6 gap-2">
-                                <div className="p-2 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">Heure</div>
-                                {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'].map(d => (
+                                <div className="p-2 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{t('hour', 'Heure')}</div>
+                                {[t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi')].map(d => (
                                     <div key={d} className="p-2 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{d}</div>
                                 ))}
                                 <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-bold text-slate-600 text-center">08:00 - 10:00</div>
@@ -157,31 +162,31 @@ const AdvisorPortal: React.FC = () => {
                     <div className="glass-card p-6 flex flex-wrap gap-4 items-center justify-between">
                         <div className="flex flex-wrap gap-4 items-center">
                             <div>
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Classe</label>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('class_label', 'Classe')}</label>
                                 <select
                                     value={selectedClass}
                                     onChange={(e) => setSelectedClass(e.target.value)}
                                     className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-44"
                                 >
                                     {classes.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name} ({c.section})</option>
+                                        <option key={c.id} value={c.id}>{c.name} ({t(`section_${c.section?.toLowerCase()}`)})</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Trimestre</label>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('term', 'Trimestre')}</label>
                                 <select
                                     value={selectedTerm}
                                     onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
                                     className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-32"
                                 >
-                                    <option value={1}>1er Trimestre</option>
-                                    <option value={2}>2e Trimestre</option>
-                                    <option value={3}>3e Trimestre</option>
+                                    <option value={1}>{t('term_1', '1er Trimestre')}</option>
+                                    <option value={2}>{t('term_2', '2e Trimestre')}</option>
+                                    <option value={3}>{t('term_3', '3e Trimestre')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Mois d'Évaluation</label>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('evaluation_month', 'Mois d\'Évaluation')}</label>
                                 <select
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(e.target.value)}
@@ -196,7 +201,7 @@ const AdvisorPortal: React.FC = () => {
 
                         <div className="bg-slate-900/50 px-4 py-3.5 rounded-xl border border-white/5 flex items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             <ShieldAlert className="w-4 h-4 text-amber-500 mr-2" />
-                            Seules les matières validées apparaîtront sur le bulletin de l'élève.
+                            {t('validated_subjects_info', 'Seules les matières validées apparaîtront sur le bulletin de l\'élève.')}
                         </div>
                     </div>
 
@@ -204,45 +209,45 @@ const AdvisorPortal: React.FC = () => {
                     <div className="glass-card overflow-hidden">
                         <div className="p-6 border-b border-white/5 flex items-center">
                             <Award className="w-5 h-5 text-amber-500 mr-2" />
-                            <h2 className="text-lg font-black text-white uppercase tracking-tight">Validation des notes par matière</h2>
+                            <h2 className="text-lg font-black text-white uppercase tracking-tight">{t('subject_validation', 'Validation des notes par matière')}</h2>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                        <th className="px-6 py-4">Matière</th>
-                                        <th className="px-6 py-4">Domaine / Bloc</th>
-                                        <th className="px-6 py-4 text-center">Coefficient</th>
-                                        <th className="px-6 py-4">Statut Saisie</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
+                                        <th className="px-6 py-4">{t('subject', 'Matière')}</th>
+                                        <th className="px-6 py-4">{t('domain_block', 'Domaine / Bloc')}</th>
+                                        <th className="px-6 py-4 text-center">{t('coefficient', 'Coefficient')}</th>
+                                        <th className="px-6 py-4">{t('entry_status', 'Statut Saisie')}</th>
+                                        <th className="px-6 py-4 text-right">{t('actions', 'Actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5 bg-slate-900/30">
                                     {subjectStatuses.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="text-center py-8 text-slate-500 font-bold text-xs">
-                                                Aucune matière programmée pour cette classe.
+                                                {t('no_subjects_programmed', 'Aucune matière programmée pour cette classe.')}
                                             </td>
                                         </tr>
                                     ) : (
                                         subjectStatuses.map(subj => {
                                             let statusBadge = (
-                                                <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/5 rounded-full text-[9px] font-black uppercase tracking-wider">Pas de notes</span>
+                                                <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/5 rounded-full text-[9px] font-black uppercase tracking-wider">{t('no_grades', 'Pas de notes')}</span>
                                             );
                                             if (subj.hasGrades) {
                                                 if (subj.isValidated) {
                                                     statusBadge = (
                                                         <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[9px] font-black uppercase tracking-wider inline-flex items-center">
-                                                            <CheckCircle2 className="w-3 h-3 mr-1" /> Validé
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" /> {t('validated', 'Validé')}
                                                         </span>
                                                     );
                                                 } else if (subj.isLocked) {
                                                     statusBadge = (
-                                                        <span className="px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">En attente de validation</span>
+                                                        <span className="px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">{t('pending_validation', 'En attente de validation')}</span>
                                                     );
                                                 } else {
                                                     statusBadge = (
-                                                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">Brouillon</span>
+                                                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">{t('draft', 'Brouillon')}</span>
                                                     );
                                                 }
                                             }
@@ -260,7 +265,7 @@ const AdvisorPortal: React.FC = () => {
                                                                     onClick={() => handleViewSubjectDetails(subj)}
                                                                     className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all inline-flex items-center text-[10px] font-black uppercase tracking-wider"
                                                                 >
-                                                                    <Eye className="w-3.5 h-3.5 mr-1" /> Inspecter
+                                                                    <Eye className="w-3.5 h-3.5 mr-1" /> {t('inspect', 'Inspecter')}
                                                                 </button>
                                                             )}
                                                             {subj.hasGrades && !subj.isValidated && (
@@ -268,7 +273,7 @@ const AdvisorPortal: React.FC = () => {
                                                                     onClick={() => handleValidateSubject(subj.id)}
                                                                     className="bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale-105 active:scale-95 transition-all"
                                                                 >
-                                                                    Valider les notes
+                                                                    {t('validate_grades', 'Valider les notes')}
                                                                 </button>
                                                             )}
                                                         </div>
@@ -290,7 +295,7 @@ const AdvisorPortal: React.FC = () => {
                         <div className="glass-card p-6">
                             <h2 className="text-xl font-black text-white mb-6 flex items-center tracking-tight">
                                 <Truck className="w-6 h-6 mr-3 text-amber-500" />
-                                Affectation Bus
+                                {t('bus_assignment', 'Affectation Bus')}
                             </h2>
                             <div className="space-y-4">
                                 {routes.map(r => (
@@ -299,7 +304,7 @@ const AdvisorPortal: React.FC = () => {
                                         onClick={() => setSelectedRoute(r.id.toString())}
                                         className={`w-full p-4 rounded-2xl border transition-all text-left group ${selectedRoute === r.id.toString() ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-white/5 border-white/5 text-slate-400 hover:border-amber-500/50'}`}
                                     >
-                                        <div className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">Route ID #{r.id}</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">{t('route_id', 'Route ID')} #{r.id}</div>
                                         <div className="font-black text-sm uppercase tracking-tight">{r.name}</div>
                                         <div className={`text-[9px] mt-2 font-bold uppercase flex items-center ${selectedRoute === r.id.toString() ? 'text-slate-900' : 'text-slate-600'}`}>
                                             <MapPin className="w-3 h-3 mr-1" /> Quartier Central
@@ -314,18 +319,18 @@ const AdvisorPortal: React.FC = () => {
                             <div className="glass-card border-none shadow-2xl overflow-hidden">
                                 <div className="p-8 border-b border-white/5 bg-slate-900/50 flex justify-between items-center">
                                     <div>
-                                        <h2 className="text-2xl font-black text-white tracking-tight italic">Passagers : {routes.find(r => r.id.toString() === selectedRoute)?.name}</h2>
-                                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Affectation des élèves au transport</p>
+                                        <h2 className="text-2xl font-black text-white tracking-tight italic">{t('passengers', 'Passagers')} : {routes.find(r => r.id.toString() === selectedRoute)?.name}</h2>
+                                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('student_transport_assignment', 'Affectation des élèves au transport')}</p>
                                     </div>
-                                    <button className="btn-primary text-[10px]">AJOUTER PASSAGER</button>
+                                    <button className="btn-primary text-[10px]">{t('add_passenger', 'AJOUTER PASSAGER')}</button>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead>
                                             <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                                <th className="px-8 py-6">Élève</th>
-                                                <th className="px-8 py-6">Classe</th>
-                                                <th className="px-8 py-6 text-right">Action</th>
+                                                <th className="px-8 py-6">{t('student', 'Élève')}</th>
+                                                <th className="px-8 py-6">{t('class', 'Classe')}</th>
+                                                <th className="px-8 py-6 text-right">{t('action', 'Action')}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5 bg-slate-900/30">
@@ -348,7 +353,7 @@ const AdvisorPortal: React.FC = () => {
                         ) : (
                             <div className="glass-card p-20 flex flex-col items-center justify-center text-center opacity-30 border-2 border-dashed border-white/5">
                                 <Truck className="w-20 h-20 mb-6" />
-                                <p className="text-xl font-black uppercase tracking-widest">Sélectionnez une route pour gérer les passagers</p>
+                                <p className="text-xl font-black uppercase tracking-widest">{t('select_route_passengers', 'Sélectionnez une route pour gérer les passagers')}</p>
                             </div>
                         )}
                     </div>
@@ -363,7 +368,7 @@ const AdvisorPortal: React.FC = () => {
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
                                 <h3 className="text-lg font-black text-white uppercase tracking-tight">{selectedSubjectForDetail.name}</h3>
-                                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Revue des notes de la classe</p>
+                                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('class_grades_review', 'Revue des notes de la classe')}</p>
                             </div>
                             <button
                                 onClick={() => setShowDetailModal(false)}
@@ -378,9 +383,9 @@ const AdvisorPortal: React.FC = () => {
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="text-slate-500 text-[9px] font-black uppercase tracking-widest border-b border-white/5">
-                                        <th className="pb-3">Élève</th>
-                                        <th className="pb-3">Matricule</th>
-                                        <th className="pb-3 text-right">Note/20</th>
+                                        <th className="pb-3">{t('student', 'Élève')}</th>
+                                        <th className="pb-3">{t('matricule', 'Matricule')}</th>
+                                        <th className="pb-3 text-right">{t('grade_out_of_20', 'Note/20')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5 font-bold">
@@ -390,7 +395,7 @@ const AdvisorPortal: React.FC = () => {
                                             <td className="py-3 text-slate-400 text-xs">{g.matricule}</td>
                                             <td className="py-3 text-right">
                                                 <span className={`px-3 py-1.5 rounded-lg text-xs font-black ${g.score === null ? 'bg-slate-800 text-slate-500' : g.score >= 10 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                                    {g.score !== null ? g.score.toFixed(2) : 'Abs/Non saisi'}
+                                                    {g.score !== null ? g.score.toFixed(2) : t('absent_not_entered', 'Abs/Non saisi')}
                                                 </span>
                                             </td>
                                         </tr>
@@ -405,7 +410,7 @@ const AdvisorPortal: React.FC = () => {
                                 onClick={() => setShowDetailModal(false)}
                                 className="bg-slate-800 text-white hover:bg-slate-700 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                             >
-                                Fermer
+                                {t('close', 'Fermer')}
                             </button>
                         </div>
                     </div>

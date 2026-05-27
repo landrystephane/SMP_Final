@@ -6,6 +6,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isRestoringSession: boolean;
   hasRole: (roles: Role[]) => boolean;
   switchSchool: (schoolId: number) => Promise<void>;
   exitImpersonation: () => Promise<void>;
@@ -31,11 +32,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const [isRestoringSession, setIsRestoringSession] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return !!savedUser && typeof window !== 'undefined' && !!(window as any).electronAPI;
+  });
+
   useEffect(() => {
     if (user && window.electronAPI) {
-      window.electronAPI.restoreSession(user).catch(err => {
-        console.error("Failed to restore main process session:", err);
-      });
+      window.electronAPI.restoreSession(user)
+        .then(() => {
+          setIsRestoringSession(false);
+        })
+        .catch(err => {
+          console.error("Failed to restore main process session:", err);
+          setIsRestoringSession(false);
+        });
+    } else {
+      setIsRestoringSession(false);
     }
   }, [user]);
 
@@ -72,6 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('user', JSON.stringify(mockUser));
         } else if (lowerUser === 'teacher' && password === 'teacher') {
             const mockUser: User = { id: 2, username: 'teacher', fullName: 'M. Enseignant', role: 'TEACHER', schoolId: 1 };
+            setUser(mockUser);
+            localStorage.setItem('user', JSON.stringify(mockUser));
+        } else if (lowerUser === 'superadmin' && password === 'superadmin') {
+            const mockUser: User = { id: 3, username: 'superadmin', fullName: 'Super Développeur', role: 'SUPERADMIN', schoolId: 1 };
             setUser(mockUser);
             localStorage.setItem('user', JSON.stringify(mockUser));
         } else {
@@ -144,7 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole, switchSchool, exitImpersonation }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user && !isRestoringSession, isRestoringSession, hasRole, switchSchool, exitImpersonation }}>
       {children}
     </AuthContext.Provider>
   );

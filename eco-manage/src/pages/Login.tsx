@@ -81,7 +81,7 @@ const Login: React.FC = () => {
                     disabled={isLoading}
                     className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-4 text-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/5 outline-none transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.trim().toLowerCase())}
                     placeholder="Admin"
                 />
               </div>

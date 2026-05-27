@@ -8,8 +8,8 @@ const Attendance: React.FC = () => {
   const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedSection, setSelectedSection] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | ''>('FRANCOPHONE');
+  const [selectedClass, setSelectedClass] = useState<string>('');
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [absences, setAbsences] = useState<Record<string, number>>({});
 
@@ -99,7 +99,7 @@ const Attendance: React.FC = () => {
             className="input-field w-full mt-1"
             value={selectedSection}
             onChange={(e) => {
-                setSelectedSection(e.target.value);
+                setSelectedSection(e.target.value as 'FRANCOPHONE' | 'ANGLOPHONE');
                 setSelectedClass('');
             }}
           >
@@ -111,10 +111,9 @@ const Attendance: React.FC = () => {
         <div className="space-y-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('choose_classroom')}</label>
           <select
-            className="input-field w-full mt-1"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all disabled:opacity-30"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            disabled={!selectedSection}
           >
             <option value="">{t('select_classroom')}</option>
             {classes.filter(c => c.section === selectedSection).map(c => (

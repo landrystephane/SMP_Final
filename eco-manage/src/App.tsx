@@ -27,8 +27,23 @@ import CustomizationSettings from './pages/CustomizationSettings';
 import AnnualArchives from './pages/AnnualArchives';
 import './index.css';
 
+import { useTranslation } from 'react-i18next';
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isRestoringSession } = useAuth();
+  const { t } = useTranslation();
+  
+  if (isRestoringSession) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-white font-black text-sm italic uppercase tracking-[0.2em]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <span>{t('verifying_session', 'Vérification de la session...')}</span>
+        </div>
+      </div>
+    );
+  }
+  
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
