@@ -80,18 +80,22 @@ const Grades: React.FC = () => {
                 if (new Date() > endDate) {
                     pastDeadline = true;
                     // Check for override
-                    const override = await window.electronAPI.getGradeOverrides({
-                        teacherId: user.id,
-                        classId: parseInt(selectedClass),
-                        term: selectedTerm,
-                        month: selectedMonth
-                    });
-                    if (override) {
-                        const overrideDate = new Date(override.deadline);
-                        overrideDate.setHours(23, 59, 59, 999);
-                        if (new Date() <= overrideDate) {
-                            pastDeadline = false;
+                    try {
+                        const override = await window.electronAPI.getGradeOverrides({
+                            teacherId: user.id,
+                            classId: parseInt(selectedClass),
+                            term: selectedTerm,
+                            month: selectedMonth
+                        });
+                        if (override) {
+                            const overrideDate = new Date(override.deadline);
+                            overrideDate.setHours(23, 59, 59, 999);
+                            if (new Date() <= overrideDate) {
+                                pastDeadline = false;
+                            }
                         }
+                    } catch (err) {
+                        console.warn("getGradeOverrides non disponible, veuillez redémarrer l'application.");
                     }
                 }
             }
@@ -158,7 +162,20 @@ const Grades: React.FC = () => {
         const days = prompt("Combien de jours supplémentaires souhaitez-vous accorder à l'enseignant de cette classe pour la saisie ? (ex: 3)", "3");
         if (days && !isNaN(parseInt(days))) {
             const classObj = classes.find(c => c.id.toString() === selectedClass);
-            if (!classObj || !classObj.teacher_id) {
+            
+            // Find the teacher assigned to this class
+            const allUsers = await window.electronAPI.getUsers(user?.schoolId);
+            const teacher = allUsers.find((u: any) => {
+                if (u.role !== 'TEACHER') return false;
+                try {
+                    const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
+                    return assigned.includes(parseInt(selectedClass));
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            if (!classObj || !teacher) {
                 alert("Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation.");
                 return;
             }
@@ -167,20 +184,24 @@ const Grades: React.FC = () => {
             newDeadline.setDate(newDeadline.getDate() + parseInt(days));
             const formattedDate = newDeadline.toISOString().split('T')[0];
 
-            await window.electronAPI.addGradeOverride({
-                teacherId: classObj.teacher_id,
-                classId: parseInt(selectedClass),
-                term: selectedTerm,
-                month: selectedMonth,
-                deadline: formattedDate,
-                grantedBy: user?.id
-            });
+            try {
+                await window.electronAPI.addGradeOverride({
+                    teacherId: teacher.id,
+                    classId: parseInt(selectedClass),
+                    term: selectedTerm,
+                    month: selectedMonth,
+                    deadline: formattedDate,
+                    grantedBy: user?.id
+                });
+            } catch (err) {
+                alert("Veuillez d'abord relancer l'application pour appliquer les mises à jour de base de données.");
+                return;
+            }
 
             // Notify the teacher
             await window.electronAPI.createNotification({
                 school_id: user?.schoolId,
-                recipient_id: classObj.teacher_id,
-                title: 'Dérogation accordée',
+                user_id: teacher.id,
                 message: `Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe ${classObj.name} jusqu'au ${formattedDate}.`,
                 type: 'SYSTEM'
             });

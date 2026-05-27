@@ -110,8 +110,7 @@ const Finance: React.FC = () => {
             // Notify FOUNDER
             await window.electronAPI.createNotification({
                 school_id: user.schoolId,
-                recipient_role: 'FOUNDER',
-                title: 'Nouvelle demande de décaissement',
+                role: 'FOUNDER',
                 message: `Une demande de ${newExpense.amount} FCFA a été soumise par l'Économe pour: ${newExpense.reason}.`,
                 type: 'FINANCE'
             });
@@ -141,8 +140,7 @@ const Finance: React.FC = () => {
             if (exp) {
                 await window.electronAPI.createNotification({
                     school_id: user.schoolId,
-                    recipient_id: exp.requested_by,
-                    title: `Décaissement ${status === 'VALIDATED' ? 'Approuvé' : 'Rejeté'}`,
+                    user_id: exp.requested_by,
                     message: `Votre demande de ${exp.amount} FCFA a été ${status === 'VALIDATED' ? 'approuvée' : 'rejetée'} par ${user.fullName}.`,
                     type: 'FINANCE'
                 });

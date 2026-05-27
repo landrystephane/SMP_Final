@@ -62,8 +62,7 @@ const AdminWorkflow: React.FC = () => {
         if (period.editingAllowed) {
             await window.electronAPI.createNotification({
                 school_id: user?.schoolId,
-                recipient_role: 'TEACHER',
-                title: 'Période de saisie des notes ouverte',
+                role: 'TEACHER',
                 message: `La période de saisie des notes est ouverte du ${period.start} au ${period.end}. Veuillez procéder au remplissage.`,
                 type: 'SYSTEM'
             });
