@@ -1001,7 +1001,7 @@ handleIPC('db:getAttendance', async (event, { classId, date }) => {
 
 handleIPC('db:getUsers', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE school_id = ?').all(sid);
+  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active FROM users WHERE school_id = ?').all(sid);
 });
 
 handleIPC('db:addUser', async (event, user) => {

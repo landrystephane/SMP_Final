@@ -410,11 +410,11 @@ const Users: React.FC = () => {
                     <td className="px-8 py-6">
                       <div className="flex items-center">
                         <div className="w-12 h-12 rounded-2xl bg-slate-950 text-amber-500 flex items-center justify-center mr-5 text-lg font-black border border-white/5 shadow-inner group-hover:bg-amber-500 group-hover:text-slate-950 transition-all duration-300">
-                          {u.fullName.charAt(0)}
+                          {(u.fullName || 'U').charAt(0)}
                         </div>
                         <div>
                             <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
-                                {u.civility ? `${u.civility} ` : ''}{u.fullName}
+                                {u.civility ? `${u.civility} ` : ''}{u.fullName || 'Utilisateur'}
                             </div>
                              <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                  <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>

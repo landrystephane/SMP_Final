@@ -106,8 +106,8 @@ const Classes: React.FC = () => {
     };
 
     const filteredClasses = classes.filter(c => 
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.code.toLowerCase().includes(searchTerm.toLowerCase())
+        (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (c.code || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const getTeacherName = (id: number) => {
