@@ -930,7 +930,7 @@ export const generateAttendanceReport = (data: { records: any[], className: stri
                 totalAbsenceHours: 0
             };
         }
-        studentStats[r.student_id].totalAbsenceHours += r.hours;
+        studentStats[r.student_id].totalAbsenceHours += (r.hours_absent || 0);
     });
 
     const tableData = Object.values(studentStats)

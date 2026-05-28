@@ -249,11 +249,11 @@ const Classes: React.FC = () => {
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Code Unique</label>
                                     <input
                                         required
+                                        disabled
                                         type="text"
-                                        placeholder="Ex: SIL-B"
-                                        className="input-field w-full mt-1"
+                                        placeholder="Généré automatiquement"
+                                        className="input-field w-full mt-1 bg-slate-800 text-slate-400 cursor-not-allowed opacity-60"
                                         value={formData.code}
-                                        onChange={(e) => setFormData({...formData, code: e.target.value})}
                                     />
                                 </div>
                             </div>

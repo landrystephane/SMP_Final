@@ -22,6 +22,7 @@ const Attendance: React.FC = () => {
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); // e.g. 2026-05
   const [reportSearch, setReportSearch] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -352,7 +353,7 @@ const Attendance: React.FC = () => {
                           </div>
                       </div>
 
-                      <div className="space-y-2">
+                       <div className="space-y-2 relative">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('search_student', 'Rechercher un élève (Optionnel)')}</label>
                           <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl focus-within:ring-2 focus-within:ring-amber-500">
                               <Search className="w-5 h-5 mr-3 text-slate-500" />
@@ -360,10 +361,40 @@ const Attendance: React.FC = () => {
                                   type="text" 
                                   placeholder="Nom, Prénom, Matricule..." 
                                   value={reportSearch}
-                                  onChange={(e) => setReportSearch(e.target.value)}
-                                  className="bg-transparent outline-none text-white font-bold w-full placeholder-slate-600" 
+                                  onChange={(e) => {
+                                      setReportSearch(e.target.value);
+                                      setShowSuggestions(true);
+                                  }}
+                                  onFocus={() => setShowSuggestions(true)}
+                                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                  className="bg-transparent outline-none text-white font-bold w-full placeholder-slate-600 focus:placeholder-slate-400" 
                               />
                           </div>
+
+                          {showSuggestions && reportSearch.trim() && (
+                              <div className="absolute left-0 right-0 mt-1 bg-slate-950 border border-slate-850 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-white/5">
+                                  {students
+                                      .filter(s => 
+                                          (s.first_name || '').toLowerCase().includes(reportSearch.toLowerCase()) || 
+                                          (s.last_name || '').toLowerCase().includes(reportSearch.toLowerCase()) || 
+                                          (s.matricule || '').toLowerCase().includes(reportSearch.toLowerCase())
+                                      )
+                                      .map(s => (
+                                          <div 
+                                              key={s.id}
+                                              onMouseDown={() => {
+                                                  setReportSearch(`${s.last_name.toUpperCase()} ${s.first_name}`);
+                                                  setShowSuggestions(false);
+                                              }}
+                                              className="px-4 py-3 text-left hover:bg-amber-500 hover:text-slate-950 cursor-pointer flex flex-col transition-colors group"
+                                          >
+                                              <span className="font-bold text-sm text-white group-hover:text-slate-950">{s.last_name.toUpperCase()} {s.first_name}</span>
+                                              <span className="text-[10px] text-slate-400 group-hover:text-slate-900">{s.matricule}</span>
+                                          </div>
+                                      ))
+                                  }
+                              </div>
+                          )}
                       </div>
                   </div>
 
