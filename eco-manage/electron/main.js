@@ -38,7 +38,7 @@ function permanentlyDeleteSchool(schoolId) {
       db.prepare('DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)').run(id);
 
       // 4. Delete child records directly containing school_id or referencing students/users/classes
-      db.prepare('DELETE FROM grades WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM grades WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(id);
       db.prepare('DELETE FROM payments WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(id);
       db.prepare('DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(id);
       db.prepare('DELETE FROM schedules WHERE school_id = ?').run(id);
@@ -51,7 +51,6 @@ function permanentlyDeleteSchool(schoolId) {
       db.prepare('DELETE FROM expenses WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM notifications WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM users WHERE school_id = ? AND role != "SUPERADMIN"').run(id);
-      db.prepare('DELETE FROM school_year_archives WHERE school_id = ?').run(id);
 
       // 5. Finally delete the school
       return db.prepare('DELETE FROM schools WHERE id = ?').run(id);
@@ -485,14 +484,15 @@ handleIPC('db:getStudents', async (event, schoolId) => {
 });
 
 handleIPC('db:addStudent', async (event, student) => {
-  const { firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId, entryYear } = student;
+  const { firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId, entryYear, scholarshipReduction, hasMoratoire } = student;
   const sid = getActiveSchoolId(schoolId);
+  const parsedClassId = parseInt(classId, 10);
   const year = entryYear || new Date().getFullYear();
   const yearShort = year.toString().slice(-2);
 
   // Get class code
-  const classObj = db.prepare('SELECT code FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
-  if (!classObj) throw new Error('Classe introuvable ou non autorisée');
+  const classObj = db.prepare('SELECT code FROM classes WHERE id = ? AND school_id = ?').get(parsedClassId, sid);
+  if (!classObj) throw new Error(`Classe introuvable ou non autorisée (ClassID: ${parsedClassId}, SchoolID: ${sid})`);
   const classCode = classObj.code;
 
   // Generate order number securely using transaction (global per school/year)
@@ -517,9 +517,9 @@ handleIPC('db:addStudent', async (event, student) => {
     matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
 
     db.prepare(`
-      INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(matricule, year, orderNumber, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, sid);
+      INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(matricule, year, orderNumber, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, sid, scholarshipReduction || 0, hasMoratoire ? 1 : 0);
 
     // Auto-create PARENT account
     if (parentContact && parentContact.trim()) {
@@ -1207,25 +1207,13 @@ handleIPC('db:getStudentDetails', async (event, studentId) => {
 
 handleIPC('db:updateStudent', async (event, student) => {
   const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire } = student;
+  const parsedClassId = parseInt(classId, 10);
+  
   const runResult = db.prepare(`
-    UPDATE students SET
-      first_name = COALESCE(?, first_name), 
-      last_name = COALESCE(?, last_name), 
-      birth_date = COALESCE(?, birth_date), 
-      birth_place = COALESCE(?, birth_place), 
-      gender = COALESCE(?, gender),
-      parent_name = COALESCE(?, parent_name),
-      parent_contact = COALESCE(?, parent_contact), 
-      emergency_contact = COALESCE(?, emergency_contact), 
-      medical_info = COALESCE(?, medical_info), 
-      address = COALESCE(?, address), 
-      neighborhood = COALESCE(?, neighborhood),
-      section = COALESCE(?, section), 
-      class_id = COALESCE(?, class_id), 
-      scholarship_reduction = COALESCE(?, scholarship_reduction), 
-      has_moratoire = COALESCE(?, has_moratoire)
+    UPDATE students 
+    SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, gender = ?, parent_name = ?, parent_contact = ?, emergency_contact = ?, medical_info = ?, address = ?, neighborhood = ?, section = ?, class_id = ?, scholarship_reduction = ?, has_moratoire = ?
     WHERE id = ?
-  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire ? 1 : 0, id);
+  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, scholarshipReduction || 0, hasMoratoire ? 1 : 0, id);
 
   if (runResult.changes > 0 && parentContact && parentContact.trim()) {
       const studentInDb = db.prepare('SELECT parent_name, school_id FROM students WHERE id = ?').get(id);
