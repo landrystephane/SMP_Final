@@ -187,7 +187,7 @@ const Tickets: React.FC = () => {
                     <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{a.content}</p>
 
                     <div className="text-[10px] text-slate-500 flex justify-between items-center pt-2 border-t border-white/5">
-                      <span>Établissement Eco-Hub</span>
+                      <span>{user?.schoolName || 'Établissement'}</span>
                       <span>{new Date(a.created_at).toLocaleString('fr-FR')}</span>
                     </div>
                   </div>

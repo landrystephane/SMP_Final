@@ -68,7 +68,8 @@ const AdminWorkflow: React.FC = () => {
             });
         }
 
-        alert(t('period_updated_success'));
+        const isEn = i18n.language.startsWith('en');
+        alert(isEn ? 'Evaluation period updated successfully.' : 'Période d\\'évaluation mise à jour avec succès.');
     }
   };
 

@@ -97,6 +97,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // System/Admin
   getDashboardStats: (params) => ipcRenderer.invoke('db:getDashboardStats', params),
+  getTeacherDashboardStats: (params) => ipcRenderer.invoke('db:getTeacherDashboardStats', params),
   getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
   setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
   logFrontendError: (errorDetails) => ipcRenderer.invoke('db:logFrontendError', errorDetails),
