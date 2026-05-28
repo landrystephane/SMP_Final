@@ -32,6 +32,7 @@ function permanentlyDeleteSchool(schoolId) {
       db.prepare('DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
       db.prepare('DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
       db.prepare('DELETE FROM tuition_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
+      db.prepare('DELETE FROM grade_overrides WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(id);
 
       // 3. Delete grandchild records referencing user_id (from users)
       db.prepare('DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)').run(id);
@@ -47,6 +48,8 @@ function permanentlyDeleteSchool(schoolId) {
       db.prepare('DELETE FROM students WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM classes WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM school_subjects WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM expenses WHERE school_id = ?').run(id);
+      db.prepare('DELETE FROM notifications WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM users WHERE school_id = ? AND role != "SUPERADMIN"').run(id);
       db.prepare('DELETE FROM school_year_archives WHERE school_id = ?').run(id);
 
