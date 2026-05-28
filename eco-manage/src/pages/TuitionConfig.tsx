@@ -56,9 +56,17 @@ const TuitionConfig: React.FC = () => {
   const submitAddInstallment = async () => {
       if (!newInstallmentName.trim()) return;
       if (window.electronAPI) {
-          await window.electronAPI.addInstallment(newInstallmentName.trim().toUpperCase());
-          setShowAddModal(false);
-          loadData();
+          try {
+              const res = await window.electronAPI.addInstallment(newInstallmentName.trim().toUpperCase());
+              if (res && res.error) {
+                  alert('Erreur: ' + res.error);
+                  return;
+              }
+              setShowAddModal(false);
+              loadData();
+          } catch (err: any) {
+              alert('Erreur: ' + err.message);
+          }
       }
   };
 

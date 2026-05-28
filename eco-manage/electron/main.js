@@ -268,6 +268,9 @@ const handleIPC = (channel, handler) => {
     } catch (error) {
       console.error(`[IPC Error] ${channel}:`, error.message);
       logErrorToFile(channel, error, args);
+      if (channel.startsWith('db:get')) {
+        return [];
+      }
       return { error: error.message };
     }
   });
@@ -1060,10 +1063,17 @@ handleIPC('db:addUser', async (event, user) => {
   const order = maxOrder + 1;
   const matricule = `${yearShort}${roleCode}${order.toString().padStart(4, '0')}`;
 
-  db.prepare(`
-    INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender, phone)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null);
+  const transaction = db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender, phone)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null);
+    
+    if (role === 'TEACHER' && assignedClasses && assignedClasses.length > 0) {
+        db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+    }
+  });
+  transaction();
   
   return { success: true, matricule };
 });
@@ -1110,35 +1120,31 @@ handleIPC('db:updateUser', async (event, userToUpdate) => {
   const finalSection = section || existing.section;
   const finalGender = gender || existing.gender;
 
-  if (password && password.trim()) {
-      const hash = bcrypt.hashSync(password.trim(), 10);
-      return db.prepare(`
-        UPDATE users SET 
-          username = ?, 
-          full_name = ?, 
-          role = ?, 
-          phone = ?, 
-          assigned_classes = ?, 
-          civility = ?, 
-          section = ?, 
-          gender = ?, 
-          password = ? 
-        WHERE id = ?
-      `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id);
-  } else {
-      return db.prepare(`
-        UPDATE users SET 
-          username = ?, 
-          full_name = ?, 
-          role = ?, 
-          phone = ?, 
-          assigned_classes = ?, 
-          civility = ?, 
-          section = ?, 
-          gender = ? 
-        WHERE id = ?
-      `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id);
-  }
+  const transaction = db.transaction(() => {
+    if (password && password.trim()) {
+        const hash = bcrypt.hashSync(password.trim(), 10);
+        db.prepare(`
+          UPDATE users SET 
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ? 
+          WHERE id = ?
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id);
+    } else {
+        db.prepare(`
+          UPDATE users SET 
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ? 
+          WHERE id = ?
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id);
+    }
+
+    if (finalRole === 'TEACHER') {
+        db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ?').run(id);
+        if (assignedClasses && assignedClasses.length > 0) {
+            db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+        }
+    }
+  });
+  transaction();
+  return { success: true };
 });
 
 handleIPC('db:changePassword', async (event, { userId, newPassword }) => {
@@ -1326,12 +1332,13 @@ handleIPC('db:getDashboardStats', async (event, params) => {
   `).get(...queryParams).total || 0;
 
   const classStats = db.prepare(`
-    SELECT c.name as level, AVG(g.score) as avg,
+    SELECT c.name as level, c.section, AVG(g.score) as avg,
     (COUNT(CASE WHEN g.score >= 10 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as passRate
     FROM classes c
     LEFT JOIN grades g ON g.class_id = c.id
     WHERE c.school_id = ? ${classWhereStr}
     GROUP BY c.id
+    ORDER BY c.section ASC, passRate DESC
   `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : [])] : [schoolId]));
 
   return {
@@ -1342,6 +1349,51 @@ handleIPC('db:getDashboardStats', async (event, params) => {
     classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
     financialAlerts: []
   };
+});
+
+handleIPC('db:getTeacherDashboardStats', async (event, params) => {
+    const { schoolId, teacherId } = params;
+    const sid = getActiveSchoolId(schoolId);
+
+    const classes = db.prepare('SELECT * FROM classes WHERE school_id = ? AND (main_teacher_id = ? OR assistant_teacher_id = ?)').all(sid, teacherId, teacherId);
+    
+    let totalStudents = 0;
+    let boys = 0;
+    let girls = 0;
+    let studentsAverages = [];
+    
+    if (classes.length > 0) {
+        const classIds = classes.map(c => c.id).join(',');
+        const studentStats = db.prepare(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
+                SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
+            FROM students
+            WHERE class_id IN (${classIds})
+        `).get();
+        totalStudents = studentStats.total || 0;
+        boys = studentStats.boys || 0;
+        girls = studentStats.girls || 0;
+
+        studentsAverages = db.prepare(`
+            SELECT s.id, s.first_name, s.last_name, s.matricule, c.name as className,
+                AVG(g.score) as average
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            LEFT JOIN grades g ON g.student_id = s.id
+            WHERE s.class_id IN (${classIds})
+            GROUP BY s.id
+            ORDER BY average DESC NULLS LAST
+        `).all();
+    }
+
+    return {
+        totalStudents,
+        genderDist: { boys, girls },
+        classes,
+        students: studentsAverages.map(s => ({ ...s, average: s.average || 0 }))
+    };
 });
 
 // Layout / Settings Customization

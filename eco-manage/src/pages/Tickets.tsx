@@ -273,19 +273,19 @@ const Tickets: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {tickets.map((t) => (
-                  <div key={t.id} className="glass-card p-6 border-l-4 border-amber-500/30 flex justify-between items-start flex-wrap gap-4">
+                {tickets.map((ticket) => (
+                  <div key={ticket.id} className="glass-card p-6 border-l-4 border-amber-500/30 flex justify-between items-start flex-wrap gap-4">
                     <div className="space-y-1">
-                      <h3 className="text-base font-bold text-white">{t.subject}</h3>
-                      <p className="text-slate-400 text-xs leading-relaxed">{t.message}</p>
-                      <span className="text-[10px] text-slate-500 block uppercase pt-2">{new Date(t.created_at || Date.now()).toLocaleString('fr-FR')}</span>
+                      <h3 className="text-base font-bold text-white">{ticket.subject}</h3>
+                      <p className="text-slate-400 text-xs leading-relaxed">{ticket.message}</p>
+                      <span className="text-[10px] text-slate-500 block uppercase pt-2">{new Date(ticket.created_at || Date.now()).toLocaleString('fr-FR')}</span>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      t.status === 'OPEN' 
+                      ticket.status === 'OPEN' 
                         ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
                         : 'bg-green-500/10 text-green-500 border border-green-500/20'
                     }`}>
-                      {t.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
+                      {ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
                     </span>
                   </div>
                 ))}

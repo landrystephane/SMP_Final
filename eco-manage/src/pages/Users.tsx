@@ -40,8 +40,8 @@ const Users: React.FC = () => {
     if (window.electronAPI && currentUser) {
       const u = await window.electronAPI.getUsers(currentUser.schoolId);
       const c = await window.electronAPI.getClasses(currentUser.schoolId);
-      setUsers(u || []);
-      setClasses(c || []);
+      setUsers(Array.isArray(u) ? u : []);
+      setClasses(Array.isArray(c) ? c : []);
     }
   };
 

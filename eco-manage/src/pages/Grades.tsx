@@ -213,54 +213,59 @@ const Grades: React.FC = () => {
   };
 
   const printStudentReport = async (student: any) => {
-      if (window.electronAPI) {
-          const classObj = classes.find(c => c.id.toString() === selectedClass);
-          const schools = await window.electronAPI.getSchools();
-          const school = schools.find((s: any) => s.id === user?.schoolId) || schools[0];
-          
-          // Fetch all students in this class
-          const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-          const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
+    if (window.electronAPI) {
+        try {
+            const classObj = classes.find(c => c.id.toString() === selectedClass);
+            const schools = await window.electronAPI.getSchools();
+            const school = schools.find((s: any) => s.id === user?.schoolId) || schools[0];
+            
+            // Fetch all students in this class
+            const allStudents = await window.electronAPI.getStudents(user?.schoolId);
+            const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
 
-          const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
-          // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)
-          const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
-              const details = await window.electronAPI.getStudentDetails(s.id);
-              const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && (g.validated === 1 || isDirector));
-              const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
-              const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
-              const avg = totalCoef > 0 ? (totalPoints / totalCoef) : 0;
-              return { id: s.id, avg, details };
-          }));
+            const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+            // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)
+            const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
+                const details = await window.electronAPI.getStudentDetails(s.id);
+                const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && (g.validated === 1 || isDirector));
+                const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
+                const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + (Number(g.coefficient) || 1), 0);
+                const avg = totalCoef > 0 ? (totalPoints / totalCoef) : 0;
+                return { id: s.id, avg, details };
+            }));
 
-          // Sort descending by average
-          studentsWithAverages.sort((a, b) => b.avg - a.avg);
+            // Sort descending by average
+            studentsWithAverages.sort((a, b) => b.avg - a.avg);
 
-          // Find student rank
-          const rankIndex = studentsWithAverages.findIndex(s => s.id === student.id);
-          const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
-          const totalStudents = studentsWithAverages.length;
+            // Find student rank
+            const rankIndex = studentsWithAverages.findIndex(s => s.id === student.id);
+            const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
+            const totalStudents = studentsWithAverages.length;
 
-          const studentData = studentsWithAverages.find(s => s.id === student.id);
-          if (studentData) {
-              let template = null;
-              if (window.electronAPI) {
-                  template = await window.electronAPI.getReportTemplate(user.schoolId);
-              }
-              generateReportCard({
-                  student,
-                  classObj,
-                  school,
-                  template,
-                  grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
-                  attendance: studentData.details.attendance,
-                  term: selectedTerm,
-                  rank,
-                  totalStudents,
-                  ignoreValidation: isDirector
-              });
-          }
-      }
+            const studentData = studentsWithAverages.find(s => s.id === student.id);
+            if (studentData) {
+                let template = null;
+                if (window.electronAPI) {
+                    template = await window.electronAPI.getReportTemplate(user?.schoolId);
+                }
+                generateReportCard({
+                    student,
+                    classObj,
+                    school,
+                    template,
+                    grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
+                    attendance: studentData.details.attendance,
+                    term: selectedTerm,
+                    rank,
+                    totalStudents,
+                    ignoreValidation: isDirector
+                });
+            }
+        } catch (err: any) {
+            console.error("Error generating report card:", err);
+            alert("Erreur lors de la génération du bulletin : " + err.message);
+        }
+    }
   }
 
   return (
@@ -423,18 +428,16 @@ const Grades: React.FC = () => {
                               </select>
                             ) : (
                               <input
-                                type="number"
-                                step="0.25"
-                                min="0"
-                                max="20"
+                                type="text"
                                 disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
-                                    let val = parseFloat(e.target.value);
+                                    let raw = e.target.value.replace(',', '.');
+                                    let val = parseFloat(raw);
                                     const updated = { ...grades };
-                                    if (isNaN(val)) {
+                                    if (raw === '') {
                                         delete updated[`${student.id}-${subject.id}`];
-                                    } else {
+                                    } else if (!isNaN(val)) {
                                         if (val > 20) val = 20;
                                         if (val < 0) val = 0;
                                         updated[`${student.id}-${subject.id}`] = val;

@@ -238,7 +238,11 @@ const Classes: React.FC = () => {
                                         placeholder="Ex: SIL B"
                                         className="input-field w-full mt-1"
                                         value={formData.name}
-                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                        onChange={(e) => {
+                                            const name = e.target.value;
+                                            const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+                                            setFormData({...formData, name, code: formData.id ? formData.code : code});
+                                        }}
                                     />
                                 </div>
                                 <div>

@@ -20,12 +20,20 @@ const Dashboard: React.FC = () => {
       }
       try {
         if (window.electronAPI && user) {
-          const data = await window.electronAPI.getDashboardStats({ 
-              schoolId: user.schoolId, 
-              section: selectedSection,
-              level: selectedCycle
-          });
-          setStats(data);
+          if (user.role === 'TEACHER') {
+              const data = await window.electronAPI.getTeacherDashboardStats({
+                  schoolId: user.schoolId,
+                  teacherId: user.id
+              });
+              setStats(data);
+          } else {
+              const data = await window.electronAPI.getDashboardStats({ 
+                  schoolId: user.schoolId, 
+                  section: selectedSection,
+                  level: selectedCycle
+              });
+              setStats(data);
+          }
         } else if (!window.electronAPI) {
           // Fallback for demo/web context
           setTimeout(() => {
@@ -60,6 +68,85 @@ const Dashboard: React.FC = () => {
 
   if (user?.role === 'SUPERADMIN' && !isImpersonating) {
       return <SystemAdmin />;
+  }
+
+  if (user?.role === 'TEACHER' && stats) {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+            <div>
+                <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
+                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu de vos classes</p>
+            </div>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
+                        <UsersIcon className="text-amber-500 group-hover:text-slate-950 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
+                </div>
+                {/* Boys */}
+                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500 transition-all">
+                        <UsersIcon className="text-blue-500 group-hover:text-slate-950 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Garçons</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.boys || 0}</p>
+                </div>
+                {/* Girls */}
+                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-pink-500/10 rounded-2xl group-hover:bg-pink-500 transition-all">
+                        <UsersIcon className="text-pink-500 group-hover:text-slate-950 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Filles</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.girls || 0}</p>
+                </div>
+            </div>
+
+            {/* List of students by merit */}
+            <div className="glass-card p-6 border-none shadow-xl">
+                <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
+                    Liste des élèves par ordre de mérite
+                </h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
+                            <tr>
+                                <th className="p-4">Rang</th>
+                                <th className="p-4">Matricule</th>
+                                <th className="p-4">Nom et Prénom</th>
+                                <th className="p-4">Classe</th>
+                                <th className="p-4 text-right">Moyenne</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-slate-300">
+                            {stats.students?.map((s: any, idx: number) => (
+                                <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                                    <td className="p-4 font-bold text-amber-500">{idx + 1}</td>
+                                    <td className="p-4 text-xs font-mono">{s.matricule}</td>
+                                    <td className="p-4 font-bold text-white uppercase">{s.last_name} <span className="capitalize font-normal text-slate-400">{s.first_name}</span></td>
+                                    <td className="p-4"><span className="px-2 py-1 bg-slate-800 rounded-lg text-[10px]">{s.className}</span></td>
+                                    <td className="p-4 text-right font-black text-emerald-400">{s.average.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                            {!stats.students?.length && (
+                                <tr>
+                                    <td colSpan={5} className="p-8 text-center text-slate-500">Aucun élève trouvé.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
   }
 
   if (!stats) return (

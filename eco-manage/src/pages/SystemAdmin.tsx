@@ -313,7 +313,7 @@ const SystemAdmin: React.FC = () => {
                   try {
                       const res = await window.electronAPI.deleteSchool({ id, password: password.trim() });
                       if (res && res.error) {
-                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect. Assurez-vous de taper "superadmin".' : res.error);
+                          setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
                           loadSchools();
@@ -343,7 +343,7 @@ const SystemAdmin: React.FC = () => {
                   try {
                       const res = await window.electronAPI.permanentlyDeleteSchool({ id, password: password.trim() });
                       if (res && res.error) {
-                          setConfirmPasswordError(res.error === 'Mot de passe incorrect' ? 'Mot de passe administrateur incorrect. Assurez-vous de taper "superadmin".' : res.error);
+                          setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
                           loadDeletedSchools();
