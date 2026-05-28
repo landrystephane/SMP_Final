@@ -730,9 +730,9 @@ handleIPC('db:getGlobalSubjects', async () => {
 
 handleIPC('db:addGlobalSubject', async (event, subject) => {
   const { name, domain, level, section } = subject;
-  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND level = ? AND section = ?').get(name, level, section);
+  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?)').get(name);
   if (existing) {
-    throw new Error('Une matière avec ce nom existe déjà pour ce niveau et cette section.');
+    throw new Error('Une matière avec ce nom exact existe déjà. Les noms doivent être uniques.');
   }
 
   const result = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)')
@@ -747,9 +747,9 @@ handleIPC('db:addGlobalSubject', async (event, subject) => {
 
 handleIPC('db:updateGlobalSubject', async (event, subject) => {
   const { id, name, domain, level, section } = subject;
-  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND level = ? AND section = ? AND id != ?').get(name, level, section, id);
+  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND id != ?').get(name, id);
   if (existing) {
-    throw new Error('Une matière avec ce nom existe déjà pour ce niveau et cette section.');
+    throw new Error('Une matière avec ce nom exact existe déjà. Les noms doivent être uniques.');
   }
 
   return db.prepare('UPDATE subjects SET name = ?, domain = ?, level = ?, section = ? WHERE id = ?')
@@ -757,18 +757,14 @@ handleIPC('db:updateGlobalSubject', async (event, subject) => {
 });
 
 handleIPC('db:deleteGlobalSubject', async (event, id) => {
-  const inUseGrades = db.prepare('SELECT COUNT(*) as count FROM grades WHERE subject_id = ?').get(id).count;
-  if (inUseGrades > 0) {
-    throw new Error('Impossible de supprimer cette matière : elle contient déjà des notes.');
-  }
-
-  const inUseClasses = db.prepare('SELECT COUNT(*) as count FROM class_subjects WHERE subject_id = ?').get(id).count;
-  if (inUseClasses > 0) {
-    throw new Error('Impossible de supprimer cette matière : elle est actuellement enseignée dans certaines classes.');
-  }
-
-  db.prepare('DELETE FROM school_subjects WHERE subject_id = ?').run(id);
-  return db.prepare('DELETE FROM subjects WHERE id = ?').run(id);
+  db.transaction((subjectId) => {
+    db.prepare('DELETE FROM grades WHERE subject_id = ?').run(subjectId);
+    db.prepare('DELETE FROM class_subjects WHERE subject_id = ?').run(subjectId);
+    db.prepare('DELETE FROM school_subjects WHERE subject_id = ?').run(subjectId);
+    db.prepare('DELETE FROM schedules WHERE subject_id = ?').run(subjectId);
+    db.prepare('DELETE FROM subjects WHERE id = ?').run(subjectId);
+  })(id);
+  return true;
 });
 
 handleIPC('db:getSchoolSubjects', async (event, schoolId) => {

@@ -174,8 +174,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 value={formData.gender}
                 onChange={(e) => setFormData({...formData, gender: e.target.value})}
               >
-                <option value="M">{t('gender_male')}</option>
-                <option value="F">{t('gender_female')}</option>
+                <option value="M" className="bg-slate-900 text-white">Masculin</option>
+                <option value="F" className="bg-slate-900 text-white">Féminin</option>
               </select>
             </div>
             <div className="space-y-1">
@@ -214,8 +214,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.section}
                     onChange={(e) => setFormData({...formData, section: e.target.value, classId: ''})}
                 >
-                    <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
-                    <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
+                    <option value="FRANCOPHONE" className="bg-slate-900 text-white">Francophone</option>
+                    <option value="ANGLOPHONE" className="bg-slate-900 text-white">Anglophone</option>
                 </select>
             </div>
             <div className="space-y-1">
@@ -225,8 +225,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.cycle || 'PRIMAIRE'}
                     onChange={(e) => setFormData({...formData, cycle: e.target.value, classId: ''})}
                 >
-                    <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
-                    <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
+                    <option value="PRIMAIRE" className="bg-slate-900 text-white">Primaire</option>
+                    <option value="MATERNELLE" className="bg-slate-900 text-white">Maternelle</option>
                 </select>
             </div>
             <div className="space-y-1 col-span-1 md:col-span-2">
@@ -237,11 +237,11 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.classId}
                     onChange={(e) => setFormData({...formData, classId: e.target.value})}
                 >
-                    <option value="">{t('select_classroom', 'Sélectionner la classe...')}</option>
+                    <option value="" className="bg-slate-900 text-white">Sélectionner la classe...</option>
                     {classes
                         .filter(c => c.section === formData.section && c.level === (formData.cycle || 'PRIMAIRE'))
                         .map(c => (
-                            <option key={c.id} value={c.id}>{c.name} ({c.level})</option>
+                            <option key={c.id} value={c.id} className="bg-slate-900 text-white">{c.name} ({c.level})</option>
                         ))}
                 </select>
             </div>
