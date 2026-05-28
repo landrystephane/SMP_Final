@@ -11,6 +11,7 @@ const Tickets: React.FC = () => {
   // States for tickets/requests
   const [tickets, setTickets] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [schoolName, setSchoolName] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [newTicketSubject, setNewTicketSubject] = useState(t('internal_message_default', 'Message interne'));
   const [receiverRole, setReceiverRole] = useState('DIRECTOR');
@@ -35,6 +36,12 @@ const Tickets: React.FC = () => {
 
             const annData = await window.electronAPI.getAnnouncements(user.schoolId);
             setAnnouncements(annData || []);
+
+            const schools = await window.electronAPI.getSchools();
+            const currentSchool = schools.find((s: any) => s.id === user.schoolId);
+            if (currentSchool) {
+                setSchoolName(currentSchool.name);
+            }
         } catch (err) {
             console.error('Failed to load data', err);
         }
@@ -187,7 +194,7 @@ const Tickets: React.FC = () => {
                     <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{a.content}</p>
 
                     <div className="text-[10px] text-slate-500 flex justify-between items-center pt-2 border-t border-white/5">
-                      <span>{user?.schoolName || 'Établissement'}</span>
+                      <span>{schoolName ? `Établissement ${schoolName}` : 'Établissement'}</span>
                       <span>{new Date(a.created_at).toLocaleString('fr-FR')}</span>
                     </div>
                   </div>

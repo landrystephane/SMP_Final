@@ -627,6 +627,7 @@ export const generateClassReportCards = (data: {
     const { classObj, school, term, studentsData } = data;
     const doc = new jsPDF();
     const isNursery = classObj.level === 'MATERNELLE';
+    const isEn = i18n.language?.startsWith('en') ?? false;
     const primary = school.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
     const secondary = school.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
 
@@ -940,7 +941,7 @@ export const generateAttendanceReport = (data: { records: any[], className: stri
             s.totalAbsenceHours > 0 ? `${s.totalAbsenceHours} h` : (isEn ? 'Present' : 'Présent(e)')
         ]);
 
-    autoTable(doc, {
+    (doc as any).autoTable({
         startY: 65,
         head: [[
             isEn ? 'MATRICULE' : 'MATRICULE',
