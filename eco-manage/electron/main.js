@@ -410,9 +410,18 @@ handleIPC('db:updateSchool', async (event, school) => {
 handleIPC('db:deleteSchool', async (event, { id, password }) => {
     if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     
-    // Verify password
     const superadmin = db.prepare('SELECT password FROM users WHERE id = ?').get(loggedInUser.id);
-    if (!superadmin || !bcrypt.compareSync(password, superadmin.password)) {
+    if (!superadmin) return { error: 'Utilisateur introuvable' };
+
+    let isValid = false;
+    if (superadmin.password.length === 64 && !superadmin.password.startsWith('$2a$')) {
+        const oldHash = crypto.createHash('sha256').update(password).digest('hex');
+        isValid = (oldHash === superadmin.password);
+    } else {
+        isValid = bcrypt.compareSync(password, superadmin.password);
+    }
+
+    if (!isValid) {
         return { error: 'Mot de passe incorrect' };
     }
 
@@ -430,9 +439,18 @@ handleIPC('db:restoreSchool', async (event, id) => {
 handleIPC('db:permanentlyDeleteSchool', async (event, { id, password }) => {
     if (loggedInUser?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     
-    // Verify password
     const superadmin = db.prepare('SELECT password FROM users WHERE id = ?').get(loggedInUser.id);
-    if (!superadmin || !bcrypt.compareSync(password, superadmin.password)) {
+    if (!superadmin) return { error: 'Utilisateur introuvable' };
+
+    let isValid = false;
+    if (superadmin.password.length === 64 && !superadmin.password.startsWith('$2a$')) {
+        const oldHash = crypto.createHash('sha256').update(password).digest('hex');
+        isValid = (oldHash === superadmin.password);
+    } else {
+        isValid = bcrypt.compareSync(password, superadmin.password);
+    }
+
+    if (!isValid) {
         return { error: 'Mot de passe incorrect' };
     }
 
