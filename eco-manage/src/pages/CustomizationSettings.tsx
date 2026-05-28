@@ -36,7 +36,7 @@ const CustomizationSettings: React.FC = () => {
         if (window.electronAPI && user) {
             const schs = await window.electronAPI.getSchools();
             setSchools(schs);
-            const mySchool = schs.find(s => s.id === user.schoolId) || schs[0];
+            const mySchool = schs.find(s => s.id?.toString() === user.schoolId?.toString()) || schs[0];
             if (mySchool) {
                 setActiveSchool(mySchool);
                 setSchoolName(mySchool.name || '');

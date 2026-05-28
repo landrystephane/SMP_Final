@@ -23,6 +23,43 @@ const Attendance: React.FC = () => {
   const [reportSearch, setReportSearch] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isUnlockedByAdmin, setIsUnlockedByAdmin] = useState(false);
+
+  const loadExistingAttendance = async () => {
+    if (window.electronAPI && selectedClass && currentDate) {
+      try {
+        const records = await window.electronAPI.getAttendance({ classId: parseInt(selectedClass), date: currentDate });
+        const hasRecords = records.length > 0;
+        
+        const unlockSetting = await window.electronAPI.getSetting(`attendance_unlock_${selectedClass}_${currentDate}`);
+        const unlocked = unlockSetting === 'true';
+        setIsUnlockedByAdmin(unlocked);
+        
+        if (user?.role === 'TEACHER') {
+            setIsLocked(hasRecords && !unlocked);
+        } else {
+            setIsLocked(false);
+        }
+
+        const newAbsences: Record<string, number> = {};
+        records.forEach((r: any) => {
+            newAbsences[r.student_id] = r.hours_absent;
+        });
+        setAbsences(newAbsences);
+      } catch (e) {
+        console.error("Failed to load attendance:", e);
+      }
+    } else {
+        setAbsences({});
+        setIsLocked(false);
+        setIsUnlockedByAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+      loadExistingAttendance();
+  }, [selectedClass, currentDate, user]);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -58,6 +95,45 @@ const Attendance: React.FC = () => {
     };
     loadStudents();
   }, [selectedClass, user]);
+
+  const handleRequestUnlock = async () => {
+      if (!window.electronAPI || !user || !selectedClass || !currentDate) return;
+      const classObj = classes.find(c => c.id.toString() === selectedClass);
+      const className = classObj ? `${classObj.name} (${classObj.code})` : selectedClass;
+      const formattedDate = new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR');
+      const subject = `Demande de déblocage : Présences ${className}`;
+      const message = `Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe ${className} du ${formattedDate}. Veuillez s'il vous plaît débloquer cette fiche.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`;
+      
+      try {
+          await window.electronAPI.sendTicket({
+              sender_id: user.id,
+              receiver_role: 'FOUNDER',
+              receiver_id: null,
+              subject,
+              message,
+              school_id: user.schoolId
+          });
+          alert("Votre demande de déblocage a été envoyée avec succès à l'administration.");
+      } catch (e: any) {
+          alert("Erreur lors de l'envoi de la demande: " + e.message);
+      }
+  };
+
+  const handleToggleUnlock = async () => {
+      if (!window.electronAPI || !selectedClass || !currentDate) return;
+      const newValue = !isUnlockedByAdmin;
+      try {
+          await window.electronAPI.setSetting({
+              key: `attendance_unlock_${selectedClass}_${currentDate}`,
+              value: newValue ? 'true' : 'false'
+          });
+          setIsUnlockedByAdmin(newValue);
+          alert(newValue ? "La fiche a été déverrouillée pour l'enseignant." : "La fiche a été verrouillée à nouveau.");
+          await loadExistingAttendance();
+      } catch (e: any) {
+          alert("Erreur lors du changement de verrouillage: " + e.message);
+      }
+  };
 
   const handleSave = async () => {
       if (window.electronAPI) {
@@ -133,12 +209,11 @@ const Attendance: React.FC = () => {
           // Filter by search if any
           let finalRecords = records;
           if (reportSearch) {
-              const lowerSearch = reportSearch.toLowerCase();
-              finalRecords = records.filter((r: any) => 
-                  r.first_name?.toLowerCase().includes(lowerSearch) || 
-                  r.last_name?.toLowerCase().includes(lowerSearch) ||
-                  r.matricule?.toLowerCase().includes(lowerSearch)
-              );
+              const searchTerms = reportSearch.trim().toLowerCase().split(/\s+/);
+              finalRecords = records.filter((r: any) => {
+                  const fullName = `${r.last_name || ''} ${r.first_name || ''} ${r.matricule || ''}`.toLowerCase();
+                  return searchTerms.every(term => fullName.includes(term));
+              });
           }
 
           if (finalRecords.length === 0) {
@@ -149,11 +224,11 @@ const Attendance: React.FC = () => {
 
           const classObj = classes.find(c => c.id.toString() === selectedClass);
           const schoolSettings = await window.electronAPI.getSchools();
-          const currentSchool = schoolSettings?.find((s: any) => s.id === user?.schoolId);
+          const currentSchool = schoolSettings?.find((s: any) => s.id?.toString() === user?.schoolId?.toString());
 
           generateAttendanceReport({
               records: finalRecords,
-              className: classObj?.name || selectedClass,
+              className: classObj ? `${classObj.name} (${classObj.code})` : selectedClass,
               periodText,
               school: currentSchool
           });
@@ -215,7 +290,7 @@ const Attendance: React.FC = () => {
           >
             <option value="">{t('select_classroom')}</option>
             {classes.filter(c => c.section === selectedSection).map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
             ))}
           </select>
         </div>
@@ -236,16 +311,52 @@ const Attendance: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-lg font-bold">{t('daily_call')} : {classes.find(c => c.id.toString() === selectedClass)?.name}</h2>
-                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">{t('zero_for_full_presence')}</p>
+                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">{isLocked ? "Fiche de présence verrouillée" : t('zero_for_full_presence')}</p>
                     </div>
                 </div>
-                <button
-                    onClick={handleSave}
-                    className="w-full md:w-auto px-8 py-3 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 transition-all flex items-center justify-center shadow-lg active:scale-95"
-                >
-                    <Save className="w-5 h-5 mr-2" /> {t('save_attendance')}
-                </button>
+                <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+                    {user?.role !== 'TEACHER' && (
+                        <button
+                            onClick={handleToggleUnlock}
+                            className={`w-full md:w-auto px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center shadow-lg active:scale-95 ${
+                                isUnlockedByAdmin 
+                                ? 'bg-rose-600 hover:bg-rose-500 text-white' 
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            }`}
+                        >
+                            {isUnlockedByAdmin ? "Re-verrouiller" : "Débloquer"}
+                        </button>
+                    )}
+                    {!isLocked && (
+                        <button
+                            onClick={handleSave}
+                            className="w-full md:w-auto px-8 py-3 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 transition-all flex items-center justify-center shadow-lg active:scale-95"
+                        >
+                            <Save className="w-5 h-5 mr-2" /> {t('save_attendance')}
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {isLocked && (
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-500 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 shadow-md">
+                    <div className="flex items-center space-x-3">
+                        <AlertCircle className="w-6 h-6 flex-shrink-0" />
+                        <div>
+                            <p className="font-bold text-sm">Fiche de présence verrouillée</p>
+                            <p className="text-xs text-slate-400">Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage.</p>
+                        </div>
+                    </div>
+                    {user?.role === 'TEACHER' && (
+                        <button
+                            onClick={handleRequestUnlock}
+                            className="w-full md:w-auto px-6 py-2 bg-amber-500 text-slate-950 font-black rounded-lg text-xs hover:bg-amber-400 active:scale-95 transition-all shadow-md"
+                        >
+                            Demander le déblocage
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div className="glass-card shadow-xl border-none">
                 <div className="overflow-x-auto">
@@ -271,21 +382,24 @@ const Attendance: React.FC = () => {
                                             <div className="flex items-center justify-center space-x-3">
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.max(0, h - 1)})}
-                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-rose-500 hover:text-white transition-all"
+                                                    disabled={isLocked}
+                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-rose-500 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     -
                                                 </button>
                                                 <input
                                                     type="number"
                                                     value={h}
+                                                    disabled={isLocked}
                                                     onChange={(e) => setAbsences({...absences, [student.id]: Math.min(8, Math.max(0, parseInt(e.target.value) || 0))})}
-                                                    className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none"
+                                                    className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none disabled:opacity-50"
                                                     max="8"
                                                     min="0"
                                                 />
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.min(8, h + 1)})}
-                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all"
+                                                    disabled={isLocked}
+                                                    className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     +
                                                 </button>
@@ -374,11 +488,11 @@ const Attendance: React.FC = () => {
                           {showSuggestions && reportSearch.trim() && (
                               <div className="absolute left-0 right-0 mt-1 bg-slate-950 border border-slate-850 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-white/5">
                                   {students
-                                      .filter(s => 
-                                          (s.first_name || '').toLowerCase().includes(reportSearch.toLowerCase()) || 
-                                          (s.last_name || '').toLowerCase().includes(reportSearch.toLowerCase()) || 
-                                          (s.matricule || '').toLowerCase().includes(reportSearch.toLowerCase())
-                                      )
+                                      .filter(s => {
+                                          const fullName = `${s.last_name || ''} ${s.first_name || ''} ${s.matricule || ''}`.toLowerCase();
+                                          const searchTerms = reportSearch.trim().toLowerCase().split(/\s+/);
+                                          return searchTerms.every(term => fullName.includes(term));
+                                      })
                                       .map(s => (
                                           <div 
                                               key={s.id}

@@ -113,7 +113,7 @@ export const generateReportCard = (data: any) => {
     doc.setFont('helvetica', 'bold');
     doc.text(isEn ? 'CLASS:' : 'CLASSE:', 25, startY + 21);
     doc.setFont('helvetica', 'normal');
-    doc.text(classObj.name, 80, startY + 21);
+    doc.text(`${classObj.name}${classObj.code ? ' (' + classObj.code + ')' : ''}`, 80, startY + 21);
 
     doc.setFont('helvetica', 'bold');
     doc.text(isEn ? 'SCHOOL YEAR:' : 'ANNÉE SCOLAIRE:', 120, startY + 7);
@@ -664,7 +664,7 @@ export const generateClassReportCards = (data: {
 
             drawText(`${student.last_name} ${student.first_name}`, 'studentName', 80, 80, 10, true);
             drawText(student.matricule, 'matricule', 80, 87, 9);
-            drawText(classObj.name, 'class', 80, 94, 9);
+            drawText(`${classObj.name}${classObj.code ? ' (' + classObj.code + ')' : ''}`, 'class', 80, 94, 9);
             drawText(`${new Date().getFullYear() - 1}/${new Date().getFullYear()}`, 'year', 175, 80, 9);
             drawText(classObj.section, 'section', 175, 87, 9);
 
@@ -790,7 +790,7 @@ export const generateClassReportCards = (data: {
             doc.setFont('helvetica', 'bold');
             doc.text(isEn ? 'CLASS:' : 'CLASSE:', 25, 94);
             doc.setFont('helvetica', 'normal');
-            doc.text(classObj.name, 80, 94);
+            doc.text(`${classObj.name}${classObj.code ? ' (' + classObj.code + ')' : ''}`, 80, 94);
 
             doc.setFont('helvetica', 'bold');
             doc.text(isEn ? 'SCHOOL YEAR:' : 'ANNÉE SCOLAIRE:', 120, 80);

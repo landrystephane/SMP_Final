@@ -240,7 +240,9 @@ const Classes: React.FC = () => {
                                         value={formData.name}
                                         onChange={(e) => {
                                             const name = e.target.value;
-                                            const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+                                            const nameClean = name.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '');
+                                            const yearShort = new Date().getFullYear().toString().slice(-2);
+                                            const code = nameClean ? `${nameClean}0${yearShort}` : '';
                                             setFormData({...formData, name, code: formData.id ? formData.code : code});
                                         }}
                                     />

@@ -21,7 +21,7 @@ const Statistics: React.FC = () => {
     const loadSchool = async () => {
       if (window.electronAPI && user) {
         const schoolsList = await window.electronAPI.getSchools();
-        const curSchool = schoolsList.find((s: any) => s.id === user.schoolId);
+        const curSchool = schoolsList.find((s: any) => s.id?.toString() === user.schoolId?.toString());
         setSchool(curSchool);
       }
     };

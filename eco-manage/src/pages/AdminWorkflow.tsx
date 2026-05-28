@@ -26,7 +26,7 @@ const AdminWorkflow: React.FC = () => {
         setClasses(cls || []);
 
         const schoolsList = await window.electronAPI.getSchools();
-        const curSchool = schoolsList.find((s: any) => s.id === user.schoolId);
+        const curSchool = schoolsList.find((s: any) => s.id?.toString() === user.schoolId?.toString());
         setSchool(curSchool);
     }
   };

@@ -71,7 +71,7 @@ const AnnualArchives: React.FC = () => {
 
     const handleDownloadAudit = () => {
         if (!window.electronAPI || !user) return;
-        const mySchool = schools.find(s => s.id === user.schoolId) || schools[0] || { name: 'Eco-Manage Academy' };
+        const mySchool = schools.find(s => s.id?.toString() === user.schoolId?.toString()) || schools[0] || { name: 'Eco-Manage Academy' };
         
         // Calculate dynamic stats
         const totalRevenue = payments.reduce((acc, p) => acc + p.amount, 0);
@@ -102,7 +102,7 @@ const AnnualArchives: React.FC = () => {
         return matchesSearch && matchesType;
     });
 
-    const activeSchool = schools.find(s => s.id === user?.schoolId) || schools[0];
+    const activeSchool = schools.find(s => s.id?.toString() === user?.schoolId?.toString()) || schools[0];
     const totalTuition = payments.reduce((acc, p) => acc + p.amount, 0);
 
     if (loading) return (

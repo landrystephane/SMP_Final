@@ -38,7 +38,7 @@ const Tickets: React.FC = () => {
             setAnnouncements(annData || []);
 
             const schools = await window.electronAPI.getSchools();
-            const currentSchool = schools.find((s: any) => s.id === user.schoolId);
+            const currentSchool = schools.find((s: any) => s.id?.toString() === user.schoolId?.toString());
             if (currentSchool) {
                 setSchoolName(currentSchool.name);
             }

@@ -17,7 +17,7 @@ const Grades: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState('month_oct');
 
-  const [grades, setGrades] = useState<Record<string, number>>({});
+  const [grades, setGrades] = useState<Record<string, string>>({});
   const [isLocked, setIsLocked] = useState(false);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
 
@@ -59,11 +59,11 @@ const Grades: React.FC = () => {
             term: selectedTerm
         });
 
-        const gradeMap: Record<string, number> = {};
+        const gradeMap: Record<string, string> = {};
         let locked = false;
         existingGrades.forEach((g: any) => {
             if (g.month === selectedMonth) {
-                gradeMap[`${g.student_id}-${g.subject_id}`] = g.score;
+                gradeMap[`${g.student_id}-${g.subject_id}`] = g.score !== null && g.score !== undefined ? g.score.toString() : '';
                 if (g.locked) locked = true;
             }
         });
@@ -111,15 +111,19 @@ const Grades: React.FC = () => {
   }, [selectedClass, selectedMonth, selectedTerm]);
 
   const handleSave = async () => {
-    const formattedGrades = Object.entries(grades).map(([key, score]) => {
+    const formattedGrades = Object.entries(grades).map(([key, scoreStr]) => {
         const [studentId, subjectId] = key.split('-');
+        let scoreNum = parseFloat(scoreStr.replace(',', '.'));
+        if (isNaN(scoreNum)) {
+            scoreNum = 0;
+        }
         return {
           student_id: parseInt(studentId),
           subject_id: parseInt(subjectId),
           class_id: parseInt(selectedClass),
           term: selectedTerm,
           month: selectedMonth,
-          score: score,
+          score: scoreNum,
           teacher_id: user?.id
         };
       });
@@ -217,7 +221,7 @@ const Grades: React.FC = () => {
         try {
             const classObj = classes.find(c => c.id.toString() === selectedClass);
             const schools = await window.electronAPI.getSchools();
-            const school = schools.find((s: any) => s.id === user?.schoolId) || schools[0];
+            const school = schools.find((s: any) => s.id?.toString() === user?.schoolId?.toString()) || schools[0];
             
             // Fetch all students in this class
             const allStudents = await window.electronAPI.getStudents(user?.schoolId);
@@ -409,9 +413,9 @@ const Grades: React.FC = () => {
                                 disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
+                                    const val = e.target.value;
                                     const updated = { ...grades };
-                                    if (isNaN(val)) {
+                                    if (val === '') {
                                         delete updated[`${student.id}-${subject.id}`];
                                     } else {
                                         updated[`${student.id}-${subject.id}`] = val;
@@ -432,17 +436,20 @@ const Grades: React.FC = () => {
                                 disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
-                                    let raw = e.target.value.replace(',', '.');
-                                    let val = parseFloat(raw);
-                                    const updated = { ...grades };
-                                    if (raw === '') {
-                                        delete updated[`${student.id}-${subject.id}`];
-                                    } else if (!isNaN(val)) {
-                                        if (val > 20) val = 20;
-                                        if (val < 0) val = 0;
-                                        updated[`${student.id}-${subject.id}`] = val;
+                                    const raw = e.target.value;
+                                    if (raw === '' || /^\d*[.,]?\d{0,2}$/.test(raw)) {
+                                        const cleanRaw = raw.replace(',', '.');
+                                        const parsed = parseFloat(cleanRaw);
+                                        if (raw === '' || raw === '.' || raw === ',' || (!isNaN(parsed) && parsed >= 0 && parsed <= 20)) {
+                                            const updated = { ...grades };
+                                            if (raw === '') {
+                                                delete updated[`${student.id}-${subject.id}`];
+                                            } else {
+                                                updated[`${student.id}-${subject.id}`] = raw;
+                                            }
+                                            setGrades(updated);
+                                        }
                                     }
-                                    setGrades(updated);
                                 }}
                                 placeholder="0.00"
                                 className="w-20 bg-slate-900/50 border border-slate-800 rounded-xl py-2 text-center text-white text-sm font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all"

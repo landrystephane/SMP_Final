@@ -843,15 +843,26 @@ handleIPC('db:addClass', async (event, classData) => {
         throw new Error('Une classe avec ce code existe déjà dans cet établissement.');
     }
 
-    const info = db.prepare(`
-        INSERT INTO classes (school_id, name, code, section, level, main_teacher_id, assistant_teacher_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(sid, name, code, section, level, mainTeacherId || null, assistantTeacherId || null);
+    let newClassId;
+    db.transaction(() => {
+        // If this teacher was assigned to another class, clear it
+        if (mainTeacherId) {
+            db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ?').run(mainTeacherId);
+        }
 
-    const newClassId = info.lastInsertRowid;
+        const info = db.prepare(`
+            INSERT INTO classes (school_id, name, code, section, level, main_teacher_id, assistant_teacher_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(sid, name, code, section, level, mainTeacherId || null, assistantTeacherId || null);
 
-    if (baseClassId) {
-        db.transaction(() => {
+        newClassId = info.lastInsertRowid;
+
+        // Sync teacher's assigned_classes
+        if (mainTeacherId) {
+            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([newClassId]), mainTeacherId);
+        }
+
+        if (baseClassId) {
             // Duplicate class subjects
             const subjectsToCopy = db.prepare('SELECT subject_id, coefficient, is_optional FROM class_subjects WHERE class_id = ?').all(baseClassId);
             const insertSubject = db.prepare('INSERT INTO class_subjects (class_id, subject_id, coefficient, is_optional) VALUES (?, ?, ?, ?)');
@@ -871,8 +882,8 @@ handleIPC('db:addClass', async (event, classData) => {
             for (const inst of installmentsToCopy) {
                 insertInstallment.run(newClassId, inst.installment_id, inst.amount);
             }
-        })();
-    }
+        }
+    })();
 
     return { success: true, id: newClassId };
 });
@@ -885,11 +896,31 @@ handleIPC('db:updateClass', async (event, classData) => {
         throw new Error('Une autre classe utilise déjà ce code.');
     }
 
-    db.prepare(`
-        UPDATE classes 
-        SET name = ?, code = ?, section = ?, level = ?, main_teacher_id = ?, assistant_teacher_id = ?
-        WHERE id = ?
-    `).run(name, code, section, level, mainTeacherId || null, assistantTeacherId || null, id);
+    db.transaction(() => {
+        // Find previous teacher of this class
+        const prevClass = db.prepare('SELECT main_teacher_id FROM classes WHERE id = ?').get(id);
+        const prevTeacherId = prevClass ? prevClass.main_teacher_id : null;
+
+        // If new teacher is different
+        if (mainTeacherId !== prevTeacherId) {
+            // Clear new teacher from any other class
+            if (mainTeacherId) {
+                db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ? AND id != ?').run(mainTeacherId, id);
+                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([id]), mainTeacherId);
+            }
+
+            // Clear class from previous teacher's assigned_classes
+            if (prevTeacherId) {
+                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([]), prevTeacherId);
+            }
+        }
+
+        db.prepare(`
+            UPDATE classes 
+            SET name = ?, code = ?, section = ?, level = ?, main_teacher_id = ?, assistant_teacher_id = ?
+            WHERE id = ?
+        `).run(name, code, section, level, mainTeacherId || null, assistantTeacherId || null, id);
+    })();
     
     return { success: true };
 });

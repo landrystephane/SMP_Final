@@ -325,6 +325,28 @@ function initDb() {
         console.error(`[Migration] Subject seeding/linking failed:`, e.message);
     }
 
+    // Clean up duplicate teacher assignments
+    try {
+        const duplicateTeachers = db.prepare(`
+            SELECT main_teacher_id, COUNT(*) as count 
+            FROM classes 
+            WHERE main_teacher_id IS NOT NULL 
+            GROUP BY main_teacher_id 
+            HAVING count > 1
+        `).all();
+
+        duplicateTeachers.forEach(t => {
+            const classIds = db.prepare('SELECT id FROM classes WHERE main_teacher_id = ? ORDER BY id DESC').all(t.main_teacher_id);
+            // Keep the first (latest), set NULL for others
+            for (let i = 1; i < classIds.length; i++) {
+                db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE id = ?').run(classIds[i].id);
+            }
+        });
+        console.log(`[Migration] Cleaned up duplicate teacher assignments`);
+    } catch (e) {
+        console.error("Failed to clean up duplicate teacher assignments:", e.message);
+    }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

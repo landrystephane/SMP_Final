@@ -27,7 +27,7 @@ const Layout: React.FC = () => {
         }
         try {
           const schools = await window.electronAPI.getSchools();
-          const currentSchool = schools.find((s: any) => s.id === user.schoolId);
+          const currentSchool = schools.find((s: any) => s.id?.toString() === user.schoolId?.toString());
           if (currentSchool) {
             if (currentSchool.is_active === 0 && user.role !== 'SUPERADMIN') {
               alert("L'accès de votre établissement a été suspendu par l'administrateur.");
