@@ -1009,6 +1009,15 @@ handleIPC('db:getAttendance', async (event, { classId, date }) => {
     `).all(classId, date);
 });
 
+handleIPC('db:getAttendanceReport', async (event, { classId, startDate, endDate }) => {
+    return db.prepare(`
+      SELECT a.*, s.first_name, s.last_name, s.matricule
+      FROM attendance a
+      JOIN students s ON a.student_id = s.id
+      WHERE s.class_id = ? AND a.date >= ? AND a.date <= ?
+    `).all(classId, startDate, endDate);
+});
+
 handleIPC('db:getUsers', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active FROM users WHERE school_id = ?').all(sid);
@@ -1200,7 +1209,7 @@ handleIPC('db:getStudentDetails', async (event, studentId) => {
   const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ?').get(studentId);
   const payments = db.prepare('SELECT p.*, i.name as installmentName FROM payments p LEFT JOIN installments i ON p.installment_id = i.id WHERE p.student_id = ?').all(studentId);
   const attendance = db.prepare('SELECT * FROM attendance WHERE student_id = ?').all(studentId);
-  const grades = db.prepare('SELECT g.*, s.name as subjectName, s.domain FROM grades g JOIN subjects s ON g.subject_id = s.id WHERE g.student_id = ?').all(studentId);
+  const grades = db.prepare('SELECT g.*, s.name as subjectName, s.domain, COALESCE(cs.coefficient, 1) as coefficient FROM grades g JOIN subjects s ON g.subject_id = s.id LEFT JOIN class_subjects cs ON g.class_id = cs.class_id AND g.subject_id = cs.subject_id WHERE g.student_id = ?').all(studentId);
 
   return { student, payments, attendance, grades };
 });

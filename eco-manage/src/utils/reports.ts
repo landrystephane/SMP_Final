@@ -887,3 +887,99 @@ export const generateClassReportCards = (data: {
 
     doc.save(`Bulletins_Classe_${classObj.name.replace(/[\s/]+/g, '_')}_T${term}.pdf`);
 };
+
+export const generateAttendanceReport = (data: { records: any[], className: string, periodText: string, school?: any }) => {
+    const { records, className, periodText, school } = data;
+    const doc = new jsPDF();
+    const isEn = i18n.language.startsWith('en');
+    const primary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+    const secondary = school?.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
+
+    // Header
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE\nRÉPUBLIQUE DU CAMEROUN", 14, 15);
+    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION\nREPUBLIC OF CAMEROON", 196, 15, { align: 'right' });
+
+    doc.setFontSize(16);
+    doc.setTextColor(secondary[0], secondary[1], secondary[2]);
+    doc.text(school?.name?.toUpperCase() || "COMPLEXE SCOLAIRE BILINGUE ECO-MANAGE", 105, 30, { align: 'center' });
+
+    // Title
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.rect(14, 40, 182, 10, 'F');
+    const titleText = isEn ? `ATTENDANCE LIST - CLASS ${className}` : `LISTE DE PRÉSENCE - CLASSE ${className}`;
+    doc.text(titleText, 105, 47, { align: 'center' });
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    doc.text(periodText.toUpperCase(), 105, 56, { align: 'center' });
+
+    // Aggregate records by student ID
+    const studentStats: Record<number, { firstName: string, lastName: string, matricule: string, totalAbsenceHours: number }> = {};
+    records.forEach(r => {
+        if (!studentStats[r.student_id]) {
+            studentStats[r.student_id] = {
+                firstName: r.first_name,
+                lastName: r.last_name,
+                matricule: r.matricule,
+                totalAbsenceHours: 0
+            };
+        }
+        studentStats[r.student_id].totalAbsenceHours += r.hours;
+    });
+
+    const tableData = Object.values(studentStats)
+        .sort((a, b) => a.lastName.localeCompare(b.lastName))
+        .map(s => [
+            s.matricule,
+            `${s.lastName.toUpperCase()} ${s.firstName}`,
+            s.totalAbsenceHours > 0 ? `${s.totalAbsenceHours} h` : (isEn ? 'Present' : 'Présent(e)')
+        ]);
+
+    autoTable(doc, {
+        startY: 65,
+        head: [[
+            isEn ? 'MATRICULE' : 'MATRICULE',
+            isEn ? 'STUDENT NAME' : 'NOMS & PRÉNOMS',
+            isEn ? 'ABSENCE (HOURS)' : 'ABSENCE (HEURES)'
+        ]],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+            fillColor: primary,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        },
+        styles: {
+            font: 'helvetica',
+            fontSize: 10,
+            cellPadding: 5
+        },
+        columnStyles: {
+            0: { cellWidth: 40 },
+            1: { cellWidth: 100 },
+            2: { cellWidth: 42, halign: 'center' }
+        }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    
+    doc.text(isEn ? 'The Teacher' : "L'Enseignant(e)", 30, finalY + 20);
+    doc.text(isEn ? 'Administration' : 'L\'Administration', 150, finalY + 20);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`${i18n.t('generated_by_footer')} ${new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`, 105, 285, { align: 'center' });
+
+    doc.save(`Presences_${className.replace(/[\s/]+/g, '_')}_${new Date().getTime()}.pdf`);
+};

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, UserCheck, Clock, Save, AlertCircle } from 'lucide-react';
+import { Calendar, UserCheck, Clock, Save, AlertCircle, FileText, Search, Printer, CalendarDays } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { generateAttendanceReport } from '../utils/reports';
 
 const Attendance: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -12,6 +13,15 @@ const Attendance: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [absences, setAbsences] = useState<Record<string, number>>({});
+  
+  // New States for Reports
+  const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT'>('INPUT');
+  const [reportPeriod, setReportPeriod] = useState<'DAY' | 'WEEK' | 'MONTH'>('DAY');
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportWeek, setReportWeek] = useState(''); // e.g. 2026-W22
+  const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); // e.g. 2026-05
+  const [reportSearch, setReportSearch] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -74,6 +84,86 @@ const Attendance: React.FC = () => {
       }
   };
 
+  const getWeekDateRange = (weekStr: string) => {
+      const [year, week] = weekStr.split('-W');
+      const d = new Date(parseInt(year), 0, 1 + (parseInt(week) - 1) * 7);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(d.setDate(diff));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { start, end };
+  };
+
+  const handleGenerateReport = async () => {
+      if (!selectedClass || !window.electronAPI) return;
+      setIsGenerating(true);
+      
+      try {
+          let startDateStr = '';
+          let endDateStr = '';
+          let periodText = '';
+          const isEn = i18n.language.startsWith('en');
+
+          if (reportPeriod === 'DAY') {
+              startDateStr = reportDate;
+              endDateStr = reportDate;
+              periodText = isEn ? `DATE: ${reportDate}` : `JOURNÉE DU: ${reportDate}`;
+          } else if (reportPeriod === 'WEEK') {
+              if (!reportWeek) throw new Error(isEn ? 'Select a week' : 'Sélectionnez une semaine');
+              const { start, end } = getWeekDateRange(reportWeek);
+              startDateStr = start.toISOString().split('T')[0];
+              endDateStr = end.toISOString().split('T')[0];
+              periodText = isEn ? `WEEK: ${reportWeek}` : `SEMAINE: ${reportWeek}`;
+          } else if (reportPeriod === 'MONTH') {
+              startDateStr = `${reportMonth}-01`;
+              const [y, m] = reportMonth.split('-');
+              const endOfMonth = new Date(parseInt(y), parseInt(m), 0);
+              endDateStr = endOfMonth.toISOString().split('T')[0];
+              periodText = isEn ? `MONTH: ${reportMonth}` : `MOIS: ${reportMonth}`;
+          }
+
+          const records = await window.electronAPI.getAttendanceReport({
+              classId: selectedClass,
+              startDate: startDateStr,
+              endDate: endDateStr
+          });
+
+          // Filter by search if any
+          let finalRecords = records;
+          if (reportSearch) {
+              const lowerSearch = reportSearch.toLowerCase();
+              finalRecords = records.filter((r: any) => 
+                  r.first_name?.toLowerCase().includes(lowerSearch) || 
+                  r.last_name?.toLowerCase().includes(lowerSearch) ||
+                  r.matricule?.toLowerCase().includes(lowerSearch)
+              );
+          }
+
+          if (finalRecords.length === 0) {
+              alert(isEn ? 'No records found for this period' : 'Aucune présence enregistrée pour cette période');
+              setIsGenerating(false);
+              return;
+          }
+
+          const classObj = classes.find(c => c.id.toString() === selectedClass);
+          const schoolSettings = await window.electronAPI.getSchools();
+          const currentSchool = schoolSettings?.find((s: any) => s.id === user?.schoolId);
+
+          generateAttendanceReport({
+              records: finalRecords,
+              className: classObj?.name || selectedClass,
+              periodText,
+              school: currentSchool
+          });
+
+      } catch (err: any) {
+          alert('Error: ' + err.message);
+      } finally {
+          setIsGenerating(false);
+      }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -81,14 +171,21 @@ const Attendance: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">{t('attendance_sheet')}</h1>
           <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest">{t('attendance_desc')}</p>
         </div>
-        <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl shadow-sm text-white focus-within:ring-2 focus-within:ring-amber-500 transition-all">
-            <Calendar className="w-5 h-5 mr-3 text-amber-500" />
-            <input
-                type="date"
-                value={currentDate}
-                onChange={(e) => setCurrentDate(e.target.value)}
-                className="bg-transparent outline-none text-sm font-black text-white"
-            />
+        <div className="flex bg-slate-900 rounded-xl p-1 border border-slate-800">
+            <button
+                onClick={() => setActiveTab('INPUT')}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'INPUT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+                <Calendar className="w-4 h-4 mr-2" />
+                {t('saisie', 'Saisie')}
+            </button>
+            <button
+                onClick={() => setActiveTab('REPORT')}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'REPORT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+                <FileText className="w-4 h-4 mr-2" />
+                {t('rapports', 'Rapports')}
+            </button>
         </div>
       </div>
 
@@ -129,7 +226,7 @@ const Attendance: React.FC = () => {
               <p className="text-xl font-bold">{t('select_class_to_start')}</p>
               <p className="text-sm mt-2">{t('default_present')}</p>
           </div>
-      ) : (
+      ) : activeTab === 'INPUT' ? (
           <div className="space-y-6">
             <div className="glass-card p-4 bg-blue-600 text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl border-none">
                 <div className="flex items-center space-x-3">
@@ -216,6 +313,78 @@ const Attendance: React.FC = () => {
                     </table>
                 </div>
             </div>
+          </div>
+      ) : (
+          <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div className="glass-card p-6 border-none shadow-xl bg-slate-900 text-white">
+                  <div className="flex items-center mb-6 text-amber-500">
+                      <Printer className="w-6 h-6 mr-3" />
+                      <h2 className="text-xl font-bold">{t('generate_attendance_report', 'Générer la Liste de Présence')}</h2>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('period', 'Période')}</label>
+                          <select
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                              value={reportPeriod}
+                              onChange={(e) => setReportPeriod(e.target.value as any)}
+                          >
+                              <option value="DAY">{t('day', 'Journée')}</option>
+                              <option value="WEEK">{t('week', 'Semaine')}</option>
+                              <option value="MONTH">{t('month', 'Mois')}</option>
+                          </select>
+                      </div>
+
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('date_selection', 'Sélection Date')}</label>
+                          <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl focus-within:ring-2 focus-within:ring-amber-500">
+                              <CalendarDays className="w-5 h-5 mr-3 text-slate-500" />
+                              {reportPeriod === 'DAY' && (
+                                  <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="bg-transparent outline-none text-white font-bold w-full" />
+                              )}
+                              {reportPeriod === 'WEEK' && (
+                                  <input type="week" value={reportWeek} onChange={(e) => setReportWeek(e.target.value)} className="bg-transparent outline-none text-white font-bold w-full" />
+                              )}
+                              {reportPeriod === 'MONTH' && (
+                                  <input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} className="bg-transparent outline-none text-white font-bold w-full" />
+                              )}
+                          </div>
+                      </div>
+
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('search_student', 'Rechercher un élève (Optionnel)')}</label>
+                          <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl focus-within:ring-2 focus-within:ring-amber-500">
+                              <Search className="w-5 h-5 mr-3 text-slate-500" />
+                              <input 
+                                  type="text" 
+                                  placeholder="Nom, Prénom, Matricule..." 
+                                  value={reportSearch}
+                                  onChange={(e) => setReportSearch(e.target.value)}
+                                  className="bg-transparent outline-none text-white font-bold w-full placeholder-slate-600" 
+                              />
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="mt-8 flex justify-end">
+                      <button
+                          onClick={handleGenerateReport}
+                          disabled={isGenerating}
+                          className="px-8 py-3 bg-amber-500 text-slate-950 rounded-xl font-black shadow-lg hover:bg-amber-400 transition-all flex items-center disabled:opacity-50"
+                      >
+                          {isGenerating ? (
+                              <span className="flex items-center">
+                                  <Clock className="w-5 h-5 mr-2 animate-spin" /> {t('generating', 'Génération...')}
+                              </span>
+                          ) : (
+                              <span className="flex items-center">
+                                  <FileText className="w-5 h-5 mr-2" /> {t('generate_pdf', 'Générer le PDF')}
+                              </span>
+                          )}
+                      </button>
+                  </div>
+              </div>
           </div>
       )}
     </div>

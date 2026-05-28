@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),
   saveAttendanceBulk: (data) => ipcRenderer.invoke('db:saveAttendanceBulk', data),
   getAttendance: (data) => ipcRenderer.invoke('db:getAttendance', data),
+  getAttendanceReport: (data) => ipcRenderer.invoke('db:getAttendanceReport', data),
 
   // System/Admin
   getDashboardStats: (params) => ipcRenderer.invoke('db:getDashboardStats', params),
