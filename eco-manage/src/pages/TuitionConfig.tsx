@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Info, Plus, Trash2, CreditCard, ChevronRight } from 'lucide-react';
+import { Save, Info, Plus, Trash2, CreditCard, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,8 @@ const TuitionConfig: React.FC = () => {
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newInstallmentName, setNewInstallmentName] = useState('');
 
   const loadData = async () => {
     if (window.electronAPI && user) {
@@ -46,11 +48,16 @@ const TuitionConfig: React.FC = () => {
       }
   };
 
-  const handleAddInstallment = async () => {
-      const name = window.prompt("Nom de la nouvelle tranche (ex: 4E TRANCHE):");
-      if (!name) return;
+  const handleAddInstallment = () => {
+      setNewInstallmentName('');
+      setShowAddModal(true);
+  };
+
+  const submitAddInstallment = async () => {
+      if (!newInstallmentName.trim()) return;
       if (window.electronAPI) {
-          await window.electronAPI.addInstallment(name.toUpperCase());
+          await window.electronAPI.addInstallment(newInstallmentName.trim().toUpperCase());
+          setShowAddModal(false);
           loadData();
       }
   };
@@ -220,6 +227,40 @@ const TuitionConfig: React.FC = () => {
               <p className="italic">{t('chronological_engine_example', 'Exemple : Pour un versement de 30.000 FCFA, si l\'inscription est de 10.000 FCFA, le système soldera l\'inscription et affectera les 20.000 FCFA restants à la première tranche impayée.')}</p>
           </div>
       </div>
+
+      {/* Add Installment Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-black text-white italic tracking-tight">NOUVELLE TRANCHE</h3>
+                    <button onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nom de la tranche</label>
+                        <input
+                            type="text"
+                            placeholder="ex: 4E TRANCHE"
+                            value={newInstallmentName}
+                            onChange={(e) => setNewInstallmentName(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+                            autoFocus
+                        />
+                    </div>
+                    <button
+                        onClick={submitAddInstallment}
+                        disabled={!newInstallmentName.trim()}
+                        className="w-full bg-amber-500 text-slate-950 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 transition-all disabled:opacity-50"
+                    >
+                        Créer la tranche
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -430,11 +430,13 @@ const Grades: React.FC = () => {
                                 disabled={isLocked || isPastDeadline}
                                 value={grades[`${student.id}-${subject.id}`] ?? ''}
                                 onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
+                                    let val = parseFloat(e.target.value);
                                     const updated = { ...grades };
                                     if (isNaN(val)) {
                                         delete updated[`${student.id}-${subject.id}`];
                                     } else {
+                                        if (val > 20) val = 20;
+                                        if (val < 0) val = 0;
                                         updated[`${student.id}-${subject.id}`] = val;
                                     }
                                     setGrades(updated);

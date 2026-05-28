@@ -540,7 +540,7 @@ const Users: React.FC = () => {
                                       value={editUserForm.role}
                                       onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value as Role})}
                                   >
-                                    {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && (
+                                    {(currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') && (
                                         <option value="FOUNDER">{t('role_FOUNDER')}</option>
                                     )}
                                     <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
