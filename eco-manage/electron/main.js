@@ -698,6 +698,11 @@ handleIPC('db:getGlobalSubjects', async () => {
 
 handleIPC('db:addGlobalSubject', async (event, subject) => {
   const { name, domain, level, section } = subject;
+  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND level = ? AND section = ?').get(name, level, section);
+  if (existing) {
+    throw new Error('Une matière avec ce nom existe déjà pour ce niveau et cette section.');
+  }
+
   const result = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)')
     .run(name, domain, level, section);
   
@@ -708,7 +713,29 @@ handleIPC('db:addGlobalSubject', async (event, subject) => {
   return result;
 });
 
+handleIPC('db:updateGlobalSubject', async (event, subject) => {
+  const { id, name, domain, level, section } = subject;
+  const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND level = ? AND section = ? AND id != ?').get(name, level, section, id);
+  if (existing) {
+    throw new Error('Une matière avec ce nom existe déjà pour ce niveau et cette section.');
+  }
+
+  return db.prepare('UPDATE subjects SET name = ?, domain = ?, level = ?, section = ? WHERE id = ?')
+    .run(name, domain, level, section, id);
+});
+
 handleIPC('db:deleteGlobalSubject', async (event, id) => {
+  const inUseGrades = db.prepare('SELECT COUNT(*) as count FROM grades WHERE subject_id = ?').get(id).count;
+  if (inUseGrades > 0) {
+    throw new Error('Impossible de supprimer cette matière : elle contient déjà des notes.');
+  }
+
+  const inUseClasses = db.prepare('SELECT COUNT(*) as count FROM class_subjects WHERE subject_id = ?').get(id).count;
+  if (inUseClasses > 0) {
+    throw new Error('Impossible de supprimer cette matière : elle est actuellement enseignée dans certaines classes.');
+  }
+
+  db.prepare('DELETE FROM school_subjects WHERE subject_id = ?').run(id);
   return db.prepare('DELETE FROM subjects WHERE id = ?').run(id);
 });
 
@@ -773,6 +800,86 @@ handleIPC('db:removeSubjectFromClass', async (event, { classId, subjectId }) => 
 handleIPC('db:getClasses', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
+});
+
+handleIPC('db:addClass', async (event, classData) => {
+    const { name, code, section, level, mainTeacherId, assistantTeacherId, schoolId, baseClassId } = classData;
+    const sid = getActiveSchoolId(schoolId);
+    
+    // Check if code is already taken in this school
+    const existing = db.prepare('SELECT id FROM classes WHERE code = ? AND school_id = ?').get(code, sid);
+    if (existing) {
+        throw new Error('Une classe avec ce code existe déjà dans cet établissement.');
+    }
+
+    const info = db.prepare(`
+        INSERT INTO classes (school_id, name, code, section, level, main_teacher_id, assistant_teacher_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sid, name, code, section, level, mainTeacherId || null, assistantTeacherId || null);
+
+    const newClassId = info.lastInsertRowid;
+
+    if (baseClassId) {
+        db.transaction(() => {
+            // Duplicate class subjects
+            const subjectsToCopy = db.prepare('SELECT subject_id, coefficient, is_optional FROM class_subjects WHERE class_id = ?').all(baseClassId);
+            const insertSubject = db.prepare('INSERT INTO class_subjects (class_id, subject_id, coefficient, is_optional) VALUES (?, ?, ?, ?)');
+            for (const sub of subjectsToCopy) {
+                insertSubject.run(newClassId, sub.subject_id, sub.coefficient, sub.is_optional);
+            }
+
+            // Duplicate tuition_fees
+            const tuitionToCopy = db.prepare('SELECT total_fee, registration_fee FROM tuition_fees WHERE class_id = ?').get(baseClassId);
+            if (tuitionToCopy) {
+                db.prepare('INSERT INTO tuition_fees (class_id, total_fee, registration_fee) VALUES (?, ?, ?)').run(newClassId, tuitionToCopy.total_fee, tuitionToCopy.registration_fee);
+            }
+
+            // Duplicate class_installment_fees
+            const installmentsToCopy = db.prepare('SELECT installment_id, amount FROM class_installment_fees WHERE class_id = ?').all(baseClassId);
+            const insertInstallment = db.prepare('INSERT INTO class_installment_fees (class_id, installment_id, amount) VALUES (?, ?, ?)');
+            for (const inst of installmentsToCopy) {
+                insertInstallment.run(newClassId, inst.installment_id, inst.amount);
+            }
+        })();
+    }
+
+    return { success: true, id: newClassId };
+});
+
+handleIPC('db:updateClass', async (event, classData) => {
+    const { id, name, code, section, level, mainTeacherId, assistantTeacherId } = classData;
+    
+    const existing = db.prepare('SELECT id FROM classes WHERE code = ? AND id != ?').get(code, id);
+    if (existing) {
+        throw new Error('Une autre classe utilise déjà ce code.');
+    }
+
+    db.prepare(`
+        UPDATE classes 
+        SET name = ?, code = ?, section = ?, level = ?, main_teacher_id = ?, assistant_teacher_id = ?
+        WHERE id = ?
+    `).run(name, code, section, level, mainTeacherId || null, assistantTeacherId || null, id);
+    
+    return { success: true };
+});
+
+handleIPC('db:deleteClass', async (event, classId) => {
+    // Prevent deletion if students are assigned
+    const studentCount = db.prepare('SELECT COUNT(*) as count FROM students WHERE class_id = ?').get(classId).count;
+    if (studentCount > 0) {
+        throw new Error('Impossible de supprimer cette classe car des élèves y sont inscrits.');
+    }
+
+    db.transaction(() => {
+        db.prepare('DELETE FROM class_subjects WHERE class_id = ?').run(classId);
+        db.prepare('DELETE FROM tuition_fees WHERE class_id = ?').run(classId);
+        db.prepare('DELETE FROM class_installment_fees WHERE class_id = ?').run(classId);
+        db.prepare('DELETE FROM schedules WHERE class_id = ?').run(classId);
+        db.prepare('DELETE FROM grades WHERE class_id = ?').run(classId);
+        db.prepare('DELETE FROM classes WHERE id = ?').run(classId);
+    })();
+
+    return { success: true };
 });
 
 handleIPC('db:getSchedules', async (event, schoolId) => {
@@ -883,6 +990,11 @@ handleIPC('db:addUser', async (event, user) => {
   const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone } = user;
   const sid = getActiveSchoolId(schoolId);
   
+  const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  if (existingUsername) {
+      throw new Error('Ce nom d\'utilisateur (identifiant) est déjà pris. Veuillez en choisir un autre.');
+  }
+
   const hash = bcrypt.hashSync(password, 10);
   
   // Auto-generate staff matricule (incremental and duplicate-safe)
@@ -920,7 +1032,23 @@ handleIPC('db:addUser', async (event, user) => {
 });
 
 handleIPC('db:deleteUser', async (event, id) => {
+  // Check if user is linked to grades
+  const gradesCount = db.prepare('SELECT COUNT(*) as count FROM grades WHERE teacher_id = ?').get(id).count;
+  if (gradesCount > 0) throw new Error('Impossible de supprimer cet utilisateur : des notes lui sont associées. Veuillez désactiver le compte.');
+
+  // Check if user is linked to payments
+  const paymentsCount = db.prepare('SELECT COUNT(*) as count FROM payments WHERE received_by = ?').get(id).count;
+  if (paymentsCount > 0) throw new Error('Impossible de supprimer cet utilisateur : des paiements lui sont associés. Veuillez désactiver le compte.');
+
+  // Check if user is linked to attendance
+  const attendanceCount = db.prepare('SELECT COUNT(*) as count FROM attendance WHERE recorded_by = ?').get(id).count;
+  if (attendanceCount > 0) throw new Error('Impossible de supprimer cet utilisateur : des présences lui sont associées. Veuillez désactiver le compte.');
+
   return db.prepare('DELETE FROM users WHERE id = ?').run(id);
+});
+
+handleIPC('db:toggleUserActive', async (event, { id, isActive }) => {
+    return db.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, id);
 });
 
 handleIPC('db:updateUser', async (event, userToUpdate) => {

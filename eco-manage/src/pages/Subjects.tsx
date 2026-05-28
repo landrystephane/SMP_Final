@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle, Edit } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -9,7 +9,8 @@ const Subjects: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
-  const [isAddingGlobal, setIsAddingGlobal] = useState(false);
+  const [isManagingGlobal, setIsManagingGlobal] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<any | null>(null);
   const [newSubject, setNewSubject] = useState({
     name: '',
     domain: '',
@@ -51,10 +52,38 @@ const Subjects: React.FC = () => {
   const handleAddGlobalSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (window.electronAPI) {
-      await window.electronAPI.addGlobalSubject(newSubject);
-      setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
-      setIsAddingGlobal(false);
-      loadData();
+      try {
+        await window.electronAPI.addGlobalSubject(newSubject);
+        setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
+        loadData();
+      } catch (err: any) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleUpdateGlobalSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (window.electronAPI && editingSubject) {
+      try {
+        await window.electronAPI.updateGlobalSubject(editingSubject);
+        setEditingSubject(null);
+        loadData();
+      } catch (err: any) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleDeleteGlobalSubject = async (id: number) => {
+    if (!window.confirm(t('confirm_delete_global_module', 'Voulez-vous vraiment supprimer cette matière ?'))) return;
+    if (window.electronAPI) {
+      try {
+        await window.electronAPI.deleteGlobalSubject(id);
+        loadData();
+      } catch (err: any) {
+        alert(err.message);
+      }
     }
   };
 
@@ -108,10 +137,10 @@ const Subjects: React.FC = () => {
         </div>
         {canManageRegistry && (
           <button
-            onClick={() => setIsAddingGlobal(true)}
+            onClick={() => setIsManagingGlobal(true)}
             className="btn-primary flex items-center"
           >
-            <Plus className="w-5 h-5 mr-2" />
+            <Globe className="w-5 h-5 mr-2" />
             {t('global_directory', 'Répertoire Global')}
           </button>
         )}
@@ -219,80 +248,125 @@ const Subjects: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Ajout Matière Globale (SuperAdmin) */}
-      {isAddingGlobal && (
+      {/* Modal Gestion Répertoire Global */}
+      {isManagingGlobal && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-md animate-in zoom-in duration-200">
+          <div className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
               <h2 className="text-xl font-bold text-white uppercase">{t('global_directory', 'Répertoire Global')}</h2>
-              <button onClick={() => setIsAddingGlobal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsManagingGlobal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <form onSubmit={handleAddGlobalSubject} className="p-6 space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_name', 'Nom de la matière')}</label>
-                <input
-                    required
-                    type="text"
-                    className="input-field w-full mt-1"
-                    placeholder={t('subject_name_placeholder', 'Ex: Mathématiques')}
-                    value={newSubject.name}
-                    onChange={(e) => setNewSubject({...newSubject, name: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_domain', 'Domaine / Compétence')}</label>
-                <input
-                    required
-                    type="text"
-                    className="input-field w-full mt-1"
-                    placeholder={t('subject_domain_placeholder', 'Ex: Sciences et Technologie')}
-                    value={newSubject.domain}
-                    onChange={(e) => setNewSubject({...newSubject, domain: e.target.value})}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('section', 'Section')}</label>
-                    <select
-                        className="input-field w-full mt-1"
-                        value={newSubject.section}
-                        onChange={(e) => setNewSubject({...newSubject, section: e.target.value})}
-                    >
-                        <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
-                        <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cycle', 'Niveau')}</label>
-                    <select
-                        className="input-field w-full mt-1"
-                        value={newSubject.level}
-                        onChange={(e) => setNewSubject({...newSubject, level: e.target.value})}
-                    >
-                        <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
-                        <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
-                    </select>
-                  </div>
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingGlobal(false)}
-                  className="flex-1 py-3 border border-slate-700 rounded-xl text-slate-400 font-bold hover:bg-slate-900 transition-all"
-                >
-                  {t('cancel', 'Annuler')}
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex-1 flex items-center justify-center"
-                >
-                  <Save className="w-5 h-5 mr-2" />
-                  {t('add_to_directory', 'Ajouter au Répertoire')}
-                </button>
-              </div>
-            </form>
+            
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-8">
+                <div className="flex-1 overflow-x-auto">
+                    <h3 className="text-sm font-bold text-amber-500 mb-4 uppercase">Matières Enregistrées</h3>
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-900 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-800">
+                                <th className="px-4 py-3">Nom</th>
+                                <th className="px-4 py-3">Niveau / Section</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50 text-slate-300">
+                            {globalSubjects.map(subj => (
+                                <tr key={subj.id} className="hover:bg-slate-800/50">
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-sm text-white">{subj.name}</div>
+                                        <div className="text-[10px] text-slate-500">{subj.domain}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-[10px] font-bold">
+                                        {subj.level} - {subj.section}
+                                    </td>
+                                    <td className="px-4 py-3 text-right space-x-2">
+                                        <button onClick={() => setEditingSubject(subj)} className="p-1.5 text-slate-400 hover:text-amber-500"><Edit className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteGlobalSubject(subj.id)} className="p-1.5 text-slate-400 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {globalSubjects.length === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="px-4 py-8 text-center text-slate-500 text-xs italic">Aucune matière.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="w-full md:w-80 shrink-0">
+                    <form onSubmit={editingSubject ? handleUpdateGlobalSubject : handleAddGlobalSubject} className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <h3 className="text-sm font-bold text-white mb-4 uppercase flex items-center">
+                            {editingSubject ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                            {editingSubject ? 'Modifier Matière' : 'Nouvelle Matière'}
+                        </h3>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_name', 'Nom de la matière')}</label>
+                            <input
+                                required
+                                type="text"
+                                className="input-field w-full mt-1"
+                                placeholder={t('subject_name_placeholder', 'Ex: Mathématiques')}
+                                value={editingSubject ? editingSubject.name : newSubject.name}
+                                onChange={(e) => editingSubject ? setEditingSubject({...editingSubject, name: e.target.value}) : setNewSubject({...newSubject, name: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_domain', 'Domaine / Compétence')}</label>
+                            <input
+                                required
+                                type="text"
+                                className="input-field w-full mt-1"
+                                placeholder={t('subject_domain_placeholder', 'Ex: Sciences et Technologie')}
+                                value={editingSubject ? editingSubject.domain : newSubject.domain}
+                                onChange={(e) => editingSubject ? setEditingSubject({...editingSubject, domain: e.target.value}) : setNewSubject({...newSubject, domain: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('section', 'Section')}</label>
+                            <select
+                                className="input-field w-full mt-1"
+                                value={editingSubject ? editingSubject.section : newSubject.section}
+                                onChange={(e) => editingSubject ? setEditingSubject({...editingSubject, section: e.target.value}) : setNewSubject({...newSubject, section: e.target.value})}
+                            >
+                                <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                                <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cycle', 'Niveau')}</label>
+                            <select
+                                className="input-field w-full mt-1"
+                                value={editingSubject ? editingSubject.level : newSubject.level}
+                                onChange={(e) => editingSubject ? setEditingSubject({...editingSubject, level: e.target.value}) : setNewSubject({...newSubject, level: e.target.value})}
+                            >
+                                <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
+                                <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
+                            </select>
+                        </div>
+                        
+                        <div className="pt-2 flex gap-2">
+                            {editingSubject && (
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingSubject(null)}
+                                    className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all"
+                                >
+                                    Annuler
+                                </button>
+                            )}
+                            <button
+                                type="submit"
+                                className="btn-primary flex-1 flex items-center justify-center"
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {editingSubject ? 'Mettre à jour' : 'Ajouter'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
           </div>
         </div>
       )}
@@ -301,3 +375,4 @@ const Subjects: React.FC = () => {
 };
 
 export default Subjects;
+

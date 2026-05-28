@@ -214,8 +214,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.section}
                     onChange={(e) => setFormData({...formData, section: e.target.value, classId: ''})}
                 >
-                    <option value="FRANCOPHONE">{t('section_francophone_label')}</option>
-                    <option value="ANGLOPHONE">{t('section_anglophone_label')}</option>
+                    <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                    <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
                 </select>
             </div>
             <div className="space-y-1">
@@ -225,8 +225,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.cycle || 'PRIMAIRE'}
                     onChange={(e) => setFormData({...formData, cycle: e.target.value, classId: ''})}
                 >
-                    <option value="PRIMAIRE">{t('cycle_primary_label')}</option>
-                    <option value="MATERNELLE">{t('cycle_nursery_label')}</option>
+                    <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
+                    <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
                 </select>
             </div>
             <div className="space-y-1 col-span-1 md:col-span-2">
@@ -237,7 +237,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.classId}
                     onChange={(e) => setFormData({...formData, classId: e.target.value})}
                 >
-                    <option value="">{t('select_classroom')}</option>
+                    <option value="">{t('select_classroom', 'Sélectionner la classe...')}</option>
                     {classes
                         .filter(c => c.section === formData.section && c.level === (formData.cycle || 'PRIMAIRE'))
                         .map(c => (

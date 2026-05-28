@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Pedagogy
   getGlobalSubjects: () => ipcRenderer.invoke('db:getGlobalSubjects'),
   addGlobalSubject: (subject) => ipcRenderer.invoke('db:addGlobalSubject', subject),
+  updateGlobalSubject: (subject) => ipcRenderer.invoke('db:updateGlobalSubject', subject),
   deleteGlobalSubject: (id) => ipcRenderer.invoke('db:deleteGlobalSubject', id),
   getSchoolSubjects: (schoolId) => ipcRenderer.invoke('db:getSchoolSubjects', schoolId),
   toggleSchoolSubject: (data) => ipcRenderer.invoke('db:toggleSchoolSubject', data),
@@ -46,6 +47,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   assignSubjectToClass: (data) => ipcRenderer.invoke('db:assignSubjectToClass', data),
   removeSubjectFromClass: (data) => ipcRenderer.invoke('db:removeSubjectFromClass', data),
   getClasses: (schoolId) => ipcRenderer.invoke('db:getClasses', schoolId),
+  addClass: (classData) => ipcRenderer.invoke('db:addClass', classData),
+  updateClass: (classData) => ipcRenderer.invoke('db:updateClass', classData),
+  deleteClass: (classId) => ipcRenderer.invoke('db:deleteClass', classId),
 
   // Users
   getUsers: (schoolId) => ipcRenderer.invoke('db:getUsers', schoolId),

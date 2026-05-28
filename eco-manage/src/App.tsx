@@ -25,6 +25,7 @@ import ParentPortal from './pages/ParentPortal';
 import Statistics from './pages/Statistics';
 import CustomizationSettings from './pages/CustomizationSettings';
 import AnnualArchives from './pages/AnnualArchives';
+import Classes from './pages/Classes';
 import './index.css';
 
 import { useTranslation } from 'react-i18next';
@@ -83,6 +84,7 @@ function App() {
             <Route path="stats" element={<Statistics />} />
             <Route path="customization" element={<CustomizationSettings />} />
             <Route path="archives" element={<AnnualArchives />} />
+            <Route path="classes" element={<Classes />} />
           </Route>
         </Routes>
       </BrowserRouter>

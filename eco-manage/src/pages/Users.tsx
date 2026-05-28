@@ -202,6 +202,22 @@ const Users: React.FC = () => {
       }
   };
 
+  const handleToggleActive = async (id: number, currentStatus: boolean, name: string) => {
+      if (!window.confirm(`Voulez-vous vraiment ${currentStatus ? 'désactiver' : 'réactiver'} le compte de ${name} ?`)) return;
+      if (window.electronAPI) {
+          try {
+              const res = await window.electronAPI.toggleUserActive({ id, isActive: !currentStatus });
+              if (res && res.error) {
+                  alert(res.error);
+              } else {
+                  loadData();
+              }
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
+  };
+
   const filteredUsers = users.filter(u =>
     (u.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -422,10 +438,18 @@ const Users: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-8 py-6">
-                        <div className="flex items-center text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/5 px-4 py-1.5 rounded-full w-fit border border-emerald-500/20">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                            {t('status_active')}
-                        </div>
+                        <button
+                            onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)}
+                            className={`flex items-center text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full w-fit border transition-all ${
+                                u.is_active !== 0
+                                    ? 'text-emerald-500 bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10 hover:border-emerald-500/40'
+                                    : 'text-rose-500 bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10 hover:border-rose-500/40'
+                            }`}
+                            title={u.is_active !== 0 ? "Désactiver ce compte" : "Réactiver ce compte"}
+                        >
+                            <div className={`w-1.5 h-1.5 rounded-full mr-2 ${u.is_active !== 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                            {u.is_active !== 0 ? t('status_active') : 'INACTIF'}
+                        </button>
                     </td>
                      <td className="px-8 py-6 text-right">
                        <div className="flex items-center justify-end space-x-2">
