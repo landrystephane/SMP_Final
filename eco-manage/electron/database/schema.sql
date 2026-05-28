@@ -321,3 +321,15 @@ CREATE TABLE IF NOT EXISTS announcements (
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );
+
+-- Report Templates
+CREATE TABLE IF NOT EXISTS report_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER UNIQUE,
+    primary_color TEXT,
+    secondary_color TEXT,
+    header_image TEXT,
+    footer_image TEXT,
+    watermark_image TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id)
+);

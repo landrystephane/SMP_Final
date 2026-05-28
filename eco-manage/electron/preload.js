@@ -114,4 +114,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createSchoolYearArchive: (data) => ipcRenderer.invoke('db:createSchoolYearArchive', data),
   getErrorLogs: () => ipcRenderer.invoke('db:getErrorLogs'),
   clearErrorLogs: () => ipcRenderer.invoke('db:clearErrorLogs'),
+  
+  // Reports
+  getReportTemplate: (schoolId) => ipcRenderer.invoke('db:getReportTemplate', schoolId),
+  saveReportTemplate: (data) => ipcRenderer.invoke('db:saveReportTemplate', data),
 });
