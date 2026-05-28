@@ -287,6 +287,17 @@ handleIPC('db:clearErrorLogs', async () => {
     return true;
 });
 
+handleIPC('db:logFrontendError', async (event, errorDetails) => {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] [Frontend Error] ${errorDetails.message}\nStack: ${errorDetails.stack}\nComponent Info: ${errorDetails.componentStack}\n\n`;
+    try {
+        fs.appendFileSync(logPath, logMessage, 'utf8');
+    } catch (err) {
+        console.error('Failed to write frontend error to log:', err);
+    }
+    return true;
+});
+
 // Auth
 handleIPC('auth:restoreSession', async (event, user) => {
     loggedInUser = user;

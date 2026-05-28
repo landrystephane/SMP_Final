@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Users, BookOpen, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, Settings, GraduationCap, Building2, Calendar, Bus, HeartHandshake, TrendingUp, Palette, Archive, Menu, X } from 'lucide-react';
+import { 
+  Users, BookOpen, GraduationCap, LayoutDashboard,
+  LogOut, Wallet, Building2, Briefcase, Calendar, 
+  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette
+} from 'lucide-react';
+import ErrorBoundary from './ErrorBoundary';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -192,7 +197,9 @@ const Layout: React.FC = () => {
           </div>
         )}
         <div className="p-6 md:p-10 max-w-7xl mx-auto">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

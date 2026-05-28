@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDashboardStats: (params) => ipcRenderer.invoke('db:getDashboardStats', params),
   getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
   setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
+  logFrontendError: (errorDetails) => ipcRenderer.invoke('db:logFrontendError', errorDetails),
   getMobileKeys: () => ipcRenderer.invoke('db:getMobileKeys'),
   generateMobileKey: (data) => ipcRenderer.invoke('db:generateMobileKey', data),
   revokeMobileKey: (id) => ipcRenderer.invoke('db:revokeMobileKey', id),
