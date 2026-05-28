@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { generateClassReportCards } from '../utils/reports';
 
 const AdminWorkflow: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [isSgActing, setIsSgActing] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
@@ -68,8 +68,8 @@ const AdminWorkflow: React.FC = () => {
             });
         }
 
-        const isEn = i18n.language.startsWith('en');
-        alert(isEn ? 'Evaluation period updated successfully.' : 'Période d\\'évaluation mise à jour avec succès.');
+        const isEn = i18n.language?.startsWith('en') ?? false;
+        alert(isEn ? 'Evaluation period updated successfully.' : "Période d'évaluation mise à jour avec succès.");
     }
   };
 
