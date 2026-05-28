@@ -90,7 +90,7 @@ const AdminWorkflow: React.FC = () => {
 
         // Fetch all students of this class
         const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-        const classStudents = allStudents.filter((s: any) => s.class_id === classId);
+        const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === classId?.toString());
 
         if (classStudents.length === 0) {
             alert("Aucun élève dans cette classe.");
@@ -108,9 +108,14 @@ const AdminWorkflow: React.FC = () => {
             });
         }
 
+        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+
         // Calculate averages for rank calculation
         const studentsWithAverages = studentsData.map(sData => {
-            const validatedGrades = sData.grades.filter((g: any) => g.validated === 1);
+            const validatedGrades = sData.grades.filter((g: any) => 
+                g.term?.toString() === period.term?.toString() && 
+                (g.validated === 1 || isDirector)
+            );
             if (validatedGrades.length === 0) {
                 return { ...sData, average: null };
             }
@@ -128,10 +133,11 @@ const AdminWorkflow: React.FC = () => {
             .sort((a, b) => (b.average || 0) - (a.average || 0));
 
         const finalStudentsData = studentsWithAverages.map(sData => {
+            const termGrades = sData.grades.filter((g: any) => g.term?.toString() === period.term?.toString());
             if (sData.average === null) {
                 return {
                     student: sData.student,
-                    grades: sData.grades,
+                    grades: termGrades,
                     attendance: sData.attendance,
                     rank: undefined,
                     totalStudents: classStudents.length
@@ -140,7 +146,7 @@ const AdminWorkflow: React.FC = () => {
             const rankIndex = sortedStudents.findIndex(s => s.student.id === sData.student.id);
             return {
                 student: sData.student,
-                grades: sData.grades,
+                grades: termGrades,
                 attendance: sData.attendance,
                 rank: rankIndex !== -1 ? rankIndex + 1 : undefined,
                 totalStudents: classStudents.length
@@ -157,7 +163,8 @@ const AdminWorkflow: React.FC = () => {
             classObj,
             school,
             term: period.term,
-            studentsData: finalStudentsData
+            studentsData: finalStudentsData,
+            ignoreValidation: isDirector
         });
 
         alert("Impression lancée avec succès (le fichier PDF a été généré).");

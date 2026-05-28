@@ -1385,8 +1385,9 @@ handleIPC('db:getDashboardStats', async (event, params) => {
 handleIPC('db:getTeacherDashboardStats', async (event, params) => {
     const { schoolId, teacherId } = params;
     const sid = getActiveSchoolId(schoolId);
+    const tId = teacherId ? parseInt(teacherId, 10) : null;
 
-    const classes = db.prepare('SELECT * FROM classes WHERE school_id = ? AND (main_teacher_id = ? OR assistant_teacher_id = ?)').all(sid, teacherId, teacherId);
+    const classes = db.prepare('SELECT * FROM classes WHERE school_id = ? AND (main_teacher_id = ? OR assistant_teacher_id = ?)').all(sid, tId, tId);
     
     let totalStudents = 0;
     let boys = 0;
@@ -1535,11 +1536,16 @@ handleIPC('db:createSchoolYearArchive', async (event, { schoolId, yearName }) =>
 
 // Grade Overrides
 handleIPC('db:getGradeOverrides', async (event, { teacherId, classId, term, month }) => {
-    return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(teacherId, classId, term, month);
+    const tId = teacherId ? parseInt(teacherId, 10) : null;
+    const cId = classId ? parseInt(classId, 10) : null;
+    return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(tId, cId, term, month);
 });
 
 handleIPC('db:addGradeOverride', async (event, { teacherId, classId, term, month, deadline, grantedBy }) => {
-    return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(teacherId, classId, term, month, deadline, grantedBy);
+    const tId = teacherId ? parseInt(teacherId, 10) : null;
+    const cId = classId ? parseInt(classId, 10) : null;
+    const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
+    return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

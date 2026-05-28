@@ -90,7 +90,7 @@ const Attendance: React.FC = () => {
     const loadStudents = async () => {
       if (window.electronAPI && selectedClass) {
         const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-        setStudents(allStudents.filter((s: any) => s.class_id.toString() === selectedClass));
+        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString()));
       }
     };
     loadStudents();

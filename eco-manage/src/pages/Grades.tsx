@@ -49,7 +49,7 @@ const Grades: React.FC = () => {
     if (window.electronAPI && selectedClass) {
         const classObj = classes.find(c => c.id.toString() === selectedClass);
         const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-        setStudents(allStudents.filter((s: any) => s.class_id.toString() === selectedClass));
+        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString()));
 
         const classSubs = await window.electronAPI.getClassSubjects(parseInt(selectedClass));
         setSubjects(classSubs);
@@ -225,7 +225,7 @@ const Grades: React.FC = () => {
             
             // Fetch all students in this class
             const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-            const classStudents = allStudents.filter((s: any) => s.class_id.toString() === selectedClass);
+            const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
 
             const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
             // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)

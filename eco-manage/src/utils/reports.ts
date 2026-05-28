@@ -623,8 +623,9 @@ export const generateClassReportCards = (data: {
     school: any;
     term: number;
     studentsData: any[];
+    ignoreValidation?: boolean;
 }) => {
-    const { classObj, school, term, studentsData } = data;
+    const { classObj, school, term, studentsData, ignoreValidation } = data;
     const doc = new jsPDF();
     const isNursery = classObj.level === 'MATERNELLE';
     const isEn = i18n.language?.startsWith('en') ?? false;
@@ -633,7 +634,7 @@ export const generateClassReportCards = (data: {
 
     studentsData.forEach((sData, index) => {
         const { student, grades, attendance, rank, totalStudents } = sData;
-        const validatedGrades = data.ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1);
+        const validatedGrades = ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1);
 
         if (index > 0) {
             doc.addPage();

@@ -79,7 +79,7 @@ const AdvisorPortal: React.FC = () => {
         
         // Map to students names
         const gradesList = students
-            .filter((s: any) => s.class_id.toString() === selectedClass)
+            .filter((s: any) => s.class_id?.toString() === selectedClass?.toString())
             .map((s: any) => {
                 const gr = subjectGrades.find((g: any) => g.student_id === s.id);
                 return {

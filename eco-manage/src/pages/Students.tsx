@@ -44,7 +44,7 @@ const Students: React.FC = () => {
 
   const filteredStudents = students.filter(s => {
     const matchSection = selectedSection === 'ALL' || s.section === selectedSection;
-    const matchClass = selectedClass === 'ALL' || s.class_id.toString() === selectedClass;
+    const matchClass = selectedClass === 'ALL' || s.class_id?.toString() === selectedClass?.toString();
     const classObj = classes.find(c => c.id === s.class_id);
     const matchCycle = selectedCycle === 'ALL' || (classObj && classObj.level === selectedCycle);
     const matchSearch = s.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
