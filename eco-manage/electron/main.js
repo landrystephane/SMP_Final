@@ -50,7 +50,7 @@ function permanentlyDeleteSchool(schoolId) {
       db.prepare('DELETE FROM school_subjects WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM expenses WHERE school_id = ?').run(id);
       db.prepare('DELETE FROM notifications WHERE school_id = ?').run(id);
-      db.prepare('DELETE FROM users WHERE school_id = ? AND role != "SUPERADMIN"').run(id);
+      db.prepare('DELETE FROM users WHERE school_id = ? AND role != \'SUPERADMIN\'').run(id);
 
       // 5. Finally delete the school
       return db.prepare('DELETE FROM schools WHERE id = ?').run(id);
