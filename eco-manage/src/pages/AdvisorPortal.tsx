@@ -753,7 +753,7 @@ const AdvisorPortal: React.FC = () => {
                                 >
                                     <option value="">Sélectionner un enseignant</option>
                                     {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.full_name}</option>
+                                        <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                     ))}
                                 </select>
                             </div>

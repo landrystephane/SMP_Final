@@ -305,6 +305,9 @@ handleIPC('db:logFrontendError', async (event, errorDetails) => {
 
 // Auth
 handleIPC('auth:restoreSession', async (event, user) => {
+    if (user) {
+        user.full_name = user.fullName;
+    }
     loggedInUser = user;
     return true;
 });
@@ -313,6 +316,7 @@ handleIPC('auth:login', async (event, { username, password }) => {
   const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR matricule = ?').get(username, username);
   
   if (!user) return null;
+  user.full_name = user.fullName;
 
   // Block login if school is deleted or suspended
   if (user.role !== 'SUPERADMIN') {
@@ -860,11 +864,6 @@ handleIPC('db:addClass', async (event, classData) => {
 
     let newClassId;
     db.transaction(() => {
-        // If this teacher was assigned to another class, clear it
-        if (mainTeacherId) {
-            db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ?').run(mainTeacherId);
-        }
-
         const info = db.prepare(`
             INSERT INTO classes (school_id, name, code, section, level, main_teacher_id, assistant_teacher_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -874,7 +873,18 @@ handleIPC('db:addClass', async (event, classData) => {
 
         // Sync teacher's assigned_classes
         if (mainTeacherId) {
-            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([newClassId]), mainTeacherId);
+            const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(mainTeacherId);
+            let teacherClasses = [];
+            if (teacher && teacher.assigned_classes) {
+                try {
+                    teacherClasses = JSON.parse(teacher.assigned_classes);
+                } catch(e) {}
+            }
+            if (!Array.isArray(teacherClasses)) teacherClasses = [];
+            if (!teacherClasses.includes(newClassId)) {
+                teacherClasses.push(newClassId);
+            }
+            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(teacherClasses), mainTeacherId);
         }
 
         if (baseClassId) {
@@ -918,15 +928,35 @@ handleIPC('db:updateClass', async (event, classData) => {
 
         // If new teacher is different
         if (mainTeacherId !== prevTeacherId) {
-            // Clear new teacher from any other class
-            if (mainTeacherId) {
-                db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ? AND id != ?').run(mainTeacherId, id);
-                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([id]), mainTeacherId);
+            // Remove class from previous teacher's assigned_classes
+            if (prevTeacherId) {
+                const prevTeacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(prevTeacherId);
+                let prevClasses = [];
+                if (prevTeacher && prevTeacher.assigned_classes) {
+                    try {
+                        prevClasses = JSON.parse(prevTeacher.assigned_classes);
+                    } catch(e) {}
+                }
+                if (Array.isArray(prevClasses)) {
+                    prevClasses = prevClasses.filter(cid => Number(cid) !== Number(id));
+                    db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(prevClasses), prevTeacherId);
+                }
             }
 
-            // Clear class from previous teacher's assigned_classes
-            if (prevTeacherId) {
-                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify([]), prevTeacherId);
+            // Add class to new teacher's assigned_classes
+            if (mainTeacherId) {
+                const newTeacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(mainTeacherId);
+                let newClasses = [];
+                if (newTeacher && newTeacher.assigned_classes) {
+                    try {
+                        newClasses = JSON.parse(newTeacher.assigned_classes);
+                    } catch(e) {}
+                }
+                if (!Array.isArray(newClasses)) newClasses = [];
+                if (!newClasses.includes(Number(id)) && !newClasses.includes(String(id))) {
+                    newClasses.push(Number(id));
+                }
+                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(newClasses), mainTeacherId);
             }
         }
 
@@ -953,6 +983,19 @@ handleIPC('db:deleteClass', async (event, classId) => {
         db.prepare('DELETE FROM class_installment_fees WHERE class_id = ?').run(classId);
         db.prepare('DELETE FROM schedules WHERE class_id = ?').run(classId);
         db.prepare('DELETE FROM grades WHERE class_id = ?').run(classId);
+
+        // Find teachers who had this class assigned and remove it
+        const teachers = db.prepare("SELECT id, assigned_classes FROM users WHERE role = 'TEACHER' AND assigned_classes LIKE ?").all(`%${classId}%`);
+        for (const t of teachers) {
+            try {
+                let parsed = JSON.parse(t.assigned_classes);
+                if (Array.isArray(parsed)) {
+                    parsed = parsed.filter(cid => Number(cid) !== Number(classId));
+                    db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(parsed), t.id);
+                }
+            } catch(e) {}
+        }
+
         db.prepare('DELETE FROM classes WHERE id = ?').run(classId);
     })();
 
@@ -1073,7 +1116,8 @@ handleIPC('db:getAttendanceReport', async (event, { classId, startDate, endDate 
 
 handleIPC('db:getUsers', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  return db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active FROM users WHERE school_id = ?').all(sid);
+  const users = db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active FROM users WHERE school_id = ?').all(sid);
+  return users.map(u => ({ ...u, full_name: u.fullName }));
 });
 
 handleIPC('db:addUser', async (event, user) => {
@@ -1406,37 +1450,64 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
     const sid = getActiveSchoolId(schoolId);
     const tId = teacherId ? parseInt(teacherId, 10) : null;
 
-    const classes = db.prepare('SELECT * FROM classes WHERE school_id = ? AND (main_teacher_id = ? OR assistant_teacher_id = ?)').all(sid, tId, tId);
-    
+    let classIds = [];
+    if (tId) {
+        // 1. Get from direct main/assistant links
+        const directClasses = db.prepare('SELECT id FROM classes WHERE school_id = ? AND (main_teacher_id = ? OR assistant_teacher_id = ?)').all(sid, tId, tId);
+        directClasses.forEach(c => classIds.push(c.id));
+
+        // 2. Get from user's assigned_classes
+        const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(tId);
+        if (teacher && teacher.assigned_classes) {
+            try {
+                const parsed = JSON.parse(teacher.assigned_classes);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(id => {
+                        const numId = Number(id);
+                        if (!isNaN(numId) && !classIds.includes(numId)) {
+                            classIds.push(numId);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Error parsing teacher assigned_classes:", e);
+            }
+        }
+    }
+
+    let classes = [];
     let totalStudents = 0;
     let boys = 0;
     let girls = 0;
     let studentsAverages = [];
     
-    if (classes.length > 0) {
-        const classIds = classes.map(c => c.id).join(',');
-        const studentStats = db.prepare(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
-                SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
-            FROM students
-            WHERE class_id IN (${classIds})
-        `).get();
-        totalStudents = studentStats.total || 0;
-        boys = studentStats.boys || 0;
-        girls = studentStats.girls || 0;
+    if (classIds.length > 0) {
+        classes = db.prepare(`SELECT * FROM classes WHERE id IN (${classIds.join(',')}) AND school_id = ?`).all(sid);
+        if (classes.length > 0) {
+            const activeClassIds = classes.map(c => c.id).join(',');
+            const studentStats = db.prepare(`
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
+                    SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
+                FROM students
+                WHERE class_id IN (${activeClassIds})
+            `).get();
+            totalStudents = studentStats.total || 0;
+            boys = studentStats.boys || 0;
+            girls = studentStats.girls || 0;
 
-        studentsAverages = db.prepare(`
-            SELECT s.id, s.first_name, s.last_name, s.matricule, c.name as className,
-                AVG(g.score) as average
-            FROM students s
-            JOIN classes c ON s.class_id = c.id
-            LEFT JOIN grades g ON g.student_id = s.id
-            WHERE s.class_id IN (${classIds})
-            GROUP BY s.id
-            ORDER BY average DESC NULLS LAST
-        `).all();
+            studentsAverages = db.prepare(`
+                SELECT s.id, s.first_name, s.last_name, s.matricule, c.name as className,
+                    AVG(g.score) as average
+                FROM students s
+                JOIN classes c ON s.class_id = c.id
+                LEFT JOIN grades g ON g.student_id = s.id
+                WHERE s.class_id IN (${activeClassIds})
+                GROUP BY s.id
+                ORDER BY average DESC NULLS LAST
+            `).all();
+        }
     }
 
     return {

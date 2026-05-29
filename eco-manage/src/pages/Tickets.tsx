@@ -345,7 +345,7 @@ const Tickets: React.FC = () => {
                     >
                         <option value="">-- Ignorer (utiliser le rôle) --</option>
                         {usersList.map(u => (
-                            <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                            <option key={u.id} value={u.id}>{u.fullName || u.full_name} ({u.role})</option>
                         ))}
                     </select>
                   </div>
