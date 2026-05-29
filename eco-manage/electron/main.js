@@ -610,6 +610,8 @@ handleIPC('db:unlockGrades', async (event, { classId, term, month }) => {
 
 // Pedagogy / Advisor validation
 handleIPC('db:getClassSubjectsValidationStatus', async (event, { classId, term, month }) => {
+  const parsedClassId = parseInt(classId, 10);
+  const parsedTerm = parseInt(term, 10);
   const subjects = db.prepare(`
     SELECT s.id, s.name, s.domain, cs.coefficient,
            (SELECT COUNT(*) FROM grades g WHERE g.class_id = ? AND g.subject_id = s.id AND g.term = ? AND g.month = ?) as gradeCount,
@@ -618,7 +620,7 @@ handleIPC('db:getClassSubjectsValidationStatus', async (event, { classId, term, 
     FROM class_subjects cs
     JOIN subjects s ON cs.subject_id = s.id
     WHERE cs.class_id = ?
-  `).all(classId, term, month, classId, term, month, classId, term, month, classId);
+  `).all(parsedClassId, parsedTerm, month, parsedClassId, parsedTerm, month, parsedClassId, parsedTerm, month, parsedClassId);
 
   return subjects.map(s => ({
     id: s.id,
@@ -632,11 +634,24 @@ handleIPC('db:getClassSubjectsValidationStatus', async (event, { classId, term, 
 });
 
 handleIPC('db:validateSubjectGrades', async (event, { classId, subjectId, term, month }) => {
+  const parsedClassId = parseInt(classId, 10);
+  const parsedSubjectId = parseInt(subjectId, 10);
+  const parsedTerm = parseInt(term, 10);
   return db.prepare(`
     UPDATE grades
     SET validated = 1, locked = 1
     WHERE class_id = ? AND subject_id = ? AND term = ? AND month = ?
-  `).run(classId, subjectId, term, month);
+  `).run(parsedClassId, parsedSubjectId, parsedTerm, month);
+});
+
+handleIPC('db:validateClassGrades', async (event, { classId, term, month }) => {
+  const parsedClassId = parseInt(classId, 10);
+  const parsedTerm = parseInt(term, 10);
+  return db.prepare(`
+    UPDATE grades
+    SET validated = 1, locked = 1
+    WHERE class_id = ? AND term = ? AND month = ?
+  `).run(parsedClassId, parsedTerm, month);
 });
 
 // Finance
@@ -957,6 +972,10 @@ handleIPC('db:updateSchedule', async (event, schedule) => {
     } else {
         return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, sid);
     }
+});
+
+handleIPC('db:deleteSchedule', async (event, id) => {
+    return db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
 });
 
 // Transport

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unlockGrades: (params) => ipcRenderer.invoke('db:unlockGrades', params),
   getClassSubjectsValidationStatus: (params) => ipcRenderer.invoke('db:getClassSubjectsValidationStatus', params),
   validateSubjectGrades: (params) => ipcRenderer.invoke('db:validateSubjectGrades', params),
+  validateClassGrades: (params) => ipcRenderer.invoke('db:validateClassGrades', params),
   getGradeOverrides: (params) => ipcRenderer.invoke('db:getGradeOverrides', params),
   addGradeOverride: (params) => ipcRenderer.invoke('db:addGradeOverride', params),
 
@@ -88,6 +89,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRouteStudents: (routeId) => ipcRenderer.invoke('db:getRouteStudents', routeId),
   getTransportPoints: (routeId) => ipcRenderer.invoke('db:getTransportPoints', routeId),
   logTransport: (log) => ipcRenderer.invoke('db:logTransport', log),
+
+  // Plannings
+  getSchedules: (schoolId) => ipcRenderer.invoke('db:getSchedules', schoolId),
+  updateSchedule: (schedule) => ipcRenderer.invoke('db:updateSchedule', schedule),
+  deleteSchedule: (id) => ipcRenderer.invoke('db:deleteSchedule', id),
 
   // Attendance
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),

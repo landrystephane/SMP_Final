@@ -56,6 +56,7 @@ export interface ElectronAPI {
   logTransport: (log: any) => Promise<any>;
   updateSchedule: (schedule: any) => Promise<any>;
   getSchedules: (schoolId: number) => Promise<any[]>;
+  deleteSchedule: (id: number) => Promise<any>;
   getMobileKeys: () => Promise<any[]>;
   generateMobileKey: (data: { name: string, userId: number | null }) => Promise<any>;
   revokeMobileKey: (id: number) => Promise<any>;
