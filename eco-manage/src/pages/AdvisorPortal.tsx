@@ -7,9 +7,15 @@ const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
     const { t } = useTranslation();
     const MONTHS = [
-        t('september', 'Septembre'), t('october', 'Octobre'), t('november', 'Novembre'),
-        t('december', 'Décembre'), t('january', 'Janvier'), t('february', 'Février'),
-        t('march', 'Mars'), t('april', 'Avril'), t('may', 'Mai')
+        { key: 'month_oct', label: t('month_oct', 'Octobre') },
+        { key: 'month_nov', label: t('month_nov', 'Novembre') },
+        { key: 'month_dec', label: t('month_dec', 'Décembre') },
+        { key: 'month_jan', label: t('month_jan', 'Janvier') },
+        { key: 'month_feb', label: t('month_feb', 'Février') },
+        { key: 'month_mar', label: t('month_mar', 'Mars') },
+        { key: 'month_apr', label: t('month_apr', 'Avril') },
+        { key: 'month_may', label: t('month_may', 'Mai') },
+        { key: 'month_jun', label: t('month_jun', 'Juin') }
     ];
     const [activeTab, setActiveTab] = useState<'PLANNING' | 'TRANSPORT' | 'EVALUATIONS'>('PLANNING');
     const [classes, setClasses] = useState<any[]>([]);
@@ -21,7 +27,9 @@ const AdvisorPortal: React.FC = () => {
     // Evaluation Validation states
     const [selectedClass, setSelectedClass] = useState<string>('');
     const [selectedTerm, setSelectedTerm] = useState<number>(1);
-    const [selectedMonth, setSelectedMonth] = useState<string>('Septembre');
+    const [selectedMonth, setSelectedMonth] = useState<string>('month_oct');
+
+    const monthLabel = MONTHS.find(m => m.key === selectedMonth)?.label || selectedMonth;
     const [subjectStatuses, setSubjectStatuses] = useState<any[]>([]);
     const [selectedSubjectForDetail, setSelectedSubjectForDetail] = useState<any>(null);
     const [detailGrades, setDetailGrades] = useState<any[]>([]);
@@ -106,7 +114,7 @@ const AdvisorPortal: React.FC = () => {
             
             await window.electronAPI.createNotification({
                 role: 'SECRETARY',
-                message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées. Les bulletins sont prêts pour l'impression.`,
+                message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${monthLabel}, Trimestre ${selectedTerm}) ont été validées. Les bulletins sont prêts pour l'impression.`,
                 type: 'ACTION_REQUIRED',
                 school_id: user?.schoolId
             });
@@ -120,11 +128,11 @@ const AdvisorPortal: React.FC = () => {
 
     const handleLaunchGradeEntry = async () => {
         if (!window.electronAPI) return;
-        if (confirm("Voulez-vous notifier tous les enseignants que la période de saisie des notes pour le " + selectedMonth + " (Trimestre " + selectedTerm + ") est ouverte ?")) {
+        if (confirm("Voulez-vous notifier tous les enseignants que la période de saisie des notes pour " + monthLabel + " (Trimestre " + selectedTerm + ") est ouverte ?")) {
             try {
                 await window.electronAPI.createNotification({
                     role: 'TEACHER',
-                    message: `La période de saisie des notes pour ${selectedMonth} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
+                    message: `La période de saisie des notes pour ${monthLabel} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
                     type: 'ACTION_REQUIRED',
                     school_id: user?.schoolId
                 });
@@ -218,7 +226,7 @@ const AdvisorPortal: React.FC = () => {
                                     className="bg-slate-950 border border-white/5 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-40"
                                 >
                                     {MONTHS.map(m => (
-                                        <option key={m} value={m}>{m}</option>
+                                        <option key={m.key} value={m.key}>{m.label}</option>
                                     ))}
                                 </select>
                             </div>

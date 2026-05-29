@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unlockGrades: (params) => ipcRenderer.invoke('db:unlockGrades', params),
   getClassSubjectsValidationStatus: (params) => ipcRenderer.invoke('db:getClassSubjectsValidationStatus', params),
   validateSubjectGrades: (params) => ipcRenderer.invoke('db:validateSubjectGrades', params),
+  validateClassGrades: (params) => ipcRenderer.invoke('db:validateClassGrades', params),
   getGradeOverrides: (params) => ipcRenderer.invoke('db:getGradeOverrides', params),
   addGradeOverride: (params) => ipcRenderer.invoke('db:addGradeOverride', params),
 

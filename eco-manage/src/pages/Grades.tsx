@@ -161,6 +161,33 @@ const Grades: React.FC = () => {
     }
   };
 
+  const handleValidateClass = async () => {
+    if (window.electronAPI) {
+        if (confirm("Voulez-vous valider et verrouiller toutes les notes de cette classe pour ce trimestre et ce mois ? Cela permettra d'imprimer les bulletins officiels.")) {
+            try {
+                const result = await (window.electronAPI as any).validateClassGrades({
+                    classId: parseInt(selectedClass),
+                    term: selectedTerm,
+                    month: selectedMonth
+                });
+                
+                // Notify Secretary/Advisor
+                await window.electronAPI.createNotification({
+                    role: 'SECRETARY',
+                    message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées par le Directeur. Les bulletins sont prêts pour l'impression.`,
+                    type: 'INFO',
+                    school_id: user?.schoolId
+                });
+
+                alert("✅ Toutes les notes de cette classe ont été validées et verrouillées avec succès !");
+                handleLoadContext();
+            } catch (err: any) {
+                alert("Erreur lors de la validation : " + err.message);
+            }
+        }
+    }
+  };
+
   const handleGrantOverride = async () => {
     if (window.electronAPI) {
         const days = prompt("Combien de jours supplémentaires souhaitez-vous accorder à l'enseignant de cette classe pour la saisie ? (ex: 3)", "3");
@@ -359,6 +386,14 @@ const Grades: React.FC = () => {
                             title="Accorder une dérogation de délai à l'enseignant"
                         >
                             DÉROGATION
+                        </button>
+                    )}
+                    {hasRole(['DIRECTOR', 'FOUNDER']) && !isLocked && (
+                        <button
+                            onClick={handleValidateClass}
+                            className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all inline-flex items-center shadow-lg shadow-emerald-600/20"
+                        >
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> VALIDER LES IMPRESSIONS
                         </button>
                     )}
                     {!isLocked ? (
