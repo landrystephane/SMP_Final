@@ -14,6 +14,7 @@ import Attendance from './pages/Attendance';
 import Tickets from './pages/Tickets';
 import Transport from './pages/Transport';
 import Users from './pages/Users';
+import Parents from './pages/Parents';
 import Profile from './pages/Profile';
 import MobileAccess from './pages/MobileAccess';
 import MobileProvisioning from './pages/MobileProvisioning';
@@ -74,6 +75,7 @@ function App() {
             <Route path="tickets" element={<Tickets />} />
             <Route path="transport" element={<Transport />} />
             <Route path="users" element={<Users />} />
+            <Route path="parents" element={<Parents />} />
             <Route path="profile" element={<Profile />} />
             <Route path="mobile-access" element={<MobileAccess />} />
             <Route path="sync" element={<SyncCenter />} />

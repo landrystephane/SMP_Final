@@ -29,7 +29,7 @@ const Classes: React.FC = () => {
             setClasses(cls || []);
             
             const users = await window.electronAPI.getUsers(user.schoolId);
-            const staff = users.filter((u: any) => u.role === 'TEACHER');
+            const staff = users.filter((u: any) => u.role?.trim().toUpperCase() === 'TEACHER');
             setTeachers(staff || []);
         }
     };

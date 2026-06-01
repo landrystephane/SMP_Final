@@ -78,6 +78,14 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDb();
+  
+  // Database migrations
+  try {
+      db.prepare('ALTER TABLE students ADD COLUMN transport_point_id INTEGER REFERENCES transport_points(id)').run();
+      console.log('Migration: Added transport_point_id to students table');
+  } catch (err) {
+      // Column might already exist, ignore
+  }
 
   // Self-healing / Seeding of default administration accounts to avoid lockouts
   try {
@@ -487,7 +495,13 @@ handleIPC('db:toggleSchoolStatus', async (event, { id, isActive }) => {
 // Students
 handleIPC('db:getStudents', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  return db.prepare('SELECT * FROM students WHERE school_id = ?').all(sid);
+  return db.prepare(`
+    SELECT s.*, 
+           (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+    FROM students s
+    LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+    WHERE s.school_id = ?
+  `).all(sid);
 });
 
 handleIPC('db:addStudent', async (event, student) => {
@@ -524,9 +538,9 @@ handleIPC('db:addStudent', async (event, student) => {
     matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
 
     db.prepare(`
-      INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(matricule, year, orderNumber, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, sid, scholarshipReduction || 0, hasMoratoire ? 1 : 0);
+      INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire, bus_route_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(matricule, year, orderNumber, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, sid, scholarshipReduction || 0, hasMoratoire ? 1 : 0, student.busRouteId ? parseInt(student.busRouteId, 10) : null);
 
     // Auto-create PARENT account
     if (parentContact && parentContact.trim()) {
@@ -539,9 +553,20 @@ handleIPC('db:addStudent', async (event, student) => {
       }
     }
   });
-
-  transaction();
+      transaction();
   return { success: true, matricule };
+});
+
+handleIPC('db:getParentsDirectory', async (event, schoolIdParam) => {
+  const schoolId = getActiveSchoolId(schoolIdParam);
+  return db.prepare(`
+    SELECT s.id as student_id, s.first_name, s.last_name, s.parent_name, s.parent_contact,
+           c.name as class_name, c.level as cycle, c.section
+    FROM students s
+    LEFT JOIN classes c ON s.class_id = c.id
+    WHERE s.school_id = ? AND s.parent_contact IS NOT NULL
+    ORDER BY c.name, s.first_name
+  `).all(schoolId);
 });
 
 handleIPC('db:deleteStudent', async (event, id) => {
@@ -674,6 +699,23 @@ handleIPC('db:addPayment', async (event, payment) => {
   const { studentId, amount, type, userId, installmentId, depositorName } = payment;
   const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
+  if (['Inscription', 'Transport', 'Examen'].includes(type)) {
+      const student = db.prepare('SELECT class_id FROM students WHERE id = ?').get(studentId);
+      if (student) {
+          const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(student.class_id);
+          if (feeConfig) {
+              let expected = 0;
+              if (type === 'Inscription') expected = feeConfig.registration_fee || 0;
+              if (type === 'Transport') expected = feeConfig.transport_fee || 0;
+              if (type === 'Examen') expected = feeConfig.exam_fee || 0;
+              
+              if (parseFloat(amount) !== expected) {
+                  throw new Error(`Paiement refusé : Le montant exact pour ${type} est de ${expected} FCFA.`);
+              }
+          }
+      }
+  }
+
   const result = db.prepare(`
     INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -703,7 +745,7 @@ handleIPC('db:deletePayment', async (event, id) => {
 handleIPC('db:getTuitionFees', async (event, schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
-    SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee
+    SELECT c.id as classId, c.name as className, COALESCE(t.total_fee, 0) as totalFee, COALESCE(t.registration_fee, 0) as registrationFee, COALESCE(t.transport_fee, 0) as transportFee, COALESCE(t.exam_fee, 0) as examFee
     FROM classes c
     LEFT JOIN tuition_fees t ON c.id = t.class_id
     WHERE c.school_id = ?
@@ -729,12 +771,12 @@ handleIPC('db:getClassInstallmentFees', async (event, schoolId) => {
     return db.prepare('SELECT cif.* FROM class_installment_fees cif JOIN classes c ON cif.class_id = c.id WHERE c.school_id = ?').all(sid);
 });
 
-handleIPC('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee }) => {
+handleIPC('db:updateTuitionFee', async (event, { classId, totalFee, registrationFee, transportFee = 0, examFee = 0 }) => {
   return db.prepare(`
-    INSERT INTO tuition_fees (class_id, total_fee, registration_fee)
-    VALUES (?, ?, ?)
-    ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee, registration_fee = excluded.registration_fee
-  `).run(classId, totalFee, registrationFee);
+    INSERT INTO tuition_fees (class_id, total_fee, registration_fee, transport_fee, exam_fee)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee, registration_fee = excluded.registration_fee, transport_fee = excluded.transport_fee, exam_fee = excluded.exam_fee
+  `).run(classId, totalFee, registrationFee, transportFee, examFee);
 });
 
 handleIPC('db:updateClassInstallmentFee', async (event, { classId, installmentId, amount }) => {
@@ -1027,13 +1069,75 @@ handleIPC('db:getBusRoutes', async (event, schoolId) => {
     return db.prepare('SELECT * FROM bus_routes WHERE school_id = ?').all(sid);
 });
 
+handleIPC('db:addBusRoute', async (event, { name, bus_number, driver_id, schoolId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    return db.prepare('INSERT INTO bus_routes (name, bus_number, driver_id, school_id) VALUES (?, ?, ?, ?)').run(name, bus_number, driver_id, sid);
+});
+
+handleIPC('db:addTransportPoint', async (event, { routeId, name, latitude, longitude, estimatedTime }) => {
+    return db.prepare('INSERT INTO transport_points (route_id, name, latitude, longitude, estimated_time_from_start) VALUES (?, ?, ?, ?, ?)').run(routeId, name, latitude, longitude, estimatedTime);
+});
+
+handleIPC('db:deleteTransportPoint', async (event, pointId) => {
+    return db.prepare('DELETE FROM transport_points WHERE id = ?').run(pointId);
+});
+
 handleIPC('db:getTransportPoints', async (event, routeId) => {
     if (!routeId) return [];
     return db.prepare('SELECT * FROM transport_points WHERE route_id = ? ORDER BY estimated_time_from_start').all(routeId);
 });
 
 handleIPC('db:getRouteStudents', async (event, routeId) => {
-    return db.prepare('SELECT * FROM students WHERE bus_route_id = ? AND has_transport = 1').all(routeId);
+    // Only fetch students who have made a transport payment, sorted by class
+    return db.prepare(`
+        SELECT s.*, c.name as class_name
+        FROM students s
+        JOIN classes c ON s.class_id = c.id
+        WHERE s.bus_route_id = ? AND EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.student_id = s.id AND p.payment_type = 'Transport'
+        )
+        ORDER BY c.name ASC, s.last_name ASC
+    `).all(routeId);
+});
+
+handleIPC('db:getTransportEligibleStudents', async (event, schoolId) => {
+    const sid = getActiveSchoolId(schoolId);
+    return db.prepare(`
+        SELECT s.*, c.name as class_name, c.level as cycle
+        FROM students s
+        JOIN classes c ON s.class_id = c.id
+        WHERE s.school_id = ? 
+        AND s.transport_point_id IS NULL
+        AND EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.student_id = s.id AND p.payment_type = 'Transport' AND p.amount > 0
+        )
+        ORDER BY c.name ASC, s.last_name ASC
+    `).all(sid);
+});
+
+handleIPC('db:assignStudentToTransportPoint', async (event, { studentId, pointId, routeId }) => {
+    // 1. Assign in DB
+    db.prepare('UPDATE students SET bus_route_id = ?, transport_point_id = ? WHERE id = ?').run(routeId, pointId, studentId);
+    
+    // 2. Fetch point details
+    const point = db.prepare('SELECT name, latitude, longitude, estimated_time_from_start FROM transport_points WHERE id = ?').get(pointId);
+    if (!point) return { success: false, error: 'Point introuvable' };
+
+    // 3. Create announcement for parent
+    const student = db.prepare('SELECT parent_contact, first_name FROM students WHERE id = ?').get(studentId);
+    if (student && student.parent_contact) {
+        const parentUser = db.prepare('SELECT id FROM users WHERE username = ?').get(student.parent_contact.trim());
+        if (parentUser) {
+            const mapLink = (point.latitude && point.longitude && point.latitude !== 0) ? `https://www.google.com/maps?q=${point.latitude},${point.longitude}` : '';
+            const msg = `🚌 **Abonnement Transport Validé**\n\nVotre enfant ${student.first_name} a été assigné au point de ramassage : **${point.name}**.\nLe bus passera approximativement à **+${point.estimated_time_from_start} minutes** après le départ de la tournée.\n\n${mapLink ? `📍 [Voir sur Google Maps](${mapLink})` : ''}`;
+            
+            db.prepare('INSERT INTO announcements (school_id, sender_id, target_role, title, content, target_users) VALUES (?, ?, ?, ?, ?, ?)')
+              .run(getActiveSchoolId(), loggedInUser?.id || 1, 'PARENT', 'Info Transport', msg, JSON.stringify([parentUser.id]));
+        }
+    }
+    return { success: true };
 });
 
 handleIPC('db:getParentStudents', async (event, parentPhone) => {
@@ -1043,6 +1147,44 @@ handleIPC('db:getParentStudents', async (event, parentPhone) => {
 handleIPC('db:logTransport', async (event, log) => {
     const { route_id, event_type, latitude, longitude } = log;
     return db.prepare(`INSERT INTO transport_logs (route_id, event_type, latitude, longitude) VALUES (?, ?, ?, ?)`).run(route_id, event_type, latitude, longitude);
+});
+
+handleIPC('db:logTransportAttendance', async (event, { studentId, routeId, direction, status, recordedBy }) => {
+    const res = db.prepare(`
+        INSERT INTO transport_attendance (student_id, route_id, date, direction, status, recorded_by)
+        VALUES (?, ?, date('now'), ?, ?, ?)
+    `).run(studentId, routeId, direction, status, recordedBy);
+
+    if (status === 'PRESENT') {
+        const student = db.prepare('SELECT first_name, school_id FROM students WHERE id = ?').get(studentId);
+        if (student) {
+            const msg = `🚌 Votre enfant ${student.first_name} est bien à bord du bus scolaire.`;
+            db.prepare(`
+                INSERT INTO announcements (school_id, sender_id, target, title, content) 
+                VALUES (?, ?, 'PARENTS', 'Appel Bus Scolaire', ?)
+            `).run(student.school_id, recordedBy, msg);
+        }
+    }
+    return res;
+});
+
+handleIPC('db:notifyTransportProximity', async (event, { pointId, driverId }) => {
+    const point = db.prepare('SELECT name, route_id FROM transport_points WHERE id = ?').get(pointId);
+    if (!point) return false;
+    
+    // Find all students assigned to this point
+    const students = db.prepare('SELECT first_name, school_id FROM students WHERE transport_point_id = ?').all(pointId);
+    
+    let sentCount = 0;
+    for (const student of students) {
+        const msg = `📍 Alerte Proximité : Le bus scolaire est bientôt au point de ramassage "${point.name}" pour ${student.first_name}. Veuillez vous préparer !`;
+        db.prepare(`
+            INSERT INTO announcements (school_id, sender_id, target, title, content) 
+            VALUES (?, ?, 'PARENTS', 'Alerte Bus', ?)
+        `).run(student.school_id, driverId, msg);
+        sentCount++;
+    }
+    return { success: true, notified: sentCount };
 });
 
 // Mobile Keys
@@ -1297,6 +1439,43 @@ handleIPC('db:createNotification', async (event, notification) => {
   }
 });
 
+handleIPC('db:sendParentAnnouncement', async (event, { sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class }) => {
+    const sid = getActiveSchoolId(school_id);
+    let query = `
+        SELECT DISTINCT u.id 
+        FROM users u 
+        JOIN students s ON u.username = s.parent_contact 
+        LEFT JOIN classes c ON s.class_id = c.id 
+        WHERE s.school_id = ? AND u.role = 'PARENT'
+    `;
+    const params = [sid];
+
+    if (filter_cycle && filter_cycle !== 'ALL') {
+        query += " AND c.level = ?";
+        params.push(filter_cycle);
+    }
+    if (filter_section && filter_section !== 'ALL') {
+        query += " AND c.section = ?";
+        params.push(filter_section);
+    }
+    if (filter_class && filter_class !== 'ALL') {
+        query += " AND c.name = ?";
+        params.push(filter_class);
+    }
+
+    const parents = db.prepare(query).all(...params);
+    if (parents.length === 0) return { success: true, count: 0 };
+
+    const transaction = db.transaction(() => {
+        const stmt = db.prepare('INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)');
+        for (const p of parents) {
+            stmt.run(sender_id, p.id, subject, message, sid);
+        }
+    });
+    transaction();
+    return { success: true, count: parents.length };
+});
+
 handleIPC('db:getNotifications', async (event, { userId, schoolId }) => {
   return []; // Deprecated, mapped to tickets
 });
@@ -1314,15 +1493,49 @@ handleIPC('db:getStudentDetails', async (event, studentId) => {
   return { student, payments, attendance, grades };
 });
 
+handleIPC('db:searchStudentsDetailed', async (event, { name, schoolId, section, level, classId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    let query = `
+        SELECT s.*, c.name as class_name, c.section, c.level,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+        FROM students s 
+        JOIN classes c ON s.class_id = c.id 
+        LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+        WHERE s.school_id = ?
+    `;
+    const params = [sid];
+
+    if (name) {
+        query += ` AND (s.first_name LIKE ? OR s.last_name LIKE ?)`;
+        params.push(`%${name}%`, `%${name}%`);
+    }
+    if (section && section !== 'ALL') {
+        query += ` AND c.section = ?`;
+        params.push(section);
+    }
+    if (level && level !== 'ALL') {
+        query += ` AND c.level = ?`;
+        params.push(level);
+    }
+    if (classId && classId !== 'ALL') {
+        query += ` AND c.id = ?`;
+        params.push(classId);
+    }
+
+    query += ` ORDER BY c.name ASC, s.last_name ASC LIMIT 50`;
+    
+    return db.prepare(query).all(...params);
+});
+
 handleIPC('db:updateStudent', async (event, student) => {
-  const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire } = student;
+  const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire, busRouteId } = student;
   const parsedClassId = parseInt(classId, 10);
   
   const runResult = db.prepare(`
     UPDATE students 
-    SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, gender = ?, parent_name = ?, parent_contact = ?, emergency_contact = ?, medical_info = ?, address = ?, neighborhood = ?, section = ?, class_id = ?, scholarship_reduction = ?, has_moratoire = ?
+    SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, gender = ?, parent_name = ?, parent_contact = ?, emergency_contact = ?, medical_info = ?, address = ?, neighborhood = ?, section = ?, class_id = ?, scholarship_reduction = ?, has_moratoire = ?, bus_route_id = ?
     WHERE id = ?
-  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, scholarshipReduction || 0, hasMoratoire ? 1 : 0, id);
+  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, scholarshipReduction || 0, hasMoratoire ? 1 : 0, busRouteId ? parseInt(busRouteId, 10) : null, id);
 
   if (runResult.changes > 0 && parentContact && parentContact.trim()) {
       const studentInDb = db.prepare('SELECT parent_name, school_id FROM students WHERE id = ?').get(id);
@@ -1435,13 +1648,193 @@ handleIPC('db:getDashboardStats', async (event, params) => {
     ORDER BY c.section ASC, passRate DESC
   `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : [])] : [schoolId]));
 
+  const schoolConfig = db.prepare('SELECT honor_roll_threshold FROM schools WHERE id = ?').get(schoolId) || {};
+  const honorThreshold = schoolConfig.honor_roll_threshold !== undefined ? schoolConfig.honor_roll_threshold : 15.0;
+
+  const honorRoll = db.prepare(`
+    SELECT s.first_name, s.last_name, c.name as class_name, AVG(g.score) as avg
+    FROM students s
+    JOIN classes c ON s.class_id = c.id
+    JOIN grades g ON g.student_id = s.id
+    WHERE s.school_id = ? ${studentWhereStr}
+    GROUP BY s.id
+    HAVING avg >= ?
+    ORDER BY avg DESC
+    LIMIT 10
+  `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : []), honorThreshold] : [schoolId, honorThreshold]));
+
   return {
     totalStudents,
     genderDist: { boys, girls },
     totalRevenue,
     totalTuitionDue,
     classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
+    honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, avg: h.avg || 0 })),
+    honorRollThreshold: honorThreshold,
     financialAlerts: []
+  };
+});
+
+handleIPC('db:getBursarDashboardStats', async (event, params) => {
+  const schoolId = getActiveSchoolId(params ? params.schoolId : null);
+  
+  const students = db.prepare(`
+    SELECT s.id, s.class_id, s.scholarship_reduction, c.name as class_name, c.level as class_level,
+           (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+    FROM students s
+    JOIN classes c ON s.class_id = c.id
+    LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+    WHERE s.school_id = ?
+  `).all(schoolId);
+
+  const tuitionFees = db.prepare(`
+    SELECT t.* 
+    FROM tuition_fees t
+    JOIN classes c ON t.class_id = c.id
+    WHERE c.school_id = ?
+  `).all(schoolId);
+  const tuitionPayments = db.prepare(`
+    SELECT p.student_id, SUM(p.amount) as total_paid 
+    FROM payments p
+    JOIN students s ON p.student_id = s.id
+    WHERE p.payment_type IN ('Scolarité', 'Inscription') AND s.school_id = ?
+    GROUP BY p.student_id
+  `).all(schoolId);
+
+  const allRevenue = db.prepare(`
+    SELECT SUM(p.amount) as total_paid
+    FROM payments p
+    JOIN students s ON p.student_id = s.id
+    WHERE s.school_id = ?
+  `).get(schoolId).total_paid || 0;
+
+  const paymentMap = {};
+  tuitionPayments.forEach(p => { paymentMap[p.student_id] = p.total_paid; });
+
+  let totalRevenue = allRevenue; // Global Recettes include ALL fees
+  let totalTuitionDue = 0;
+  let totalTuitionPaid = 0;
+  const classMap = {};
+
+  students.forEach(s => {
+    if (!classMap[s.class_name]) {
+        classMap[s.class_name] = { name: s.class_name, level: s.class_level, totalStudents: 0, upToDateStudents: 0 };
+    }
+    classMap[s.class_name].totalStudents++;
+
+    const classFeeConfig = tuitionFees.find(f => f.class_id === s.class_id);
+    const totalReg = classFeeConfig ? classFeeConfig.registration_fee : 0;
+    const totalPension = classFeeConfig ? classFeeConfig.total_fee : 0;
+    
+    const scholarship = s.scholarship_reduction || 0;
+    const due = totalReg + Math.max(0, totalPension - scholarship);
+    const paid = paymentMap[s.id] || 0;
+
+    totalTuitionDue += due;
+    totalTuitionPaid += paid;
+
+    if (paid >= due) {
+        classMap[s.class_name].upToDateStudents++;
+    }
+  });
+
+  const validatedExpenses = db.prepare(`
+    SELECT SUM(amount) as total 
+    FROM expenses 
+    WHERE status = 'VALIDATED' AND school_id = ?
+  `).get(schoolId).total || 0;
+
+  return {
+      totalRevenue,
+      totalTuitionPaid,
+      totalExpenses: validatedExpenses,
+      totalTuitionDue,
+      totalStudents: students.length,
+      classStats: Object.values(classMap).sort((a, b) => b.totalStudents - a.totalStudents)
+  };
+});
+
+handleIPC('db:getAdvisorDashboardStats', async (event, params) => {
+  const schoolId = getActiveSchoolId(params ? params.schoolId : null);
+  
+  // Get all classes
+  const classes = db.prepare(`SELECT id, name, level, section FROM classes WHERE school_id = ?`).all(schoolId);
+  const students = db.prepare(`
+      SELECT s.id, s.class_id, 
+             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+      FROM students s 
+      LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+      WHERE s.school_id = ?
+  `).all(schoolId).filter(s => s.has_paid_registration);
+  
+  // Calculate absences
+  const absences = db.prepare(`
+    SELECT a.student_id, COUNT(*) as absence_count
+    FROM attendance a
+    JOIN students s ON a.student_id = s.id
+    WHERE s.school_id = ? AND a.status = 'ABSENT'
+    GROUP BY a.student_id
+  `).all(schoolId);
+
+  const absenceMap = {};
+  absences.forEach(a => { absenceMap[a.student_id] = a.absence_count; });
+
+  // Calculate pass rates
+  const grades = db.prepare(`
+    SELECT g.student_id, g.class_id, AVG(g.score) as avg
+    FROM grades g
+    JOIN classes c ON g.class_id = c.id
+    WHERE c.school_id = ?
+    GROUP BY g.student_id
+  `).all(schoolId);
+
+  const classMap = {};
+  classes.forEach(c => {
+      classMap[c.id] = { ...c, totalStudents: 0, totalAbsences: 0, passedStudents: 0, totalGraded: 0 };
+  });
+
+  students.forEach(s => {
+      if (classMap[s.class_id]) {
+          classMap[s.class_id].totalStudents++;
+          classMap[s.class_id].totalAbsences += (absenceMap[s.id] || 0);
+      }
+  });
+
+  grades.forEach(g => {
+      if (classMap[g.class_id]) {
+          classMap[g.class_id].totalGraded++;
+          if (g.avg >= 10) {
+              classMap[g.class_id].passedStudents++;
+          }
+      }
+  });
+
+  let totalAbsences = 0;
+  let overallPassed = 0;
+  let overallGraded = 0;
+
+  const finalClassStats = Object.values(classMap).map((c) => {
+      totalAbsences += c.totalAbsences;
+      overallPassed += c.passedStudents;
+      overallGraded += c.totalGraded;
+      const passRate = c.totalGraded > 0 ? (c.passedStudents / c.totalGraded) * 100 : 0;
+      return {
+          name: c.name,
+          level: c.level,
+          section: c.section,
+          totalStudents: c.totalStudents,
+          totalAbsences: c.totalAbsences,
+          passRate
+      };
+  });
+
+  const overallPassRate = overallGraded > 0 ? (overallPassed / overallGraded) * 100 : 0;
+
+  return {
+      totalStudents: students.length,
+      totalAbsences,
+      overallPassRate,
+      classStats: finalClassStats
   };
 });
 
@@ -1490,8 +1883,10 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
                     COUNT(*) as total,
                     SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
                     SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
-                FROM students
-                WHERE class_id IN (${activeClassIds})
+                FROM students s
+                LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+                WHERE s.class_id IN (${activeClassIds})
+                AND (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0)
             `).get();
             totalStudents = studentStats.total || 0;
             boys = studentStats.boys || 0;
@@ -1503,10 +1898,24 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
                 FROM students s
                 JOIN classes c ON s.class_id = c.id
                 LEFT JOIN grades g ON g.student_id = s.id
+                LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
                 WHERE s.class_id IN (${activeClassIds})
+                AND (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0)
                 GROUP BY s.id
                 ORDER BY average DESC NULLS LAST
             `).all();
+        }
+    }
+
+    const schoolConfig = db.prepare('SELECT timetable_slots FROM schools WHERE id = ?').get(sid);
+    const subjects = db.prepare('SELECT id, name FROM class_subjects').all();
+    
+    let schedules = [];
+    if (tId) {
+        if (classIds.length > 0) {
+            schedules = db.prepare(`SELECT * FROM schedules WHERE school_id = ? AND (teacher_id = ? OR (type = 'PAUSE' AND class_id IN (${classIds.join(',')})))`).all(sid, tId);
+        } else {
+            schedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND teacher_id = ?').all(sid, tId);
         }
     }
 
@@ -1514,7 +1923,10 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
         totalStudents,
         genderDist: { boys, girls },
         classes,
-        students: studentsAverages.map(s => ({ ...s, average: s.average || 0 }))
+        subjects,
+        students: studentsAverages.map(s => ({ ...s, average: s.average || 0 })),
+        schedules,
+        timetable_slots: schoolConfig ? schoolConfig.timetable_slots : null
     };
 });
 
@@ -1534,11 +1946,14 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
         bulletin_sig_left, 
         bulletin_sig_middle, 
         bulletin_sig_right, 
-        header_french, 
         header_english,
         bulletin_pdf_use_custom,
         bulletin_pdf_template,
-        bulletin_pdf_mapping
+        bulletin_pdf_mapping,
+        transport_fee_model,
+        transport_fee_amount,
+        honor_roll_threshold,
+        timetable_slots
     } = settings;
     return db.prepare(`
         UPDATE schools SET
@@ -1558,7 +1973,11 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
             header_english = ?,
             bulletin_pdf_use_custom = ?,
             bulletin_pdf_template = ?,
-            bulletin_pdf_mapping = ?
+            bulletin_pdf_mapping = ?,
+            transport_fee_model = ?,
+            transport_fee_amount = ?,
+            honor_roll_threshold = ?,
+            timetable_slots = ?
         WHERE id = ?
     `).run(
         name || '',
@@ -1578,6 +1997,10 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
         bulletin_pdf_use_custom !== undefined && bulletin_pdf_use_custom !== null ? bulletin_pdf_use_custom : 0,
         bulletin_pdf_template || '',
         bulletin_pdf_mapping || '{}',
+        transport_fee_model || 'ANNUAL',
+        transport_fee_amount || 0,
+        honor_roll_threshold !== undefined && honor_roll_threshold !== null ? honor_roll_threshold : 15.0,
+        timetable_slots || '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]',
         id
     );
 });

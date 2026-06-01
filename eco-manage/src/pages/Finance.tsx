@@ -10,7 +10,7 @@ const Finance: React.FC = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [tuitionFees, setTuitionFees] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS' | 'EXPENSES'>('MANAGEMENT');
+  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS' | 'EXPENSES' | 'SPECIAL_FEES'>('MANAGEMENT');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
@@ -59,20 +59,21 @@ const Finance: React.FC = () => {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await window.electronAPI.addPayment({
                 ...newPayment,
-                amount: parseFloat(newPayment.amount),
+                amount: parseFloat(newPayment.amount.replace(/\s+/g, '')),
                 userId: user.id,
                 installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
             });
             
             if (res && res.error) {
                 alert(`Erreur de paiement: ${res.error}`);
+                setIsAddingPayment(false);
                 return;
             }
 
             // Generate receipt automatically
             if (res.receiptNumber) {
                 const s = students.find(stud => stud.id.toString() === newPayment.studentId);
-                const financials = getStudentFinancials(s);
+                const financials = getStudentFinancials(s, newPayment.type);
                 const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
                 const paymentData = {
                     ...newPayment,
@@ -101,7 +102,7 @@ const Finance: React.FC = () => {
         try {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             await window.electronAPI.createExpense({
-                amount: parseFloat(newExpense.amount),
+                amount: parseFloat(newExpense.amount.replace(/\s+/g, '')),
                 reason: newExpense.reason,
                 requested_by: user.id,
                 school_id: user.schoolId
@@ -111,7 +112,7 @@ const Finance: React.FC = () => {
             await window.electronAPI.createNotification({
                 school_id: user.schoolId,
                 role: 'FOUNDER',
-                message: `Une demande de ${newExpense.amount} FCFA a été soumise par l'Économe pour: ${newExpense.reason}.`,
+                message: `Une demande de ${newExpense.amount} FCFA a été soumise par l'Économe pour: ${newExpense.reason}. \n\nVeuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`,
                 type: 'FINANCE'
             });
 
@@ -154,36 +155,87 @@ const Finance: React.FC = () => {
     }
   };
 
-  const getStudentFinancials = (student: any) => {
+  const getStudentFinancials = (student: any, feeType: string = 'Scolarité') => {
       if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
-      const classConfig = tuitionFees.find(f => f.classId === student.class_id);
-      const scholarship = student.scholarship_reduction || 0;
-      const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
-      const totalReg = classConfig?.registrationFee || 0;
-      const totalDue = totalPension + totalReg;
+      
+      const activeSchool = schools.find(s => s.id === user?.schoolId) || schools[0] || {};
+      
+      let totalDue = 0;
+      if (feeType === 'Scolarité') {
+          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+          const scholarship = student.scholarship_reduction || 0;
+          const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
+          const totalReg = classConfig?.registrationFee || 0;
+          totalDue = totalPension + totalReg;
+      } else if (feeType === 'Transport') {
+          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+          totalDue = classConfig?.transportFee || 0;
+      } else if (feeType === 'Examen') {
+          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+          totalDue = classConfig?.examFee || 0;
+      }
 
-      const studentPayments = payments.filter(p => p.student_id === student.id);
+      const studentPayments = payments.filter(p => p.student_id === student.id && (p.payment_type === feeType || (!p.payment_type && feeType === 'Scolarité')));
       const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
-
       let remaining = totalPaid;
       const breakdown: any = { registration: 0, installments: [] };
 
-      breakdown.registration = Math.min(totalReg, remaining);
-      remaining -= breakdown.registration;
+      if (feeType === 'Scolarité') {
+          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+          const totalReg = classConfig?.registrationFee || 0;
+          breakdown.registration = Math.min(totalReg, remaining);
+          remaining -= breakdown.registration;
 
-      const classInsts = (installments || []).map(inst => ({
-          ...inst,
-          amountDue: (classInstallmentFees || []).find(cif => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
-      }));
+          const classInsts = (installments || []).map(inst => ({
+              ...inst,
+              amountDue: (classInstallmentFees || []).find(cif => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
+          }));
 
-      for (const inst of classInsts) {
-          const paidForThis = Math.min(inst.amountDue, remaining);
-          breakdown.installments.push({ ...inst, paid: paidForThis });
-          remaining -= paidForThis;
+          for (const inst of classInsts) {
+              const paidForThis = Math.min(inst.amountDue, remaining);
+              breakdown.installments.push({ ...inst, paid: paidForThis });
+              remaining -= paidForThis;
+          }
       }
 
       return { totalDue, totalPaid, balance: totalDue - totalPaid, breakdown, overpaid: remaining };
   };
+
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [filterSection, setFilterSection] = useState('ALL');
+  const [filterLevel, setFilterLevel] = useState('ALL');
+  const [filterClass, setFilterClass] = useState('ALL');
+  const [filterFeeType, setFilterFeeType] = useState('Scolarité'); // Scolarité, Transport, Examen
+  const [filterStatus, setFilterStatus] = useState('ALL'); // UP_TO_DATE, IN_ARREARS
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
+  const [paymentFilterSection, setPaymentFilterSection] = useState('ALL');
+  const [paymentFilterLevel, setPaymentFilterLevel] = useState('ALL');
+  const [paymentFilterClass, setPaymentFilterClass] = useState('ALL');
+
+  const handleSearch = async () => {
+    if (window.electronAPI) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const results = await window.electronAPI.searchStudentsDetailed({
+            name: searchQuery,
+            schoolId: user.schoolId,
+            section: filterSection,
+            level: filterLevel,
+            classId: filterClass
+        });
+        setSearchResults(results);
+    }
+  };
+
+  useEffect(() => {
+    handleSearch();
+  }, [searchQuery, filterSection, filterLevel, filterClass, payments]);
+
+  useEffect(() => {
+    if (students.length > 0 && searchResults.length === 0 && !searchQuery && filterSection === 'ALL' && filterLevel === 'ALL' && filterClass === 'ALL') {
+        setSearchResults(students);
+    }
+  }, [students]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -203,18 +255,26 @@ const Finance: React.FC = () => {
                 onClick={() => setActiveTab('PAYMENTS')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PAYMENTS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-                {t('student_collection')}
+                {t('payment_history')}
             </button>
             <button
-                onClick={() => setActiveTab('EXPENSES')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXPENSES' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                onClick={() => setActiveTab('SPECIAL_FEES')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'SPECIAL_FEES' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}
             >
-                {t('expenses_tab', 'Décaissements')}
+                Services
             </button>
+            {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER' || user?.role === 'BURSAR') && (
+                <button
+                    onClick={() => setActiveTab('EXPENSES')}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXPENSES' ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                    Décaissements
+                </button>
+            )}
         </div>
       </div>
 
-      {activeTab === 'MANAGEMENT' ? (
+      {activeTab === 'MANAGEMENT' && (
         <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all group">
@@ -302,7 +362,7 @@ const Finance: React.FC = () => {
                                         <button
                                             onClick={() => {
                                                 const s = students.find(stud => stud.id === p.student_id);
-                                                const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id });
+                                                const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id }, p.payment_type);
                                                 const user = JSON.parse(localStorage.getItem('user') || '{}');
                                                 const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
                                                 // @ts-ignore
@@ -321,7 +381,9 @@ const Finance: React.FC = () => {
                 </div>
             </div>
         </div>
-      ) : (
+      )} 
+      
+      {activeTab === 'PAYMENTS' && (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center bg-gradient-to-r from-amber-500 to-yellow-400 p-8 rounded-3xl text-slate-950 shadow-2xl shadow-amber-500/20">
                 <div className="mb-4 md:mb-0">
@@ -337,20 +399,121 @@ const Finance: React.FC = () => {
             </div>
 
             <div className="glass-card border-none shadow-xl overflow-hidden">
-                <div className="p-4 border-b border-white/5 flex items-center gap-4 bg-slate-900/50">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
-                            type="text"
-                            placeholder={t('search_student_payment')}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-6 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                <div className="p-4 border-b border-white/5 bg-slate-900/50 space-y-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            <input
+                                type="text"
+                                placeholder={t('search_student_payment')}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-6 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => {
+                                    const filteredStudentsForPrint = students.filter(s => {
+                                        if (filterSection !== 'ALL' && classes.find(c => c.id === s.class_id)?.section !== filterSection) return false;
+                                        if (filterLevel !== 'ALL' && classes.find(c => c.id === s.class_id)?.level !== filterLevel) return false;
+                                        if (filterClass !== 'ALL' && s.class_id.toString() !== filterClass) return false;
+                                        const fin = getStudentFinancials(s, filterFeeType);
+                                        if (filterStatus === 'UP_TO_DATE' && fin.balance > 0) return false;
+                                        if (filterStatus === 'IN_ARREARS' && fin.balance <= 0) return false;
+                                        if (searchQuery && !`${s.first_name} ${s.last_name} ${s.matricule}`.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                                        return true;
+                                    }).map(s => ({
+                                        ...s, 
+                                        className: classes.find(c => c.id === s.class_id)?.name || 'N/A',
+                                        financials: getStudentFinancials(s, filterFeeType)
+                                    }));
+                                    
+                                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                    const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
+                                    
+                                    // @ts-ignore
+                                    import('../utils/reports').then(m => m.generateFinancialList(filteredStudentsForPrint, filterFeeType, filterStatus, activeSchool));
+                                }}
+                                className="p-3.5 bg-indigo-500/10 text-indigo-500 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-lg"
+                                title="Imprimer la liste"
+                            >
+                                <Printer className="w-5 h-5" />
+                            </button>
+                            <button 
+                                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                                className={`p-3.5 rounded-2xl transition-colors ${showAdvancedFilters ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                            >
+                                <Filter className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
-                    <button className="p-3.5 bg-slate-800 hover:bg-slate-700 rounded-2xl text-slate-400 transition-colors">
-                        <Filter className="w-5 h-5" />
-                    </button>
+
+                    {showAdvancedFilters && (
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t border-white/5 animate-in slide-in-from-top-2">
+                            <select
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                value={filterSection}
+                                onChange={(e) => {
+                                    setFilterSection(e.target.value);
+                                    setFilterLevel('ALL');
+                                    setFilterClass('ALL');
+                                }}
+                            >
+                                <option value="ALL">Toutes les sections</option>
+                                <option value="Francophone">Francophone</option>
+                                <option value="Anglophone">Anglophone</option>
+                            </select>
+
+                            <select
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                value={filterLevel}
+                                onChange={(e) => {
+                                    setFilterLevel(e.target.value);
+                                    setFilterClass('ALL');
+                                }}
+                                disabled={filterSection === 'ALL'}
+                            >
+                                <option value="ALL">Tous les cycles</option>
+                                <option value="Maternelle">Maternelle</option>
+                                <option value="Primaire">Primaire</option>
+                            </select>
+
+                            <select
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                value={filterClass}
+                                onChange={(e) => setFilterClass(e.target.value)}
+                                disabled={filterLevel === 'ALL'}
+                            >
+                                <option value="ALL">Toutes les salles</option>
+                                {classes
+                                    .filter(c => c.section === filterSection && c.level === filterLevel)
+                                    .map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                            
+                            <select
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                value={filterFeeType}
+                                onChange={(e) => setFilterFeeType(e.target.value)}
+                            >
+                                <option value="Scolarité">Frais Scolarité</option>
+                                <option value="Transport">Frais Transport</option>
+                                <option value="Examen">Frais Examen</option>
+                            </select>
+                            
+                            <select
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                            >
+                                <option value="ALL">Tous statuts</option>
+                                <option value="UP_TO_DATE">À jour</option>
+                                <option value="IN_ARREARS">Non à jour (Arriérés)</option>
+                            </select>
+                        </div>
+                    )}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -365,12 +528,13 @@ const Finance: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {students.filter(s =>
-                                s.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                s.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                s.matricule.toLowerCase().includes(searchQuery.toLowerCase())
-                            ).map(s => {
-                                const fin = getStudentFinancials(s);
+                            {searchResults.filter(s => {
+                                const fin = getStudentFinancials(s, filterFeeType);
+                                if (filterStatus === 'UP_TO_DATE' && fin.balance > 0) return false;
+                                if (filterStatus === 'IN_ARREARS' && fin.balance <= 0) return false;
+                                return true;
+                            }).map(s => {
+                                const fin = getStudentFinancials(s, filterFeeType);
                                 return (
                                     <tr key={s.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4">
@@ -420,42 +584,135 @@ const Finance: React.FC = () => {
       {/* Modal Nouveau Paiement */}
       {isAddingPayment && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in zoom-in duration-300">
-              <div className="glass-card w-full max-w-lg bg-slate-900 border-slate-800 shadow-2xl p-0 overflow-hidden">
-                  <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
+              <div className="glass-card w-full max-w-lg max-h-[90vh] bg-slate-900 border-slate-800 shadow-2xl p-0 flex flex-col overflow-hidden">
+                  <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50 flex-shrink-0">
                       <div>
                         <h2 className="text-2xl font-black text-white tracking-tight">{t('register_payment')}</h2>
                         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Saisie sécurisée des fonds</p>
                       </div>
-                      <button onClick={() => setIsAddingPayment(false)} className="p-2 hover:bg-white/5 rounded-full transition-all"><Plus className="w-8 h-8 rotate-45 text-slate-500" /></button>
+                      <button type="button" onClick={() => setIsAddingPayment(false)} className="p-2 hover:bg-white/5 rounded-full transition-all"><Plus className="w-8 h-8 rotate-45 text-slate-500" /></button>
                   </div>
-                  <form onSubmit={handleAddPayment} className="p-8 space-y-6">
-                      <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                            <Users className="w-3 h-3 mr-2" /> {t('beneficiary_student')}
-                          </label>
+                  <form onSubmit={handleAddPayment} className="p-8 space-y-6 overflow-y-auto flex-1">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <select
-                            required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
-                            value={newPayment.studentId}
-                            onChange={(e) => setNewPayment({...newPayment, studentId: e.target.value})}
+                              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                              value={paymentFilterSection}
+                              onChange={(e) => {
+                                  setPaymentFilterSection(e.target.value);
+                                  setPaymentFilterLevel('ALL');
+                                  setPaymentFilterClass('ALL');
+                              }}
                           >
-                              <option value="">{t('choose_student')}</option>
-                              {students.map(s => (
-                                  <option key={s.id} value={s.id}>{s.last_name} {s.first_name} ({s.matricule})</option>
+                              <option value="ALL">Toutes les sections</option>
+                              <option value="FRANCOPHONE">Francophone</option>
+                              <option value="ANGLOPHONE">Anglophone</option>
+                          </select>
+
+                          <select
+                              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                              value={paymentFilterLevel}
+                              onChange={(e) => {
+                                  setPaymentFilterLevel(e.target.value);
+                                  setPaymentFilterClass('ALL');
+                              }}
+                              disabled={paymentFilterSection === 'ALL'}
+                          >
+                              <option value="ALL">Tous les cycles</option>
+                              <option value="MATERNELLE">Maternelle</option>
+                              <option value="PRIMAIRE">Primaire</option>
+                          </select>
+
+                          <select
+                              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                              value={paymentFilterClass}
+                              onChange={(e) => setPaymentFilterClass(e.target.value)}
+                              disabled={paymentFilterLevel === 'ALL'}
+                          >
+                              <option value="ALL">Toutes les salles</option>
+                              {classes
+                                  .filter(c => (paymentFilterSection === 'ALL' || c.section === paymentFilterSection) && (paymentFilterLevel === 'ALL' || c.level === paymentFilterLevel))
+                                  .map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
                               ))}
                           </select>
                       </div>
 
+                      <div className="space-y-2 relative">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                            <Users className="w-3 h-3 mr-2" /> {t('beneficiary_student')}
+                          </label>
+                          <input
+                              type="text"
+                              placeholder="Rechercher un élève (Nom, Matricule...)"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                              value={newPayment.studentId ? `${students.find(s => s.id.toString() === newPayment.studentId)?.last_name} ${students.find(s => s.id.toString() === newPayment.studentId)?.first_name}` : paymentSearchQuery}
+                              onChange={(e) => {
+                                  setPaymentSearchQuery(e.target.value);
+                                  if (newPayment.studentId) {
+                                      setNewPayment({...newPayment, studentId: ''});
+                                  }
+                              }}
+                          />
+                          {!newPayment.studentId && paymentSearchQuery && (
+                              <div className="absolute z-10 w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-h-48 overflow-y-auto mt-2">
+                                  {students.filter(s => {
+                                      if (paymentFilterClass !== 'ALL' && s.class_id?.toString() !== paymentFilterClass) return false;
+                                      const c = classes.find(cl => cl.id === s.class_id);
+                                      if (paymentFilterLevel !== 'ALL' && (!c || c.level !== paymentFilterLevel)) return false;
+                                      if (paymentFilterSection !== 'ALL' && (!c || c.section !== paymentFilterSection)) return false;
+                                      
+                                      if (paymentSearchQuery) {
+                                          const q = paymentSearchQuery.toLowerCase();
+                                          return (s.first_name?.toLowerCase() || '').includes(q) || 
+                                                 (s.last_name?.toLowerCase() || '').includes(q) || 
+                                                 (s.matricule?.toLowerCase() || '').includes(q);
+                                      }
+                                      return true;
+                                  }).slice(0, 10).map(s => (
+                                      <div 
+                                          key={s.id} 
+                                          className="p-3 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
+                                          onClick={() => {
+                                              let amt = newPayment.amount;
+                                              if (['Inscription', 'Transport', 'Examen'].includes(newPayment.type)) {
+                                                  const classConfig = tuitionFees.find(f => f.classId === s.class_id);
+                                                  if (classConfig) {
+                                                      if (newPayment.type === 'Inscription') amt = classConfig.registrationFee || 0;
+                                                      if (newPayment.type === 'Transport') amt = classConfig.transportFee || 0;
+                                                      if (newPayment.type === 'Examen') amt = classConfig.examFee || 0;
+                                                  }
+                                              }
+                                              setNewPayment({...newPayment, studentId: s.id.toString(), amount: amt.toString()});
+                                              setPaymentSearchQuery('');
+                                          }}
+                                      >
+                                          <div>
+                                              <p className="text-white font-bold text-sm">{s.last_name} {s.first_name}</p>
+                                              <p className="text-[10px] text-slate-500 font-bold uppercase">{s.matricule} • {classes.find(c => c.id === s.class_id)?.name}</p>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
+                      </div>
+
                       {newPayment.studentId && (
-                          <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl animate-in fade-in duration-300">
-                              <div className="flex justify-between items-center mb-2">
-                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte</span>
-                                  <span className="text-sm font-black text-white">{getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).balance.toLocaleString()} FCFA Restant</span>
+                          <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl animate-in fade-in duration-300 relative">
+                              <button 
+                                  type="button" 
+                                  onClick={() => setNewPayment({...newPayment, studentId: ''})}
+                                  className="absolute top-2 right-2 p-1.5 bg-slate-900 rounded-lg text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                              >
+                                  <Plus className="w-4 h-4 rotate-45" />
+                              </button>
+                              <div className="flex justify-between items-center mb-2 pr-8">
+                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte ({newPayment.type})</span>
+                                  <span className="text-sm font-black text-white">{getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).balance.toLocaleString()} FCFA Restant</span>
                               </div>
                               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-amber-500"
-                                    style={{ width: `${getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue > 0 ? (getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId)).totalDue) * 100 : 0}%` }}
+                                    style={{ width: `${getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalDue > 0 ? (getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalDue) * 100 : 0}%` }}
                                   />
                               </div>
                           </div>
@@ -470,10 +727,11 @@ const Finance: React.FC = () => {
                                 <input
                                     required
                                     type="number"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 pl-6 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 pl-6 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={newPayment.amount}
                                     onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
                                     placeholder="0"
+                                    disabled={['Inscription', 'Transport', 'Examen'].includes(newPayment.type)}
                                 />
                                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600 uppercase tracking-widest">FCFA</span>
                             </div>
@@ -485,7 +743,20 @@ const Finance: React.FC = () => {
                             <select
                                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
                                 value={newPayment.type}
-                                onChange={(e) => setNewPayment({...newPayment, type: e.target.value})}
+                                onChange={(e) => {
+                                    const t = e.target.value;
+                                    let amt = newPayment.amount;
+                                    if (newPayment.studentId && ['Inscription', 'Transport', 'Examen'].includes(t)) {
+                                        const s = students.find(st => st.id.toString() === newPayment.studentId);
+                                        const classConfig = tuitionFees.find(f => f.classId === s?.class_id);
+                                        if (classConfig) {
+                                            if (t === 'Inscription') amt = classConfig.registrationFee || 0;
+                                            if (t === 'Transport') amt = classConfig.transportFee || 0;
+                                            if (t === 'Examen') amt = classConfig.examFee || 0;
+                                        }
+                                    }
+                                    setNewPayment({...newPayment, type: t, amount: amt.toString()});
+                                }}
                             >
                                 <option value="Scolarité">{t('tuition_fees_pension')}</option>
                                 <option value="Inscription">{t('registration_fees')}</option>
@@ -628,6 +899,90 @@ const Finance: React.FC = () => {
               </form>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'SPECIAL_FEES' && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Transport Section */}
+                <div className="glass-card overflow-hidden border-none shadow-2xl">
+                    <div className="p-6 border-b border-white/5 bg-indigo-500/10">
+                        <h2 className="text-xl font-black text-indigo-400 uppercase tracking-tight flex items-center italic">
+                            <Clock className="w-5 h-5 mr-3" />
+                            Abonnés Transport
+                        </h2>
+                        <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
+                            {(() => {
+                                const relevant = payments.filter(p => p.payment_type === 'Transport' && p.amount > 0);
+                                const ids = [...new Set(relevant.map(p => p.student_id))];
+                                return ids.length;
+                            })()} Élèves Inscrits
+                        </p>
+                    </div>
+                    <div className="divide-y divide-white/5 bg-slate-950/40">
+                        {(() => {
+                            const relevant = payments.filter(p => p.payment_type === 'Transport' && p.amount > 0);
+                            const ids = [...new Set(relevant.map(p => p.student_id))];
+                            const list = ids.map(id => students.find(s => s.id === id)).filter(Boolean);
+                            if (list.length === 0) {
+                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">Aucun abonnement</div>;
+                            }
+                            return list.map(s => {
+                                const c = classes.find(c => c.id === s.class_id);
+                                return (
+                                    <div key={s.id} className="p-4 flex justify-between items-center hover:bg-white/5 transition-all">
+                                        <div>
+                                            <p className="text-sm font-black text-white uppercase">{s.last_name} {s.first_name}</p>
+                                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{c?.name}</p>
+                                        </div>
+                                        <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                    </div>
+                                );
+                            });
+                        })()}
+                    </div>
+                </div>
+
+                {/* Exam Section */}
+                <div className="glass-card overflow-hidden border-none shadow-2xl">
+                    <div className="p-6 border-b border-white/5 bg-rose-500/10">
+                        <h2 className="text-xl font-black text-rose-400 uppercase tracking-tight flex items-center italic">
+                            <FileText className="w-5 h-5 mr-3" />
+                            Candidats Examens
+                        </h2>
+                        <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
+                            {(() => {
+                                const relevant = payments.filter(p => p.payment_type === 'Examen' && p.amount > 0);
+                                const ids = [...new Set(relevant.map(p => p.student_id))];
+                                return ids.length;
+                            })()} Élèves Inscrits
+                        </p>
+                    </div>
+                    <div className="divide-y divide-white/5 bg-slate-950/40">
+                        {(() => {
+                            const relevant = payments.filter(p => p.payment_type === 'Examen' && p.amount > 0);
+                            const ids = [...new Set(relevant.map(p => p.student_id))];
+                            const list = ids.map(id => students.find(s => s.id === id)).filter(Boolean);
+                            if (list.length === 0) {
+                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">Aucun candidat</div>;
+                            }
+                            return list.map(s => {
+                                const c = classes.find(c => c.id === s.class_id);
+                                return (
+                                    <div key={s.id} className="p-4 flex justify-between items-center hover:bg-white/5 transition-all">
+                                        <div>
+                                            <p className="text-sm font-black text-white uppercase">{s.last_name} {s.first_name}</p>
+                                            <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">{c?.name}</p>
+                                        </div>
+                                        <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                    </div>
+                                );
+                            });
+                        })()}
+                    </div>
+                </div>
+            </div>
         </div>
       )}
     </div>

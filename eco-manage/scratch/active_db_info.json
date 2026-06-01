@@ -1,0 +1,852 @@
+[
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.Todos_8wekyb3d8bbwe\\LocalState\\AccountsRoot\\d3e4fab6faf44a3f8559834d154f1d01\\todosqlite.db",
+    "size": 212992,
+    "modified": "2026-05-29T01:40:06.592Z",
+    "tables": {
+      "settings": 56,
+      "task_folders": 1,
+      "tasks": 0,
+      "members": 0,
+      "steps": 0,
+      "linked_entities": 0,
+      "capabilities": 5,
+      "groups": 0,
+      "assignments": 0,
+      "folder_import_metadata": 0,
+      "activities": 0
+    },
+    "totalRows": 62
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Zoom\\data\\zoomus.zmdb.default.noenc.rlock.db",
+    "size": 5120,
+    "modified": "2026-05-29T01:31:41.909Z",
+    "tables": {
+      "feature_toggle_kvs": 0,
+      "experiment": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Temp\\.profile\\Default\\load_statistics.db",
+    "size": 45056,
+    "modified": "2026-05-29T01:07:15.541Z",
+    "tables": {
+      "load_statistics": 6,
+      "redirect_statistics": 0,
+      "meta": 3
+    },
+    "totalRows": 9
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.Windows.Photos_8wekyb3d8bbwe\\LocalState\\standalone.sqlite",
+    "size": 8192,
+    "modified": "2026-05-29T01:07:10.671Z",
+    "tables": {
+      "importHistory": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.Windows.Photos_8wekyb3d8bbwe\\LocalState\\shared.sqlite",
+    "size": 282624,
+    "modified": "2026-05-29T01:07:10.615Z",
+    "tables": {
+      "mediaItemImageEmbeddings": 0,
+      "mediaItemCategory": 0,
+      "MediaItemCategorizationStatus": 0,
+      "mediaItemFile": 23,
+      "mediaItemProps": 23,
+      "mediaItemDates": 115,
+      "mediaItemAddresses": 0,
+      "mediaFolder": 5
+    },
+    "totalRows": 166
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Docker\\cagent\\session.db",
+    "size": 45056,
+    "modified": "2026-05-29T01:06:27.146Z",
+    "tables": {
+      "sessions": 0,
+      "migrations": 19,
+      "session_items": 0,
+      "sqlite_sequence": 0
+    },
+    "totalRows": 19
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Background Tasks Profiles\\j1sx1qcq.MozillaBackgroundTask-E7CF176E110C211B-backgroundupdate\\8e372ee4.sqlite",
+    "size": 491520,
+    "modified": "2026-05-28T23:19:50.107Z",
+    "tables": {
+      "Profiles": 0,
+      "SharedPrefs": 0,
+      "NimbusEnrollments": 9,
+      "Heartbeats": 0,
+      "MessagingSystemMessageImpressions": 0,
+      "MessagingSystemMessageBlocklist": 0,
+      "NimbusSyncTimestamps": 2
+    },
+    "totalRows": 11
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\eco-manage\\school.db",
+    "size": 176128,
+    "modified": "2026-05-28T16:00:54.217Z",
+    "tables": {
+      "schools": 4,
+      "sqlite_sequence": 7,
+      "users": 5,
+      "classes": 72,
+      "subjects": 26,
+      "school_subjects": 29,
+      "class_subjects": 0,
+      "students": 0,
+      "grades": 0,
+      "installments": 3,
+      "payments": 0,
+      "tuition_fees": 0,
+      "class_installment_fees": 0,
+      "attendance": 0,
+      "schedules": 0,
+      "bus_routes": 2,
+      "transport_points": 0,
+      "transport_logs": 0,
+      "mobile_access_keys": 0,
+      "settings": 0,
+      "tickets": 0,
+      "announcements": 3,
+      "school_year_archives": 0,
+      "expenses": 0,
+      "notifications": 0,
+      "report_templates": 0,
+      "grade_overrides": 0
+    },
+    "totalRows": 151
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\LocalState\\Search\\AppsIndex.db",
+    "size": 1318912,
+    "modified": "2026-05-28T15:09:02.735Z",
+    "tables": {
+      "tiles": 248,
+      "tiles_data": 461,
+      "tiles_idx": 459,
+      "tiles_content": 248,
+      "tiles_docsize": 248,
+      "tiles_config": 3,
+      "synonyms": 9607,
+      "synonyms_data": 392,
+      "synonyms_idx": 390,
+      "synonyms_content": 9607,
+      "synonyms_docsize": 9607,
+      "synonyms_config": 3,
+      "ranks": 5010,
+      "metadata": 5
+    },
+    "totalRows": 36288
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe\\TempState\\nh-telemetry-cache.db",
+    "size": 90112,
+    "modified": "2026-05-28T12:52:33.313Z",
+    "tables": {
+      "events": 0,
+      "settings": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\ConnectedDevicesPlatform\\f50bd5aafcc3304c\\ActivitiesCache.db",
+    "size": 7598080,
+    "modified": "2026-05-27T23:43:35.730Z",
+    "tables": {
+      "Activity": 1346,
+      "ActivityOperation": 0,
+      "AppSettings": 0,
+      "Metadata": 7,
+      "ManualSequence": 1,
+      "Activity_PackageId": 2956,
+      "DataEncryptionKeys": 3,
+      "Asset": 172
+    },
+    "totalRows": 4485
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Background Tasks Profiles\\j1sx1qcq.MozillaBackgroundTask-E7CF176E110C211B-backgroundupdate\\storage.sqlite",
+    "size": 4096,
+    "modified": "2026-05-27T12:19:55.212Z",
+    "tables": {
+      "database": 1,
+      "cache": 1,
+      "repository": 4,
+      "origin": 0
+    },
+    "totalRows": 6
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Background Tasks Profiles\\j1sx1qcq.MozillaBackgroundTask-E7CF176E110C211B-backgroundupdate\\places.sqlite",
+    "size": 5242880,
+    "modified": "2026-05-22T20:21:42.256Z",
+    "tables": {
+      "moz_origins": 0,
+      "moz_places": 0,
+      "moz_places_extra": 0,
+      "moz_historyvisits": 0,
+      "moz_historyvisits_extra": 0,
+      "moz_inputhistory": 0,
+      "moz_bookmarks": 6,
+      "moz_bookmarks_deleted": 0,
+      "moz_keywords": 0,
+      "sqlite_sequence": 0,
+      "moz_anno_attributes": 0,
+      "moz_annos": 0,
+      "moz_items_annos": 0,
+      "moz_meta": 0,
+      "moz_places_metadata": 0,
+      "moz_places_metadata_search_queries": 0,
+      "moz_previews_tombstones": 0,
+      "moz_newtab_story_click": 0,
+      "moz_newtab_story_impression": 0,
+      "moz_newtab_shortcuts_interaction": 0,
+      "sqlite_stat1": 5
+    },
+    "totalRows": 11
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\AMD\\CN\\RGStats.db",
+    "size": 77824,
+    "modified": "2026-05-22T14:59:25.485Z",
+    "tables": {
+      "Version": 0,
+      "InstalledGames": 10,
+      "GameSessions": 364
+    },
+    "totalRows": 374
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\storage.sqlite",
+    "size": 4096,
+    "modified": "2026-05-21T18:11:53.703Z",
+    "tables": {
+      "database": 1,
+      "cache": 1,
+      "repository": 3,
+      "origin": 5
+    },
+    "totalRows": 10
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\favicons.sqlite",
+    "size": 5242880,
+    "modified": "2026-05-21T18:11:53.085Z",
+    "tables": {
+      "moz_icons": 17,
+      "moz_pages_w_icons": 13,
+      "moz_icons_to_pages": 23,
+      "sqlite_stat1": 3
+    },
+    "totalRows": 56
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\places.sqlite",
+    "size": 5242880,
+    "modified": "2026-05-21T18:11:53.073Z",
+    "tables": {
+      "moz_origins": 10,
+      "moz_places": 28,
+      "moz_historyvisits": 23,
+      "moz_inputhistory": 0,
+      "moz_bookmarks": 12,
+      "moz_bookmarks_deleted": 0,
+      "moz_keywords": 0,
+      "sqlite_sequence": 0,
+      "moz_anno_attributes": 2,
+      "moz_annos": 2,
+      "moz_items_annos": 0,
+      "moz_meta": 3,
+      "sqlite_stat1": 21,
+      "moz_places_metadata": 2,
+      "moz_places_metadata_search_queries": 0,
+      "moz_previews_tombstones": 0,
+      "moz_places_extra": 0,
+      "moz_historyvisits_extra": 0,
+      "moz_newtab_story_click": 0,
+      "moz_newtab_story_impression": 0,
+      "moz_newtab_shortcuts_interaction": 0
+    },
+    "totalRows": 103
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\cookies.sqlite",
+    "size": 524288,
+    "modified": "2026-05-21T18:11:53.046Z",
+    "tables": {
+      "moz_cookies": 15
+    },
+    "totalRows": 15
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profile Groups\\68872cb9.sqlite",
+    "size": 622592,
+    "modified": "2026-05-21T18:11:53.027Z",
+    "tables": {
+      "Profiles": 0,
+      "SharedPrefs": 0,
+      "NimbusEnrollments": 33,
+      "Heartbeats": 0,
+      "MessagingSystemMessageImpressions": 0,
+      "MessagingSystemMessageBlocklist": 0,
+      "NimbusSyncTimestamps": 2
+    },
+    "totalRows": 35
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\bounce-tracking-protection.sqlite",
+    "size": 98304,
+    "modified": "2026-05-21T18:11:53.011Z",
+    "tables": {
+      "sites": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\formhistory.sqlite",
+    "size": 262144,
+    "modified": "2026-05-21T18:11:26.685Z",
+    "tables": {
+      "moz_formhistory": 0,
+      "moz_deleted_formhistory": 0,
+      "moz_history_to_sources": 0,
+      "moz_sources": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\permissions.sqlite",
+    "size": 98304,
+    "modified": "2026-05-21T18:11:22.168Z",
+    "tables": {
+      "moz_perms": 3,
+      "moz_hosts": 0
+    },
+    "totalRows": 3
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\protections.sqlite",
+    "size": 65536,
+    "modified": "2026-05-21T18:10:54.340Z",
+    "tables": {
+      "events": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\domain_to_categories.sqlite",
+    "size": 98304,
+    "modified": "2026-05-21T18:10:53.680Z",
+    "tables": {
+      "domain_to_categories": 0,
+      "moz_meta": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Electron\\school.db",
+    "size": 151552,
+    "modified": "2026-05-19T10:22:04.362Z",
+    "tables": {
+      "schools": 1,
+      "sqlite_sequence": 2,
+      "users": 0,
+      "classes": 0,
+      "subjects": 26,
+      "school_subjects": 26,
+      "class_subjects": 0,
+      "students": 0,
+      "grades": 0,
+      "installments": 0,
+      "payments": 0,
+      "tuition_fees": 0,
+      "class_installment_fees": 0,
+      "attendance": 0,
+      "schedules": 0,
+      "bus_routes": 0,
+      "transport_points": 0,
+      "transport_logs": 0,
+      "mobile_access_keys": 0,
+      "settings": 0,
+      "tickets": 0,
+      "announcements": 0,
+      "school_year_archives": 0
+    },
+    "totalRows": 55
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\LocalState\\Search\\settings.db",
+    "size": 1994752,
+    "modified": "2026-05-13T07:18:40.528Z",
+    "tables": {
+      "metadata": 6,
+      "synonyms": 13,
+      "synonyms_data": 3,
+      "synonyms_idx": 1,
+      "synonyms_content": 13,
+      "synonyms_docsize": 13,
+      "synonyms_config": 3,
+      "settings": 1121,
+      "settings_data": 579,
+      "settings_idx": 577,
+      "settings_content": 1121,
+      "settings_docsize": 1121,
+      "settings_config": 3,
+      "derivedsynonyms": 8472,
+      "derivedsynonyms_data": 89,
+      "derivedsynonyms_idx": 76,
+      "derivedsynonyms_content": 8472,
+      "derivedsynonyms_docsize": 8472,
+      "derivedsynonyms_config": 3
+    },
+    "totalRows": 30158
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\Microsoft.Winget.Source_8wekyb3d8bbwe\\installed.db",
+    "size": 225280,
+    "modified": "2026-04-13T08:55:04.587Z",
+    "tables": {
+      "metadata": 4,
+      "ids": 4,
+      "names": 4,
+      "monikers": 4,
+      "versions": 5,
+      "channels": 1,
+      "pathparts": 1,
+      "manifest": 4,
+      "tags": 25,
+      "tags_map": 31,
+      "commands": 6,
+      "commands_map": 6,
+      "pfns": 0,
+      "pfns_map": 0,
+      "productcodes": 5,
+      "productcodes_map": 5,
+      "norm_names": 4,
+      "norm_names_map": 4,
+      "norm_publishers": 4,
+      "norm_publishers_map": 4,
+      "upgradecodes": 1,
+      "upgradecodes_map": 1,
+      "manifest_metadata": 8
+    },
+    "totalRows": 131
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\StoreEdgeFD\\installed.db",
+    "size": 225280,
+    "modified": "2026-04-02T12:33:51.372Z",
+    "tables": {
+      "metadata": 4,
+      "ids": 3,
+      "names": 3,
+      "monikers": 1,
+      "versions": 4,
+      "channels": 1,
+      "pathparts": 1,
+      "manifest": 3,
+      "tags": 90,
+      "tags_map": 90,
+      "commands": 0,
+      "commands_map": 0,
+      "pfns": 0,
+      "pfns_map": 0,
+      "productcodes": 4,
+      "productcodes_map": 4,
+      "norm_names": 7,
+      "norm_names_map": 7,
+      "norm_publishers": 3,
+      "norm_publishers_map": 3,
+      "upgradecodes": 1,
+      "upgradecodes_map": 1,
+      "manifest_metadata": 9
+    },
+    "totalRows": 239
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\store.db",
+    "size": 573440,
+    "modified": "2026-03-26T22:20:01.292Z",
+    "tables": {
+      "SearchProducts": 651,
+      "LocalizedProperties": 1953,
+      "SearchTerms": 22
+    },
+    "totalRows": 2626
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Temp\\.profile\\first_party_sets.db",
+    "size": 69632,
+    "modified": "2026-03-25T18:47:38.564Z",
+    "tables": {
+      "meta": 4,
+      "public_sets": 313,
+      "browser_context_sets_version": 1,
+      "browser_context_sites_to_clear": 0,
+      "browser_contexts_cleared": 1,
+      "policy_configurations": 0,
+      "manual_configurations": 0
+    },
+    "totalRows": 319
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Temp\\.profile\\Default\\EdgeHubAppUsage\\EdgeHubAppUsageSQLite.db",
+    "size": 32768,
+    "modified": "2026-03-09T08:01:14.864Z",
+    "tables": {
+      "hub_app_data_usage": 1,
+      "meta": 3
+    },
+    "totalRows": 4
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Temp\\.profile\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2026-03-09T08:01:13.403Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\logins.db",
+    "size": 327680,
+    "modified": "2026-03-04T11:36:21.394Z",
+    "tables": {
+      "loginsL": 0,
+      "sqlite_sequence": 0,
+      "loginsM": 0,
+      "loginsSyncMeta": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\key4.db",
+    "size": 294912,
+    "modified": "2026-03-04T11:36:18.710Z",
+    "tables": {
+      "nssPrivate": 1,
+      "metaData": 2
+    },
+    "totalRows": 3
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\cert9.db",
+    "size": 229376,
+    "modified": "2026-03-04T11:36:18.680Z",
+    "tables": {
+      "nssPublic": 16
+    },
+    "totalRows": 16
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\windows.immersivecontrolpanel_cw5n1h2txyewy\\LocalState\\Search\\settings.db",
+    "size": 2035712,
+    "modified": "2026-02-27T08:47:51.459Z",
+    "tables": {
+      "metadata": 6,
+      "synonyms": 774,
+      "synonyms_data": 5,
+      "synonyms_idx": 3,
+      "synonyms_content": 774,
+      "synonyms_docsize": 774,
+      "synonyms_config": 3,
+      "settings": 1104,
+      "settings_data": 507,
+      "settings_idx": 505,
+      "settings_content": 1104,
+      "settings_docsize": 1104,
+      "settings_config": 3,
+      "derivedsynonyms": 8333,
+      "derivedsynonyms_data": 87,
+      "derivedsynonyms_idx": 79,
+      "derivedsynonyms_content": 8333,
+      "derivedsynonyms_docsize": 8333,
+      "derivedsynonyms_config": 3
+    },
+    "totalRows": 31834
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\38833FF26BA1D.UnigramPreview_g9c9v27vpyspw\\LocalState\\local.db",
+    "size": 12288,
+    "modified": "2026-02-22T08:38:15.418Z",
+    "tables": {
+      "Proxy": 0,
+      "sqlite_sequence": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\CamScanner\\Camscanner\\camscanner.db",
+    "size": 114688,
+    "modified": "2026-02-06T10:40:30.164Z",
+    "tables": {
+      "sync_accounts": 1,
+      "sqlite_sequence": 1,
+      "dirs": 0,
+      "documents": 5,
+      "graphics_v2": 0,
+      "pages": 3,
+      "invite_esign_doc": 0,
+      "invite_share_dir": 0,
+      "mtags": 0,
+      "tags": 0,
+      "note_path_v2": 0,
+      "page_mark_v2": 0,
+      "pdfsize": 0,
+      "signature": 0,
+      "sync_delete_record": 0,
+      "local_storage": 7,
+      "recent_list": 7,
+      "pdf_thumbnails": 1
+    },
+    "totalRows": 25
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Adobe\\OOBE\\opm.db",
+    "size": 9216,
+    "modified": "2026-01-13T11:09:54.987Z",
+    "tables": {
+      "opm_data": 1,
+      "opm_data_v2": 1,
+      "opm_meta": 2
+    },
+    "totalRows": 4
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Background Tasks Profiles\\j1sx1qcq.MozillaBackgroundTask-E7CF176E110C211B-backgroundupdate\\storage\\ls-archive.sqlite",
+    "size": 131072,
+    "modified": "2026-01-10T20:36:40.179Z",
+    "tables": {
+      "webappsstore2": 0,
+      "database": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Background Tasks Profiles\\j1sx1qcq.MozillaBackgroundTask-E7CF176E110C211B-backgroundupdate\\favicons.sqlite",
+    "size": 5242880,
+    "modified": "2026-01-10T20:36:39.121Z",
+    "tables": {
+      "moz_icons": 0,
+      "moz_pages_w_icons": 0,
+      "moz_icons_to_pages": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\content-prefs.sqlite",
+    "size": 229376,
+    "modified": "2026-01-08T23:19:42.849Z",
+    "tables": {
+      "groups": 0,
+      "settings": 0,
+      "prefs": 0
+    },
+    "totalRows": 0
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\storage\\ls-archive.sqlite",
+    "size": 131072,
+    "modified": "2026-01-08T23:19:39.916Z",
+    "tables": {
+      "webappsstore2": 4,
+      "database": 1
+    },
+    "totalRows": 5
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\windows.immersivecontrolpanel_cw5n1h2txyewy\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-12-18T11:14:11.648Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\\LocalCache\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-12-17T06:13:57.370Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-12-16T11:34:36.385Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\jupyter\\nbsignatures.db",
+    "size": 45056,
+    "modified": "2025-12-08T21:44:29.824Z",
+    "tables": {
+      "nbsignatures": 118,
+      "sqlite_sequence": 1
+    },
+    "totalRows": 119
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\pgAdmin\\pgadmin4.db",
+    "size": 176128,
+    "modified": "2025-12-08T16:10:01.608Z",
+    "tables": {
+      "alembic_version": 1,
+      "version": 1,
+      "role": 2,
+      "roles_users": 1,
+      "servergroup": 1,
+      "module_preference": 108,
+      "preference_category": 30,
+      "preferences": 257,
+      "user_preferences": 0,
+      "debugger_function_arguments": 0,
+      "process": 0,
+      "keys": 3,
+      "query_history": 0,
+      "database": 0,
+      "macros": 22,
+      "user": 1,
+      "user_mfa": 0,
+      "sharedserver": 0,
+      "setting": 2,
+      "sqlite_sequence": 1,
+      "user_macros": 0,
+      "server": 1,
+      "application_state": 1
+    },
+    "totalRows": 432
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Zoom\\data\\process_monitoring.db",
+    "size": 6144,
+    "modified": "2025-11-27T00:15:10.989Z",
+    "tables": {
+      "meta": 3,
+      "process_metrics": 0,
+      "sqlite_sequence": 0
+    },
+    "totalRows": 3
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Cisco Packet Tracer\\QtWebEngine\\Default\\databases\\Databases.db",
+    "size": 28672,
+    "modified": "2025-11-26T17:41:15.060Z",
+    "tables": {
+      "meta": 3,
+      "Databases": 0,
+      "sqlite_sequence": 0
+    },
+    "totalRows": 3
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\64815ZMobileApps.VideoCompressorResizeCompressVide_y5q3202s7vj2w\\LocalState\\history.db",
+    "size": 16384,
+    "modified": "2025-11-22T13:05:15.588Z",
+    "tables": {
+      "sqlite_sequence": 1,
+      "history": 0
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.Windows.Photos_8wekyb3d8bbwe\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-10-20T06:47:20.480Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-10-09T10:50:24.403Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-09-26T12:19:38.904Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-09-25T14:14:00.299Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Packages\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\LocalState\\EBWebView\\Default\\heavy_ad_intervention_opt_out.db",
+    "size": 16384,
+    "modified": "2025-09-25T14:11:40.047Z",
+    "tables": {
+      "previews_v1": 0,
+      "enabled_previews_v1": 1
+    },
+    "totalRows": 1
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Zoom\\data\\in_progress_infos.db",
+    "size": 5120,
+    "modified": "2025-09-19T09:10:23.199Z",
+    "tables": {
+      "meta": 3,
+      "InProgressInfos": 0
+    },
+    "totalRows": 3
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\webappsstore.sqlite",
+    "size": 98304,
+    "modified": "2025-09-13T08:12:06.856Z",
+    "tables": {
+      "webappsstore2": 4
+    },
+    "totalRows": 4
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Local\\Mozilla\\Firefox\\Profiles\\7ruegrhm.default\\OfflineCache\\index.sqlite",
+    "size": 262144,
+    "modified": "2025-09-05T12:37:08.482Z",
+    "tables": {
+      "moz_cache": 0,
+      "moz_cache_groups": 0,
+      "moz_cache_namespaces": 0
+    },
+    "totalRows": 0
+  }
+]

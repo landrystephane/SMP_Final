@@ -58,6 +58,19 @@ function initDb() {
         console.error(`[Migration] Classes table migration failed:`, e.message);
     }
 
+    // 3.6 Tuition Fees Migration
+    try {
+        const tuitionCols = db.prepare(`PRAGMA table_info(tuition_fees)`).all();
+        if (!tuitionCols.find(c => c.name === 'transport_fee')) {
+            db.prepare(`ALTER TABLE tuition_fees ADD COLUMN transport_fee REAL DEFAULT 0`).run();
+        }
+        if (!tuitionCols.find(c => c.name === 'exam_fee')) {
+            db.prepare(`ALTER TABLE tuition_fees ADD COLUMN exam_fee REAL DEFAULT 0`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Tuition fees migration failed:`, e.message);
+    }
+
 
     // 4. Student Table Migration: Add parent_name if missing
     try {
@@ -122,6 +135,11 @@ function initDb() {
         addCol('bulletin_pdf_use_custom', '0');
         addCol('bulletin_pdf_template', '');
         addCol('bulletin_pdf_mapping', '{}');
+        addCol('timetable_slots', '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]');
+        if (!schoolCols.find(c => c.name === 'honor_roll_threshold')) {
+            console.log(`[Migration] Adding honor_roll_threshold to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN honor_roll_threshold REAL DEFAULT 15.0`).run();
+        }
     } catch (e) {
         console.error(`[Migration] School layout customization columns failed:`, e.message);
     }
@@ -233,6 +251,43 @@ function initDb() {
         console.log(`[Migration] Report Templates table verified/created`);
     } catch (e) {
         console.error(`[Migration] Report Templates table failed:`, e.message);
+    }
+
+    // 7.2. Transport Attendance Migration
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS transport_attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                route_id INTEGER,
+                date DATE NOT NULL,
+                direction TEXT NOT NULL,
+                status TEXT NOT NULL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                recorded_by INTEGER,
+                FOREIGN KEY (student_id) REFERENCES students(id),
+                FOREIGN KEY (route_id) REFERENCES bus_routes(id),
+                FOREIGN KEY (recorded_by) REFERENCES users(id)
+            );
+        `);
+        console.log(`[Migration] Transport Attendance table verified/created`);
+    } catch (e) {
+        console.error(`[Migration] Transport Attendance table failed:`, e.message);
+    }
+
+    // 7.3. School Transport config Migration
+    try {
+        const schoolCols = db.prepare(`PRAGMA table_info(schools)`).all();
+        if (!schoolCols.find(c => c.name === 'transport_fee_model')) {
+            console.log(`[Migration] Adding transport_fee_model to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN transport_fee_model TEXT DEFAULT 'ANNUAL'`).run();
+        }
+        if (!schoolCols.find(c => c.name === 'transport_fee_amount')) {
+            console.log(`[Migration] Adding transport_fee_amount to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN transport_fee_amount REAL DEFAULT 0`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] School transport columns failed:`, e.message);
     }
 
     // 8. Seed default global subjects if none exist in the database, and link them to school 1

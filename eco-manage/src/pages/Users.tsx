@@ -22,6 +22,8 @@ const Users: React.FC = () => {
     gender: 'M',
     phone: ''
   });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editUserForm, setEditUserForm] = useState({
     civility: 'M.',
@@ -85,15 +87,16 @@ const Users: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     // Name validation
     const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
     if (!nameRegex.test(newUser.fullName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
+        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
         return;
     }
     if (!nameRegex.test(newUser.username.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
+        setFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
         return;
     }
 
@@ -103,7 +106,7 @@ const Users: React.FC = () => {
         cleanPhone = cleanPhone.slice(3);
     }
     if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
-        alert(t('alert_invalid_phone'));
+        setFormError(t('alert_invalid_phone'));
         return;
     }
 
@@ -115,7 +118,7 @@ const Users: React.FC = () => {
           assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : []
       });
       if (res && res.error) {
-          alert(`${t('alert_error')}: ${res.error}`);
+          setFormError(`${t('alert_error')}: ${res.error}`);
           return;
       }
       setNewUser({ 
@@ -136,15 +139,16 @@ const Users: React.FC = () => {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
       e.preventDefault();
+      setEditFormError(null);
       if (!editingUser) return;
 
       const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
       if (!nameRegex.test(editUserForm.fullName.trim())) {
-          alert("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
+          setEditFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
           return;
       }
       if (!nameRegex.test(editUserForm.username.trim())) {
-          alert("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
+          setEditFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
           return;
       }
 
@@ -153,7 +157,7 @@ const Users: React.FC = () => {
           cleanPhone = cleanPhone.slice(3);
       }
       if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
-          alert(t('alert_invalid_phone'));
+          setEditFormError(t('alert_invalid_phone'));
           return;
       }
 
@@ -173,15 +177,14 @@ const Users: React.FC = () => {
               });
 
               if (res && res.error) {
-                  alert(`${t('alert_update_error')}: ${res.error}`);
+                  setEditFormError(`${t('alert_update_error')}: ${res.error}`);
                   return;
               }
 
               setEditingUser(null);
               loadData();
-              alert(t('alert_agent_updated'));
           } catch (err: any) {
-              alert(err.message);
+              setEditFormError(err.message);
           }
       }
   };
@@ -219,9 +222,11 @@ const Users: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u =>
-    (u.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.role || '').toLowerCase().includes(searchQuery.toLowerCase())
+    u.role !== 'PARENT' && (
+        (u.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (u.role || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   return (
@@ -245,6 +250,11 @@ const Users: React.FC = () => {
                     <h2 className="text-2xl font-black tracking-tight text-white uppercase italic">{t('add_agent_title')}</h2>
                 </div>
                 <form onSubmit={handleAddUser} className="space-y-5">
+                    {formError && (
+                        <div className="p-3 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold whitespace-pre-wrap">
+                            {formError}
+                        </div>
+                    )}
                     <div className="grid grid-cols-3 gap-4">
                         <div className="col-span-1 space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('civility_label')}</label>
@@ -484,6 +494,11 @@ const Users: React.FC = () => {
                       <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-white/5 rounded-full transition-all"><X className="w-6 h-6 text-slate-500" /></button>
                   </div>
                   <form onSubmit={handleUpdateUser} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                      {editFormError && (
+                          <div className="p-3 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold whitespace-pre-wrap">
+                              {editFormError}
+                          </div>
+                      )}
                       <div className="grid grid-cols-3 gap-4">
                           <div className="col-span-1 space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('civility_label')}</label>

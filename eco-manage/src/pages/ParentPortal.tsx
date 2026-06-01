@@ -30,30 +30,27 @@ const ParentPortal: React.FC = () => {
             let studs: any[] = [];
             if (user.role === 'PARENT') {
                 studs = await window.electronAPI.getParentStudents(user.username);
+                setChildren(studs);
+
+                const tf = await window.electronAPI.getTuitionFees(user.schoolId);
+                const insts = await window.electronAPI.getInstallments();
+                const cif = await window.electronAPI.getClassInstallmentFees(user.schoolId);
+                const schs = await window.electronAPI.getSchools();
+                const cls = await window.electronAPI.getClasses(user.schoolId);
+
+                setTuitionFees(tf || []);
+                setInstallments(insts || []);
+                setClassInstallmentFees(cif || []);
+                setSchools(schs || []);
+                setClasses(cls || []);
+
+                if (studs.length > 0) {
+                    setSelectedChild(studs[0]);
+                    const details = await window.electronAPI.getStudentDetails(studs[0].id);
+                    setStats(details);
+                }
             } else {
-                studs = await window.electronAPI.getStudents(user.schoolId);
-            }
-
-            setChildren(studs);
-
-            const tf = await window.electronAPI.getTuitionFees(user.schoolId);
-            const insts = await window.electronAPI.getInstallments();
-            const cif = await window.electronAPI.getClassInstallmentFees(user.schoolId);
-            const schs = await window.electronAPI.getSchools();
-            const cls = await window.electronAPI.getClasses(user.schoolId);
-
-            setTuitionFees(tf || []);
-            setInstallments(insts || []);
-            setClassInstallmentFees(cif || []);
-            setSchools(schs || []);
-            setClasses(cls || []);
-
-            if (studs.length > 0) {
-                setSelectedChild(studs[0]);
-                const details = await window.electronAPI.getStudentDetails(studs[0].id);
-                setStats(details);
-            } else if (user.role === 'SUPERADMIN' || user.role === 'FOUNDER') {
-                // Mock data for superadmin preview
+                // Mock data for admin/founder preview
                 const mockStuds = [
                     { id: 101, first_name: 'Junior', last_name: 'DEMO', matricule: '26SIL0001', neighborhood: 'Bastos', has_transport: 1, class_id: 1, scholarship_reduction: 15000, has_moratoire: 1 },
                     { id: 102, first_name: 'Aline', last_name: 'DEMO', matricule: '26CP0002', neighborhood: 'Bastos', has_transport: 0, class_id: 1, scholarship_reduction: 0, has_moratoire: 0 }
@@ -244,6 +241,8 @@ const ParentPortal: React.FC = () => {
         </div>
     );
 
+    if (!selectedChild) return null;
+
     const financials = getStudentFinancials(selectedChild);
     const termGrades = stats?.grades?.filter((g: any) => g.term === selectedTerm) || [];
     const validatedGrades = termGrades.filter((g: any) => g.validated === 1);
@@ -252,8 +251,16 @@ const ParentPortal: React.FC = () => {
     const average = totalCoef > 0 ? totalPoints / totalCoef : 0;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-4xl mx-auto">
-            {/* Top Premium Card */}
+        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+            {user?.role !== 'PARENT' && (
+                <div className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-6 py-4 rounded-2xl flex items-center shadow-lg">
+                    <AlertTriangle className="w-6 h-6 mr-4 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-black uppercase tracking-tight text-sm">Mode Aperçu (Démo)</h4>
+                        <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Vous visualisez l'interface telle qu'elle apparaîtra aux parents, avec des données fictives.</p>
+                    </div>
+                </div>
+            )}
             <div className="bg-slate-900/50 p-8 rounded-[32px] border border-white/5 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

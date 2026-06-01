@@ -17,7 +17,7 @@ const AdvisorPortal: React.FC = () => {
         { key: 'month_may', label: t('month_may', 'Mai') },
         { key: 'month_jun', label: t('month_jun', 'Juin') }
     ];
-    const [activeTab, setActiveTab] = useState<'PLANNING' | 'TRANSPORT' | 'EVALUATIONS'>('PLANNING');
+    const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS'>('PLANNING');
     const [classes, setClasses] = useState<any[]>([]);
     const [routes, setRoutes] = useState<any[]>([]);
     const [students, setStudents] = useState<any[]>([]);
@@ -51,18 +51,25 @@ const AdvisorPortal: React.FC = () => {
 
     const loadData = async () => {
         if (window.electronAPI && user) {
-            const [c, r, studs, allUsers] = await Promise.all([
+            const [c, r, studs, allUsers, schs] = await Promise.all([
                 window.electronAPI.getClasses(user.schoolId),
                 window.electronAPI.getBusRoutes(user.schoolId),
                 window.electronAPI.getStudents(user.schoolId),
-                window.electronAPI.getUsers(user.schoolId)
+                window.electronAPI.getUsers(user.schoolId),
+                window.electronAPI.getSchools()
             ]);
             setClasses(c);
             setRoutes(r);
-            setStudents(studs);
-            setTeachers(allUsers.filter((u: any) => u.role === 'TEACHER'));
+            setStudents(studs.filter((s: any) => s.has_paid_registration === 1));
+            setTeachers(allUsers.filter((u: any) => u.role?.trim().toUpperCase() === 'TEACHER'));
             if (c && c.length > 0) {
                 setSelectedClass(c[0].id.toString());
+            }
+            const mySchool = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString()) || schs[0];
+            if (mySchool && mySchool.timetable_slots) {
+                try {
+                    setTimetableSlots(JSON.parse(mySchool.timetable_slots));
+                } catch(e) {}
             }
         }
     };
@@ -113,6 +120,17 @@ const AdvisorPortal: React.FC = () => {
         }
     }, [selectedClass, selectedTerm, selectedMonth]);
 
+    const classObj = classes.find(c => c.id.toString() === selectedClass);
+    const availableTeachers = teachers.filter(t => {
+        if (classObj?.main_teacher_id === t.id) return true;
+        if (classObj?.assistant_teacher_id === t.id) return true;
+        try {
+            const assigned = JSON.parse(t.assigned_classes || '[]');
+            if (assigned.includes(classObj?.id?.toString()) || assigned.includes(Number(classObj?.id))) return true;
+        } catch(e) {}
+        return false;
+    });
+
     const handleOpenScheduleModal = (existing: any = null, day: number = 1, start: string = '08:00', end: string = '10:00') => {
         if (existing) {
             setEditingSchedule(existing);
@@ -128,7 +146,7 @@ const AdvisorPortal: React.FC = () => {
             setSchedStart(start);
             setSchedEnd(end);
             setSchedSubject(classSubjects[0]?.id?.toString() || '');
-            setSchedTeacher(teachers[0]?.id?.toString() || '');
+            setSchedTeacher(availableTeachers[0]?.id?.toString() || '');
             setSchedType('COURSE');
         }
         setShowScheduleModal(true);
@@ -136,16 +154,22 @@ const AdvisorPortal: React.FC = () => {
 
     const handleSaveSchedule = async () => {
         if (!window.electronAPI || !selectedClass) return;
-        if (!schedSubject) {
-            alert("Veuillez sélectionner une matière.");
-            return;
+        if (schedType !== 'PAUSE') {
+            if (!schedSubject) {
+                alert("Veuillez sélectionner une matière.");
+                return;
+            }
+            if (!schedTeacher) {
+                alert("Veuillez sélectionner un enseignant.");
+                return;
+            }
         }
         try {
             const payload = {
                 id: editingSchedule ? editingSchedule.id : undefined,
                 class_id: parseInt(selectedClass),
-                subject_id: parseInt(schedSubject),
-                teacher_id: schedTeacher ? parseInt(schedTeacher) : null,
+                subject_id: (schedType !== 'PAUSE' && schedSubject) ? parseInt(schedSubject) : null,
+                teacher_id: (schedType !== 'PAUSE' && schedTeacher) ? parseInt(schedTeacher) : null,
                 day_of_week: schedDay,
                 start_time: schedStart,
                 end_time: schedEnd,
@@ -177,9 +201,9 @@ const AdvisorPortal: React.FC = () => {
     };
 
     const getSubjectName = (subId: number) => classSubjects.find(s => s.id === subId)?.name || `Matière #${subId}`;
-    const getTeacherName = (tId: number) => teachers.find(t => t.id === tId)?.fullName || `Enseignant #${tId}`;
+    const getTeacherName = (tId: number) => teachers.find(t => t.id === tId)?.fullName || teachers.find(t => t.id === tId)?.full_name || `Enseignant #${tId}`;
     const getScheduleForSlot = (day: number, start: string) => {
-        return schedules.find(s => s.day_of_week === day && s.start_time === start);
+        return schedules.find(s => s.day_of_week === day && s.start_time?.trim() === start?.trim());
     };
 
     const handleViewSubjectDetails = async (subj: any) => {
@@ -242,18 +266,19 @@ const AdvisorPortal: React.FC = () => {
                 alert("Erreur : API Electron non disponible");
                 return;
             }
-            if (confirm("Voulez-vous notifier tous les enseignants que la période de saisie des notes pour " + monthLabel + " (Trimestre " + selectedTerm + ") est ouverte ?")) {
-                const res = await window.electronAPI.createNotification({
-                    role: 'TEACHER',
-                    message: `La période de saisie des notes pour ${monthLabel} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
-                    type: 'ACTION_REQUIRED',
-                    school_id: user?.schoolId
-                });
-                if (res && res.error) {
-                    alert("Erreur base de données : " + res.error);
-                } else {
-                    alert("Tous les enseignants ont été notifiés !");
-                }
+            
+            // Remove window.confirm as it blocks/hangs in some Electron setups
+            const res = await window.electronAPI.createNotification({
+                role: 'TEACHER',
+                message: `La période de saisie des notes pour ${monthLabel} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
+                type: 'ACTION_REQUIRED',
+                school_id: user?.schoolId
+            });
+            
+            if (res && res.error) {
+                alert("Erreur base de données : " + res.error);
+            } else {
+                alert("Tous les enseignants ont été notifiés !");
             }
         } catch (err: any) {
             alert("Erreur lors de la notification: " + err.message);
@@ -265,16 +290,18 @@ const AdvisorPortal: React.FC = () => {
         { key: 2, label: t('tuesday', 'Mardi') },
         { key: 3, label: t('wednesday', 'Mercredi') },
         { key: 4, label: t('thursday', 'Jeudi') },
-        { key: 5, label: t('friday', 'Vendredi') }
+        { key: 5, label: t('friday', 'Vendredi') },
+        { key: 6, label: t('saturday', 'Samedi') },
+        { key: 7, label: t('sunday', 'Dimanche') }
     ];
 
-    const TIME_SLOTS = [
+    const [timetableSlots, setTimetableSlots] = useState<any[]>([
         { label: '08:00 - 10:00', start: '08:00', end: '10:00', isBreak: false },
         { label: '10:00 - 12:00', start: '10:00', end: '12:00', isBreak: false },
         { label: '12:00 - 13:00', start: '12:00', end: '13:00', isBreak: true },
         { label: '13:00 - 15:00', start: '13:00', end: '15:00', isBreak: false },
         { label: '15:00 - 17:00', start: '15:00', end: '17:00', isBreak: false }
-    ];
+    ]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -286,7 +313,6 @@ const AdvisorPortal: React.FC = () => {
                 <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => setActiveTab('PLANNING')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PLANNING' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_planning', 'Plannings')}</button>
                     <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_evaluations', 'Évaluations')}</button>
-                    <button onClick={() => setActiveTab('TRANSPORT')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'TRANSPORT' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_transport', 'Transport')}</button>
                 </div>
             </div>
 
@@ -337,15 +363,17 @@ const AdvisorPortal: React.FC = () => {
                                 </select>
                             </div>
                             
-                            <div className="flex flex-col justify-end h-full">
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">Action</label>
-                                <button
-                                    onClick={handleLaunchGradeEntry}
-                                    className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase tracking-wider"
-                                >
-                                    Lancer la Saisie
-                                </button>
-                            </div>
+                            {user?.role !== 'ADVISOR' && (
+                                <div className="flex flex-col justify-end h-full">
+                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">Action</label>
+                                    <button
+                                        onClick={handleLaunchGradeEntry}
+                                        className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase tracking-wider"
+                                    >
+                                        Lancer la Saisie
+                                    </button>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -368,9 +396,14 @@ const AdvisorPortal: React.FC = () => {
                                     {t('weekly_schedule', 'Emploi du Temps Hebdomadaire')}
                                 </h2>
                                 <button 
-                                    onClick={() => handleOpenScheduleModal()} 
+                                    onClick={() => {
+                                        if (!selectedClass) {
+                                            alert("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.");
+                                            return;
+                                        }
+                                        handleOpenScheduleModal();
+                                    }} 
                                     className="btn-primary text-[10px]"
-                                    disabled={!selectedClass}
                                 >
                                     {t('schedule_class', 'PROGRAMMER COURS')}
                                 </button>
@@ -381,7 +414,43 @@ const AdvisorPortal: React.FC = () => {
                                     Veuillez choisir une classe dans le filtre ci-dessus pour gérer son emploi du temps.
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-6 gap-3">
+                                (() => {
+                                    // Generate slots PURELY from schedules
+                                    const allSlots: any[] = [];
+                                    schedules.forEach(s => {
+                                        if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
+                                            allSlots.push({
+                                                label: `${s.start_time} - ${s.end_time || '?'}`,
+                                                start: s.start_time.trim(),
+                                                end: s.end_time?.trim() || '',
+                                                isBreak: false
+                                            });
+                                        }
+                                    });
+                                    // Sort slots by start time
+                                    allSlots.sort((a, b) => {
+                                        const timeA = a.start || '00:00';
+                                        const timeB = b.start || '00:00';
+                                        return timeA.localeCompare(timeB);
+                                    });
+
+                                    if (allSlots.length === 0) {
+                                        return (
+                                            <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                                                <p className="text-slate-400 font-bold mb-4">Aucun cours programmé pour le moment.</p>
+                                                <p className="text-xs text-slate-500 mb-6">L'emploi du temps se construira au fur et à mesure.</p>
+                                                <button 
+                                                    onClick={() => handleOpenScheduleModal()} 
+                                                    className="px-6 py-2 bg-amber-500 text-slate-950 font-black text-[10px] rounded-xl uppercase tracking-widest hover:bg-amber-400 transition-all"
+                                                >
+                                                    + Ajouter un cours ou une pause
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                <div className="grid grid-cols-8 gap-3">
                                     {/* Header */}
                                     <div className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{t('hour', 'Heure')}</div>
                                     {DAYS_OF_WEEK.map(d => (
@@ -389,8 +458,8 @@ const AdvisorPortal: React.FC = () => {
                                     ))}
 
                                     {/* Rows */}
-                                    {TIME_SLOTS.map(slot => (
-                                        <React.Fragment key={slot.label}>
+                                    {allSlots.map((slot, index) => (
+                                        <React.Fragment key={`${slot.label}-${index}`}>
                                             {/* Time slot column */}
                                             <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex items-center justify-center border border-slate-800">
                                                 {slot.label}
@@ -398,31 +467,38 @@ const AdvisorPortal: React.FC = () => {
 
                                             {/* Days columns */}
                                             {DAYS_OF_WEEK.map(day => {
-                                                if (slot.isBreak) {
-                                                    return (
-                                                        <div key={day.key} className="p-4 bg-slate-900/10 border border-dashed border-slate-800 rounded-xl text-[10px] font-bold text-slate-600 text-center flex items-center justify-center uppercase tracking-widest">
-                                                            Pause
-                                                        </div>
-                                                    );
-                                                }
-
                                                 const sData = getScheduleForSlot(day.key, slot.start);
+                                                
                                                 if (sData) {
                                                     const typeColor = sData.type === 'EVALUATION' 
                                                         ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
                                                         : sData.type === 'HOLIDAY'
                                                             ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
-                                                            : 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+                                                            : sData.type === 'PAUSE'
+                                                                ? 'bg-slate-900/10 border-dashed border-slate-800 text-slate-600'
+                                                                : 'bg-amber-500/10 border-amber-500/20 text-amber-500';
                                                     
+                                                    if (sData.type === 'PAUSE') {
+                                                        return (
+                                                            <button
+                                                                key={day.key}
+                                                                onClick={() => handleOpenScheduleModal(sData)}
+                                                                className={`p-4 rounded-xl border text-center hover:scale-[1.02] active:scale-95 transition-all w-full flex items-center justify-center ${typeColor}`}
+                                                            >
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest">Pause</span>
+                                                            </button>
+                                                        );
+                                                    }
+
                                                     return (
                                                         <button
                                                             key={day.key}
                                                             onClick={() => handleOpenScheduleModal(sData)}
-                                                            className={`p-4 rounded-xl border text-left hover:scale-[1.02] active:scale-95 transition-all w-full flex flex-col justify-between ${typeColor}`}
+                                                            className={`p-3 rounded-xl border text-left hover:scale-[1.02] active:scale-95 transition-all w-full flex flex-col justify-between ${typeColor} h-full`}
                                                         >
                                                             <div>
-                                                                <div className="text-[10px] font-black uppercase truncate">{getSubjectName(sData.subject_id)}</div>
-                                                                <div className="text-[8px] text-white/50 mt-1 uppercase font-bold truncate">{getTeacherName(sData.teacher_id)}</div>
+                                                                <div className="text-[9px] font-black uppercase break-all leading-tight text-amber-500">{getSubjectName(sData.subject_id)}</div>
+                                                                <div className="text-[8px] text-white/50 mt-1 uppercase font-bold break-words leading-tight">{getTeacherName(sData.teacher_id)}</div>
                                                             </div>
                                                             <div className="text-[7px] font-black uppercase tracking-wider mt-2 opacity-50">
                                                                 {sData.type || 'COURS'}
@@ -435,15 +511,16 @@ const AdvisorPortal: React.FC = () => {
                                                     <button
                                                         key={day.key}
                                                         onClick={() => handleOpenScheduleModal(null, day.key, slot.start, slot.end)}
-                                                        className="p-4 bg-white/5 border border-white/5 hover:border-amber-500/30 hover:bg-amber-500/5 rounded-xl text-slate-700 hover:text-amber-500 transition-all flex items-center justify-center group"
+                                                        className="p-4 bg-slate-900/10 border border-dashed border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/5 rounded-xl text-[10px] font-bold text-slate-600 hover:text-amber-500 text-center flex flex-col items-center justify-center uppercase tracking-widest group transition-all"
                                                     >
-                                                        <span className="text-xs font-black opacity-0 group-hover:opacity-100 transition-all">+ PROGRAMMER</span>
+                                                        <span className="hidden group-hover:block opacity-100">+ PROG.</span>
                                                     </button>
                                                 );
                                             })}
                                         </React.Fragment>
                                     ))}
                                 </div>
+                                );})()
                             )}
                         </div>
                     </div>
@@ -538,77 +615,6 @@ const AdvisorPortal: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'TRANSPORT' && (
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-                    <div className="space-y-6">
-                        <div className="glass-card p-6">
-                            <h2 className="text-xl font-black text-white mb-6 flex items-center tracking-tight">
-                                <Truck className="w-6 h-6 mr-3 text-amber-500" />
-                                {t('bus_assignment', 'Affectation Bus')}
-                            </h2>
-                            <div className="space-y-4">
-                                {routes.map(r => (
-                                    <button
-                                        key={r.id}
-                                        onClick={() => setSelectedRoute(r.id.toString())}
-                                        className={`w-full p-4 rounded-2xl border transition-all text-left group ${selectedRoute === r.id.toString() ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-white/5 border-white/5 text-slate-400 hover:border-amber-500/50'}`}
-                                    >
-                                        <div className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">{t('route_id', 'Route ID')} #{r.id}</div>
-                                        <div className="font-black text-sm uppercase tracking-tight">{r.name}</div>
-                                        <div className={`text-[9px] mt-2 font-bold uppercase flex items-center ${selectedRoute === r.id.toString() ? 'text-slate-900' : 'text-slate-600'}`}>
-                                            <MapPin className="w-3 h-3 mr-1" /> Quartier Central
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="xl:col-span-3 space-y-6">
-                        {selectedRoute ? (
-                            <div className="glass-card border-none shadow-2xl overflow-hidden">
-                                <div className="p-8 border-b border-white/5 bg-slate-900/50 flex justify-between items-center">
-                                    <div>
-                                        <h2 className="text-2xl font-black text-white tracking-tight italic">{t('passengers', 'Passagers')} : {routes.find(r => r.id.toString() === selectedRoute)?.name}</h2>
-                                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('student_transport_assignment', 'Affectation des élèves au transport')}</p>
-                                    </div>
-                                    <button className="btn-primary text-[10px]">{t('add_passenger', 'AJOUTER PASSAGER')}</button>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                                <th className="px-8 py-6">{t('student', 'Élève')}</th>
-                                                <th className="px-8 py-6">{t('class', 'Classe')}</th>
-                                                <th className="px-8 py-6 text-right">{t('action', 'Action')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 bg-slate-900/30">
-                                            {students.filter(s => s.bus_route_id?.toString() === selectedRoute).map(s => (
-                                                <tr key={s.id} className="hover:bg-white/5 transition-colors">
-                                                    <td className="px-8 py-6">
-                                                        <div className="font-black text-white uppercase text-sm tracking-tight">{s.last_name} {s.first_name}</div>
-                                                        <div className="text-[10px] text-amber-500 font-bold tracking-tighter">Mat: {s.matricule}</div>
-                                                    </td>
-                                                    <td className="px-8 py-6 text-xs text-slate-400 font-black uppercase">{classes.find(c => c.id === s.class_id)?.name}</td>
-                                                    <td className="px-8 py-6 text-right">
-                                                        <button className="p-2.5 text-slate-500 hover:text-rose-500 transition-colors bg-white/5 rounded-xl border border-white/10"><Trash2 className="w-4 h-4" /></button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="glass-card p-20 flex flex-col items-center justify-center text-center opacity-30 border-2 border-dashed border-white/5">
-                                <Truck className="w-20 h-20 mb-6" />
-                                <p className="text-xl font-black uppercase tracking-widest">{t('select_route_passengers', 'Sélectionnez une route pour gérer les passagers')}</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
@@ -730,33 +736,37 @@ const AdvisorPortal: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
-                                <select
-                                    value={schedSubject}
-                                    onChange={(e) => setSchedSubject(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
-                                >
-                                    <option value="">Sélectionner une matière</option>
-                                    {classSubjects.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            {schedType !== 'PAUSE' && (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
+                                        <select
+                                            value={schedSubject}
+                                            onChange={(e) => setSchedSubject(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        >
+                                            <option value="">Sélectionner une matière</option>
+                                            {classSubjects.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
 
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Enseignant</label>
-                                <select
-                                    value={schedTeacher}
-                                    onChange={(e) => setSchedTeacher(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
-                                >
-                                    <option value="">Sélectionner un enseignant</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
-                                    ))}
-                                </select>
-                            </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Enseignant</label>
+                                        <select
+                                            value={schedTeacher}
+                                            onChange={(e) => setSchedTeacher(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        >
+                                            <option value="">Sélectionner un enseignant</option>
+                                            {availableTeachers.map(t => (
+                                                <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
 
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Type de cours</label>
@@ -768,6 +778,7 @@ const AdvisorPortal: React.FC = () => {
                                     <option value="COURSE">COURS STANDARD</option>
                                     <option value="EVALUATION">ÉVALUATION / EXAMEN</option>
                                     <option value="HOLIDAY">CONGÉ / FERIÉ</option>
+                                    <option value="PAUSE">PAUSE (Personnalisée)</option>
                                 </select>
                             </div>
                         </div>

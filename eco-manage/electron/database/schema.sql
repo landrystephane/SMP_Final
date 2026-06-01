@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS schools (
     bulletin_pdf_use_custom INTEGER DEFAULT 0,
     bulletin_pdf_template TEXT DEFAULT '',
     bulletin_pdf_mapping TEXT DEFAULT '{}',
+    timetable_slots TEXT DEFAULT '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]',
+    honor_roll_threshold REAL DEFAULT 15.0,
+    transport_fee_model TEXT DEFAULT 'ANNUAL',
+    transport_fee_amount REAL DEFAULT 0,
     deleted_at TEXT DEFAULT NULL,
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -159,7 +163,11 @@ CREATE TABLE IF NOT EXISTS tuition_fees (
     class_id INTEGER PRIMARY KEY,
     total_fee REAL NOT NULL,
     registration_fee REAL DEFAULT 0,
-    FOREIGN KEY (class_id) REFERENCES classes(id)
+    transport_fee REAL DEFAULT 0,
+    exam_fee REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(class_id) REFERENCES classes(id)
 );
 
 CREATE TABLE IF NOT EXISTS class_installment_fees (
@@ -231,6 +239,20 @@ CREATE TABLE IF NOT EXISTS transport_logs (
     longitude REAL,
     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES bus_routes(id)
+);
+
+CREATE TABLE IF NOT EXISTS transport_attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER,
+    route_id INTEGER,
+    date DATE NOT NULL,
+    direction TEXT NOT NULL, -- 'MORNING_PICKUP', 'EVENING_DROPOFF'
+    status TEXT NOT NULL, -- 'PRESENT', 'ABSENT'
+    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    recorded_by INTEGER,
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (route_id) REFERENCES bus_routes(id),
+    FOREIGN KEY (recorded_by) REFERENCES users(id)
 );
 
 -- Mobile Access Keys

@@ -127,7 +127,7 @@ const Statistics: React.FC = () => {
           <div className="glass-card p-8 bg-slate-900/40 border-none relative overflow-hidden group">
               <Award className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 group-hover:text-purple-500/10 transition-all" />
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{t('honor_rolls', 'Honor Rolls')}</p>
-              <h3 className="text-4xl font-black text-white">12</h3>
+              <h3 className="text-4xl font-black text-white">{stats.honorRoll ? stats.honorRoll.length : 0}</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-purple-500">
                   {t('average_gt_14', 'Moyennes > 14/20')}
               </div>
@@ -193,15 +193,10 @@ const Statistics: React.FC = () => {
               <div className="glass-card p-10 bg-gradient-to-br from-amber-500 to-amber-600 border-none shadow-2xl shadow-amber-500/20 relative overflow-hidden group">
                   <Award className="absolute -right-8 -top-8 w-48 h-48 text-white/10 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
                   <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase mb-6 relative z-10">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
-                  <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest mb-8 relative z-10">{t('top_students_term', 'Meilleurs élèves du trimestre (Moy > 15/20)')}</p>
+                  <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest mb-8 relative z-10">Meilleurs élèves du trimestre (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
 
                   <div className="space-y-4 relative z-10">
-                      {[
-                        { name: 'KAMGANG Landry', class: 'CM2', avg: 18.45 },
-                        { name: 'NGONO Michelle', class: 'SIL', avg: 17.80 },
-                        { name: 'TCHATCHOUA Paul', class: 'CM1', avg: 17.25 },
-                        { name: 'MBARGA Cédric', class: 'CE2', avg: 16.90 },
-                      ].map((s, i) => (
+                      {(stats.honorRoll || []).map((s: any, i: number) => (
                           <div key={i} className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
                               <div className="flex items-center gap-4">
                                   <span className="text-xl font-black text-amber-950/40">#{i+1}</span>
@@ -213,17 +208,16 @@ const Statistics: React.FC = () => {
                               <span className="text-lg font-black text-slate-950">{s.avg.toFixed(2)}</span>
                           </div>
                       ))}
+                      {(!stats.honorRoll || stats.honorRoll.length === 0) && (
+                          <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun élève au tableau d'honneur</p>
+                      )}
                   </div>
 
                   <button 
                       onClick={() => {
-                          const honorRoll = [
-                            { name: 'KAMGANG Landry', class: 'CM2', avg: 18.45 },
-                            { name: 'NGONO Michelle', class: 'SIL', avg: 17.80 },
-                            { name: 'TCHATCHOUA Paul', class: 'CM1', avg: 17.25 },
-                            { name: 'MBARGA Cédric', class: 'CE2', avg: 16.90 },
-                          ];
-                          honorRoll.forEach(student => {
+                          const honorRoll = stats.honorRoll || [];
+                          if (honorRoll.length === 0) return;
+                          honorRoll.forEach((student: any) => {
                             generateHonorCertificate(student.name, student.class, student.avg, school);
                           });
                           alert(t('certificates_generated', "Certificats d'honneur générés avec succès."));

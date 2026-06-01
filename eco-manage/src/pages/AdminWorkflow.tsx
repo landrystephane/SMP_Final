@@ -11,6 +11,7 @@ const AdminWorkflow: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [school, setSchool] = useState<any>(null);
   const [printingClassId, setPrintingClassId] = useState<number | null>(null);
+  const [bulletinsValidated, setBulletinsValidated] = useState(false);
 
   const [period, setPeriod] = useState({
     term: 1,
@@ -35,6 +36,8 @@ const AdminWorkflow: React.FC = () => {
     if (window.electronAPI) {
         const status = await window.electronAPI.getSetting('sg_acting_director');
         setIsSgActing(status === 'true');
+        const bv = await window.electronAPI.getSetting('bulletins_validated');
+        setBulletinsValidated(bv === 'true');
     }
   };
 
@@ -78,6 +81,20 @@ const AdminWorkflow: React.FC = () => {
         const newValue = !isSgActing;
         await window.electronAPI.setSetting({ key: 'sg_acting_director', value: newValue.toString() });
         setIsSgActing(newValue);
+        window.dispatchEvent(new Event('sg_mode_changed'));
+        
+        const isEn = i18n.language?.startsWith('en') ?? false;
+        alert(isEn 
+            ? `SG Acting Mode ${newValue ? 'Enabled' : 'Disabled'}. The SG now has director privileges.` 
+            : `Mode SG Intérimaire ${newValue ? 'Activé' : 'Désactivé'}. Le SG a maintenant les privilèges du directeur.`);
+    }
+  };
+
+  const toggleBulletinsValidation = async () => {
+    if (window.electronAPI) {
+        const newValue = !bulletinsValidated;
+        await window.electronAPI.setSetting({ key: 'bulletins_validated', value: newValue.toString() });
+        setBulletinsValidated(newValue);
     }
   };
 
@@ -204,7 +221,13 @@ const AdminWorkflow: React.FC = () => {
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
               <span className="text-slate-300">{t('allow_grade_entry')}</span>
               <div 
-                  onClick={() => setPeriod(prev => ({...prev, editingAllowed: !prev.editingAllowed}))}
+                  onClick={async () => {
+                      const newValue = !period.editingAllowed;
+                      setPeriod(prev => ({...prev, editingAllowed: newValue}));
+                      if (window.electronAPI) {
+                          await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: newValue.toString() });
+                      }
+                  }}
                   className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${period.editingAllowed ? 'bg-green-500' : 'bg-slate-600'}`}
               >
                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${period.editingAllowed ? 'translate-x-6' : ''}`} />
@@ -217,6 +240,7 @@ const AdminWorkflow: React.FC = () => {
         </div>
 
         {/* SG Acting Director Toggle */}
+        {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR') && (
         <div className="glass-card p-6 space-y-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 text-purple-400">
@@ -240,6 +264,34 @@ const AdminWorkflow: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Global Print Validation Toggle */}
+        {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR' || (user?.role === 'SG' && isSgActing)) && (
+        <div className="glass-card p-6 space-y-4 md:col-span-2 border-l-4 border-emerald-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 text-emerald-400">
+                <ShieldCheck className="w-6 h-6" />
+                <h2 className="text-xl font-semibold">Validation Globale des Bulletins</h2>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400">
+            Autoriser la secrétaire à lancer l'impression des bulletins pour toutes les classes.
+          </p>
+          <div className="flex items-center justify-between p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+            <div>
+                <span className="text-white font-bold block text-sm">Statut de validation</span>
+                <span className="text-[10px] text-slate-500 uppercase font-black">{t('currently')}: {bulletinsValidated ? 'VALIDÉ (Impression autorisée)' : 'NON VALIDÉ (Impression bloquée)'}</span>
+            </div>
+            <div
+                onClick={toggleBulletinsValidation}
+                className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all duration-300 ${bulletinsValidated ? 'bg-emerald-500' : 'bg-slate-700'}`}
+            >
+                <div className={`w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-300 ${bulletinsValidated ? 'translate-x-7' : ''}`} />
+            </div>
+          </div>
+        </div>
+        )}
 
         {/* Validation Status */}
         <div className="glass-card p-6 space-y-4 md:col-span-2">
@@ -285,13 +337,16 @@ const AdminWorkflow: React.FC = () => {
                   <td className="py-4 font-bold text-white">{c.name}</td>
                   <td className="py-4 text-xs font-semibold text-slate-400">{c.level} • {c.section}</td>
                   <td className="py-4">
-                    <span className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-bold uppercase tracking-wider">EN ATTENTE</span>
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${bulletinsValidated ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        {bulletinsValidated ? 'VALIDÉ' : 'EN ATTENTE'}
+                    </span>
                   </td>
                   <td className="py-4">
                     <button
                       onClick={() => handlePrintClassReportCards(c.id)}
-                      disabled={printingClassId === c.id}
-                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50"
+                      disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : ""}
                     >
                       <Printer className="w-4 h-4" />
                       {printingClassId === c.id ? "Impression..." : t('start_printing')}

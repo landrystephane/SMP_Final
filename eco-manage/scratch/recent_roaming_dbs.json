@@ -1,0 +1,22 @@
+[
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Docker\\cagent\\session.db",
+    "size": 45056,
+    "modified": "2026-05-29T01:06:27.146Z"
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\enspd-project\\school.db",
+    "size": 0,
+    "modified": "2026-05-29T00:08:49.292Z"
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Zoom\\data\\zoomus.zmdb.default.noenc.rlock.db",
+    "size": 5120,
+    "modified": "2026-05-29T01:31:41.909Z"
+  },
+  {
+    "path": "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Zoom\\data\\zoomus.zmdb.kvs.enc.db",
+    "size": 118784,
+    "modified": "2026-05-29T01:31:41.066Z"
+  }
+]

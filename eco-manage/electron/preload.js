@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Students
   getStudents: (schoolId) => ipcRenderer.invoke('db:getStudents', schoolId),
+  searchStudentsDetailed: (params) => ipcRenderer.invoke('db:searchStudentsDetailed', params),
   getStudentDetails: (id) => ipcRenderer.invoke('db:getStudentDetails', id),
   addStudent: (student) => ipcRenderer.invoke('db:addStudent', student),
   updateStudent: (student) => ipcRenderer.invoke('db:updateStudent', student),
@@ -86,9 +87,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Transport
   getBusRoutes: (schoolId) => ipcRenderer.invoke('db:getBusRoutes', schoolId),
+  addBusRoute: (route) => ipcRenderer.invoke('db:addBusRoute', route),
   getRouteStudents: (routeId) => ipcRenderer.invoke('db:getRouteStudents', routeId),
   getTransportPoints: (routeId) => ipcRenderer.invoke('db:getTransportPoints', routeId),
+  addTransportPoint: (point) => ipcRenderer.invoke('db:addTransportPoint', point),
+  deleteTransportPoint: (id) => ipcRenderer.invoke('db:deleteTransportPoint', id),
   logTransport: (log) => ipcRenderer.invoke('db:logTransport', log),
+  logTransportAttendance: (data) => ipcRenderer.invoke('db:logTransportAttendance', data),
+  notifyTransportProximity: (data) => ipcRenderer.invoke('db:notifyTransportProximity', data),
 
   // Plannings
   getSchedules: (schoolId) => ipcRenderer.invoke('db:getSchedules', schoolId),
@@ -104,6 +110,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // System/Admin
   getDashboardStats: (params) => ipcRenderer.invoke('db:getDashboardStats', params),
   getTeacherDashboardStats: (params) => ipcRenderer.invoke('db:getTeacherDashboardStats', params),
+  getBursarDashboardStats: (params) => ipcRenderer.invoke('db:getBursarDashboardStats', params),
+  getAdvisorDashboardStats: (params) => ipcRenderer.invoke('db:getAdvisorDashboardStats', params),
   getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
   setSetting: (data) => ipcRenderer.invoke('db:setSetting', data),
   logFrontendError: (errorDetails) => ipcRenderer.invoke('db:logFrontendError', errorDetails),
@@ -126,4 +134,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reports
   getReportTemplate: (schoolId) => ipcRenderer.invoke('db:getReportTemplate', schoolId),
   saveReportTemplate: (data) => ipcRenderer.invoke('db:saveReportTemplate', data),
+
+  // Parents Directory and Announcements
+  getParentsDirectory: (schoolId) => ipcRenderer.invoke('db:getParentsDirectory', schoolId),
+  sendParentAnnouncement: (data) => ipcRenderer.invoke('db:sendParentAnnouncement', data),
+
+  // New Transport APIs
+  getTransportEligibleStudents: (schoolId) => ipcRenderer.invoke('db:getTransportEligibleStudents', schoolId),
+  assignStudentToTransportPoint: (data) => ipcRenderer.invoke('db:assignStudentToTransportPoint', data),
 });

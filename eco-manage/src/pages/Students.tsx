@@ -160,7 +160,14 @@ const Students: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 font-medium">
-                    {classes.find(c => c.id === s.class_id)?.name || 'N/A'}
+                    <div className="flex items-center gap-2">
+                        {classes.find(c => c.id === s.class_id)?.name || 'N/A'}
+                        {s.has_paid_registration === 0 && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title="Cet élève n'a pas encore payé son inscription complète et est donc inactif dans la salle de classe.">
+                                Non-Inscrit
+                            </span>
+                        )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={s.gender === 'M' ? 'text-blue-400' : 'text-pink-400'}>{s.gender}</span>

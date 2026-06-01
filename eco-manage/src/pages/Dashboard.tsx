@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet } from 'lucide-react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import SystemAdmin from './SystemAdmin';
@@ -11,6 +12,8 @@ const Dashboard: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
+  const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE'>('OVERVIEW');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadStats = async () => {
@@ -21,6 +24,22 @@ const Dashboard: React.FC = () => {
       try {
         if (window.electronAPI && user) {
           if (user.role === 'TEACHER') {
+              const data = await window.electronAPI.getTeacherDashboardStats({
+                  schoolId: user.schoolId,
+                  teacherId: user.id
+              });
+              setStats(data);
+          } else if (user.role === 'BURSAR') {
+              const data = await window.electronAPI.getBursarDashboardStats({
+                  schoolId: user.schoolId
+              });
+              setStats(data);
+          } else if (user.role === 'ADVISOR') {
+              const data = await window.electronAPI.getAdvisorDashboardStats({
+                  schoolId: user.schoolId
+              });
+              setStats(data);
+          } else if (user.role === 'TEACHER') {
               const data = await window.electronAPI.getTeacherDashboardStats({
                   schoolId: user.schoolId,
                   teacherId: user.id
@@ -70,13 +89,137 @@ const Dashboard: React.FC = () => {
       return <SystemAdmin />;
   }
 
+  if (user?.role === 'PARENT') {
+      return <Navigate to="/parent-portal" replace />;
+  }
+  if (user?.role === 'DRIVER') {
+      return <Navigate to="/driver-portal" replace />;
+  }
+
   if (user?.role === 'TEACHER' && stats) {
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-            <div>
-                <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
-                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu de vos classes</p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
+                    <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu de vos classes</p>
+                </div>
+                <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
+                    <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mes Classes</button>
+                    <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mon Emploi du Temps</button>
+                </div>
             </div>
+
+            {teacherTab === 'TIMETABLE' ? (
+                <div className="glass-card p-6 border-none shadow-xl">
+                    <div className="flex items-center space-x-3 text-amber-500 mb-6 border-b border-white/5 pb-4">
+                        <LayoutGrid className="w-5 h-5" />
+                        <h2 className="text-lg font-black uppercase text-white tracking-wide">Mon Emploi du Temps Hebdomadaire</h2>
+                    </div>
+                    
+                    <div className="overflow-x-auto pb-4">
+                        <div className="min-w-[800px]">
+                            <div className="grid grid-cols-8 gap-3">
+                                {/* Header */}
+                                <div className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{t('hour', 'Heure')}</div>
+                                {[
+                                    { key: 1, label: t('monday', 'Lundi') },
+                                    { key: 2, label: t('tuesday', 'Mardi') },
+                                    { key: 3, label: t('wednesday', 'Mercredi') },
+                                    { key: 4, label: t('thursday', 'Jeudi') },
+                                    { key: 5, label: t('friday', 'Vendredi') },
+                                    { key: 6, label: t('saturday', 'Samedi') },
+                                    { key: 7, label: t('sunday', 'Dimanche') }
+                                ].map(d => (
+                                    <div key={d.key} className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{d.label}</div>
+                                ))}
+
+                                {/* Rows */}
+                                {(() => {
+                                    const allSlots: any[] = [];
+                                    if (stats.schedules) {
+                                        stats.schedules.forEach((s: any) => {
+                                            if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
+                                                allSlots.push({
+                                                    label: `${s.start_time} - ${s.end_time || '?'}`,
+                                                    start: s.start_time.trim(),
+                                                    end: s.end_time?.trim() || '',
+                                                    isBreak: false
+                                                });
+                                            }
+                                        });
+                                    }
+                                    allSlots.sort((a, b) => (a.start || '00:00').localeCompare(b.start || '00:00'));
+
+                                    if (allSlots.length === 0) {
+                                        return (
+                                            <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                                                <p className="text-slate-400 font-bold mb-4">Aucun cours programmé pour vous.</p>
+                                                <p className="text-xs text-slate-500">Votre emploi du temps s'affichera ici dès qu'on vous aura attribué des cours.</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return allSlots.map((slot: any, index: number) => (
+                                    <React.Fragment key={`${slot.label}-${index}`}>
+                                        <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex items-center justify-center border border-slate-800">
+                                            {slot.label}
+                                        </div>
+                                        {[1, 2, 3, 4, 5, 6, 7].map(day => {
+                                            const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
+                                            
+                                            if (sData) {
+                                                const typeColor = sData.type === 'EVALUATION' 
+                                                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                                                    : sData.type === 'PAUSE'
+                                                        ? 'bg-slate-900/10 border-dashed border-slate-800 text-slate-600'
+                                                        : 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+                                                
+                                                if (sData.type === 'PAUSE') {
+                                                    return (
+                                                        <div key={day} className={`p-4 rounded-xl border text-center flex items-center justify-center ${typeColor}`}>
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest">Pause (Perso)</span>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
+                                                
+                                                return (
+                                                    <div key={day} className={`p-2 rounded-xl border text-center flex flex-col justify-center ${typeColor} h-[70px] overflow-hidden`} title={`${className} - ${subjectName || sData.type}`}>
+                                                        <div className="w-full">
+                                                            <div className="text-[10px] font-black uppercase text-amber-500 truncate px-1">
+                                                                {className}
+                                                            </div>
+                                                            {subjectName && (
+                                                                <div className="text-[9px] font-bold uppercase mt-1 text-slate-300 truncate px-1">
+                                                                    {subjectName}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[7px] font-black uppercase tracking-wider mt-1 opacity-50 truncate">
+                                                            {sData.type || 'COURS'}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            
+                                            return (
+                                                <div key={day} className="p-4 bg-slate-950/20 rounded-xl border border-white/5 hover:bg-slate-900/50 transition-all flex items-center justify-center">
+                                                    <span className="text-slate-700 text-xs">-</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
@@ -139,6 +282,191 @@ const Dashboard: React.FC = () => {
                             {!stats.students?.length && (
                                 <tr>
                                     <td colSpan={5} className="p-8 text-center text-slate-500">Aucun élève trouvé.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            </>
+            )}
+        </div>
+    );
+  }
+
+  if (user?.role === 'BURSAR' && stats) {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+            <div>
+                <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
+                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Financier</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Recouvrements (Recettes) */}
+                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-emerald-500/10 rounded-2xl">
+                        <CreditCard className="text-emerald-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
+                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                </div>
+
+                {/* Total Décaissements (Dépenses) */}
+                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-rose-500/10 rounded-2xl">
+                        <Wallet className="text-rose-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
+                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                </div>
+
+                {/* Solde Actuel (Recettes - Dépenses) */}
+                <div className="glass-card p-6 border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-amber-500/20 rounded-2xl">
+                        <Activity className="text-amber-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
+                  <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">FCFA</span></p>
+                </div>
+                
+                {/* Reste à Percevoir (Arriérés) */}
+                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-blue-500/10 rounded-2xl">
+                        <UsersIcon className="text-blue-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('arrears', 'Reste à Percevoir')}</p>
+                  <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                </div>
+            </div>
+
+            <div className="glass-card p-6 border-none shadow-xl">
+                <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
+                    État de recouvrement par Salle de Classe
+                </h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
+                            <tr>
+                                <th className="p-4">Classe</th>
+                                <th className="p-4 text-center">Effectif Total</th>
+                                <th className="p-4 text-center">Élèves à jour</th>
+                                <th className="p-4 text-right">Progression</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-slate-300">
+                            {stats.classStats?.map((s: any) => {
+                                const progress = s.totalStudents > 0 ? (s.upToDateStudents / s.totalStudents) * 100 : 0;
+                                return (
+                                <tr key={s.name} className="border-b border-white/5 hover:bg-white/[0.02]">
+                                    <td className="p-4 font-bold text-white uppercase">{s.name}</td>
+                                    <td className="p-4 text-center font-bold text-slate-400">{s.totalStudents}</td>
+                                    <td className="p-4 text-center font-black text-emerald-400">{s.upToDateStudents}</td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end space-x-2">
+                                            <span className="text-xs font-bold">{progress.toFixed(0)}%</span>
+                                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )})}
+                            {!stats.classStats?.length && (
+                                <tr>
+                                    <td colSpan={4} className="p-8 text-center text-slate-500">Aucune donnée disponible.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  if (user?.role === 'ADVISOR' && stats) {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+            <div>
+                <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
+                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Pédagogique</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-card p-6 border-none group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-amber-500/10 rounded-2xl">
+                        <UsersIcon className="text-amber-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Effectif Global</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
+                </div>
+
+                <div className="glass-card p-6 border-none group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-rose-500/10 rounded-2xl">
+                        <AlertTriangle className="text-rose-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Absences Globales</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.totalAbsences}</p>
+                </div>
+                
+                <div className="glass-card p-6 border-none group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-emerald-500/10 rounded-2xl">
+                        <Activity className="text-emerald-500 w-6 h-6" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Taux de Réussite Global</p>
+                  <p className="text-3xl font-black text-white mt-1">{stats.overallPassRate?.toFixed(1)}%</p>
+                </div>
+            </div>
+
+            <div className="glass-card p-6 border-none shadow-xl">
+                <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
+                    Statistiques par Salle de Classe
+                </h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
+                            <tr>
+                                <th className="p-4">Classe</th>
+                                <th className="p-4 text-center">Effectif Total</th>
+                                <th className="p-4 text-center">Absences</th>
+                                <th className="p-4 text-right">Taux de réussite</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-slate-300">
+                            {stats.classStats?.map((s: any) => {
+                                return (
+                                <tr key={s.name} className="border-b border-white/5 hover:bg-white/[0.02]">
+                                    <td className="p-4 font-bold text-white uppercase">{s.name}</td>
+                                    <td className="p-4 text-center font-bold text-slate-400">{s.totalStudents}</td>
+                                    <td className="p-4 text-center font-black text-rose-400">{s.totalAbsences}</td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end space-x-2">
+                                            <span className={`text-xs font-bold ${s.passRate >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{s.passRate?.toFixed(1)}%</span>
+                                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                <div className={`h-full ${s.passRate >= 50 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${s.passRate}%` }} />
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )})}
+                            {!stats.classStats?.length && (
+                                <tr>
+                                    <td colSpan={4} className="p-8 text-center text-slate-500">Aucune donnée disponible.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -213,7 +541,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
         <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
@@ -243,6 +571,7 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
 
+        {user?.role !== 'SG' && (
         <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-rose-500/10 rounded-2xl group-hover:bg-rose-500 transition-all">
@@ -251,14 +580,15 @@ const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{t('tuition')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_recovery')}</p>
-          <p className="text-2xl font-black text-white mt-1">{stats.totalRevenue.toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
           <div className="w-full h-1.5 bg-slate-700 rounded-full mt-4 overflow-hidden p-[1px]">
              <div
                 className="h-full bg-rose-500 rounded-full shadow-lg shadow-rose-500/50"
-                style={{ width: `${Math.min(100, (stats.totalRevenue / (stats.totalTuitionDue || 1)) * 100)}%` }}
+                style={{ width: `${Math.min(100, ((stats?.totalRevenue || 0) / ((stats?.totalTuitionDue || 1) || 1)) * 100)}%` }}
              />
           </div>
         </div>
+        )}
 
         <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-4">
@@ -288,7 +618,7 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setSelectedDiagnosticClass(e.target.value)}
                 >
                     <option value="ALL">{t('all_classes')}</option>
-                    {stats.classStats.map((c: any) => <option key={c.level} value={c.level}>{c.level}</option>)}
+                    {(stats?.classStats || []).map((c: any) => <option key={c.level} value={c.level}>{c.level}</option>)}
                 </select>
             </div>
 
@@ -321,7 +651,10 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4 flex justify-end">
-                        <button className="text-[10px] font-black text-slate-950 bg-amber-500 px-4 py-2 rounded-xl hover:bg-yellow-400 active:scale-95 transition-all uppercase tracking-widest flex items-center shadow-lg shadow-amber-500/10">
+                        <button 
+                            onClick={() => navigate('/classes')}
+                            className="text-[10px] font-black text-slate-950 bg-amber-500 px-4 py-2 rounded-xl hover:bg-yellow-400 active:scale-95 transition-all uppercase tracking-widest flex items-center shadow-lg shadow-amber-500/10"
+                        >
                             {t('class_details')} <ChevronRight className="w-3 h-3 ml-1" />
                         </button>
                     </div>
@@ -374,7 +707,10 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="pt-2">
-                        <button className="w-full py-3 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all border border-white/5">
+                        <button 
+                            onClick={() => navigate('/admin-workflow')}
+                            className="w-full py-3 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all border border-white/5"
+                        >
                             {t('view_details_by_class')}
                         </button>
                     </div>

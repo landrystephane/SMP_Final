@@ -144,8 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
     checkActingStatus();
+    
+    window.addEventListener('sg_mode_changed', checkActingStatus);
     const interval = setInterval(checkActingStatus, 30000);
-    return () => clearInterval(interval);
+    
+    return () => {
+        window.removeEventListener('sg_mode_changed', checkActingStatus);
+        clearInterval(interval);
+    };
   }, [user]);
 
   const hasRole = (roles: Role[]) => {

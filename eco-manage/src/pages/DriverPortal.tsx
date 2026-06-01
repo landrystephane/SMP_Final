@@ -12,6 +12,13 @@ const DriverPortal: React.FC = () => {
   const [isDriving, setIsDriving] = useState(false);
   const [attendance, setAttendance] = useState<Record<number, boolean>>({});
   const [points, setPoints] = useState<any[]>([]);
+  const [showAddPoint, setShowAddPoint] = useState(false);
+  const [newPoint, setNewPoint] = useState({ name: '' });
+  const [eligibleStudents, setEligibleStudents] = useState<any[]>([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [filterSection, setFilterSection] = useState('ALL');
+  const [filterLevel, setFilterLevel] = useState('ALL');
+  const [filterClass, setFilterClass] = useState('ALL');
 
   const loadRouteData = async () => {
     if (window.electronAPI) {
@@ -36,12 +43,53 @@ const DriverPortal: React.FC = () => {
             ]);
         }
       }
+
+      // Load eligible students that paid for transport but are not assigned
+      const eligible = await window.electronAPI.getTransportEligibleStudents(user?.schoolId);
+      setEligibleStudents(eligible || []);
     }
   };
 
   useEffect(() => {
     loadRouteData();
   }, [user]);
+
+  const handleAddPoint = async () => {
+      if (!activeRoute || !newPoint.name) return;
+      
+      setIsAdding(true);
+      let lat = 0;
+      let lng = 0;
+      
+      // Try to get GPS coordinates
+      if ('geolocation' in navigator) {
+          try {
+              const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                  navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
+              });
+              lat = position.coords.latitude;
+              lng = position.coords.longitude;
+          } catch (err) {
+              console.warn("GPS failed or denied:", err);
+              // Fallback to 0,0 but alert driver
+              alert("Impossible d'obtenir la position GPS exacte. L'arrêt sera créé sans coordonnées précises.");
+          }
+      }
+
+      if (window.electronAPI) {
+          await window.electronAPI.addTransportPoint({
+              routeId: activeRoute.id,
+              name: newPoint.name,
+              latitude: lat,
+              longitude: lng,
+              estimatedTime: 0
+          });
+          setShowAddPoint(false);
+          setNewPoint({ name: '' });
+          loadRouteData();
+      }
+      setIsAdding(false);
+  };
 
   const toggleActivity = async () => {
     const newState = !isDriving;
@@ -72,8 +120,11 @@ const DriverPortal: React.FC = () => {
           latitude: points[nextIdx].latitude,
           longitude: points[nextIdx].longitude
         });
-        // Simulate Parent Notification
-        console.log(`Notifying parents at stop: ${points[nextIdx].name}`);
+        
+        await window.electronAPI.notifyTransportProximity({
+            pointId: points[nextIdx].id,
+            driverId: user?.id
+        });
       }
     } else {
       toggleActivity();
@@ -81,9 +132,38 @@ const DriverPortal: React.FC = () => {
     }
   };
 
-  const togglePresence = (studentId: number) => {
-    setAttendance(prev => ({ ...prev, [studentId]: !prev[studentId] }));
+  const togglePresence = async (studentId: number) => {
+    const isPresent = !attendance[studentId];
+    setAttendance(prev => ({ ...prev, [studentId]: isPresent }));
+    
+    if (window.electronAPI && activeRoute && isDriving) {
+        await window.electronAPI.logTransportAttendance({
+            studentId,
+            routeId: activeRoute.id,
+            direction: new Date().getHours() < 12 ? 'MORNING_PICKUP' : 'EVENING_DROPOFF',
+            status: isPresent ? 'PRESENT' : 'ABSENT',
+            recordedBy: user?.id
+        });
+    }
   };
+
+  const handleAssignStudent = async (studentId: number, pointId: number) => {
+      if (window.electronAPI && activeRoute) {
+          await window.electronAPI.assignStudentToTransportPoint({
+              studentId,
+              pointId,
+              routeId: activeRoute.id
+          });
+          loadRouteData(); // Reload to update lists
+      }
+  };
+
+  const filteredEligible = eligibleStudents.filter(s => {
+      if (filterSection !== 'ALL' && s.section !== filterSection) return false;
+      if (filterLevel !== 'ALL' && s.level !== filterLevel) return false;
+      if (filterClass !== 'ALL' && s.class_name !== filterClass) return false;
+      return true;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -113,9 +193,14 @@ const DriverPortal: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Navigation & Points */}
         <div className="glass-card p-8 space-y-8 bg-slate-900/40 border-none">
-            <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4 flex items-center">
-                <MapIcon className="w-4 h-4 mr-3 text-amber-500" /> {t('itinerary', 'Itinéraire')}
-            </h2>
+            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center">
+                    <MapIcon className="w-4 h-4 mr-3 text-amber-500" /> {t('itinerary', 'Itinéraire')}
+                </h2>
+                <button onClick={() => setShowAddPoint(true)} className="p-2 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 text-xs font-black transition-all">
+                    + Ajouter Arrêt
+                </button>
+            </div>
             <div className="relative space-y-10 pl-10">
                 <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-800" />
                 {points.map((p, idx) => (
@@ -158,8 +243,80 @@ const DriverPortal: React.FC = () => {
             )}
         </div>
 
-        {/* Liste d'appel des élèves */}
+        {/* Section Assignation des Élèves Éligibles */}
         <div className="lg:col-span-2 space-y-6">
+            {eligibleStudents.length > 0 && (
+                <div className="glass-card overflow-hidden border-none shadow-2xl mb-8 border border-indigo-500/20 bg-indigo-900/10">
+                    <div className="p-8 border-b border-white/5 flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center italic">
+                                <MapPin className="w-6 h-6 mr-4 text-indigo-400" />
+                                {t('assign_students', 'Assignation des Élèves')}
+                            </h2>
+                            <p className="text-[10px] text-indigo-300/70 font-black uppercase mt-1 tracking-widest">
+                                Élèves ayant souscrit au transport
+                            </p>
+                        </div>
+                        <div className="flex gap-4">
+                            <select 
+                                className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
+                                value={filterSection}
+                                onChange={e => setFilterSection(e.target.value)}
+                            >
+                                <option value="ALL">Toutes Sections</option>
+                                <option value="FRANCOPHONE">Francophone</option>
+                                <option value="ANGLOPHONE">Anglophone</option>
+                            </select>
+                            <select 
+                                className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
+                                value={filterLevel}
+                                onChange={e => setFilterLevel(e.target.value)}
+                            >
+                                <option value="ALL">Tous Cycles</option>
+                                <option value="PRIMAIRE">Primaire</option>
+                                <option value="MATERNELLE">Maternelle</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 divide-y divide-white/5 bg-slate-950/40">
+                        {filteredEligible.map(s => (
+                            <div key={s.id} className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between hover:bg-white/5 transition-all gap-4">
+                                <div className="flex items-center space-x-5">
+                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/20">
+                                        {s.last_name[0]}
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-black uppercase text-sm tracking-tight">{s.last_name} {s.first_name}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] text-amber-500 font-bold uppercase tracking-widest italic">{s.neighborhood || t('undefined_neighborhood', 'Quartier non défini')}</span>
+                                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white font-black uppercase">{s.class_name}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <select 
+                                        className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-xs font-black text-white flex-1 md:flex-none outline-none"
+                                        onChange={(e) => handleAssignStudent(s.id, parseInt(e.target.value))}
+                                        value=""
+                                    >
+                                        <option value="" disabled>Assigner à un arrêt...</option>
+                                        {points.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        ))}
+                        {filteredEligible.length === 0 && (
+                            <div className="py-10 text-center text-slate-500 font-black uppercase text-xs tracking-widest">
+                                Aucun élève pour ces filtres
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Liste d'appel des élèves */}
             <div className="glass-card overflow-hidden border-none shadow-2xl">
                 <div className="p-8 bg-slate-900/80 border-b border-white/5 flex justify-between items-center">
                     <div>
@@ -185,7 +342,10 @@ const DriverPortal: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-white font-black uppercase text-base tracking-tight">{s.last_name} {s.first_name}</p>
-                                    <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1 italic">{s.neighborhood || t('undefined_neighborhood', 'Quartier non défini')}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] text-amber-500 font-bold uppercase tracking-widest italic">{s.neighborhood || t('undefined_neighborhood', 'Quartier non défini')}</span>
+                                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white font-black uppercase">{s.class_name}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-3">
@@ -236,6 +396,27 @@ const DriverPortal: React.FC = () => {
             </div>
         </div>
       </div>
+
+      {/* Add Point Modal */}
+      {showAddPoint && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl">
+                  <h3 className="text-xl font-black text-white italic tracking-tight mb-6">NOUVEAU POINT DE RAMASSAGE</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nom de l'arrêt</label>
+                          <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Carrefour Mvog-Mbi" />
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                          <button onClick={() => setShowAddPoint(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-xs font-black text-white uppercase" disabled={isAdding}>Annuler</button>
+                          <button onClick={handleAddPoint} disabled={isAdding} className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase disabled:opacity-50 flex justify-center items-center">
+                              {isAdding ? <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" /> : 'Ajouter'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,63 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "superadmin",
+      "role": "SUPERADMIN",
+      "assigned_classes": null,
+      "school_id": 1,
+      "full_name": "Super Développeur"
+    },
+    {
+      "id": 3,
+      "username": "fondateur",
+      "role": "FOUNDER",
+      "assigned_classes": "[]",
+      "school_id": 1,
+      "full_name": "fondateur"
+    },
+    {
+      "id": 4,
+      "username": "admin",
+      "role": "FOUNDER",
+      "assigned_classes": null,
+      "school_id": 1,
+      "full_name": "Fondateur École"
+    },
+    {
+      "id": 5,
+      "username": "harold@gmail.com",
+      "role": "FOUNDER",
+      "assigned_classes": "[]",
+      "school_id": 2,
+      "full_name": "TADIE Harold"
+    },
+    {
+      "id": 6,
+      "username": "tadie",
+      "role": "FOUNDER",
+      "assigned_classes": "[]",
+      "school_id": 3,
+      "full_name": "Tadie Harold"
+    }
+  ],
+  "classes": [
+    {
+      "id": 22,
+      "name": "SIL",
+      "code": "SIL",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null,
+      "school_id": 2
+    },
+    {
+      "id": 40,
+      "name": "SIL",
+      "code": "SIL",
+      "main_teacher_id": null,
+      "assistant_teacher_id": null,
+      "school_id": 3
+    }
+  ],
+  "students": []
+}

@@ -28,7 +28,7 @@ const MobileProvisioning: React.FC = () => {
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">{t('activation_success', 'Activation Réussie')}</h1>
             <p className="text-slate-400 mb-8">{t('activation_desc', 'Votre smartphone est désormais lié au serveur central de l\'école.')}</p>
-            <button className="w-full max-w-xs py-3 bg-slate-gold-gold text-slate-900 rounded-lg font-bold">
+            <button onClick={() => window.location.href = '/'} className="w-full max-w-xs py-3 bg-slate-gold-gold text-slate-900 rounded-lg font-bold">
                 {t('access_app', 'Accéder à l\'application')}
             </button>
         </div>

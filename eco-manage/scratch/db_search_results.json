@@ -1,0 +1,635 @@
+{
+  "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\eco-manage\\school.db": {
+    "size": 176128,
+    "users": [
+      {
+        "id": 1,
+        "username": "superadmin",
+        "role": "SUPERADMIN",
+        "assigned_classes": null,
+        "school_id": 1,
+        "full_name": "Super Développeur"
+      },
+      {
+        "id": 3,
+        "username": "fondateur",
+        "role": "FOUNDER",
+        "assigned_classes": "[]",
+        "school_id": 1,
+        "full_name": "fondateur"
+      },
+      {
+        "id": 4,
+        "username": "admin",
+        "role": "FOUNDER",
+        "assigned_classes": null,
+        "school_id": 1,
+        "full_name": "Fondateur École"
+      },
+      {
+        "id": 5,
+        "username": "harold@gmail.com",
+        "role": "FOUNDER",
+        "assigned_classes": "[]",
+        "school_id": 2,
+        "full_name": "TADIE Harold"
+      },
+      {
+        "id": 6,
+        "username": "tadie",
+        "role": "FOUNDER",
+        "assigned_classes": "[]",
+        "school_id": 3,
+        "full_name": "Tadie Harold"
+      }
+    ],
+    "classes": [
+      {
+        "id": 1,
+        "name": "SIL",
+        "code": "SIL",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 2,
+        "name": "CP",
+        "code": "CP",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 3,
+        "name": "CE1",
+        "code": "CE1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 4,
+        "name": "CE2",
+        "code": "CE2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 5,
+        "name": "CM1",
+        "code": "CM1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 6,
+        "name": "CM2",
+        "code": "CM2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 7,
+        "name": "Class 1",
+        "code": "CL1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 8,
+        "name": "Class 2",
+        "code": "CL2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 9,
+        "name": "Class 3",
+        "code": "CL3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 10,
+        "name": "Class 4",
+        "code": "CL4",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 11,
+        "name": "Class 5",
+        "code": "CL5",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 12,
+        "name": "Class 6",
+        "code": "CL6",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 13,
+        "name": "Petite Section",
+        "code": "PS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 14,
+        "name": "Moyenne Section",
+        "code": "MS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 15,
+        "name": "Grande Section",
+        "code": "GS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 16,
+        "name": "Nursery 1",
+        "code": "N1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 17,
+        "name": "Nursery 2",
+        "code": "N2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 18,
+        "name": "Nursery 3",
+        "code": "N3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 1
+      },
+      {
+        "id": 19,
+        "name": "Petite Section",
+        "code": "PS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 20,
+        "name": "Moyenne Section",
+        "code": "MS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 21,
+        "name": "Grande Section",
+        "code": "GS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 22,
+        "name": "SIL",
+        "code": "SIL",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 23,
+        "name": "CP",
+        "code": "CP",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 24,
+        "name": "CE1",
+        "code": "CE1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 25,
+        "name": "CE2",
+        "code": "CE2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 26,
+        "name": "CM1",
+        "code": "CM1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 27,
+        "name": "CM2",
+        "code": "CM2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 28,
+        "name": "Nursery 1",
+        "code": "N1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 29,
+        "name": "Nursery 2",
+        "code": "N2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 30,
+        "name": "Nursery 3",
+        "code": "N3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 31,
+        "name": "Class 1",
+        "code": "CL1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 32,
+        "name": "Class 2",
+        "code": "CL2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 33,
+        "name": "Class 3",
+        "code": "CL3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 34,
+        "name": "Class 4",
+        "code": "CL4",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 35,
+        "name": "Class 5",
+        "code": "CL5",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 36,
+        "name": "Class 6",
+        "code": "CL6",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 2
+      },
+      {
+        "id": 37,
+        "name": "Petite Section",
+        "code": "PS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 38,
+        "name": "Moyenne Section",
+        "code": "MS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 39,
+        "name": "Grande Section",
+        "code": "GS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 40,
+        "name": "SIL",
+        "code": "SIL",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 41,
+        "name": "CP",
+        "code": "CP",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 42,
+        "name": "CE1",
+        "code": "CE1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 43,
+        "name": "CE2",
+        "code": "CE2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 44,
+        "name": "CM1",
+        "code": "CM1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 45,
+        "name": "CM2",
+        "code": "CM2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 46,
+        "name": "Nursery 1",
+        "code": "N1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 47,
+        "name": "Nursery 2",
+        "code": "N2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 48,
+        "name": "Nursery 3",
+        "code": "N3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 49,
+        "name": "Class 1",
+        "code": "CL1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 50,
+        "name": "Class 2",
+        "code": "CL2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 51,
+        "name": "Class 3",
+        "code": "CL3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 52,
+        "name": "Class 4",
+        "code": "CL4",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 53,
+        "name": "Class 5",
+        "code": "CL5",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 54,
+        "name": "Class 6",
+        "code": "CL6",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 3
+      },
+      {
+        "id": 55,
+        "name": "Petite Section",
+        "code": "PS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 56,
+        "name": "Moyenne Section",
+        "code": "MS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 57,
+        "name": "Grande Section",
+        "code": "GS",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 58,
+        "name": "SIL",
+        "code": "SIL",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 59,
+        "name": "CP",
+        "code": "CP",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 60,
+        "name": "CE1",
+        "code": "CE1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 61,
+        "name": "CE2",
+        "code": "CE2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 62,
+        "name": "CM1",
+        "code": "CM1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 63,
+        "name": "CM2",
+        "code": "CM2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 64,
+        "name": "Nursery 1",
+        "code": "N1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 65,
+        "name": "Nursery 2",
+        "code": "N2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 66,
+        "name": "Nursery 3",
+        "code": "N3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 67,
+        "name": "Class 1",
+        "code": "CL1",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 68,
+        "name": "Class 2",
+        "code": "CL2",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 69,
+        "name": "Class 3",
+        "code": "CL3",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 70,
+        "name": "Class 4",
+        "code": "CL4",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 71,
+        "name": "Class 5",
+        "code": "CL5",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      },
+      {
+        "id": 72,
+        "name": "Class 6",
+        "code": "CL6",
+        "main_teacher_id": null,
+        "assistant_teacher_id": null,
+        "school_id": 4
+      }
+    ],
+    "students": []
+  },
+  "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\Electron\\school.db": {
+    "size": 151552,
+    "users": [],
+    "classes": [],
+    "students": []
+  },
+  "C:\\Users\\LANDRY TOUOTAP\\AppData\\Roaming\\enspd-project\\school.db": {
+    "error": "no such table: users"
+  }
+}

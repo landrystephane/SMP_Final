@@ -20,6 +20,7 @@ const Grades: React.FC = () => {
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [isLocked, setIsLocked] = useState(false);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
+  const [bulletinsValidated, setBulletinsValidated] = useState(false);
 
   const loadData = async () => {
       if (window.electronAPI) {
@@ -40,6 +41,9 @@ const Grades: React.FC = () => {
         } else {
             setClasses(c);
         }
+        
+        const bv = await window.electronAPI.getSetting('bulletins_validated');
+        setBulletinsValidated(bv === 'true');
       }
   }
 
@@ -49,9 +53,28 @@ const Grades: React.FC = () => {
     if (window.electronAPI && selectedClass) {
         const classObj = classes.find(c => c.id.toString() === selectedClass);
         const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString()));
+        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString() && s.has_paid_registration === 1));
 
-        const classSubs = await window.electronAPI.getClassSubjects(parseInt(selectedClass));
+        let classSubs = await window.electronAPI.getClassSubjects(parseInt(selectedClass));
+        
+        if (user?.role === 'TEACHER') {
+            try {
+                const allSchedules = await window.electronAPI.getSchedules(user?.schoolId);
+                const classSchedules = allSchedules.filter((s: any) => 
+                    s.class_id?.toString() === selectedClass?.toString() && 
+                    s.teacher_id?.toString() === user?.id?.toString()
+                );
+                
+                const assignedSubjectIds = new Set(classSchedules.map((s: any) => s.subject_id));
+                
+                // If they have assigned subjects, only show those.
+                // If they don't have any schedules, they might see nothing. This enforces the restriction.
+                classSubs = classSubs.filter((sub: any) => assignedSubjectIds.has(sub.id));
+            } catch (e) {
+                console.error("Failed to load schedules for subject filtering", e);
+            }
+        }
+        
         setSubjects(classSubs);
 
         const existingGrades = await window.electronAPI.getGrades({
@@ -70,33 +93,30 @@ const Grades: React.FC = () => {
         setGrades(gradeMap);
         setIsLocked(locked);
 
-        // Check deadline
+        // Check deadline and permissions
         let pastDeadline = false;
-        if (user?.role === 'TEACHER') {
-            const periodEnd = await window.electronAPI.getSetting('period_end');
-            if (periodEnd) {
-                const endDate = new Date(periodEnd);
-                endDate.setHours(23, 59, 59, 999);
-                if (new Date() > endDate) {
-                    pastDeadline = true;
-                    // Check for override
-                    try {
-                        const override = await window.electronAPI.getGradeOverrides({
-                            teacherId: user.id,
-                            classId: parseInt(selectedClass),
-                            term: selectedTerm,
-                            month: selectedMonth
-                        });
-                        if (override) {
-                            const overrideDate = new Date(override.deadline);
-                            overrideDate.setHours(23, 59, 59, 999);
-                            if (new Date() <= overrideDate) {
-                                pastDeadline = false;
-                            }
+        const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed');
+        if (editingAllowed === 'false') {
+            pastDeadline = true;
+            
+            // Check for override if master toggle is false
+            if (user?.role === 'TEACHER') {
+                try {
+                    const override = await window.electronAPI.getGradeOverrides({
+                        teacherId: user.id,
+                        classId: parseInt(selectedClass),
+                        term: selectedTerm,
+                        month: selectedMonth
+                    });
+                    if (override) {
+                        const overrideDate = new Date(override.deadline);
+                        overrideDate.setHours(23, 59, 59, 999);
+                        if (new Date() <= overrideDate) {
+                            pastDeadline = false;
                         }
-                    } catch (err) {
-                        console.warn("getGradeOverrides non disponible, veuillez redémarrer l'application.");
                     }
+                } catch (err) {
+                    console.warn("getGradeOverrides non disponible.");
                 }
             }
         }
@@ -111,6 +131,10 @@ const Grades: React.FC = () => {
   }, [selectedClass, selectedMonth, selectedTerm]);
 
   const handleSave = async () => {
+    if (isLocked || isPastDeadline) {
+        alert("La saisie est bloquée (période fermée ou délai dépassé).");
+        return;
+    }
     const formattedGrades = Object.entries(grades).map(([key, scoreStr]) => {
         const [studentId, subjectId] = key.split('-');
         let scoreNum = parseFloat(scoreStr.replace(',', '.'));
@@ -496,7 +520,9 @@ const Grades: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}
-                            className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5"
+                            disabled={!bulletinsValidated && user?.role === 'SECRETARY'}
+                            title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'est pas encore autorisée par la direction." : ""}
+                            className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                               <FileText className="w-5 h-5" />
                           </button>

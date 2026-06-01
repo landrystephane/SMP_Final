@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Info, Plus, Trash2, CreditCard, ChevronRight, X } from 'lucide-react';
+import { Save, Info, Plus, Trash2, CreditCard, ChevronRight, X, Bus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -13,6 +13,10 @@ const TuitionConfig: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInstallmentName, setNewInstallmentName] = useState('');
+  
+  const [schoolSettings, setSchoolSettings] = useState<any>(null);
+  const [transportFeeModel, setTransportFeeModel] = useState<'MONTHLY' | 'ANNUAL'>('ANNUAL');
+  const [transportFeeAmount, setTransportFeeAmount] = useState<number>(0);
 
   const loadData = async () => {
     if (window.electronAPI && user) {
@@ -28,6 +32,15 @@ const TuitionConfig: React.FC = () => {
       setFees(joined);
       setInstallments(inst || []);
       setClassInstallmentFees(cif || []);
+      
+      const schools = await window.electronAPI.getSchools();
+      const currentSchool = schools.find((s: any) => s.id === user.schoolId);
+      if (currentSchool) {
+          setSchoolSettings(currentSchool);
+          setTransportFeeModel(currentSchool.transport_fee_model || 'ANNUAL');
+          setTransportFeeAmount(currentSchool.transport_fee_amount || 0);
+      }
+      
       setLoading(false);
     }
   };
@@ -36,15 +49,30 @@ const TuitionConfig: React.FC = () => {
     loadData();
   }, [user]);
 
-  const handleUpdateBase = async (classId: number, fee: number, reg: number) => {
+  const handleUpdateBase = async (classId: number, fee: number, reg: number, trans: number, exam: number) => {
     if (window.electronAPI) {
-      await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg });
+      await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
     }
   };
 
   const handleUpdateInstallmentFee = async (classId: number, installmentId: number, amount: number) => {
       if (window.electronAPI) {
           await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
+      }
+  };
+
+  const handleUpdateTransportSettings = async () => {
+      if (window.electronAPI && schoolSettings) {
+          try {
+              await window.electronAPI.updateSchoolSettings({
+                  ...schoolSettings,
+                  transport_fee_model: transportFeeModel,
+                  transport_fee_amount: transportFeeAmount
+              });
+              alert(t('settings_updated', 'Paramètres mis à jour avec succès.'));
+          } catch (e: any) {
+              alert(`Erreur: ${e.message}`);
+          }
       }
   };
 
@@ -148,6 +176,8 @@ const TuitionConfig: React.FC = () => {
                 <tr className="bg-slate-950 text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] border-b border-white/5">
                     <th className="px-10 py-8">{t('class_level', 'Classe / Niveau')}</th>
                     <th className="px-10 py-8">{t('registration_fee', 'Inscription Fixe (FCFA)')}</th>
+                    <th className="px-10 py-8">Transport (FCFA)</th>
+                    <th className="px-10 py-8">Examen (FCFA)</th>
                     <th className="px-10 py-8">{t('total_pension', 'Pension Totale (FCFA)')}</th>
                     {installments.map(inst => (
                         <th key={inst.id} className="px-10 py-8 text-amber-500 bg-amber-500/5">{inst.name}</th>
@@ -164,10 +194,12 @@ const TuitionConfig: React.FC = () => {
                     <td className="px-10 py-6">
                         <input
                             type="number"
+                            min={0}
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-emerald-500 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner"
-                            value={f.registrationFee || 0}
+                            value={f.registrationFee === 0 ? '' : f.registrationFee}
                             onChange={(e) => {
-                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, registrationFee: parseFloat(e.target.value) || 0 } : item);
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, registrationFee: val } : item);
                                 setFees(newFees);
                             }}
                         />
@@ -175,10 +207,39 @@ const TuitionConfig: React.FC = () => {
                     <td className="px-10 py-6">
                         <input
                             type="number"
-                            className="w-full max-w-[160px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:ring-2 focus:ring-amber-500/20 transition-all shadow-inner"
-                            value={f.totalFee}
+                            min={0}
+                            className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-indigo-500 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+                            value={f.transportFee === 0 ? '' : f.transportFee}
                             onChange={(e) => {
-                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, totalFee: parseFloat(e.target.value) || 0 } : item);
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, transportFee: val } : item);
+                                setFees(newFees);
+                            }}
+                        />
+                    </td>
+                    <td className="px-10 py-6">
+                        <input
+                            type="number"
+                            min={0}
+                            disabled={!f.className.includes('CM2') && !f.className.includes('CLASS 6')}
+                            className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-rose-500 outline-none focus:ring-2 focus:ring-rose-500/20 transition-all shadow-inner disabled:opacity-30 disabled:cursor-not-allowed"
+                            value={!f.className.includes('CM2') && !f.className.includes('CLASS 6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
+                            onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, examFee: val } : item);
+                                setFees(newFees);
+                            }}
+                        />
+                    </td>
+                    <td className="px-10 py-6">
+                        <input
+                            type="number"
+                            min={0}
+                            className="w-full max-w-[160px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:ring-2 focus:ring-amber-500/20 transition-all shadow-inner"
+                            value={f.totalFee === 0 ? '' : f.totalFee}
+                            onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                const newFees = fees.map(item => item.classId === f.classId ? { ...item, totalFee: val } : item);
                                 setFees(newFees);
                             }}
                         />
@@ -189,10 +250,11 @@ const TuitionConfig: React.FC = () => {
                             <td key={inst.id} className="px-10 py-6 bg-amber-500/5">
                                 <input
                                     type="number"
+                                    min={0}
                                     className="w-full max-w-[120px] bg-slate-950 border border-amber-500/20 rounded-2xl px-4 py-3 text-xs font-black text-amber-500 outline-none focus:ring-2 focus:ring-amber-500/30 transition-all shadow-inner"
-                                    value={fee}
+                                    value={fee === 0 ? '' : fee}
                                     onChange={(e) => {
-                                        const amount = parseFloat(e.target.value) || 0;
+                                        const amount = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                         handleUpdateInstallmentFee(f.classId, inst.id, amount);
                                         const updatedCif = [...classInstallmentFees.filter(c => !(c.class_id === f.classId && c.installment_id === inst.id)), { class_id: f.classId, installment_id: inst.id, amount }];
                                         setClassInstallmentFees(updatedCif);
@@ -203,7 +265,7 @@ const TuitionConfig: React.FC = () => {
                     })}
                     <td className="px-10 py-6 text-right">
                     <button
-                        onClick={() => handleUpdateBase(f.classId, f.totalFee, f.registrationFee)}
+                        onClick={() => handleUpdateBase(f.classId, f.totalFee, f.registrationFee, f.transportFee, f.examFee)}
                         className="p-4 bg-amber-500 text-slate-950 hover:bg-amber-400 rounded-2xl transition-all shadow-xl shadow-amber-500/10 active:scale-95 flex items-center justify-center"
                         title={t('apply_changes', 'Appliquer les changements')}
                     >
@@ -233,6 +295,48 @@ const TuitionConfig: React.FC = () => {
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5 font-black text-amber-500 uppercase">2. {t('installments', 'Tranches')} (1, 2, 3)</div>
               </div>
               <p className="italic">{t('chronological_engine_example', 'Exemple : Pour un versement de 30.000 FCFA, si l\'inscription est de 10.000 FCFA, le système soldera l\'inscription et affectera les 20.000 FCFA restants à la première tranche impayée.')}</p>
+          </div>
+      </div>
+
+      {/* Transport Fee Settings */}
+      <div className="glass-card p-10 bg-slate-900/40 border-white/5">
+          <div className="flex justify-between items-center mb-8">
+              <div>
+                  <h2 className="text-2xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
+                      <Bus className="w-6 h-6 text-amber-500" /> Paramètres de Transport
+                  </h2>
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Configuration globale des frais de transport scolaire</p>
+              </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Modèle de Facturation</label>
+                  <select 
+                      value={transportFeeModel}
+                      onChange={(e) => setTransportFeeModel(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+                  >
+                      <option value="ANNUAL">Annuel (Forfait Global)</option>
+                      <option value="MONTHLY">Mensuel (Abonnement par mois)</option>
+                  </select>
+              </div>
+              <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Montant ({transportFeeModel === 'MONTHLY' ? 'Par Mois' : 'Annuel'}) en FCFA</label>
+                  <input 
+                      type="number"
+                      value={transportFeeAmount}
+                      onChange={(e) => setTransportFeeAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+                  />
+              </div>
+          </div>
+          <div className="mt-8 flex justify-end">
+              <button 
+                  onClick={handleUpdateTransportSettings}
+                  className="px-8 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/20"
+              >
+                  Enregistrer les paramètres de transport
+              </button>
           </div>
       </div>
 

@@ -17,6 +17,7 @@ const Layout: React.FC = () => {
 
   const [schoolName, setSchoolName] = useState('Eco-Manage');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSgActing, setIsSgActing] = useState(false);
 
   useEffect(() => {
     const loadActiveSchool = async () => {
@@ -49,6 +50,11 @@ const Layout: React.FC = () => {
       } else {
         setSchoolName('Eco-Manage');
       }
+
+      if (window.electronAPI) {
+          const sgActing = await window.electronAPI.getSetting('sg_acting_director');
+          setIsSgActing(sgActing === 'true');
+      }
     };
     loadActiveSchool();
     const interval = setInterval(loadActiveSchool, 4000);
@@ -67,21 +73,22 @@ const Layout: React.FC = () => {
     { key: 'students', path: '/students', icon: Users, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'subjects', path: '/subjects', icon: BookOpen, roles: ['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'classes', path: '/classes', icon: Building2, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'pedagogy_advisor', path: '/advisor', icon: Award, roles: ['FOUNDER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'finance', path: '/finance', icon: CreditCard, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
     { key: 'tuition_config', path: '/tuition-config', icon: Settings, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
     { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'stats', path: '/stats', icon: TrendingUp, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
-    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'users', path: '/users', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'mobile_access', path: '/mobile-access', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'parents', path: '/parents', icon: HeartHandshake, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'mobile_access', path: '/mobile-access', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport', path: '/transport', icon: Bus, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'ADVISOR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'customization', path: '/customization', icon: Palette, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'archives', path: '/archives', icon: Archive, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
-    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['DRIVER'] },
     { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['PARENT', 'SUPERADMIN', 'FOUNDER'] },
   ];
@@ -126,7 +133,8 @@ const Layout: React.FC = () => {
               </div>
               <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-black text-white leading-none tracking-tight truncate" title={schoolName}>{schoolName}</h2>
-                  <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest mt-1 opacity-80">{t(`role_${user?.role}`)}</p>
+                  <p className="text-xs font-bold text-slate-300 mt-1 truncate" title={user?.fullName || user?.username}>{user?.fullName || user?.username}</p>
+                  <p className="text-[9px] text-amber-500 font-black uppercase tracking-widest mt-0.5 opacity-80">{t(`role_${user?.role}`)}</p>
               </div>
             </div>
             <button

@@ -15,7 +15,14 @@ const Attendance: React.FC = () => {
   const [absences, setAbsences] = useState<Record<string, number>>({});
   
   // New States for Reports
-  const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT'>('INPUT');
+  const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT'>(() => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+          const u = JSON.parse(storedUser);
+          if (u.role === 'SECRETARY' || u.role === 'DIRECTOR') return 'REPORT';
+      }
+      return 'INPUT';
+  });
   const [reportPeriod, setReportPeriod] = useState<'DAY' | 'WEEK' | 'MONTH'>('DAY');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportWeek, setReportWeek] = useState(''); // e.g. 2026-W22
@@ -248,13 +255,15 @@ const Attendance: React.FC = () => {
           <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest">{t('attendance_desc')}</p>
         </div>
         <div className="flex bg-slate-900 rounded-xl p-1 border border-slate-800">
-            <button
-                onClick={() => setActiveTab('INPUT')}
-                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'INPUT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
-            >
-                <Calendar className="w-4 h-4 mr-2" />
-                {t('saisie', 'Saisie')}
-            </button>
+            {user?.role !== 'SECRETARY' && user?.role !== 'DIRECTOR' && (
+                <button
+                    onClick={() => setActiveTab('INPUT')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'INPUT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {t('saisie', 'Saisie')}
+                </button>
+            )}
             <button
                 onClick={() => setActiveTab('REPORT')}
                 className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'REPORT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}

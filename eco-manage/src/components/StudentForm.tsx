@@ -13,6 +13,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
   const { t } = useTranslation();
   const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     firstName: student?.first_name || '',
     lastName: student?.last_name || '',
@@ -30,13 +31,17 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
     classId: student?.class_id?.toString() || '',
     scholarshipReduction: student?.scholarship_reduction || 0,
     hasMoratoire: student?.has_moratoire === 1 || student?.has_moratoire === true || false,
+    busRouteId: student?.bus_route_id?.toString() || '',
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadClasses = async () => {
         if (window.electronAPI) {
             const data = await window.electronAPI.getClasses(user?.schoolId);
             setClasses(data || []);
+            const r = await window.electronAPI.getBusRoutes(user?.schoolId);
+            setRoutes(r || []);
 
             // Auto-detect correct cycle if editing a student
             if (student && student.class_id && data) {
@@ -55,19 +60,20 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!formData.classId) {
-        alert(t('alert_select_class'));
+        setFormError(t('alert_select_class'));
         return;
     }
 
     // Name validations (Must contain only letters, spaces, hyphens)
     const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
     if (!nameRegex.test(formData.firstName.trim()) || !nameRegex.test(formData.lastName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe Nom et le Prénom de l'élève ne doivent contenir que des lettres.");
+        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom et le Prénom de l'élève ne doivent contenir que des lettres.");
         return;
     }
     if (formData.parentName && !nameRegex.test(formData.parentName.trim())) {
-        alert("🚨 ERREUR DE SAISIE :\nLe nom du parent/tuteur ne doit contenir que des lettres.");
+        setFormError("🚨 ERREUR DE SAISIE :\nLe nom du parent/tuteur ne doit contenir que des lettres.");
         return;
     }
 
@@ -77,7 +83,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         cleanPhone = cleanPhone.slice(3);
     }
     if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
-        alert(t('alert_invalid_phone_parent'));
+        setFormError(t('alert_invalid_phone_parent'));
         return;
     }
 
@@ -91,7 +97,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 cleanUrgence = cleanUrgence.slice(3);
             }
             if (!/^(2|6)\d{8}$/.test(cleanUrgence)) {
-                alert(t('alert_invalid_emergency_contact'));
+                setFormError(t('alert_invalid_emergency_contact'));
                 return;
             }
         }
@@ -118,6 +124,11 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          {formError && (
+            <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-sm font-bold whitespace-pre-line">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('last_name')}</label>

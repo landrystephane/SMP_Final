@@ -53,6 +53,8 @@ const SystemAdmin: React.FC = () => {
   const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
   const [newSubject, setNewSubject] = useState({ name: '', domain: 'Science', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
   const [newFounder, setNewFounder] = useState({ username: '', password: '', fullName: '' });
+  const [founderError, setFounderError] = useState<string | null>(null);
+  const [founderEditError, setFounderEditError] = useState<string | null>(null);
 
   const loadSchools = async () => {
     if (window.electronAPI) {
@@ -154,6 +156,7 @@ const SystemAdmin: React.FC = () => {
 
   const handleAddFounder = async (e: React.FormEvent) => {
       e.preventDefault();
+      setFounderError(null);
       if (!selectedSchool || !window.electronAPI) return;
 
       try {
@@ -164,7 +167,7 @@ const SystemAdmin: React.FC = () => {
           });
           
           if (res && res.error) {
-              alert(t('alert_error') + `: ${res.error}`);
+              setFounderError(res.error);
               return;
           }
 
@@ -174,11 +177,12 @@ const SystemAdmin: React.FC = () => {
           const users = await window.electronAPI.getUsers(selectedSchool.id);
           setSchoolUsers(users || []);
       } catch (err: any) {
-          alert(t('alert_error') + `: ${err.message}`);
+          setFounderError(err.message);
       }
   }
 
   const startEditFounder = (founder: any) => {
+      setFounderEditError(null);
       setEditingFounder(founder);
       setEditFounderUsername(founder.username || '');
       setEditFounderFullName(founder.fullName || '');
@@ -186,6 +190,7 @@ const SystemAdmin: React.FC = () => {
   };
 
   const handleUpdateFounder = async () => {
+      setFounderEditError(null);
       if (!editingFounder || !selectedSchool || !window.electronAPI) return;
       try {
           const res = await window.electronAPI.updateUser({
@@ -196,7 +201,7 @@ const SystemAdmin: React.FC = () => {
           });
 
           if (res && res.error) {
-              alert(t('alert_update_error') + `: ${res.error}`);
+              setFounderEditError(res.error);
               return;
           }
 
@@ -204,9 +209,8 @@ const SystemAdmin: React.FC = () => {
           // Reload users for this school
           const users = await window.electronAPI.getUsers(selectedSchool.id);
           setSchoolUsers(users || []);
-          alert(t('alert_agent_updated'));
       } catch (err: any) {
-          alert(t('alert_error') + `: ${err.message}`);
+          setFounderEditError(err.message);
       }
   };
 
@@ -899,6 +903,11 @@ const SystemAdmin: React.FC = () => {
                               <div key={u.id} className="p-5 bg-slate-950 rounded-2xl border border-white/5">
                                 {editingFounder?.id === u.id ? (
                                   <form onSubmit={(e) => { e.preventDefault(); handleUpdateFounder(); }} className="space-y-4">
+                                    {founderEditError && (
+                                        <div className="p-3 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold">
+                                            {founderEditError}
+                                        </div>
+                                    )}
                                     <div className="space-y-1">
                                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('sys_full_name')}</label>
                                       <input
@@ -1070,6 +1079,11 @@ const SystemAdmin: React.FC = () => {
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Propriétaire principal pour {selectedSchool?.name}</p>
                   </div>
                   <form onSubmit={handleAddFounder} className="p-6 md:p-10 space-y-6 overflow-y-auto flex-1">
+                      {founderError && (
+                          <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-sm font-bold">
+                              {founderError}
+                          </div>
+                      )}
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet</label>
                           <input required className="input-field w-full" value={newFounder.fullName} onChange={e => setNewFounder({...newFounder, fullName: e.target.value})} placeholder="John Doe" />

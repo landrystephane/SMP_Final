@@ -12,7 +12,6 @@ const hexToRgb = (hex: string): [number, number, number] => {
         num & 255
     ];
 };
-
 export const generateReportCard = (data: any) => {
     const { student, classObj, school, template, grades, attendance, term, rank, totalStudents } = data;
     const doc = new jsPDF();
@@ -355,10 +354,12 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.text(payment.depositor_name, 65, startY + 44);
     }
 
+    const safeNum = (num: number) => num.toLocaleString('en-US').replace(/,/g, ' ');
+
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(isEn ? `AMOUNT PAID: ${payment.amount.toLocaleString()} FCFA` : `MONTANT PAYÉ: ${payment.amount.toLocaleString()} FCFA`, 20, startY + 50);
+    doc.text(isEn ? `AMOUNT PAID: ${safeNum(payment.amount)} FCFA` : `MONTANT PAYÉ: ${safeNum(payment.amount)} FCFA`, 20, startY + 50);
     doc.text(isEn ? `PURPOSE: ${payment.payment_type.toUpperCase()}` : `MOTIF: ${payment.payment_type.toUpperCase()}`, 20, startY + 58);
 
     doc.setFontSize(9);
@@ -366,9 +367,16 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
     doc.setFont('helvetica', 'bold');
     doc.text(isEn ? 'FINANCIAL STATUS:' : 'SITUATION FINANCIÈRE:', 20, startY + 74);
     doc.setFont('helvetica', 'normal');
-    doc.text(isEn ? `Total Due: ${financials.totalDue.toLocaleString()} FCFA` : `Total dû: ${financials.totalDue.toLocaleString()} FCFA`, 30, startY + 82);
-    doc.text(isEn ? `Total Paid: ${financials.totalPaid.toLocaleString()} FCFA` : `Total versé: ${financials.totalPaid.toLocaleString()} FCFA`, 30, startY + 89);
-    doc.text(isEn ? `Balance: ${financials.balance.toLocaleString()} FCFA` : `Reste à payer: ${financials.balance.toLocaleString()} FCFA`, 30, startY + 96);
+    doc.text(isEn ? `Total Due: ${safeNum(financials.totalDue)} FCFA` : `Total dû: ${safeNum(financials.totalDue)} FCFA`, 30, startY + 82);
+    doc.text(isEn ? `Total Paid: ${safeNum(financials.totalPaid)} FCFA` : `Total versé: ${safeNum(financials.totalPaid)} FCFA`, 30, startY + 89);
+    doc.text(isEn ? `Balance: ${safeNum(financials.balance)} FCFA` : `Reste à payer: ${safeNum(financials.balance)} FCFA`, 30, startY + 96);
+
+    const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? 'PARTIAL PAYMENT / ADVANCE' : 'AVANCE');
+    const statusColor = financials.balance <= 0 ? [34, 197, 94] : [245, 158, 11]; // Green for full, Orange for partial
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.text(paymentStatus, 20, startY + 110);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primary[0], primary[1], primary[2]);
@@ -562,11 +570,25 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.text(school?.header_french || "RÉPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie", 50, 23, { align: 'center' });
     doc.text(school?.header_english || "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland", 247, 23, { align: 'center' });
 
-    // School Name
+    // School Name and Info
     doc.setFontSize(22);
     doc.setTextColor(primary[0], primary[1], primary[2]);
     doc.setFont('helvetica', 'bold');
     doc.text(school?.name?.toUpperCase() || (isEn ? "ECO-MANAGE SCHOOL" : "ECO-MANAGE ECOLE"), 148, 55, { align: 'center' });
+    
+    if (school?.motto) {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont('helvetica', 'italic');
+        doc.text(`« ${school.motto} »`, 148, 62, { align: 'center' });
+    }
+    
+    if (school?.address || school?.bp) {
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${school.address || ''} ${school.bp ? ` - BP: ${school.bp}` : ''}`.trim(), 148, school?.motto ? 67 : 62, { align: 'center' });
+    }
 
     // Certificate Title
     doc.setFontSize(30);
@@ -984,4 +1006,77 @@ export const generateAttendanceReport = (data: { records: any[], className: stri
     doc.text(`${i18n.t('generated_by_footer')} ${new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`, 105, 285, { align: 'center' });
 
     doc.save(`Presences_${className.replace(/[\s/]+/g, '_')}_${new Date().getTime()}.pdf`);
+};
+
+export const generateParentsListReport = async (parents: any[], schoolInfo: any, title: string) => {
+    const doc = new jsPDF('p', 'pt', 'a4');
+    let yPos = 40;
+    const BRAND_COLOR: [number, number, number] = [245, 158, 11];
+    const TEXT_COLOR: [number, number, number] = [51, 65, 85];
+    const LIGHT_BG: [number, number, number] = [248, 250, 252];
+
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.text(schoolInfo?.name || "ECO-MANAGE", 40, yPos);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2]);
+    yPos += 15;
+    if (schoolInfo?.address) {
+        doc.text(schoolInfo.address, 40, yPos);
+        yPos += 15;
+    }
+    if (schoolInfo?.phone) {
+        doc.text("T�l: ", 40, yPos);
+    }
+
+    yPos += 40;
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(2, 6, 23);
+    doc.text(title, doc.internal.pageSize.getWidth() / 2, yPos, { align: "center" });
+    yPos += 30;
+
+    // Table
+    const tableColumn = ["Nom du Parent", "Contact", "Enfant(s) rattaché(s)", "Classe", "Cycle / Section"];
+    const tableRows: any[] = [];
+
+    parents.forEach(p => {
+        tableRows.push([
+            p.parent_name || "Non renseigné",
+            p.parent_contact || "N/A",
+            `${p.first_name} ${p.last_name}`,
+            p.class_name,
+            `${p.cycle} / ${p.section}`
+        ]);
+    });
+
+    (doc as any).autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: yPos,
+        theme: "grid",
+        headStyles: {
+            fillColor: BRAND_COLOR,
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            halign: "center"
+        },
+        bodyStyles: {
+            textColor: TEXT_COLOR,
+            fontSize: 9
+        },
+        alternateRowStyles: {
+            fillColor: LIGHT_BG
+        },
+        margin: { top: 40, right: 40, bottom: 40, left: 40 }
+    });
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    doc.save(`repertoire_parents_${safeTitle}.pdf`);
 };

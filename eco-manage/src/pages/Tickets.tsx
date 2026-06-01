@@ -230,9 +230,8 @@ const Tickets: React.FC = () => {
                     onChange={(e) => setNewAnnTarget(e.target.value as any)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                   >
-                    <option value="ALL">{t('target_all_option', 'Tout le monde (Personnels & Parents)')}</option>
+                    <option value="ALL">{t('target_all_option', 'Tout le monde (Personnels)')}</option>
                     <option value="STAFF">{t('target_staff_option', 'Personnels de l\'école uniquement')}</option>
-                    <option value="PARENTS">{t('target_parents_option', 'Parents d\'élèves uniquement')}</option>
                   </select>
                 </div>
 

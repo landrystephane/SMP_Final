@@ -25,6 +25,8 @@ const CustomizationSettings: React.FC = () => {
     const [bulletinSigRight, setBulletinSigRight] = useState("LE DIRECTEUR (HEADMASTER)");
     const [headerFrench, setHeaderFrench] = useState("MINISTÈRE DE L'ÉDUCATION DE BASE");
     const [headerEnglish, setHeaderEnglish] = useState("MINISTRY OF BASIC EDUCATION");
+    const [honorRollThreshold, setHonorRollThreshold] = useState<number>(15.0);
+    const [timetableSlots, setTimetableSlots] = useState<any[]>([]);
 
     // Custom PDF template fields
     const [headerImage, setHeaderImage] = useState('');
@@ -51,6 +53,18 @@ const CustomizationSettings: React.FC = () => {
                 setBulletinSigRight(mySchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)");
                 setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
                 setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
+                setHonorRollThreshold(mySchool.honor_roll_threshold !== undefined && mySchool.honor_roll_threshold !== null ? mySchool.honor_roll_threshold : 15.0);
+                try {
+                    setTimetableSlots(mySchool.timetable_slots ? JSON.parse(mySchool.timetable_slots) : [
+                        { label: '08:00 - 10:00', start: '08:00', end: '10:00', isBreak: false },
+                        { label: '10:00 - 12:00', start: '10:00', end: '12:00', isBreak: false },
+                        { label: '12:00 - 13:00', start: '12:00', end: '13:00', isBreak: true },
+                        { label: '13:00 - 15:00', start: '13:00', end: '15:00', isBreak: false },
+                        { label: '15:00 - 17:00', start: '15:00', end: '17:00', isBreak: false }
+                    ]);
+                } catch(e) {
+                    setTimetableSlots([]);
+                }
                 
                 const template = await window.electronAPI.getReportTemplate(user.schoolId);
                 if (template) {
@@ -89,7 +103,9 @@ const CustomizationSettings: React.FC = () => {
                 bulletin_sig_middle: bulletinSigMiddle,
                 bulletin_sig_right: bulletinSigRight,
                 header_french: headerFrench,
-                header_english: headerEnglish
+                header_english: headerEnglish,
+                honor_roll_threshold: honorRollThreshold,
+                timetable_slots: JSON.stringify(timetableSlots)
             });
 
             await window.electronAPI.saveReportTemplate({
@@ -255,6 +271,110 @@ const CustomizationSettings: React.FC = () => {
                                         onChange={(e) => setSecondaryColor(e.target.value)}
                                         className="bg-transparent text-sm font-bold text-white uppercase tracking-wider outline-none w-full"
                                     />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Pedagogy & Timetable Settings */}
+                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
+                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
+                            <Layout className="w-5 h-5" />
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pedagogy_settings', 'Pédagogie & Emploi du Temps')}</h2>
+                        </div>
+
+                        <div className="space-y-8">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_threshold', 'Moyenne Minimum - Tableau d\'Honneur ( /20)')}</label>
+                                <input
+                                    type="number"
+                                    min="10"
+                                    max="20"
+                                    step="0.5"
+                                    value={honorRollThreshold}
+                                    onChange={(e) => setHonorRollThreshold(parseFloat(e.target.value))}
+                                    className="w-full md:w-1/3 bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                />
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_timetable_slots', 'Configuration des Plages Horaires')}</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setTimetableSlots([...timetableSlots, { label: 'Nouveau', start: '00:00', end: '00:00', isBreak: false }])}
+                                        className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
+                                    >
+                                        + Ajouter une plage
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {timetableSlots.map((slot, index) => (
+                                        <div key={index} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
+                                            <input 
+                                                type="text" 
+                                                value={slot.label} 
+                                                onChange={(e) => {
+                                                    const newSlots = [...timetableSlots];
+                                                    newSlots[index].label = e.target.value;
+                                                    setTimetableSlots(newSlots);
+                                                }}
+                                                placeholder="Libellé (ex: 08:00 - 10:00)"
+                                                className="w-full md:w-1/3 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500"
+                                            />
+                                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                                <input 
+                                                    type="time" 
+                                                    value={slot.start}
+                                                    onChange={(e) => {
+                                                        const newSlots = [...timetableSlots];
+                                                        newSlots[index].start = e.target.value;
+                                                        setTimetableSlots(newSlots);
+                                                    }}
+                                                    className="bg-transparent border-b border-white/10 px-2 py-1 text-sm text-slate-300 outline-none focus:border-amber-500"
+                                                />
+                                                <span className="text-slate-500">-</span>
+                                                <input 
+                                                    type="time" 
+                                                    value={slot.end}
+                                                    onChange={(e) => {
+                                                        const newSlots = [...timetableSlots];
+                                                        newSlots[index].end = e.target.value;
+                                                        setTimetableSlots(newSlots);
+                                                    }}
+                                                    className="bg-transparent border-b border-white/10 px-2 py-1 text-sm text-slate-300 outline-none focus:border-amber-500"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between w-full md:w-auto md:ml-auto gap-4">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={slot.isBreak}
+                                                        onChange={(e) => {
+                                                            const newSlots = [...timetableSlots];
+                                                            newSlots[index].isBreak = e.target.checked;
+                                                            setTimetableSlots(newSlots);
+                                                        }}
+                                                        className="w-4 h-4 rounded accent-amber-500"
+                                                    />
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pause ?</span>
+                                                </label>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newSlots = timetableSlots.filter((_, i) => i !== index);
+                                                        setTimetableSlots(newSlots);
+                                                    }}
+                                                    className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
+                                                >
+                                                    <ShieldAlert className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {timetableSlots.length === 0 && (
+                                        <p className="text-center text-slate-500 text-sm font-bold italic py-4">Aucune plage horaire définie. L'emploi du temps sera vide.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
