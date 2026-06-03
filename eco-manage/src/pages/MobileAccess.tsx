@@ -156,12 +156,22 @@ const MobileAccess: React.FC = () => {
                 </p>
 
                 <div className="mt-6 space-y-4">
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-between items-start gap-4">
                         <div>
                             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Adresse IP du Serveur Local</p>
-                            <p className="text-xl text-amber-500 font-black tracking-widest">{serverIp}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Accès via: http://{serverIp}:3001</p>
+                            <p className="text-xl text-amber-500 font-black tracking-widest">{Array.isArray(serverIp) ? serverIp[0] : serverIp}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Accès via: http://{Array.isArray(serverIp) ? serverIp[0] : serverIp}:3001</p>
                         </div>
+                        {Array.isArray(serverIp) && serverIp.length > 1 && (
+                            <div className="mt-2 w-full">
+                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Autres adresses détectées (si la première échoue) :</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {serverIp.slice(1).map(ip => (
+                                        <span key={ip} className="text-[10px] bg-white/5 px-2 py-1 rounded text-slate-400">http://{ip}:3001</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t('architecture', 'Architecture')}</p>

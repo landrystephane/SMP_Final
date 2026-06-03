@@ -11,21 +11,29 @@ const isDev = !app.isPackaged;
 let loggedInUser = null;
 
 let localIp = '127.0.0.1';
+let localIps = [];
 try {
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
+        // Skip common virtual adapters to prioritize the real ones, but still collect them
         for (const net of nets[name]) {
             if (net.family === 'IPv4' && !net.internal) {
-                localIp = net.address;
-                break;
+                localIps.push({name, address: net.address});
             }
         }
-        if (localIp !== '127.0.0.1') break;
     }
 } catch (e) {}
 
 ipcMain.handle('db:getServerIp', async () => {
-    return localIp;
+    // Sort so that Wi-Fi and Ethernet come before VirtualBox/VMware
+    localIps.sort((a, b) => {
+        const aIsVirtual = a.name.toLowerCase().includes('virtual') || a.name.toLowerCase().includes('vmware') || a.name.toLowerCase().includes('vbox');
+        const bIsVirtual = b.name.toLowerCase().includes('virtual') || b.name.toLowerCase().includes('vmware') || b.name.toLowerCase().includes('vbox');
+        if (aIsVirtual && !bIsVirtual) return 1;
+        if (!aIsVirtual && bIsVirtual) return -1;
+        return 0;
+    });
+    return localIps.map(ip => ip.address);
 });
 
 function getActiveSchoolId(schoolId) {
