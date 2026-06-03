@@ -136,7 +136,7 @@ const DriverPortal: React.FC = () => {
     const isPresent = !attendance[studentId];
     setAttendance(prev => ({ ...prev, [studentId]: isPresent }));
     
-    if (window.electronAPI && activeRoute && isDriving) {
+    if (window.electronAPI && activeRoute) {
         await window.electronAPI.logTransportAttendance({
             studentId,
             routeId: activeRoute.id,
@@ -270,11 +270,24 @@ const DriverPortal: React.FC = () => {
                             <select 
                                 className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
                                 value={filterLevel}
-                                onChange={e => setFilterLevel(e.target.value)}
+                                onChange={e => { setFilterLevel(e.target.value); setFilterClass('ALL'); }}
                             >
                                 <option value="ALL">Tous Cycles</option>
                                 <option value="PRIMAIRE">Primaire</option>
                                 <option value="MATERNELLE">Maternelle</option>
+                            </select>
+                            <select 
+                                className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
+                                value={filterClass}
+                                onChange={e => setFilterClass(e.target.value)}
+                            >
+                                <option value="ALL">Toutes Salles</option>
+                                {Array.from(new Set(eligibleStudents
+                                    .filter(s => (filterSection === 'ALL' || s.section === filterSection) && (filterLevel === 'ALL' || s.level === filterLevel))
+                                    .map(s => s.class_name)
+                                )).filter(Boolean).map(cName => (
+                                    <option key={cName} value={cName}>{cName}</option>
+                                ))}
                             </select>
                         </div>
                     </div>

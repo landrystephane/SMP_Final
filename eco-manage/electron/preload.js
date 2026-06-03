@@ -120,7 +120,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   logFrontendError: (errorDetails) => ipcRenderer.invoke('db:logFrontendError', errorDetails),
   getMobileKeys: () => ipcRenderer.invoke('db:getMobileKeys'),
   generateMobileKey: (data) => ipcRenderer.invoke('db:generateMobileKey', data),
-  revokeMobileKey: (id) => ipcRenderer.invoke('db:revokeMobileKey', id),
+  deleteMobileKey: (id) => ipcRenderer.invoke('db:deleteMobileKey', id),
   getSchools: () => ipcRenderer.invoke('db:getSchools'),
   getDeletedSchools: () => ipcRenderer.invoke('db:getDeletedSchools'),
   addSchool: (school) => ipcRenderer.invoke('db:addSchool', school),
@@ -148,5 +148,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTransportEligibleStudents: (schoolId) => ipcRenderer.invoke('db:getTransportEligibleStudents', schoolId),
   assignStudentToTransportPoint: (data) => ipcRenderer.invoke('db:assignStudentToTransportPoint', data),
   
+  getServerIp: () => ipcRenderer.invoke('db:getServerIp'),
   showAlert: (msg, title) => ipcRenderer.sendSync('dialog:alert', msg, title),
 });

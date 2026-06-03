@@ -21,8 +21,8 @@ export const getPrimaryAppreciation = (score: number) => {
 
 export const calculateAttendanceObservations = (hours: number) => {
     const isEn = i18n.language.startsWith('en');
-    if (hours === 0) return isEn ? 'EXEMPLARY CONDUCT' : 'CONDUITE EXEMPLAIRE';
-    if (hours <= 5) return isEn ? 'SATISFACTORY CONDUCT' : 'CONDUITE SATISFAISANTE';
-    if (hours <= 15) return isEn ? 'CONDUCT TO BE MONITORED' : 'CONDUITE À SURVEILLER';
-    return isEn ? 'CONDUCT WARNING' : 'AVERTISSEMENT CONDUITE';
+    if (hours === 0) return isEn ? 'EXEMPLARY STUDENT' : 'ÉLÈVE EXEMPLAIRE';
+    if (hours <= 5) return isEn ? 'WARNING' : 'AVERTISSEMENT';
+    if (hours <= 15) return isEn ? 'STUDENT TO BE MONITORED' : 'ÉLÈVE À SURVEILLER';
+    return isEn ? 'ABSENTEE (PARENT SUMMONED)' : 'ABSENTÉISTE (PARENT CONVOQUÉ)';
 };

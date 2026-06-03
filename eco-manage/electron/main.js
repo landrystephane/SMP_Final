@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { initDb, db, dbPath } = require('./database/db');
@@ -8,6 +9,24 @@ const { startApiServer } = require('./api-server');
 const isDev = !app.isPackaged;
 
 let loggedInUser = null;
+
+let localIp = '127.0.0.1';
+try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                localIp = net.address;
+                break;
+            }
+        }
+        if (localIp !== '127.0.0.1') break;
+    }
+} catch (e) {}
+
+ipcMain.handle('db:getServerIp', async () => {
+    return localIp;
+});
 
 function getActiveSchoolId(schoolId) {
   if (schoolId && schoolId !== 0) return Number(schoolId);
@@ -88,6 +107,11 @@ app.whenReady().then(() => {
   try {
       db.prepare('ALTER TABLE grades ADD COLUMN teacher_id INTEGER REFERENCES users(id)').run();
       console.log('Migration: Added teacher_id to grades table');
+  } catch (err) {}
+
+  try {
+      db.prepare("ALTER TABLE schools ADD COLUMN evaluation_periods TEXT DEFAULT '[{\"id\":1,\"name\":\"1ER TRIMESTRE\"},{\"id\":2,\"name\":\"2E TRIMESTRE\"},{\"id\":3,\"name\":\"3E TRIMESTRE\"}]'").run();
+      console.log('Migration: Added evaluation_periods to schools table');
   } catch (err) {}
 
   // Self-healing / Seeding of default administration accounts to avoid lockouts
@@ -1169,7 +1193,7 @@ handleIPC('db:getRouteStudents', async (event, routeId) => {
 handleIPC('db:getTransportEligibleStudents', async (event, schoolId) => {
     const sid = getActiveSchoolId(schoolId);
     return db.prepare(`
-        SELECT s.*, c.name as class_name, c.level as cycle
+        SELECT s.*, c.name as class_name, c.level as level, c.section as section
         FROM students s
         JOIN classes c ON s.class_id = c.id
         WHERE s.school_id = ? 
@@ -1263,8 +1287,8 @@ handleIPC('db:generateMobileKey', async (event, { name, userId }) => {
         .run(key, name, userId);
 });
 
-handleIPC('db:revokeMobileKey', async (event, keyId) => {
-    return db.prepare('UPDATE mobile_access_keys SET status = "REVOKED" WHERE id = ?').run(keyId);
+handleIPC('db:deleteMobileKey', async (event, keyId) => {
+    return db.prepare('DELETE FROM mobile_access_keys WHERE id = ?').run(keyId);
 });
 
 // Settings
@@ -1288,16 +1312,40 @@ handleIPC('db:saveAttendanceBulk', async (event, { records, userId }) => {
             recorded_by = excluded.recorded_by
     `);
     
+    const exceeders = [];
+    
     const transaction = db.transaction(() => {
         for (const r of records) {
             const status = r.hours > 0 ? 'ABSENT' : 'PRESENT';
+            
+            // Get previous total to avoid spamming (only notify when crossing the 15h threshold)
+            const prevTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
+            
             upsert.run(r.studentId, r.date, status, r.hours, userId);
+            
+            const newTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
+            
+            if (newTotal >= 15 && prevTotal < 15) {
+                const student = db.prepare('SELECT first_name, last_name, parent_contact, school_id FROM students WHERE id = ?').get(r.studentId);
+                if (student) {
+                    exceeders.push({ studentId: r.studentId, firstName: student.first_name, lastName: student.last_name, total: newTotal });
+                    
+                    // Find parent user
+                    if (student.parent_contact) {
+                        const parentUser = db.prepare('SELECT id FROM users WHERE username = ?').get(student.parent_contact.trim());
+                        if (parentUser) {
+                            const message = `URGENT - CONVOCATION PARENTALE : Votre enfant ${student.first_name} ${student.last_name} a cumulé ${newTotal} heures d'absence non justifiées. Veuillez vous présenter à la direction de l'école dans les plus brefs délais.`;
+                            db.prepare('INSERT INTO tickets (sender_id, receiver_id, receiver_role, subject, message, school_id) VALUES (?, ?, ?, ?, ?, ?)').run(userId, parentUser.id, 'PARENT', 'CONVOCATION PARENTALE', message, student.school_id);
+                        }
+                    }
+                }
+            }
         }
     });
 
     try {
         transaction();
-        return { success: true };
+        return { success: true, exceeders };
     } catch (err) {
         return { success: false, error: err.message };
     }
@@ -1482,10 +1530,21 @@ handleIPC('db:sendTicket', async (event, ticket) => {
 
 handleIPC('db:getTickets', async (event, { userId, role, schoolId }) => {
   const sid = getActiveSchoolId(schoolId);
+  const querySelect = `
+    SELECT t.*, 
+           u.full_name as sender_name, 
+           u.role as sender_role, 
+           u.civility as sender_civility,
+           (SELECT GROUP_CONCAT(c.name, ', ') FROM classes c WHERE c.main_teacher_id = u.id OR c.assistant_teacher_id = u.id) as teacher_classes,
+           (SELECT GROUP_CONCAT(s.first_name || ' ' || s.last_name, ', ') FROM students s WHERE s.parent_contact = u.username) as parent_students
+    FROM tickets t 
+    JOIN users u ON t.sender_id = u.id 
+    WHERE t.school_id = ?
+  `;
   if (role === 'SUPERADMIN' || role === 'FOUNDER') {
-      return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ? ORDER BY t.created_at DESC').all(sid);
+      return db.prepare(querySelect + ' ORDER BY t.created_at DESC').all(sid);
   }
-  return db.prepare('SELECT t.*, u.full_name as sender_name FROM tickets t JOIN users u ON t.sender_id = u.id WHERE t.school_id = ? AND (t.sender_id = ? OR t.receiver_role = ? OR t.receiver_id = ?) ORDER BY t.created_at DESC')
+  return db.prepare(querySelect + ' AND (t.sender_id = ? OR t.receiver_role = ? OR t.receiver_id = ?) ORDER BY t.created_at DESC')
     .all(sid, userId, role, userId);
 });
 
@@ -1523,7 +1582,7 @@ handleIPC('db:createNotification', async (event, notification) => {
   }
 });
 
-handleIPC('db:sendParentAnnouncement', async (event, { sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class }) => {
+handleIPC('db:sendParentAnnouncement', async (event, { sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class, target_student_id }) => {
     const sid = getActiveSchoolId(school_id);
     let query = `
         SELECT DISTINCT u.id 
@@ -1534,17 +1593,22 @@ handleIPC('db:sendParentAnnouncement', async (event, { sender_id, school_id, sub
     `;
     const params = [sid];
 
-    if (filter_cycle && filter_cycle !== 'ALL') {
-        query += " AND c.level = ?";
-        params.push(filter_cycle);
-    }
-    if (filter_section && filter_section !== 'ALL') {
-        query += " AND c.section = ?";
-        params.push(filter_section);
-    }
-    if (filter_class && filter_class !== 'ALL') {
-        query += " AND c.name = ?";
-        params.push(filter_class);
+    if (target_student_id) {
+        query += " AND s.id = ?";
+        params.push(target_student_id);
+    } else {
+        if (filter_cycle && filter_cycle !== 'ALL') {
+            query += " AND c.level = ?";
+            params.push(filter_cycle);
+        }
+        if (filter_section && filter_section !== 'ALL') {
+            query += " AND c.section = ?";
+            params.push(filter_section);
+        }
+        if (filter_class && filter_class !== 'ALL') {
+            query += " AND c.name = ?";
+            params.push(filter_class);
+        }
     }
 
     const parents = db.prepare(query).all(...params);
@@ -1949,6 +2013,12 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
                 console.error("Error parsing teacher assigned_classes:", e);
             }
         }
+        
+        // 3. Get from schedules
+        const scheduleClasses = db.prepare('SELECT DISTINCT class_id FROM schedules WHERE school_id = ? AND teacher_id = ?').all(sid, tId);
+        scheduleClasses.forEach(sc => {
+            if (sc.class_id && !classIds.includes(sc.class_id)) classIds.push(sc.class_id);
+        });
     }
 
     let classes = [];
@@ -1967,10 +2037,8 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
                     SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
                     SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
                 FROM students s
-                LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
-                WHERE s.class_id IN (${activeClassIds})
-                AND (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0)
-            `).get();
+                WHERE s.class_id IN (${activeClassIds}) AND s.school_id = ?
+            `).get(sid);
             totalStudents = studentStats.total || 0;
             boys = studentStats.boys || 0;
             girls = studentStats.girls || 0;
@@ -1981,9 +2049,7 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
                 FROM students s
                 JOIN classes c ON s.class_id = c.id
                 LEFT JOIN grades g ON g.student_id = s.id
-                LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
                 WHERE s.class_id IN (${activeClassIds})
-                AND (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0)
                 GROUP BY s.id
                 ORDER BY average DESC NULLS LAST
             `).all();
@@ -1991,7 +2057,7 @@ handleIPC('db:getTeacherDashboardStats', async (event, params) => {
     }
 
     const schoolConfig = db.prepare('SELECT timetable_slots FROM schools WHERE id = ?').get(sid);
-    const subjects = db.prepare('SELECT id, name FROM class_subjects').all();
+    const subjects = db.prepare('SELECT id, name FROM subjects').all();
     
     let schedules = [];
     if (tId) {
@@ -2029,6 +2095,7 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
         bulletin_sig_left, 
         bulletin_sig_middle, 
         bulletin_sig_right, 
+        header_french,
         header_english,
         bulletin_pdf_use_custom,
         bulletin_pdf_template,
@@ -2036,7 +2103,8 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
         transport_fee_model,
         transport_fee_amount,
         honor_roll_threshold,
-        timetable_slots
+        timetable_slots,
+        evaluation_periods
     } = settings;
     return db.prepare(`
         UPDATE schools SET
@@ -2060,7 +2128,8 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
             transport_fee_model = ?,
             transport_fee_amount = ?,
             honor_roll_threshold = ?,
-            timetable_slots = ?
+            timetable_slots = ?,
+            evaluation_periods = ?
         WHERE id = ?
     `).run(
         name || '',
@@ -2084,6 +2153,7 @@ handleIPC('db:updateSchoolSettings', async (event, settings) => {
         transport_fee_amount || 0,
         honor_roll_threshold !== undefined && honor_roll_threshold !== null ? honor_roll_threshold : 15.0,
         timetable_slots || '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]',
+        evaluation_periods || '[{"id":1,"name":"1ER TRIMESTRE"},{"id":2,"name":"2E TRIMESTRE"},{"id":3,"name":"3E TRIMESTRE"}]',
         id
     );
 });

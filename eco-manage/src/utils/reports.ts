@@ -81,11 +81,18 @@ export const generateReportCard = (data: any) => {
     // --- Title ---
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    const termTitle = term === 1 
-        ? (isEn ? '1ST TERM' : '1ER TRIMESTRE') 
-        : term === 2 
-            ? (isEn ? '2ND TERM' : '2E TRIMESTRE') 
-            : (isEn ? '3RD TERM' : '3E TRIMESTRE');
+    let evaluationPeriods: any[] = [];
+    try {
+        if (school.evaluation_periods) evaluationPeriods = JSON.parse(school.evaluation_periods);
+    } catch (e) {}
+    
+    let termTitle = '';
+    if (typeof term === 'string') {
+        termTitle = term.toUpperCase();
+    } else {
+        const found = evaluationPeriods.find((ep: any) => ep.id === term);
+        termTitle = found ? found.name.toUpperCase() : (isEn ? `TERM ${term}` : `PÉRIODE ${term}`);
+    }
     doc.setTextColor(primary[0], primary[1], primary[2]);
     doc.text(isEn ? 'REPORT CARD' : 'BULLETIN DE NOTES', 105, startY, { align: 'center' });
     doc.setFontSize(10);
@@ -811,13 +818,20 @@ export const generateClassReportCards = (data: {
 
             doc.setFontSize(16);
             doc.setFont('helvetica', 'bold');
-            const termTitle = isAnnual 
-                ? (isEn ? 'ANNUAL REPORT CARD' : 'BULLETIN ANNUEL')
-                : term === 1 
-                ? (isEn ? '1ST TERM' : '1ER TRIMESTRE') 
-                : term === 2 
-                    ? (isEn ? '2ND TERM' : '2E TRIMESTRE') 
-                    : (isEn ? '3RD TERM' : '3E TRIMESTRE');
+            let evaluationPeriods: any[] = [];
+            try {
+                if (school.evaluation_periods) evaluationPeriods = JSON.parse(school.evaluation_periods);
+            } catch (e) {}
+            
+            let termTitle = isAnnual ? (isEn ? 'ANNUAL REPORT CARD' : 'BULLETIN ANNUEL') : '';
+            if (!isAnnual) {
+                if (typeof term === 'string') {
+                    termTitle = term.toUpperCase();
+                } else {
+                    const found = evaluationPeriods.find((ep: any) => ep.id === term);
+                    termTitle = found ? found.name.toUpperCase() : (isEn ? `TERM ${term}` : `PÉRIODE ${term}`);
+                }
+            }
             doc.setTextColor(primary[0], primary[1], primary[2]);
             doc.text(isEn ? 'REPORT CARD' : 'BULLETIN DE NOTES', 105, 58, { align: 'center' });
             doc.setFontSize(10);

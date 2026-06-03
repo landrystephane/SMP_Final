@@ -11,6 +11,7 @@ const MobileAccess: React.FC = () => {
   const [enteredMatricule, setEnteredMatricule] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [serverIp, setServerIp] = useState('127.0.0.1');
 
   const loadData = async () => {
     if (window.electronAPI && user) {
@@ -18,6 +19,8 @@ const MobileAccess: React.FC = () => {
       setKeys(data);
       const u = await window.electronAPI.getUsers(user.schoolId);
       setUsers(u || []);
+      const ip = await window.electronAPI.getServerIp();
+      setServerIp(ip);
     } else {
       // Fallback
       setKeys([
@@ -59,10 +62,10 @@ const MobileAccess: React.FC = () => {
     }
   };
 
-  const handleRevoke = async (id: number) => {
-    if (!confirm(t('confirm_revoke_key', "Voulez-vous révoquer cette clé ?"))) return;
+  const handleDelete = async (id: number) => {
+    if (!confirm(t('confirm_delete_key', "Voulez-vous vraiment supprimer cette clé ?"))) return;
     if (window.electronAPI) {
-      await window.electronAPI.revokeMobileKey(id);
+      await window.electronAPI.deleteMobileKey(id);
       await loadData();
     }
   };
@@ -116,13 +119,11 @@ const MobileAccess: React.FC = () => {
                                       className="text-slate-500 hover:text-white transition-colors"
                                       title={t('copy_key', "Copier la clé")}
                                   ><Copy className="w-5 h-5" /></button>
-                                  {k.status === 'ACTIVE' && (
-                                      <button
-                                          onClick={() => handleRevoke(k.id)}
-                                          className="text-slate-500 hover:text-rose-500 transition-colors"
-                                          title={t('revoke_access', "Révoquer l'accès")}
-                                      ><Trash2 className="w-5 h-5" /></button>
-                                  )}
+                                  <button
+                                      onClick={() => handleDelete(k.id)}
+                                      className="text-slate-500 hover:text-rose-500 transition-colors"
+                                      title={t('delete_key', "Supprimer la clé")}
+                                  ><Trash2 className="w-5 h-5" /></button>
                               </td>
                           </tr>
                       )) : (
@@ -155,6 +156,13 @@ const MobileAccess: React.FC = () => {
                 </p>
 
                 <div className="mt-6 space-y-4">
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                        <div>
+                            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Adresse IP du Serveur Local</p>
+                            <p className="text-xl text-amber-500 font-black tracking-widest">{serverIp}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Accès via: http://{serverIp}:5173</p>
+                        </div>
+                    </div>
                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t('architecture', 'Architecture')}</p>
                         <p className="text-xs text-white font-bold">{t('rsa_trust_link', 'Liaison de confiance RSA entre le terminal mobile et ce serveur central.')}</p>

@@ -22,6 +22,8 @@ const Parents: React.FC = () => {
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  const [targetStudentId, setTargetStudentId] = useState<number | null>(null);
+
   const loadData = async () => {
     if (window.electronAPI && currentUser) {
       const p = await window.electronAPI.getParentsDirectory(currentUser.schoolId);
@@ -80,7 +82,8 @@ const Parents: React.FC = () => {
               message: announcementMessage,
               filter_cycle: filterCycle,
               filter_section: filterSection,
-              filter_class: filterClass
+              filter_class: filterClass,
+              target_student_id: targetStudentId
           });
           
           if (res && res.success) {
@@ -88,6 +91,7 @@ const Parents: React.FC = () => {
               setShowAnnouncementModal(false);
               setAnnouncementSubject('');
               setAnnouncementMessage('');
+              setTargetStudentId(null);
           } else {
               alert("Erreur lors de l'envoi du communiqué.");
           }
@@ -142,7 +146,7 @@ const Parents: React.FC = () => {
           </div>
                <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
               <button 
-                  onClick={() => setShowAnnouncementModal(true)}
+                  onClick={() => { setTargetStudentId(null); setShowAnnouncementModal(true); }}
                   disabled={filteredParents.length === 0}
                   className="btn-secondary h-[46px] px-6 disabled:opacity-50 flex items-center justify-center flex-1 md:flex-none whitespace-nowrap"
               >
@@ -186,6 +190,7 @@ const Parents: React.FC = () => {
                   <th className="px-8 py-6">Contact / Login</th>
                   <th className="px-8 py-6">Enfant(s) rattaché(s)</th>
                   <th className="px-8 py-6">Salle de Classe</th>
+                  <th className="px-8 py-6">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-slate-900/30">
@@ -216,6 +221,14 @@ const Parents: React.FC = () => {
                             {p.class_name} ({p.section})
                         </span>
                     </td>
+                    <td className="px-8 py-6">
+                        <button
+                            onClick={() => { setTargetStudentId(p.student_id); setShowAnnouncementModal(true); }}
+                            className="p-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-slate-950 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest flex items-center"
+                        >
+                            <Shield className="w-3 h-3 mr-1" /> Message
+                        </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -231,7 +244,7 @@ const Parents: React.FC = () => {
                       <div>
                           <h3 className="text-xl font-black text-white">Envoyer un Communiqué</h3>
                           <p className="text-xs text-slate-400 mt-1">
-                              Destinataires: {filteredParents.length} parent(s) correspondant aux filtres
+                              Destinataires: {targetStudentId ? "1 parent" : `${filteredParents.length} parent(s) correspondant aux filtres`}
                           </p>
                       </div>
                   </div>
@@ -258,8 +271,8 @@ const Parents: React.FC = () => {
                   </div>
                   <div className="p-6 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
                       <button 
-                          onClick={() => setShowAnnouncementModal(false)}
-                          className="px-6 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                          onClick={() => { setShowAnnouncementModal(false); setTargetStudentId(null); }}
+                          className="flex-1 px-6 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-white/10 active:scale-95 transition-all"
                       >
                           Annuler
                       </button>

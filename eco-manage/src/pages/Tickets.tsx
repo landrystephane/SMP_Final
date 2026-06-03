@@ -279,10 +279,39 @@ const Tickets: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {tickets.map((ticket) => (
+                {tickets.map((ticket) => {
+                  let senderIdentity = ticket.sender_name || t('administration');
+                  if (ticket.sender_civility) {
+                      const civ = ticket.sender_civility === 'M.' ? 'Monsieur' : (ticket.sender_civility === 'Mme' ? 'Madame' : ticket.sender_civility);
+                      senderIdentity = `${civ} ${senderIdentity}`;
+                  } else if (ticket.sender_name && ticket.sender_role !== 'SUPERADMIN') {
+                      senderIdentity = `Monsieur/Madame ${senderIdentity}`;
+                  }
+                  
+                  let senderContext = '';
+                  if (ticket.sender_role === 'TEACHER' && ticket.teacher_classes) {
+                      senderContext = `(Enseignant - Salle: ${ticket.teacher_classes})`;
+                  } else if (ticket.sender_role === 'PARENT' && ticket.parent_students) {
+                      senderContext = `(Parent de: ${ticket.parent_students})`;
+                  } else if (ticket.sender_role === 'DIRECTOR') {
+                      senderContext = `(La Direction)`;
+                  } else if (ticket.sender_role === 'BURSAR') {
+                      senderContext = `(L'Économat)`;
+                  } else if (ticket.sender_role === 'DRIVER') {
+                      senderContext = `(Chauffeur)`;
+                  } else if (ticket.sender_role) {
+                      senderContext = `(${ticket.sender_role})`;
+                  }
+
+                  return (
                   <div key={ticket.id} className="glass-card p-6 border-l-4 border-amber-500/30 flex justify-between items-start flex-wrap gap-4">
-                    <div className="space-y-1">
-                      <h3 className="text-base font-bold text-white">{ticket.subject}</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-white">{ticket.subject}</h3>
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                              {t('from', 'De')} : <span className="text-amber-500">{senderIdentity}</span> <span className="text-slate-500">{senderContext}</span>
+                          </span>
+                      </div>
                       <p className="text-slate-400 text-xs leading-relaxed">{ticket.message}</p>
                       <span className="text-[10px] text-slate-500 block uppercase pt-2">{new Date(ticket.created_at || Date.now()).toLocaleString('fr-FR')}</span>
                     </div>
@@ -294,7 +323,8 @@ const Tickets: React.FC = () => {
                       {ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -343,8 +373,12 @@ const Tickets: React.FC = () => {
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                     >
                         <option value="">-- Ignorer (utiliser le rôle) --</option>
-                        {usersList.map(u => (
-                            <option key={u.id} value={u.id}>{u.fullName || u.full_name} ({u.role})</option>
+                        {Array.from(new Set(usersList.filter(u => u.role !== 'PARENT').map(u => u.role))).map(role => (
+                            <optgroup key={role} label={role === 'TEACHER' ? 'ENSEIGNANTS' : role === 'DIRECTOR' ? 'DIRECTION' : role}>
+                                {usersList.filter(u => u.role === role).map(u => (
+                                    <option key={u.id} value={u.id}>{u.fullName || u.full_name}</option>
+                                ))}
+                            </optgroup>
                         ))}
                     </select>
                   </div>

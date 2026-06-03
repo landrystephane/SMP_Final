@@ -83,6 +83,10 @@ function initDb() {
             console.log(`[Migration] Adding has_transport to students`);
             db.prepare(`ALTER TABLE students ADD COLUMN has_transport INTEGER DEFAULT 0`).run();
         }
+        if (!studentCols.find(c => c.name === 'transport_point_id')) {
+            console.log(`[Migration] Adding transport_point_id to students`);
+            db.prepare(`ALTER TABLE students ADD COLUMN transport_point_id INTEGER`).run();
+        }
     } catch (e) {
         console.error(`[Migration] Student table migration failed:`, e.message);
     }

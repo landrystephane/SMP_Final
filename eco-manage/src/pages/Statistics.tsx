@@ -14,8 +14,22 @@ const Statistics: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
+  const [honorCycle, setHonorCycle] = useState<string>('ALL');
+  const [honorSection, setHonorSection] = useState<string>('ALL');
+  const [honorClass, setHonorClass] = useState<string>('ALL');
   const [activeCycle, setActiveCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [school, setSchool] = useState<any>(null);
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (window.electronAPI && user) {
+        const cls = await window.electronAPI.getClasses(user.schoolId);
+        setAllClasses(cls);
+      }
+    };
+    fetchClasses();
+  }, [user]);
 
   useEffect(() => {
     const loadSchool = async () => {
@@ -130,7 +144,7 @@ const Statistics: React.FC = () => {
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{t('honor_rolls', 'Honor Rolls')}</p>
               <h3 className="text-4xl font-black text-white">{stats.honorRoll ? stats.honorRoll.length : 0}</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-purple-500">
-                  {t('average_gt_14', 'Moyennes > 14/20')}
+                  Moyennes &ge; {stats.honorRollThreshold || 15}/20
               </div>
           </div>
       </div>
@@ -179,10 +193,20 @@ const Statistics: React.FC = () => {
           <div className="space-y-8">
               <div className="glass-card p-10 bg-gradient-to-br from-amber-500 to-amber-600 border-none shadow-2xl shadow-amber-500/20 relative overflow-hidden group">
                   <Award className="absolute -right-8 -top-8 w-48 h-48 text-white/10 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-                  <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase mb-6 relative z-10">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
-                  <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest mb-8 relative z-10">Meilleurs élèves du trimestre (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
+                  <div className="flex justify-between items-center relative z-10 mb-8">
+                      <div>
+                          <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
+                          <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest">Meilleurs élèves (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
+                      </div>
+                      <button 
+                          onClick={() => window.print()}
+                          className="px-4 py-2 bg-slate-950 text-amber-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all border border-slate-950 hover:border-amber-500 shadow-xl"
+                      >
+                          Imprimer
+                      </button>
+                  </div>
 
-                  <div className="space-y-6 relative z-10 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div id="honor-roll-section" className="space-y-6 relative z-10 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                       {(() => {
                           const grouped: any = {};
                           (stats.honorRoll || []).forEach((s: any) => {
@@ -190,26 +214,95 @@ const Statistics: React.FC = () => {
                               if (!grouped[key]) grouped[key] = [];
                               grouped[key].push(s);
                           });
-                          const keys = Object.keys(grouped);
+                          
+                          // Build all possible class keys from database
+                          const allPossibleKeys = new Set(Object.keys(grouped));
+                          allClasses.forEach(c => {
+                              const key = `${c.level || 'Cycle'} > ${c.section || 'Section'} > ${c.name}`;
+                              allPossibleKeys.add(key);
+                          });
+                          
+                          const keys = Array.from(allPossibleKeys).sort();
+                          
                           if (keys.length === 0) {
-                              return <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun élève au tableau d'honneur</p>;
+                              return <div className="flex items-center justify-center h-32"><p className="text-center text-amber-950/60 text-sm font-black uppercase tracking-widest py-4">Aucun élève au tableau d'honneur</p></div>;
                           }
-                          return keys.map((groupName, gIdx) => (
-                              <div key={gIdx} className="space-y-3">
-                                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-900/10 pb-1">{groupName}</h3>
-                                  {grouped[groupName].map((s: any, i: number) => (
-                                      <div key={i} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
-                                          <div className="flex items-center gap-4">
-                                              <span className="text-sm font-black text-amber-950/40">#{i+1}</span>
-                                              <div>
-                                                  <p className="text-xs font-black text-slate-950 uppercase">{s.name}</p>
-                                              </div>
+                          
+                          const cycles = Array.from(new Set(keys.map(k => k.split(' > ')[0])));
+                          const sections = Array.from(new Set(keys.filter(k => honorCycle === 'ALL' || k.split(' > ')[0] === honorCycle).map(k => k.split(' > ')[1])));
+                          const classesList = Array.from(new Set(keys.filter(k => {
+                              const [c, s] = k.split(' > ');
+                              if (honorCycle !== 'ALL' && c !== honorCycle) return false;
+                              if (honorSection !== 'ALL' && s !== honorSection) return false;
+                              return true;
+                          }).map(k => k.split(' > ')[2])));
+
+                          const filteredKeys = keys.filter(k => {
+                              const [c, s, cl] = k.split(' > ');
+                              if (honorCycle !== 'ALL' && c !== honorCycle) return false;
+                              if (honorSection !== 'ALL' && s !== honorSection) return false;
+                              if (honorClass !== 'ALL' && cl !== honorClass) return false;
+                              return true;
+                          });
+
+                          return (
+                              <>
+                                  <div className="grid grid-cols-3 gap-2 mb-4">
+                                      <select 
+                                          value={honorCycle}
+                                          onChange={(e) => { setHonorCycle(e.target.value); setHonorClass('ALL'); }}
+                                          className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                                      >
+                                          <option value="ALL">Tous les cycles</option>
+                                          {cycles.map(c => <option key={c} value={c}>{c}</option>)}
+                                      </select>
+                                      <select 
+                                          value={honorSection}
+                                          onChange={(e) => { setHonorSection(e.target.value); setHonorClass('ALL'); }}
+                                          className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                                      >
+                                          <option value="ALL">Toutes les sections</option>
+                                          {sections.map(s => <option key={s} value={s}>{s}</option>)}
+                                      </select>
+                                      <select 
+                                          value={honorClass}
+                                          onChange={(e) => setHonorClass(e.target.value)}
+                                          className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                                      >
+                                          <option value="ALL">Toutes les classes</option>
+                                          {classesList.map(c => <option key={c} value={c}>{c}</option>)}
+                                      </select>
+                                  </div>
+                                  
+                                  {filteredKeys.length === 0 && (
+                                      <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun résultat pour ces filtres.</p>
+                                  )}
+                                  
+                                  {filteredKeys.map((groupName, gIdx) => {
+                                      const groupStudents = grouped[groupName] || [];
+                                      return (
+                                          <div key={gIdx} className="space-y-3">
+                                              <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-900/10 pb-1">{groupName}</h3>
+                                              {groupStudents.length === 0 ? (
+                                                  <p className="text-amber-900/50 text-[10px] italic text-center py-2 font-bold">Aucun élève n'a atteint le seuil requis ({stats.honorRollThreshold || 15}/20)</p>
+                                              ) : (
+                                                  groupStudents.map((s: any, i: number) => (
+                                                      <div key={i} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
+                                                          <div className="flex items-center gap-4">
+                                                              <span className="text-sm font-black text-amber-950/40">#{i+1}</span>
+                                                              <div>
+                                                                  <p className="text-xs font-black text-slate-950 uppercase">{s.name}</p>
+                                                              </div>
+                                                          </div>
+                                                          <span className="text-sm font-black text-slate-950">{s.avg.toFixed(2)}</span>
+                                                      </div>
+                                                  ))
+                                              )}
                                           </div>
-                                          <span className="text-sm font-black text-slate-950">{s.avg.toFixed(2)}</span>
-                                      </div>
-                                  ))}
-                              </div>
-                          ));
+                                      );
+                                  })}
+                              </>
+                          );
                       })()}
                   </div>
 

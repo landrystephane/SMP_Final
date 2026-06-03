@@ -74,8 +74,7 @@ body {
   }
 
   select.input-field option {
-    background-color: #0b0f19 !important;
-    color: #ffffff !important;
+    background-color: rgb(15 23 42 / 1) !important; /* bg-slate-900 */
   }
 
   input[type="date"] {

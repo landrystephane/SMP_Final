@@ -11,6 +11,7 @@ const Grades: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
 
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | ''>('FRANCOPHONE');
   const [selectedClass, setSelectedClass] = useState('');
@@ -44,6 +45,18 @@ const Grades: React.FC = () => {
         
         const bv = await window.electronAPI.getSetting('bulletins_validated');
         setBulletinsValidated(bv === 'true');
+
+        const schools = await window.electronAPI.getSchools();
+        const mySchool = schools.find((s: any) => s.id?.toString() === user?.schoolId?.toString()) || schools[0];
+        if (mySchool && mySchool.evaluation_periods) {
+            try {
+                setEvaluationPeriods(JSON.parse(mySchool.evaluation_periods));
+            } catch(e) {
+                setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+            }
+        } else {
+            setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+        }
       }
   }
 
@@ -166,8 +179,13 @@ const Grades: React.FC = () => {
         alert("✅ Les notes ont été enregistrées avec succès !\n\nNote : Actuellement en mode 'Brouillon'. N'oubliez pas de les VALIDER pour qu'elles apparaissent sur le bulletin de l'élève.");
         handleLoadContext();
       } else {
-        alert('Erreur: ' + result.error);
+        alert("Erreur: " + result.error);
       }
+    } else {
+      // Mobile / Web fallback
+      const key = `pending_grades_${Date.now()}`;
+      localStorage.setItem(key, JSON.stringify(formattedGrades));
+      alert("✅ Notes sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC.");
     }
   };
 
@@ -358,12 +376,12 @@ const Grades: React.FC = () => {
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('term')}</label>
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('term', 'Période')}</label>
           <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
             value={selectedTerm} onChange={(e) => setSelectedTerm(parseInt(e.target.value))}>
-            <option value={1}>{t('term_1')}</option>
-            <option value={2}>{t('term_2')}</option>
-            <option value={3}>{t('term_3')}</option>
+            {evaluationPeriods.map(ep => (
+                <option key={ep.id} value={ep.id}>{ep.name}</option>
+            ))}
           </select>
         </div>
         <div className="space-y-1">

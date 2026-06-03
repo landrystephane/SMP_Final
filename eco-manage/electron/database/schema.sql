@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS schools (
     bulletin_pdf_template TEXT DEFAULT '',
     bulletin_pdf_mapping TEXT DEFAULT '{}',
     timetable_slots TEXT DEFAULT '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]',
+    evaluation_periods TEXT DEFAULT '[{"id":1,"name":"1ER TRIMESTRE"},{"id":2,"name":"2E TRIMESTRE"},{"id":3,"name":"3E TRIMESTRE"}]',
     honor_roll_threshold REAL DEFAULT 15.0,
     transport_fee_model TEXT DEFAULT 'ANNUAL',
     transport_fee_amount REAL DEFAULT 0,

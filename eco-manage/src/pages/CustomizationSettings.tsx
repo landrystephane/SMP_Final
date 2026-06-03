@@ -27,6 +27,9 @@ const CustomizationSettings: React.FC = () => {
     const [headerEnglish, setHeaderEnglish] = useState("MINISTRY OF BASIC EDUCATION");
     const [honorRollThreshold, setHonorRollThreshold] = useState<number>(15.0);
     const [timetableSlots, setTimetableSlots] = useState<any[]>([]);
+    const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
+    const [installments, setInstallments] = useState<any[]>([]);
+    const [installmentDeadlines, setInstallmentDeadlines] = useState<any[]>([]);
 
     // Custom PDF template fields
     const [headerImage, setHeaderImage] = useState('');
@@ -65,8 +68,18 @@ const CustomizationSettings: React.FC = () => {
                 } catch(e) {
                     setTimetableSlots([]);
                 }
+
+                try {
+                    setEvaluationPeriods(mySchool.evaluation_periods ? JSON.parse(mySchool.evaluation_periods) : [
+                        { id: 1, name: '1ER TRIMESTRE' },
+                        { id: 2, name: '2E TRIMESTRE' },
+                        { id: 3, name: '3E TRIMESTRE' }
+                    ]);
+                } catch(e) {
+                    setEvaluationPeriods([]);
+                }
+                const template = window.electronAPI.getReportTemplate ? await window.electronAPI.getReportTemplate(mySchool.id) : null;
                 
-                const template = await window.electronAPI.getReportTemplate(user.schoolId);
                 if (template) {
                     setHeaderImage(template.header_image || '');
                     setWatermarkImage(template.watermark_image || '');
@@ -74,6 +87,11 @@ const CustomizationSettings: React.FC = () => {
                     setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
                     setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
                 }
+                
+                const insts = window.electronAPI.getInstallments ? await window.electronAPI.getInstallments() : [];
+                setInstallments(insts || []);
+                const deadls = window.electronAPI.getInstallmentDeadlines ? await window.electronAPI.getInstallmentDeadlines(mySchool.id) : [];
+                setInstallmentDeadlines(deadls || []);
             }
         }
         setLoading(false);
@@ -105,7 +123,8 @@ const CustomizationSettings: React.FC = () => {
                 header_french: headerFrench,
                 header_english: headerEnglish,
                 honor_roll_threshold: honorRollThreshold,
-                timetable_slots: JSON.stringify(timetableSlots)
+                timetable_slots: JSON.stringify(timetableSlots),
+                evaluation_periods: JSON.stringify(evaluationPeriods)
             });
 
             await window.electronAPI.saveReportTemplate({
@@ -119,6 +138,11 @@ const CustomizationSettings: React.FC = () => {
             if (res && res.error) {
                 throw new Error(res.error);
             }
+
+            if (window.electronAPI.saveInstallmentDeadlines) {
+                await window.electronAPI.saveInstallmentDeadlines(activeSchool.id, installmentDeadlines);
+            }
+
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
             loadSettings();
@@ -295,6 +319,81 @@ const CustomizationSettings: React.FC = () => {
                                     onChange={(e) => setHonorRollThreshold(parseFloat(e.target.value))}
                                     className="w-full md:w-1/3 bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Périodes d'Évaluation (Trimestres / Séquences)</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEvaluationPeriods([...evaluationPeriods, { id: evaluationPeriods.length + 1, name: `Période ${evaluationPeriods.length + 1}` }])}
+                                        className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
+                                    >
+                                        + Ajouter une période
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {evaluationPeriods.map((period, index) => (
+                                        <div key={index} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
+                                            <span className="text-slate-500 font-bold text-xs w-8 text-center bg-white/5 rounded-lg py-2">ID: {period.id}</span>
+                                            <input 
+                                                type="text" 
+                                                value={period.name} 
+                                                onChange={(e) => {
+                                                    const newPeriods = [...evaluationPeriods];
+                                                    newPeriods[index].name = e.target.value;
+                                                    setEvaluationPeriods(newPeriods);
+                                                }}
+                                                placeholder="Ex: 1ER TRIMESTRE, 1ÈRE SÉQUENCE"
+                                                className="w-full md:flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500 uppercase"
+                                            />
+                                            <div className="flex items-center justify-between w-full md:w-auto gap-4">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newPeriods = evaluationPeriods.filter((_, i) => i !== index);
+                                                        setEvaluationPeriods(newPeriods);
+                                                    }}
+                                                    className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
+                                                >
+                                                    <ShieldAlert className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {evaluationPeriods.length === 0 && (
+                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">Attention : Aucune période d'évaluation définie !</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Échéances des Tranches de Scolarité</label>
+                                <div className="space-y-3">
+                                    {installments.map(inst => {
+                                        const deadline = installmentDeadlines.find(d => d.installment_id === inst.id)?.deadline_date || '';
+                                        return (
+                                            <div key={inst.id} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
+                                                <span className="text-slate-500 font-bold text-xs w-32 bg-white/5 rounded-lg py-2 px-3">{inst.name}</span>
+                                                <input 
+                                                    type="date" 
+                                                    value={deadline}
+                                                    onChange={(e) => {
+                                                        const newDeadlines = [...installmentDeadlines];
+                                                        const existing = newDeadlines.find(d => d.installment_id === inst.id);
+                                                        if (existing) {
+                                                            existing.deadline_date = e.target.value;
+                                                        } else {
+                                                            newDeadlines.push({ installment_id: inst.id, deadline_date: e.target.value });
+                                                        }
+                                                        setInstallmentDeadlines(newDeadlines);
+                                                    }}
+                                                    className="w-full md:flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500"
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div className="space-y-4">

@@ -32,6 +32,8 @@ const Attendance: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [isUnlockedByAdmin, setIsUnlockedByAdmin] = useState(false);
+  
+  const [exceedersToNotify, setExceedersToNotify] = useState<any[]>([]);
 
   const loadExistingAttendance = async () => {
     if (window.electronAPI && selectedClass && currentDate) {
@@ -158,13 +160,28 @@ const Attendance: React.FC = () => {
                       alert(`Erreur: ${res.error}`);
                       return;
                   }
-                  alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
+                  if (res && res.exceeders && res.exceeders.length > 0) {
+                      setExceedersToNotify(res.exceeders);
+                  } else {
+                      alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
+                  }
               } catch (err: any) {
                   alert(err.message);
               }
           } else {
               alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
           }
+      } else {
+          // Mobile / Web fallback
+          const records = Object.keys(absences).map(studentId => ({
+              student_id: parseInt(studentId),
+              date: currentDate,
+              status: absences[studentId] > 0 ? 'ABSENT' : 'PRESENT',
+              hours_absent: absences[studentId]
+          }));
+          const key = `pending_attendance_${Date.now()}`;
+          localStorage.setItem(key, JSON.stringify(records));
+          alert("✅ Absences sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC.");
       }
   };
 
@@ -538,6 +555,35 @@ const Attendance: React.FC = () => {
                           )}
                       </button>
                   </div>
+              </div>
+          </div>
+      )}
+
+      {exceedersToNotify.length > 0 && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in-95">
+                  <div className="flex items-center justify-center w-16 h-16 bg-rose-500/20 text-rose-500 rounded-full mb-6 mx-auto">
+                      <AlertCircle className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-center text-white mb-2">Convocations Envoyées</h3>
+                  <p className="text-slate-400 text-center text-sm mb-6">
+                      Les présences ont été enregistrées avec succès.<br/>
+                      Cependant, les élèves suivants ont dépassé 15h d'absences cumulées. Un message de convocation automatique a été envoyé à leurs parents.
+                  </p>
+                  <div className="space-y-3 mb-8 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {exceedersToNotify.map((ex, i) => (
+                          <div key={i} className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+                              <span className="font-bold text-white text-sm">{ex.firstName} {ex.lastName}</span>
+                              <span className="text-rose-500 font-black text-sm bg-rose-500/10 px-3 py-1 rounded-lg">{ex.total}h d'absence</span>
+                          </div>
+                      ))}
+                  </div>
+                  <button
+                      onClick={() => setExceedersToNotify([])}
+                      className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black transition-all shadow-lg hover:shadow-amber-500/25 active:scale-95"
+                  >
+                      Compris
+                  </button>
               </div>
           </div>
       )}
