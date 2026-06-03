@@ -34,7 +34,8 @@ const Statistics: React.FC = () => {
         const data = await window.electronAPI.getDashboardStats({ 
             schoolId: user.schoolId, 
             section: activeSection,
-            level: activeCycle
+            level: activeCycle,
+            teacherId: user.role === 'TEACHER' ? user.id : undefined
         });
         setStats(data);
         setLoading(false);
@@ -171,21 +172,7 @@ const Statistics: React.FC = () => {
                   </div>
               </div>
 
-              {/* Subject Pass Rates */}
-              <div className="glass-card p-10 bg-slate-900/30 border-none">
-                  <h2 className="text-2xl font-black text-white italic tracking-tight uppercase mb-8">{t('critical_points_by_subject', 'Points Critiques par Matière')}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[t('math', 'Mathématiques'), t('french', 'Français'), t('english', 'Anglais'), t('sciences', 'Sciences')].map(m => (
-                          <div key={m} className="p-6 bg-slate-950/50 rounded-2xl border border-white/5 flex justify-between items-center">
-                              <span className="font-black text-xs text-slate-400 uppercase tracking-widest">{m}</span>
-                              <div className="flex items-center gap-3">
-                                  <span className="text-xl font-black text-white">82%</span>
-                                  <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
+              {/* Critical Points By Subject Removed as requested */}
           </div>
 
           {/* Right: Honor Roll (Top Students) */}
@@ -195,22 +182,35 @@ const Statistics: React.FC = () => {
                   <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase mb-6 relative z-10">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
                   <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest mb-8 relative z-10">Meilleurs élèves du trimestre (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
 
-                  <div className="space-y-4 relative z-10">
-                      {(stats.honorRoll || []).map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
-                              <div className="flex items-center gap-4">
-                                  <span className="text-xl font-black text-amber-950/40">#{i+1}</span>
-                                  <div>
-                                      <p className="text-xs font-black text-slate-950 uppercase">{s.name}</p>
-                                      <p className="text-[10px] font-bold text-amber-950/60 uppercase">{s.class}</p>
-                                  </div>
+                  <div className="space-y-6 relative z-10 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                      {(() => {
+                          const grouped: any = {};
+                          (stats.honorRoll || []).forEach((s: any) => {
+                              const key = `${s.level || 'Cycle'} > ${s.section || 'Section'} > ${s.class}`;
+                              if (!grouped[key]) grouped[key] = [];
+                              grouped[key].push(s);
+                          });
+                          const keys = Object.keys(grouped);
+                          if (keys.length === 0) {
+                              return <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun élève au tableau d'honneur</p>;
+                          }
+                          return keys.map((groupName, gIdx) => (
+                              <div key={gIdx} className="space-y-3">
+                                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-900/10 pb-1">{groupName}</h3>
+                                  {grouped[groupName].map((s: any, i: number) => (
+                                      <div key={i} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
+                                          <div className="flex items-center gap-4">
+                                              <span className="text-sm font-black text-amber-950/40">#{i+1}</span>
+                                              <div>
+                                                  <p className="text-xs font-black text-slate-950 uppercase">{s.name}</p>
+                                              </div>
+                                          </div>
+                                          <span className="text-sm font-black text-slate-950">{s.avg.toFixed(2)}</span>
+                                      </div>
+                                  ))}
                               </div>
-                              <span className="text-lg font-black text-slate-950">{s.avg.toFixed(2)}</span>
-                          </div>
-                      ))}
-                      {(!stats.honorRoll || stats.honorRoll.length === 0) && (
-                          <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun élève au tableau d'honneur</p>
-                      )}
+                          ));
+                      })()}
                   </div>
 
                   <button 

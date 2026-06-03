@@ -58,8 +58,22 @@ const Layout: React.FC = () => {
     };
     loadActiveSchool();
     const interval = setInterval(loadActiveSchool, 4000);
-    return () => clearInterval(interval);
-  }, [user]);
+    
+    // Override window.alert
+    const originalAlert = window.alert;
+    window.alert = (message) => {
+        if (window.electronAPI && (window.electronAPI as any).showAlert) {
+            (window.electronAPI as any).showAlert(message, schoolName);
+        } else {
+            originalAlert(message);
+        }
+    };
+
+    return () => {
+        clearInterval(interval);
+        window.alert = originalAlert;
+    };
+  }, [user, schoolName]);
 
   const handleLogout = async () => {
     await logout();

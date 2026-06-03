@@ -22,7 +22,7 @@ export const getPrimaryAppreciation = (score: number) => {
 export const calculateAttendanceObservations = (hours: number) => {
     const isEn = i18n.language.startsWith('en');
     if (hours === 0) return isEn ? 'EXEMPLARY CONDUCT' : 'CONDUITE EXEMPLAIRE';
-    if (hours <= 5) return isEn ? 'TO BE ENCOURAGED' : 'À ENCOURAGER';
+    if (hours <= 5) return isEn ? 'SATISFACTORY CONDUCT' : 'CONDUITE SATISFAISANTE';
     if (hours <= 15) return isEn ? 'CONDUCT TO BE MONITORED' : 'CONDUITE À SURVEILLER';
     return isEn ? 'CONDUCT WARNING' : 'AVERTISSEMENT CONDUITE';
 };

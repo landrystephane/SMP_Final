@@ -11,6 +11,7 @@ const AdminWorkflow: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [school, setSchool] = useState<any>(null);
   const [printingClassId, setPrintingClassId] = useState<number | null>(null);
+  const [printingAnnualClassId, setPrintingAnnualClassId] = useState<number | null>(null);
   const [bulletinsValidated, setBulletinsValidated] = useState(false);
 
   const [period, setPeriod] = useState({
@@ -193,6 +194,127 @@ const AdminWorkflow: React.FC = () => {
     }
   };
 
+  const handlePrintAnnualReportCards = async (classId: number) => {
+    if (!window.electronAPI || !school) return;
+    setPrintingAnnualClassId(classId);
+    try {
+        const classObj = classes.find(c => c.id === classId);
+        if (!classObj) return;
+
+        const allStudents = await window.electronAPI.getStudents(user?.schoolId);
+        const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === classId?.toString());
+
+        if (classStudents.length === 0) {
+            alert("Aucun élève dans cette classe.");
+            return;
+        }
+
+        const studentsData: any[] = [];
+        for (const student of classStudents) {
+            const details = await window.electronAPI.getStudentDetails(student.id);
+            studentsData.push({
+                student,
+                grades: details.grades || [],
+                attendance: details.attendance || []
+            });
+        }
+
+        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+
+        // Get all unique terms present in the grades for this class to determine N
+        let allTerms = new Set<number>();
+        studentsData.forEach(sd => {
+            sd.grades.forEach((g: any) => {
+                if (g.validated === 1 || isDirector) {
+                    allTerms.add(Number(g.term));
+                }
+            });
+        });
+        const termsArray = Array.from(allTerms).sort((a, b) => a - b);
+        const N = termsArray.length || 1;
+
+        // Calculate averages for rank calculation
+        const studentsWithAverages = studentsData.map(sData => {
+            // Only keep validated grades
+            const validGrades = sData.grades.filter((g: any) => g.validated === 1 || isDirector);
+            if (validGrades.length === 0) {
+                return { ...sData, validGrades, average: null, termAverages: {} };
+            }
+
+            let termAverages: Record<number, number> = {};
+            let sumOfTermAverages = 0;
+            let termsCountForStudent = 0;
+
+            termsArray.forEach(t => {
+                const termG = validGrades.filter((g: any) => Number(g.term) === t);
+                if (termG.length > 0) {
+                    const tPts = termG.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
+                    const tCoef = termG.reduce((acc: number, g: any) => acc + g.coefficient, 0);
+                    const tAvg = tPts / (tCoef || 1);
+                    termAverages[t] = tAvg;
+                    sumOfTermAverages += tAvg;
+                    termsCountForStudent++;
+                }
+            });
+
+            // The annual average is the sum of ALL term averages divided by N (the total number of terms for the school year so far)
+            const annualAverage = sumOfTermAverages / N;
+
+            return {
+                ...sData,
+                validGrades,
+                termAverages,
+                average: annualAverage
+            };
+        });
+
+        // Sort students to assign rank
+        const sortedStudents = [...studentsWithAverages]
+            .filter(s => s.average !== null)
+            .sort((a, b) => (b.average || 0) - (a.average || 0));
+
+        const finalStudentsData = studentsWithAverages.map(sData => {
+            if (sData.average === null) {
+                return {
+                    ...sData,
+                    rank: undefined,
+                    totalStudents: classStudents.length,
+                    termsArray
+                };
+            }
+            const rankIndex = sortedStudents.findIndex(s => s.student.id === sData.student.id);
+            return {
+                ...sData,
+                rank: rankIndex !== -1 ? rankIndex + 1 : undefined,
+                totalStudents: classStudents.length,
+                termsArray
+            };
+        }).sort((a, b) => {
+            if (a.rank === undefined && b.rank === undefined) return 0;
+            if (a.rank === undefined) return 1;
+            if (b.rank === undefined) return -1;
+            return a.rank - b.rank;
+        });
+
+        // Use the existing generateClassReportCards but pass an isAnnual flag
+        generateClassReportCards({
+            classObj,
+            school,
+            term: 'ANNUEL',
+            studentsData: finalStudentsData,
+            ignoreValidation: isDirector,
+            isAnnual: true
+        });
+
+        alert("Impression du bulletin ANNUEL lancée avec succès.");
+    } catch (err: any) {
+        console.error(err);
+        alert("Erreur lors de la génération: " + err.message);
+    } finally {
+        setPrintingAnnualClassId(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -342,15 +464,27 @@ const AdminWorkflow: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4">
-                    <button
-                      onClick={() => handlePrintClassReportCards(c.id)}
-                      disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
-                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : ""}
-                    >
-                      <Printer className="w-4 h-4" />
-                      {printingClassId === c.id ? "Impression..." : t('start_printing')}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                        onClick={() => handlePrintClassReportCards(c.id)}
+                        disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : "Bulletin du trimestre actuel"}
+                        >
+                        <Printer className="w-4 h-4" />
+                        {printingClassId === c.id ? "Impression..." : t('start_printing')}
+                        </button>
+                        
+                        <button
+                        onClick={() => handlePrintAnnualReportCards(c.id)}
+                        disabled={printingAnnualClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
+                        className="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : "Bulletin Annuel (Moyenne des trimestres)"}
+                        >
+                        <Printer className="w-4 h-4" />
+                        {printingAnnualClassId === c.id ? "Impression..." : "B. Annuel"}
+                        </button>
+                    </div>
                   </td>
                 </tr>
               ))}

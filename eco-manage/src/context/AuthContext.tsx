@@ -42,6 +42,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.electronAPI.restoreSession(user)
         .then(() => {
           setIsRestoringSession(false);
+          // Update document title for alert boxes
+          window.electronAPI.getSchools().then((schools: any) => {
+              const currentSchool = schools.find((s: any) => Number(s.id) === Number(user.schoolId)) || schools[0];
+              if (currentSchool && currentSchool.name) {
+                  document.title = currentSchool.name;
+              } else {
+                  document.title = "Eco'Manage";
+              }
+          });
         })
         .catch(err => {
           console.error("Failed to restore main process session:", err);
@@ -49,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     } else {
       setIsRestoringSession(false);
+      document.title = "Eco'Manage";
     }
   }, [user]);
 
@@ -69,6 +79,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
                 setUser(userObj);
                 localStorage.setItem('user', JSON.stringify(userObj));
+                
+                // Update document title for alert boxes
+                window.electronAPI.getSchools().then((schools: any) => {
+                    const currentSchool = schools.find((s: any) => Number(s.id) === Number(userObj.schoolId)) || schools[0];
+                    if (currentSchool && currentSchool.name) {
+                        document.title = currentSchool.name;
+                    }
+                });
             } else {
                 throw new Error('Invalid credentials');
             }

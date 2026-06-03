@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteInstallment: (id) => ipcRenderer.invoke('db:deleteInstallment', id),
   getClassInstallmentFees: (schoolId) => ipcRenderer.invoke('db:getClassInstallmentFees', schoolId),
   updateClassInstallmentFee: (data) => ipcRenderer.invoke('db:updateClassInstallmentFee', data),
+  getInstallmentDeadlines: (schoolId) => ipcRenderer.invoke('db:getInstallmentDeadlines', schoolId),
+  saveInstallmentDeadlines: (data) => ipcRenderer.invoke('db:saveInstallmentDeadlines', data),
+  notifyLateInstallments: (data) => ipcRenderer.invoke('db:notifyLateInstallments', data),
 
   // Pedagogy
   getGlobalSubjects: () => ipcRenderer.invoke('db:getGlobalSubjects'),
@@ -138,8 +141,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Parents Directory and Announcements
   getParentsDirectory: (schoolId) => ipcRenderer.invoke('db:getParentsDirectory', schoolId),
   sendParentAnnouncement: (data) => ipcRenderer.invoke('db:sendParentAnnouncement', data),
+  getParentMessages: (data) => ipcRenderer.invoke('db:getParentMessages', data),
+  sendParentTicket: (data) => ipcRenderer.invoke('db:sendParentTicket', data),
 
   // New Transport APIs
   getTransportEligibleStudents: (schoolId) => ipcRenderer.invoke('db:getTransportEligibleStudents', schoolId),
   assignStudentToTransportPoint: (data) => ipcRenderer.invoke('db:assignStudentToTransportPoint', data),
+  
+  showAlert: (msg, title) => ipcRenderer.sendSync('dialog:alert', msg, title),
 });

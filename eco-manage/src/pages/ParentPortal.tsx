@@ -23,6 +23,11 @@ const ParentPortal: React.FC = () => {
     const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
     const [schools, setSchools] = useState<any[]>([]);
     const [classes, setClasses] = useState<any[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
+    const [announcements, setAnnouncements] = useState<any[]>([]);
+    const [ticketSubject, setTicketSubject] = useState('');
+    const [ticketMessage, setTicketMessage] = useState('');
+    const [ticketReceiver, setTicketReceiver] = useState('');
 
     const loadData = async () => {
         setLoading(true);
@@ -37,12 +42,16 @@ const ParentPortal: React.FC = () => {
                 const cif = await window.electronAPI.getClassInstallmentFees(user.schoolId);
                 const schs = await window.electronAPI.getSchools();
                 const cls = await window.electronAPI.getClasses(user.schoolId);
+                const usrs = await window.electronAPI.getUsers(user.schoolId);
+                const msgs = await window.electronAPI.getParentMessages ? await window.electronAPI.getParentMessages({ schoolId: user.schoolId, userId: user.id }) : [];
 
                 setTuitionFees(tf || []);
                 setInstallments(insts || []);
                 setClassInstallmentFees(cif || []);
                 setSchools(schs || []);
                 setClasses(cls || []);
+                setUsers(usrs || []);
+                setAnnouncements(msgs || []);
 
                 if (studs.length > 0) {
                     setSelectedChild(studs[0]);
@@ -219,6 +228,27 @@ const ParentPortal: React.FC = () => {
             }
         } catch (e: any) {
             alert(`Erreur d'impression du bulletin: ${e.message}`);
+        }
+    };
+
+    const handleSendTicket = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!ticketSubject || !ticketMessage || !ticketReceiver) return;
+        try {
+            if (window.electronAPI && window.electronAPI.sendParentTicket) {
+                await window.electronAPI.sendParentTicket({
+                    schoolId: user?.schoolId,
+                    senderId: user?.id,
+                    receiverId: parseInt(ticketReceiver),
+                    subject: ticketSubject,
+                    message: ticketMessage
+                });
+                alert('Message envoyé avec succès à l\'enseignant.');
+                setTicketSubject('');
+                setTicketMessage('');
+            }
+        } catch (err: any) {
+            alert("Erreur lors de l'envoi du message: " + err.message);
         }
     };
 
@@ -506,12 +536,81 @@ const ParentPortal: React.FC = () => {
             )}
 
             {/* School communication feed */}
-            <div className="glass-card p-6 border-l-4 border-l-amber-500 bg-amber-500/5 rounded-2xl flex items-center space-x-3">
-                <Info className="w-5 h-5 text-amber-500 shrink-0" />
-                <div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Note administrative</span>
-                    <p className="text-xs text-slate-300 font-bold mt-0.5">La réunion parents-enseignants trimestrielle aura lieu ce Samedi à 10H précises.</p>
-                </div>
+            <div className="space-y-4">
+                <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
+                    <Info className="w-6 h-6 text-amber-500" /> Messages de la Direction
+                </h2>
+                {announcements.length > 0 ? (
+                    announcements.map((ann) => (
+                        <div key={ann.id} className="glass-card p-6 border-l-4 border-l-amber-500 bg-amber-500/5 rounded-2xl flex items-start space-x-4">
+                            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-1" />
+                            <div>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
+                                    {new Date(ann.created_at).toLocaleDateString()} - De : {ann.sender_name}
+                                </span>
+                                <h4 className="text-sm font-black text-white mt-1 uppercase">{ann.title}</h4>
+                                <p className="text-xs text-slate-300 font-bold mt-1 whitespace-pre-wrap">{ann.content}</p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Aucun communiqué de la direction</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Ticket to teacher */}
+            <div className="glass-card p-8 bg-slate-900 border border-white/5 rounded-[32px] space-y-6">
+                <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
+                    Contacter l'enseignant
+                </h2>
+                <form onSubmit={handleSendTicket} className="space-y-4">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Destinataire (Enseignant de l'élève)</label>
+                        <select 
+                            required
+                            value={ticketReceiver}
+                            onChange={(e) => setTicketReceiver(e.target.value)}
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500"
+                        >
+                            <option value="">-- Sélectionner l'enseignant --</option>
+                            {(() => {
+                                const studentClass = classes.find(c => c.id === selectedChild.class_id);
+                                if (!studentClass) return null;
+                                const teachers = users.filter(u => u.id === studentClass.main_teacher_id || u.id === studentClass.assistant_teacher_id);
+                                return teachers.map(t => (
+                                    <option key={t.id} value={t.id}>{t.full_name} ({t.id === studentClass.main_teacher_id ? 'Titulaire' : 'Suppléant'})</option>
+                                ));
+                            })()}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Sujet</label>
+                        <input 
+                            required
+                            type="text"
+                            value={ticketSubject}
+                            onChange={(e) => setTicketSubject(e.target.value)}
+                            placeholder="Sujet de votre message..."
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Message</label>
+                        <textarea 
+                            required
+                            rows={4}
+                            value={ticketMessage}
+                            onChange={(e) => setTicketMessage(e.target.value)}
+                            placeholder="Rédigez votre message ici..."
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 resize-none custom-scrollbar"
+                        ></textarea>
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-yellow-400 transition-all">
+                        Envoyer le message
+                    </button>
+                </form>
             </div>
 
             {/* Bus GPS Map Modal */}

@@ -145,6 +145,15 @@ CREATE TABLE IF NOT EXISTS installments (
     display_order INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS school_installment_deadlines (
+    school_id INTEGER,
+    installment_id INTEGER,
+    deadline_date DATE,
+    PRIMARY KEY (school_id, installment_id),
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (installment_id) REFERENCES installments(id)
+);
+
 CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,

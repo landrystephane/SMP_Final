@@ -20,7 +20,8 @@ const Users: React.FC = () => {
     section: 'FRANCOPHONE',
     cycle: 'PRIMAIRE',
     gender: 'M',
-    phone: ''
+    phone: '',
+    classRole: 'MAIN'
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -35,7 +36,8 @@ const Users: React.FC = () => {
     section: 'FRANCOPHONE',
     cycle: 'PRIMAIRE',
     gender: 'M',
-    classId: ''
+    classId: '',
+    classRole: 'MAIN'
   });
 
   const loadData = async () => {
@@ -70,6 +72,14 @@ const Users: React.FC = () => {
             }
         }
 
+        let currentClassRole = 'MAIN';
+        if (assignedClassId && editingUser.id) {
+            const cls = classes.find(c => c.id.toString() === assignedClassId);
+            if (cls && cls.assistant_teacher_id === editingUser.id) {
+                currentClassRole = 'ASSISTANT';
+            }
+        }
+
         setEditUserForm({
             civility: editingUser.civility || 'M.',
             fullName: editingUser.fullName || '',
@@ -80,7 +90,8 @@ const Users: React.FC = () => {
             section: editingUser.section || 'FRANCOPHONE',
             cycle: classLevel,
             gender: editingUser.gender || 'M',
-            classId: assignedClassId
+            classId: assignedClassId,
+            classRole: currentClassRole
         });
     }
   }, [editingUser, classes]);
@@ -115,7 +126,8 @@ const Users: React.FC = () => {
           ...newUser,
           phone: cleanPhone,
           schoolId: currentUser.schoolId,
-          assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : []
+          assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : [],
+          classRole: newUser.classRole
       });
       if (res && res.error) {
           setFormError(`${t('alert_error')}: ${res.error}`);
@@ -131,7 +143,8 @@ const Users: React.FC = () => {
           section: 'FRANCOPHONE', 
           cycle: 'PRIMAIRE',
           gender: 'M',
-          phone: ''
+          phone: '',
+          classRole: 'MAIN'
       });
       loadData();
     }
@@ -173,7 +186,8 @@ const Users: React.FC = () => {
                   password: editUserForm.password || undefined,
                   section: editUserForm.section,
                   gender: editUserForm.gender,
-                  assignedClasses: editUserForm.classId ? [parseInt(editUserForm.classId)] : []
+                  assignedClasses: editUserForm.classId ? [parseInt(editUserForm.classId)] : [],
+                  classRole: editUserForm.classRole
               });
 
               if (res && res.error) {
@@ -221,13 +235,19 @@ const Users: React.FC = () => {
       }
   };
 
-  const filteredUsers = users.filter(u =>
-    u.role !== 'PARENT' && (
-        (u.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (u.role || '').toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
+  const normalize = (str: any) => (str || '').toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const filteredUsers = users.filter(u => {
+      if (u.role === 'PARENT') return false;
+      const q = normalize(searchQuery);
+      const translatedRole = t(`role_${u.role}`) || '';
+      return (
+          normalize(u.fullName || '').includes(q) ||
+          normalize(u.username || '').includes(q) ||
+          normalize(u.role || '').includes(q) ||
+          normalize(translatedRole).includes(q)
+      );
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -361,18 +381,31 @@ const Users: React.FC = () => {
                                     </select>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
-                                <select
-                                    className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
-                                    value={newUser.classId}
-                                    onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
-                                >
-                                    <option value="">{t('no_assignment')}</option>
-                                    {classes
-                                        .filter(c => c.section === newUser.section && c.level === (newUser.cycle || 'PRIMAIRE'))
-                                        .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
+                                    <select
+                                        className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
+                                        value={newUser.classId}
+                                        onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
+                                    >
+                                        <option value="">{t('no_assignment')}</option>
+                                        {classes
+                                            .filter(c => c.section === newUser.section && c.level === (newUser.cycle || 'PRIMAIRE'))
+                                            .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Rôle</label>
+                                    <select
+                                        className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
+                                        value={newUser.classRole}
+                                        onChange={(e) => setNewUser({...newUser, classRole: e.target.value})}
+                                    >
+                                        <option value="MAIN">Titulaire</option>
+                                        <option value="ASSISTANT">Suppléant</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -604,18 +637,31 @@ const Users: React.FC = () => {
                                       </select>
                                   </div>
                               </div>
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
-                                  <select
-                                      className="input-field w-full bg-amber-500/5 appearance-none"
-                                      value={editUserForm.classId}
-                                      onChange={(e) => setEditUserForm({...editUserForm, classId: e.target.value})}
-                                  >
-                                      <option value="">{t('no_assignment')}</option>
-                                      {classes
-                                          .filter(c => c.section === editUserForm.section && c.level === editUserForm.cycle)
-                                          .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                  </select>
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
+                                      <select
+                                          className="input-field w-full bg-amber-500/5 appearance-none"
+                                          value={editUserForm.classId}
+                                          onChange={(e) => setEditUserForm({...editUserForm, classId: e.target.value})}
+                                      >
+                                          <option value="">{t('no_assignment')}</option>
+                                          {classes
+                                              .filter(c => c.section === editUserForm.section && c.level === editUserForm.cycle)
+                                              .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                      </select>
+                                  </div>
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Rôle</label>
+                                      <select
+                                          className="input-field w-full bg-amber-500/5 appearance-none"
+                                          value={editUserForm.classRole}
+                                          onChange={(e) => setEditUserForm({...editUserForm, classRole: e.target.value})}
+                                      >
+                                          <option value="MAIN">Titulaire</option>
+                                          <option value="ASSISTANT">Suppléant</option>
+                                      </select>
+                                  </div>
                               </div>
                           </div>
                       )}

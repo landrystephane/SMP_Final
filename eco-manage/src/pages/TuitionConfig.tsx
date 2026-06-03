@@ -9,6 +9,7 @@ const TuitionConfig: React.FC = () => {
   const [fees, setFees] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
+  const [deadlines, setDeadlines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -24,6 +25,7 @@ const TuitionConfig: React.FC = () => {
       const classes = await window.electronAPI.getClasses(user.schoolId);
       const inst = await window.electronAPI.getInstallments();
       const cif = await window.electronAPI.getClassInstallmentFees(user.schoolId);
+      const dead = await window.electronAPI.getInstallmentDeadlines(user.schoolId);
 
       const joined = data.map((f: any) => ({
           ...f,
@@ -32,9 +34,10 @@ const TuitionConfig: React.FC = () => {
       setFees(joined);
       setInstallments(inst || []);
       setClassInstallmentFees(cif || []);
+      setDeadlines(dead || []);
       
       const schools = await window.electronAPI.getSchools();
-      const currentSchool = schools.find((s: any) => s.id === user.schoolId);
+      const currentSchool = schools.find((s: any) => Number(s.id) === Number(user.schoolId)) || schools[0];
       if (currentSchool) {
           setSchoolSettings(currentSchool);
           setTransportFeeModel(currentSchool.transport_fee_model || 'ANNUAL');
@@ -61,6 +64,24 @@ const TuitionConfig: React.FC = () => {
       }
   };
 
+  const handleUpdateDeadline = async (installmentId: number, date: string) => {
+      const updated = [...deadlines];
+      const idx = updated.findIndex(d => d.installment_id === installmentId);
+      if (idx >= 0) {
+          updated[idx].deadline_date = date;
+      } else {
+          updated.push({ installment_id: installmentId, deadline_date: date });
+      }
+      setDeadlines(updated);
+      
+      if (window.electronAPI && user) {
+          await window.electronAPI.saveInstallmentDeadlines({
+              schoolId: user.schoolId,
+              deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
+          });
+      }
+  };
+
   const handleUpdateTransportSettings = async () => {
       if (window.electronAPI && schoolSettings) {
           try {
@@ -69,10 +90,26 @@ const TuitionConfig: React.FC = () => {
                   transport_fee_model: transportFeeModel,
                   transport_fee_amount: transportFeeAmount
               });
+              
+              // Appliquer à toutes les classes
+              for (const f of fees) {
+                  await window.electronAPI.updateTuitionFee({
+                      classId: f.classId,
+                      totalFee: f.totalFee || 0,
+                      registrationFee: f.registrationFee || 0,
+                      transportFee: transportFeeAmount,
+                      examFee: f.examFee || 0
+                  });
+              }
+              const newFees = fees.map(f => ({ ...f, transportFee: transportFeeAmount }));
+              setFees(newFees);
+              
               alert(t('settings_updated', 'Paramètres mis à jour avec succès.'));
           } catch (e: any) {
               alert(`Erreur: ${e.message}`);
           }
+      } else {
+          alert("Erreur: Les paramètres de l'école n'ont pas pu être chargés.");
       }
   };
 
@@ -156,15 +193,27 @@ const TuitionConfig: React.FC = () => {
               </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-              {installments.map((inst, idx) => (
-                  <div key={inst.id} className="p-8 bg-slate-950/80 rounded-[2rem] border border-white/5 flex flex-col justify-between items-start group/card hover:border-amber-500/30 transition-all shadow-2xl">
-                      <div className="flex justify-between w-full items-start mb-6">
-                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t('installment', 'Tranche')} {idx + 1}</span>
-                        <button onClick={() => handleDeleteInstallment(inst.id, inst.name)} className="text-slate-700 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+              {installments.map((inst, idx) => {
+                  const deadlineRecord = deadlines.find(d => d.installment_id === inst.id);
+                  return (
+                      <div key={inst.id} className="p-8 bg-slate-950/80 rounded-[2rem] border border-white/5 flex flex-col justify-between items-start group/card hover:border-amber-500/30 transition-all shadow-2xl">
+                          <div className="flex justify-between w-full items-start mb-6">
+                              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t('installment', 'Tranche')} {idx + 1}</span>
+                              <button onClick={() => handleDeleteInstallment(inst.id, inst.name)} className="text-slate-700 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                          <span className="font-black text-xl text-white uppercase tracking-tighter mb-4">{inst.name}</span>
+                          <div className="w-full">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Date limite</label>
+                              <input 
+                                  type="date" 
+                                  value={deadlineRecord?.deadline_date || ''}
+                                  onChange={(e) => handleUpdateDeadline(inst.id, e.target.value)}
+                                  className="w-full bg-slate-900 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-slate-300 outline-none focus:border-amber-500"
+                              />
+                          </div>
                       </div>
-                      <span className="font-black text-xl text-white uppercase tracking-tighter">{inst.name}</span>
-                  </div>
-              ))}
+                  );
+              })}
           </div>
       </div>
 
@@ -221,9 +270,9 @@ const TuitionConfig: React.FC = () => {
                         <input
                             type="number"
                             min={0}
-                            disabled={!f.className.includes('CM2') && !f.className.includes('CLASS 6')}
+                            disabled={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6')}
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-rose-500 outline-none focus:ring-2 focus:ring-rose-500/20 transition-all shadow-inner disabled:opacity-30 disabled:cursor-not-allowed"
-                            value={!f.className.includes('CM2') && !f.className.includes('CLASS 6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
+                            value={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
                             onChange={(e) => {
                                 const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, examFee: val } : item);

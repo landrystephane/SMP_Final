@@ -39,12 +39,6 @@ const Dashboard: React.FC = () => {
                   schoolId: user.schoolId
               });
               setStats(data);
-          } else if (user.role === 'TEACHER') {
-              const data = await window.electronAPI.getTeacherDashboardStats({
-                  schoolId: user.schoolId,
-                  teacherId: user.id
-              });
-              setStats(data);
           } else {
               const data = await window.electronAPI.getDashboardStats({ 
                   schoolId: user.schoolId, 

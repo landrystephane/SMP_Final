@@ -21,6 +21,8 @@ const Finance: React.FC = () => {
   const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [deadlines, setDeadlines] = useState<any[]>([]);
+  const [isNotifying, setIsNotifying] = useState(false);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -33,6 +35,7 @@ const Finance: React.FC = () => {
       const cif = await window.electronAPI.getClassInstallmentFees(sid);
       const schs = await window.electronAPI.getSchools();
       const exp = await window.electronAPI.getExpenses(sid);
+      const dead = await window.electronAPI.getInstallmentDeadlines(sid);
       setPayments(p || []);
       setStudents(s || []);
       setClasses(c || []);
@@ -41,6 +44,7 @@ const Finance: React.FC = () => {
       setClassInstallmentFees(cif || []);
       setSchools(schs || []);
       setExpenses(exp || []);
+      setDeadlines(dead || []);
     }
   };
 
@@ -74,12 +78,18 @@ const Finance: React.FC = () => {
             if (res.receiptNumber) {
                 const s = students.find(stud => stud.id.toString() === newPayment.studentId);
                 const financials = getStudentFinancials(s, newPayment.type);
+                
+                // Intégrer le montant payé actuel dans les calculs financiers pour le reçu
+                const amountPaid = parseFloat(newPayment.amount) || 0;
+                financials.totalPaid += amountPaid;
+                financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
+
                 const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
                 const paymentData = {
                     ...newPayment,
                     receipt_number: res.receiptNumber,
                     payment_date: new Date().toISOString(),
-                    amount: parseFloat(newPayment.amount),
+                    amount: amountPaid,
                     payment_type: newPayment.type
                 };
                 // @ts-ignore
@@ -155,13 +165,37 @@ const Finance: React.FC = () => {
     }
   };
 
+  const handleNotifyRetards = async (installmentId: number) => {
+      if (!window.confirm("Voulez-vous envoyer une notification d'échéance à tous les parents retardataires pour cette tranche ?")) return;
+      setIsNotifying(true);
+      try {
+          if (window.electronAPI && user) {
+              const res = await window.electronAPI.notifyLateInstallments({
+                  schoolId: user.schoolId,
+                  installmentId,
+                  senderId: user.id
+              });
+              if (res.success) {
+                  alert(`${res.notifiedCount} notifications envoyées avec succès.`);
+              } else {
+                  alert(`Erreur: ${res.error}`);
+              }
+          }
+      } catch (err: any) {
+          alert(`Erreur: ${err.message}`);
+      }
+      setIsNotifying(false);
+  };
+
   const getStudentFinancials = (student: any, feeType: string = 'Scolarité') => {
       if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
       
       const activeSchool = schools.find(s => s.id === user?.schoolId) || schools[0] || {};
       
       let totalDue = 0;
-      if (feeType === 'Scolarité') {
+      const isTuitionOrReg = feeType === 'Scolarité' || feeType === 'Inscription';
+
+      if (isTuitionOrReg) {
           const classConfig = tuitionFees.find(f => f.classId === student.class_id);
           const scholarship = student.scholarship_reduction || 0;
           const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
@@ -175,7 +209,10 @@ const Finance: React.FC = () => {
           totalDue = classConfig?.examFee || 0;
       }
 
-      const studentPayments = payments.filter(p => p.student_id === student.id && (p.payment_type === feeType || (!p.payment_type && feeType === 'Scolarité')));
+      const studentPayments = payments.filter(p => p.student_id === student.id && (
+          (isTuitionOrReg && (p.payment_type === 'Scolarité' || p.payment_type === 'Inscription' || !p.payment_type)) ||
+          (!isTuitionOrReg && p.payment_type === feeType)
+      ));
       const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
       let remaining = totalPaid;
       const breakdown: any = { registration: 0, installments: [] };
@@ -276,7 +313,7 @@ const Finance: React.FC = () => {
 
       {activeTab === 'MANAGEMENT' && (
         <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
@@ -310,6 +347,33 @@ const Finance: React.FC = () => {
                     <p className="text-3xl font-black text-rose-500 mt-1">
                         {students.reduce((acc, s) => acc + Math.max(0, getStudentFinancials(s).balance), 0).toLocaleString()} <span className="text-xs">FCFA</span>
                     </p>
+                </div>
+                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all group flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-3 bg-indigo-500/10 rounded-2xl group-hover:bg-indigo-500 transition-all">
+                                <FileText className="text-indigo-500 group-hover:text-slate-950 w-6 h-6" />
+                            </div>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Alertes</span>
+                        </div>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Relance des Échéances</p>
+                        <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1 text-[10px] text-white outline-none mb-3" id="notify-installment-select">
+                            {installments.map(inst => {
+                                const dl = deadlines.find(d => d.installment_id === inst.id)?.deadline_date;
+                                return <option key={inst.id} value={inst.id}>{inst.name} {dl ? `(${dl})` : ''}</option>;
+                            })}
+                        </select>
+                    </div>
+                    <button 
+                        onClick={() => {
+                            const val = (document.getElementById('notify-installment-select') as HTMLSelectElement)?.value;
+                            if (val) handleNotifyRetards(parseInt(val));
+                        }}
+                        disabled={isNotifying || installments.length === 0}
+                        className="w-full py-2 bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-50"
+                    >
+                        {isNotifying ? 'Envoi...' : 'Notifier Retardataires'}
+                    </button>
                 </div>
             </div>
 
@@ -953,29 +1017,42 @@ const Finance: React.FC = () => {
                         </h2>
                         <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
                             {(() => {
-                                const relevant = payments.filter(p => p.payment_type === 'Examen' && p.amount > 0);
-                                const ids = [...new Set(relevant.map(p => p.student_id))];
-                                return ids.length;
+                                const candidates = students.filter(s => {
+                                    const c = classes.find(cl => cl.id === s.class_id);
+                                    if (!c) return false;
+                                    const name = c.name.toUpperCase().replace(/\s+/g, '');
+                                    return name.includes('CM2') || name.includes('CLASS6');
+                                });
+                                return candidates.length;
                             })()} Élèves Inscrits
                         </p>
                     </div>
-                    <div className="divide-y divide-white/5 bg-slate-950/40">
+                    <div className="divide-y divide-white/5 bg-slate-950/40 max-h-64 overflow-y-auto">
                         {(() => {
-                            const relevant = payments.filter(p => p.payment_type === 'Examen' && p.amount > 0);
-                            const ids = [...new Set(relevant.map(p => p.student_id))];
-                            const list = ids.map(id => students.find(s => s.id === id)).filter(Boolean);
-                            if (list.length === 0) {
+                            const candidates = students.filter(s => {
+                                const c = classes.find(cl => cl.id === s.class_id);
+                                if (!c) return false;
+                                const name = c.name.toUpperCase().replace(/\s+/g, '');
+                                return name.includes('CM2') || name.includes('CLASS6');
+                            }).sort((a, b) => a.last_name.localeCompare(b.last_name));
+                            
+                            if (candidates.length === 0) {
                                 return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">Aucun candidat</div>;
                             }
-                            return list.map(s => {
+                            return candidates.map(s => {
                                 const c = classes.find(c => c.id === s.class_id);
+                                const hasPaid = payments.some(p => p.student_id === s.id && p.payment_type === 'Examen' && p.amount > 0);
                                 return (
                                     <div key={s.id} className="p-4 flex justify-between items-center hover:bg-white/5 transition-all">
                                         <div>
                                             <p className="text-sm font-black text-white uppercase">{s.last_name} {s.first_name}</p>
                                             <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">{c?.name}</p>
                                         </div>
-                                        <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                        {hasPaid ? (
+                                            <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                        ) : (
+                                            <div className="text-xs font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-xl">Non Payé</div>
+                                        )}
                                     </div>
                                 );
                             });

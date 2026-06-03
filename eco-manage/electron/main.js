@@ -83,9 +83,12 @@ app.whenReady().then(() => {
   try {
       db.prepare('ALTER TABLE students ADD COLUMN transport_point_id INTEGER REFERENCES transport_points(id)').run();
       console.log('Migration: Added transport_point_id to students table');
-  } catch (err) {
-      // Column might already exist, ignore
-  }
+  } catch (err) {}
+
+  try {
+      db.prepare('ALTER TABLE grades ADD COLUMN teacher_id INTEGER REFERENCES users(id)').run();
+      console.log('Migration: Added teacher_id to grades table');
+  } catch (err) {}
 
   // Self-healing / Seeding of default administration accounts to avoid lockouts
   try {
@@ -240,6 +243,17 @@ app.whenReady().then(() => {
 
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seeding_done', 'true')").run();
   }
+
+  ipcMain.on('dialog:alert', (event, message, title) => {
+    const { dialog } = require('electron');
+    dialog.showMessageBoxSync({
+        type: 'info',
+        title: title || 'Information',
+        message: String(message),
+        buttons: ['OK']
+    });
+    event.returnValue = true;
+  });
 
   createWindow();
 });
@@ -501,6 +515,7 @@ handleIPC('db:getStudents', async (event, schoolId) => {
     FROM students s
     LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
     WHERE s.school_id = ?
+    ORDER BY s.last_name ASC, s.first_name ASC
   `).all(sid);
 });
 
@@ -787,6 +802,67 @@ handleIPC('db:updateClassInstallmentFee', async (event, { classId, installmentId
     `).run(classId, installmentId, amount);
 });
 
+handleIPC('db:getInstallmentDeadlines', async (event, schoolId) => {
+    const sid = getActiveSchoolId(schoolId);
+    return db.prepare('SELECT * FROM school_installment_deadlines WHERE school_id = ?').all(sid);
+});
+
+handleIPC('db:saveInstallmentDeadlines', async (event, { schoolId, deadlines }) => {
+    const sid = getActiveSchoolId(schoolId);
+    const stmt = db.prepare(`
+        INSERT INTO school_installment_deadlines (school_id, installment_id, deadline_date)
+        VALUES (?, ?, ?)
+        ON CONFLICT(school_id, installment_id) DO UPDATE SET deadline_date = excluded.deadline_date
+    `);
+    const transaction = db.transaction((list) => {
+        for (const d of list) {
+            stmt.run(sid, d.installmentId, d.deadlineDate);
+        }
+    });
+    transaction(deadlines);
+    return { success: true };
+});
+
+handleIPC('db:notifyLateInstallments', async (event, { schoolId, installmentId, senderId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    
+    // 1. Get the target installment name and deadline
+    const installment = db.prepare('SELECT name FROM installments WHERE id = ?').get(installmentId);
+    const deadlineRecord = db.prepare('SELECT deadline_date FROM school_installment_deadlines WHERE school_id = ? AND installment_id = ?').get(sid, installmentId);
+    
+    if (!installment || !deadlineRecord || !deadlineRecord.deadline_date) {
+        return { success: false, error: 'Échéance non configurée pour cette tranche.' };
+    }
+
+    // 2. Find students who haven't fully paid this installment
+    // Note: payments table has installment_id OR payment_type = 'Scolarité'.
+    // In our current schema, we check total paid for "Scolarité" vs required per class.
+    // However, to be simple, we can check payments specifically linked to this installment_id.
+    const lateStudents = db.prepare(`
+        SELECT s.id, s.first_name, s.parent_contact, cif.amount as required_amount,
+               COALESCE((SELECT SUM(amount) FROM payments p WHERE p.student_id = s.id AND p.installment_id = ? AND p.payment_type = 'Scolarité'), 0) as paid_amount
+        FROM students s
+        JOIN class_installment_fees cif ON s.class_id = cif.class_id AND cif.installment_id = ?
+        WHERE s.school_id = ?
+    `).all(installmentId, installmentId, sid);
+
+    let notifiedCount = 0;
+    const notifyStmt = db.prepare(`
+        INSERT INTO announcements (school_id, sender_id, target, title, content) 
+        VALUES (?, ?, 'PARENTS', 'Alerte Échéance Scolarité', ?)
+    `);
+
+    for (const student of lateStudents) {
+        if (student.paid_amount < student.required_amount) {
+            const msg = `⚠️ Rappel Important : Le délai pour le paiement de la ${installment.name} approche (${deadlineRecord.deadline_date}). Le montant attendu est de ${student.required_amount} FCFA, dont ${student.paid_amount} FCFA ont été versés. Veuillez régulariser la situation de votre enfant ${student.first_name} dans les plus brefs délais.`;
+            notifyStmt.run(sid, senderId, msg);
+            notifiedCount++;
+        }
+    }
+
+    return { success: true, notifiedCount };
+});
+
 // Pedagogy
 handleIPC('db:getGlobalSubjects', async () => {
   return db.prepare('SELECT * FROM subjects').all();
@@ -898,12 +974,6 @@ handleIPC('db:addClass', async (event, classData) => {
     const { name, code, section, level, mainTeacherId, assistantTeacherId, schoolId, baseClassId } = classData;
     const sid = getActiveSchoolId(schoolId);
     
-    // Check if code is already taken in this school
-    const existing = db.prepare('SELECT id FROM classes WHERE code = ? AND school_id = ?').get(code, sid);
-    if (existing) {
-        throw new Error('Une classe avec ce code existe déjà dans cet établissement.');
-    }
-
     let newClassId;
     db.transaction(() => {
         const info = db.prepare(`
@@ -958,11 +1028,6 @@ handleIPC('db:addClass', async (event, classData) => {
 handleIPC('db:updateClass', async (event, classData) => {
     const { id, name, code, section, level, mainTeacherId, assistantTeacherId } = classData;
     
-    const existing = db.prepare('SELECT id FROM classes WHERE code = ? AND id != ?').get(code, id);
-    if (existing) {
-        throw new Error('Une autre classe utilise déjà ce code.');
-    }
-
     db.transaction(() => {
         // Find previous teacher of this class
         const prevClass = db.prepare('SELECT main_teacher_id FROM classes WHERE id = ?').get(id);
@@ -1263,12 +1328,12 @@ handleIPC('db:getUsers', async (event, schoolId) => {
 });
 
 handleIPC('db:addUser', async (event, user) => {
-  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone } = user;
+  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone, classRole } = user;
   const sid = getActiveSchoolId(schoolId);
   
   const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (existingUsername) {
-      throw new Error('Ce nom d\'utilisateur (identifiant) est déjà pris. Veuillez en choisir un autre.');
+      throw new Error("Ce nom d'utilisateur est déjà utilisé");
   }
 
   const hash = bcrypt.hashSync(password, 10);
@@ -1306,7 +1371,11 @@ handleIPC('db:addUser', async (event, user) => {
     `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null);
     
     if (role === 'TEACHER' && assignedClasses && assignedClasses.length > 0) {
-        db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+        if (classRole === 'ASSISTANT') {
+            db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+        } else {
+            db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+        }
     }
   });
   transaction();
@@ -1327,6 +1396,16 @@ handleIPC('db:deleteUser', async (event, id) => {
   const attendanceCount = db.prepare('SELECT COUNT(*) as count FROM attendance WHERE recorded_by = ?').get(id).count;
   if (attendanceCount > 0) throw new Error('Impossible de supprimer cet utilisateur : des présences lui sont associées. Veuillez désactiver le compte.');
 
+  // Verify if user is main teacher of any class
+  const mainTeacherClasses = db.prepare('SELECT name FROM classes WHERE main_teacher_id = ?').all(id);
+  if (mainTeacherClasses.length > 0) {
+      const classNames = mainTeacherClasses.map(c => c.name).join(', ');
+      throw new Error(`Mesure de sécurité : Impossible de supprimer ce compte car il est Titulaire des classes suivantes : ${classNames}. Veuillez d'abord affecter un autre titulaire à ces classes.`);
+  }
+
+  // Assistant teacher can be safely removed from their class
+  db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ?').run(id);
+
   return db.prepare('DELETE FROM users WHERE id = ?').run(id);
 });
 
@@ -1335,7 +1414,7 @@ handleIPC('db:toggleUserActive', async (event, { id, isActive }) => {
 });
 
 handleIPC('db:updateUser', async (event, userToUpdate) => {
-  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password } = userToUpdate;
+  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
 
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -1374,8 +1453,13 @@ handleIPC('db:updateUser', async (event, userToUpdate) => {
 
     if (finalRole === 'TEACHER') {
         db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ?').run(id);
+        db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ?').run(id);
         if (assignedClasses && assignedClasses.length > 0) {
-            db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+            if (classRole === 'ASSISTANT') {
+                db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+            } else {
+                db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+            }
         }
     }
   });
@@ -1652,15 +1736,14 @@ handleIPC('db:getDashboardStats', async (event, params) => {
   const honorThreshold = schoolConfig.honor_roll_threshold !== undefined ? schoolConfig.honor_roll_threshold : 15.0;
 
   const honorRoll = db.prepare(`
-    SELECT s.first_name, s.last_name, c.name as class_name, AVG(g.score) as avg
+    SELECT s.first_name, s.last_name, c.name as class_name, c.level as class_level, c.section as class_section, AVG(g.score) as avg
     FROM students s
     JOIN classes c ON s.class_id = c.id
     JOIN grades g ON g.student_id = s.id
     WHERE s.school_id = ? ${studentWhereStr}
     GROUP BY s.id
     HAVING avg >= ?
-    ORDER BY avg DESC
-    LIMIT 10
+    ORDER BY c.level ASC, c.section ASC, c.name ASC, avg DESC
   `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : []), honorThreshold] : [schoolId, honorThreshold]));
 
   return {
@@ -1669,7 +1752,7 @@ handleIPC('db:getDashboardStats', async (event, params) => {
     totalRevenue,
     totalTuitionDue,
     classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
-    honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, avg: h.avg || 0 })),
+    honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, level: h.class_level, section: h.class_section, avg: h.avg || 0 })),
     honorRollThreshold: honorThreshold,
     financialAlerts: []
   };
@@ -2059,6 +2142,38 @@ handleIPC('db:addGradeOverride', async (event, { teacherId, classId, term, month
     const cId = classId ? parseInt(classId, 10) : null;
     const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
     return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
+});
+
+handleIPC('db:getParentMessages', async (event, { schoolId, userId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    // Fetch announcements meant for PARENTS or ALL
+    const announcements = db.prepare(`
+        SELECT a.id, a.title, a.content, a.created_at, u.full_name as sender_name, u.role as sender_role 
+        FROM announcements a 
+        LEFT JOIN users u ON a.sender_id = u.id 
+        WHERE a.school_id = ? AND a.target IN ('PARENTS', 'ALL')
+    `).all(sid);
+
+    // Fetch direct tickets to the parent
+    const tickets = db.prepare(`
+        SELECT t.id, t.subject as title, t.message as content, t.created_at, u.full_name as sender_name, u.role as sender_role
+        FROM tickets t
+        LEFT JOIN users u ON t.sender_id = u.id
+        WHERE t.school_id = ? AND t.receiver_id = ?
+    `).all(sid, userId);
+
+    const allMessages = [...announcements, ...tickets];
+    allMessages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    return allMessages;
+});
+
+handleIPC('db:sendParentTicket', async (event, { schoolId, senderId, receiverId, subject, message }) => {
+    const sid = getActiveSchoolId(schoolId);
+    return db.prepare(`
+        INSERT INTO tickets (school_id, sender_id, receiver_role, receiver_id, subject, message, status) 
+        VALUES (?, ?, 'TEACHER', ?, ?, ?, 'OPEN')
+    `).run(sid, senderId, receiverId, subject, message);
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
