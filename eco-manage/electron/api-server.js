@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
 const { db } = require('./database/db');
 
 function startApiServer() {
@@ -79,6 +80,13 @@ function startApiServer() {
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`Mobile API Server running on port ${port}`);
+  });
+
+  // Serve the React frontend for the mobile app
+  const distPath = path.join(__dirname, '../dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 

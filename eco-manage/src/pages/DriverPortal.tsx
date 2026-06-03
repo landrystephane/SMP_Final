@@ -19,6 +19,7 @@ const DriverPortal: React.FC = () => {
   const [filterSection, setFilterSection] = useState('ALL');
   const [filterLevel, setFilterLevel] = useState('ALL');
   const [filterClass, setFilterClass] = useState('ALL');
+  const [classes, setClasses] = useState<any[]>([]);
 
   const loadRouteData = async () => {
     if (window.electronAPI) {
@@ -47,6 +48,9 @@ const DriverPortal: React.FC = () => {
       // Load eligible students that paid for transport but are not assigned
       const eligible = await window.electronAPI.getTransportEligibleStudents(user?.schoolId);
       setEligibleStudents(eligible || []);
+
+      const c = await window.electronAPI.getClasses(user?.schoolId);
+      setClasses(c || []);
     }
   };
 
@@ -282,11 +286,10 @@ const DriverPortal: React.FC = () => {
                                 onChange={e => setFilterClass(e.target.value)}
                             >
                                 <option value="ALL">Toutes Salles</option>
-                                {Array.from(new Set(eligibleStudents
-                                    .filter(s => (filterSection === 'ALL' || s.section === filterSection) && (filterLevel === 'ALL' || s.level === filterLevel))
-                                    .map(s => s.class_name)
-                                )).filter(Boolean).map(cName => (
-                                    <option key={cName} value={cName}>{cName}</option>
+                                {classes
+                                    .filter(c => (filterSection === 'ALL' || c.section === filterSection) && (filterLevel === 'ALL' || c.level === filterLevel))
+                                    .map(c => (
+                                    <option key={c.id} value={c.name}>{c.name}</option>
                                 ))}
                             </select>
                         </div>

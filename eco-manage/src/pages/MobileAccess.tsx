@@ -160,7 +160,7 @@ const MobileAccess: React.FC = () => {
                         <div>
                             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Adresse IP du Serveur Local</p>
                             <p className="text-xl text-amber-500 font-black tracking-widest">{serverIp}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Accès via: http://{serverIp}:5173</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Accès via: http://{serverIp}:3001</p>
                         </div>
                     </div>
                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
