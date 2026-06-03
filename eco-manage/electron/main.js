@@ -1222,8 +1222,8 @@ handleIPC('db:assignStudentToTransportPoint', async (event, { studentId, pointId
             const mapLink = (point.latitude && point.longitude && point.latitude !== 0) ? `https://www.google.com/maps?q=${point.latitude},${point.longitude}` : '';
             const msg = `🚌 **Abonnement Transport Validé**\n\nVotre enfant ${student.first_name} a été assigné au point de ramassage : **${point.name}**.\nLe bus passera approximativement à **+${point.estimated_time_from_start} minutes** après le départ de la tournée.\n\n${mapLink ? `📍 [Voir sur Google Maps](${mapLink})` : ''}`;
             
-            db.prepare('INSERT INTO announcements (school_id, sender_id, target_role, title, content, target_users) VALUES (?, ?, ?, ?, ?, ?)')
-              .run(getActiveSchoolId(), loggedInUser?.id || 1, 'PARENT', 'Info Transport', msg, JSON.stringify([parentUser.id]));
+            db.prepare('INSERT INTO tickets (school_id, sender_id, receiver_id, receiver_role, subject, message) VALUES (?, ?, ?, ?, ?, ?)')
+              .run(getActiveSchoolId(), loggedInUser?.id || 1, parentUser.id, 'PARENT', 'Info Transport', msg);
         }
     }
     return { success: true };
