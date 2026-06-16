@@ -1,10 +1,24 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
 
-const userDataPath = app.getPath('userData');
-const dbPath = path.join(userDataPath, 'school.db');
+let dbPath;
+
+// Determine if running inside Electron or as a standard Node.js process (Cloud)
+if (process.versions && process.versions.electron) {
+    const { app } = require('electron');
+    const userDataPath = app.getPath('userData');
+    dbPath = path.join(userDataPath, 'school.db');
+} else {
+    // Web Server / Cloud mode
+    // Use an environment variable, or default to a local 'data' folder
+    const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
+    dbPath = path.join(dataDir, 'school.db');
+}
+
 const schemaPath = path.join(__dirname, 'schema.sql');
 
 if (!fs.existsSync(path.dirname(dbPath))) {
@@ -124,10 +138,15 @@ function initDb() {
         const addCol = (name, def) => {
             if (!schoolCols.find(c => c.name === name)) {
                 console.log(`[Migration] Adding ${name} to schools`);
-                const escapedDef = def.replace(/'/g, "''");
+                const escapedDef = def ? def.replace(/'/g, "''") : '';
                 db.prepare(`ALTER TABLE schools ADD COLUMN ${name} TEXT DEFAULT '${escapedDef}'`).run();
             }
         };
+        addCol('motto', '');
+        addCol('bp', '');
+        addCol('contact_email', '');
+        addCol('contact_phone', '');
+        addCol('logo', '');
         addCol('primary_color', '#1e293b');
         addCol('secondary_color', '#f59e0b');
         addCol('receipt_sig_title', "Signature de l'Économe");
@@ -190,6 +209,18 @@ function initDb() {
         if (!schoolCols.find(c => c.name === 'is_active')) {
             console.log(`[Migration] Adding is_active to schools`);
             db.prepare(`ALTER TABLE schools ADD COLUMN is_active INTEGER DEFAULT 1`).run();
+        }
+        
+        // SaaS Subscription Migration
+        if (!schoolCols.find(c => c.name === 'subscription_end_date')) {
+            console.log(`[Migration] Adding subscription_end_date to schools`);
+            // Set existing schools to have 1 year of free trial by default from today
+            db.prepare(`ALTER TABLE schools ADD COLUMN subscription_end_date DATE DEFAULT NULL`).run();
+            db.prepare(`UPDATE schools SET subscription_end_date = date('now', '+1 year') WHERE subscription_end_date IS NULL`).run();
+        }
+        if (!schoolCols.find(c => c.name === 'subscription_status')) {
+            console.log(`[Migration] Adding subscription_status to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN subscription_status TEXT DEFAULT 'ACTIVE'`).run();
         }
     } catch (e) {
         console.error(`[Migration] Schools deletion and active columns migration failed:`, e.message);
@@ -326,7 +357,7 @@ function initDb() {
                     { name: 'Mathematics', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
                     { name: 'English Language', domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
                     { name: 'General Science', domain: 'Sciences and Technology', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
-                    { name: 'Social Studies & History', domain: 'Human Sciences', level: 'ANGLOPHONE' },
+                    { name: 'Social Studies & History', domain: 'Human Sciences', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
                     { name: 'Citizenship Education & Morals', domain: 'Personal Development', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
                     { name: 'Creative Arts & Music', domain: 'Culture & Arts', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
                     { name: 'Physical Education & Sports', domain: 'Well-being', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
@@ -384,26 +415,101 @@ function initDb() {
         console.error(`[Migration] Subject seeding/linking failed:`, e.message);
     }
 
-    // Clean up duplicate teacher assignments
+    // 9. New migrations for School Management evolutions
     try {
-        const duplicateTeachers = db.prepare(`
-            SELECT main_teacher_id, COUNT(*) as count 
-            FROM classes 
-            WHERE main_teacher_id IS NOT NULL 
-            GROUP BY main_teacher_id 
-            HAVING count > 1
-        `).all();
+        // Schools table columns: requires_subject_code, allow_founder_term_edit, term_structure
+        const schoolCols = db.prepare(`PRAGMA table_info(schools)`).all();
+        if (!schoolCols.find(c => c.name === 'requires_subject_code')) {
+            console.log(`[Migration] Adding requires_subject_code to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN requires_subject_code INTEGER DEFAULT 1`).run();
+        }
+        if (!schoolCols.find(c => c.name === 'allow_founder_term_edit')) {
+            console.log(`[Migration] Adding allow_founder_term_edit to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN allow_founder_term_edit INTEGER DEFAULT 0`).run();
+        }
+        if (!schoolCols.find(c => c.name === 'term_structure')) {
+            console.log(`[Migration] Adding term_structure to schools`);
+            db.prepare(`ALTER TABLE schools ADD COLUMN term_structure TEXT DEFAULT '[{"term_id":1,"name":"1ER TRIMESTRE","sequences":[{"id":1,"name":"Séquence 1"},{"id":2,"name":"Séquence 2"}]},{"term_id":2,"name":"2E TRIMESTRE","sequences":[{"id":3,"name":"Séquence 3"},{"id":4,"name":"Séquence 4"}]},{"term_id":3,"name":"3E TRIMESTRE","sequences":[{"id":5,"name":"Séquence 5"},{"id":6,"name":"Séquence 6"}]}]'`).run();
+        }
 
-        duplicateTeachers.forEach(t => {
-            const classIds = db.prepare('SELECT id FROM classes WHERE main_teacher_id = ? ORDER BY id DESC').all(t.main_teacher_id);
-            // Keep the first (latest), set NULL for others
-            for (let i = 1; i < classIds.length; i++) {
-                db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE id = ?').run(classIds[i].id);
-            }
-        });
-        console.log(`[Migration] Cleaned up duplicate teacher assignments`);
+        // Classes table columns: grading_scale_id
+        const classCols = db.prepare(`PRAGMA table_info(classes)`).all();
+        if (!classCols.find(c => c.name === 'grading_scale_id')) {
+            console.log(`[Migration] Adding grading_scale_id to classes`);
+            db.prepare(`ALTER TABLE classes ADD COLUMN grading_scale_id INTEGER`).run();
+        }
+
+        // Grades table columns: letter_score
+        const gradeCols = db.prepare(`PRAGMA table_info(grades)`).all();
+        if (!gradeCols.find(c => c.name === 'letter_score')) {
+            console.log(`[Migration] Adding letter_score to grades`);
+            db.prepare(`ALTER TABLE grades ADD COLUMN letter_score TEXT`).run();
+        }
+
+        // Notifications table columns: request_type, request_data, action_status
+        const notifCols = db.prepare(`PRAGMA table_info(notifications)`).all();
+        if (!notifCols.find(c => c.name === 'request_type')) {
+            console.log(`[Migration] Adding request_type to notifications`);
+            db.prepare(`ALTER TABLE notifications ADD COLUMN request_type TEXT`).run();
+        }
+        if (!notifCols.find(c => c.name === 'request_data')) {
+            console.log(`[Migration] Adding request_data to notifications`);
+            db.prepare(`ALTER TABLE notifications ADD COLUMN request_data TEXT`).run();
+        }
+        if (!notifCols.find(c => c.name === 'action_status')) {
+            console.log(`[Migration] Adding action_status to notifications`);
+            db.prepare(`ALTER TABLE notifications ADD COLUMN action_status TEXT DEFAULT 'PENDING'`).run();
+        }
+
+        // Create new tables
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS pending_subjects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_id INTEGER,
+                name TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                level TEXT NOT NULL,
+                section TEXT NOT NULL,
+                activation_code TEXT NOT NULL,
+                status TEXT DEFAULT 'PENDING',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (school_id) REFERENCES schools(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS class_teacher_subjects (
+                class_id INTEGER,
+                subject_id INTEGER,
+                teacher_id INTEGER,
+                PRIMARY KEY (class_id, subject_id, teacher_id),
+                FOREIGN KEY (class_id) REFERENCES classes(id),
+                FOREIGN KEY (subject_id) REFERENCES subjects(id),
+                FOREIGN KEY (teacher_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS grading_scales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_id INTEGER,
+                name TEXT NOT NULL,
+                is_numerical INTEGER DEFAULT 0,
+                min_value REAL,
+                max_value REAL,
+                FOREIGN KEY (school_id) REFERENCES schools(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS grading_scale_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scale_id INTEGER,
+                symbol TEXT NOT NULL,
+                min_range REAL,
+                max_range REAL,
+                numeric_equivalent REAL NOT NULL,
+                description TEXT,
+                FOREIGN KEY (scale_id) REFERENCES grading_scales(id)
+            );
+        `);
+        console.log(`[Migration] New evolution tables verified/created successfully`);
     } catch (e) {
-        console.error("Failed to clean up duplicate teacher assignments:", e.message);
+        console.error(`[Migration] New school evolutions migration failed:`, e.message);
     }
 
     console.log('Database initialized and migrated at:', dbPath);

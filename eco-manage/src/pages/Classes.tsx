@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { Building2, Plus, Edit2, Trash2, Users, Search, Save, X, Copy } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Users, Search, Save, X, Copy, BookOpen } from 'lucide-react';
+import { useNotification } from '../context/NotificationContext';
 
 const Classes: React.FC = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { showNotification } = useNotification();
+    
     const [classes, setClasses] = useState<any[]>([]);
     const [teachers, setTeachers] = useState<any[]>([]);
+    const [gradingScales, setGradingScales] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     
+    // For teacher assignment modal
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedClassForAssign, setSelectedClassForAssign] = useState<any>(null);
+    const [classSubjects, setClassSubjects] = useState<any[]>([]);
+    const [assignments, setAssignments] = useState<Record<number, number>>({}); // subject_id -> teacher_id
+
     // Form state
     const [formData, setFormData] = useState({
         id: null as number | null,
@@ -20,7 +30,8 @@ const Classes: React.FC = () => {
         level: 'PRIMAIRE',
         mainTeacherId: '',
         assistantTeacherId: '',
-        baseClassId: ''
+        baseClassId: '',
+        gradingScaleId: ''
     });
 
     const loadData = async () => {
@@ -31,6 +42,9 @@ const Classes: React.FC = () => {
             const users = await window.electronAPI.getUsers(user.schoolId);
             const staff = users.filter((u: any) => u.role?.trim().toUpperCase() === 'TEACHER');
             setTeachers(staff || []);
+
+            const scales = await (window.electronAPI as any).getGradingScales(user.schoolId);
+            setGradingScales(scales || []);
         }
     };
 
@@ -48,7 +62,8 @@ const Classes: React.FC = () => {
                 level: cls.level,
                 mainTeacherId: cls.main_teacher_id?.toString() || '',
                 assistantTeacherId: cls.assistant_teacher_id?.toString() || '',
-                baseClassId: ''
+                baseClassId: '',
+                gradingScaleId: cls.grading_scale_id?.toString() || ''
             });
         } else {
             setFormData({
@@ -59,7 +74,8 @@ const Classes: React.FC = () => {
                 level: 'PRIMAIRE',
                 mainTeacherId: '',
                 assistantTeacherId: '',
-                baseClassId: ''
+                baseClassId: '',
+                gradingScaleId: ''
             });
         }
         setIsModalOpen(true);
@@ -78,17 +94,28 @@ const Classes: React.FC = () => {
                 baseClassId: formData.baseClassId ? parseInt(formData.baseClassId) : null
             };
 
+            let classId = formData.id;
             if (formData.id) {
                 const res = await (window.electronAPI as any).updateClass(dataToSave);
                 if (res.error) throw new Error(res.error);
             } else {
                 const res = await (window.electronAPI as any).addClass(dataToSave);
                 if (res.error) throw new Error(res.error);
+                classId = res.id;
             }
+
+            if (classId) {
+                await (window.electronAPI as any).setClassGradingScale({
+                    classId,
+                    scaleId: formData.gradingScaleId ? parseInt(formData.gradingScaleId) : null
+                });
+            }
+
+            showNotification(formData.id ? "Classe mise à jour avec succès !" : "Classe créée avec succès !", "success");
             await loadData();
             setIsModalOpen(false);
         } catch (err: any) {
-            alert("Erreur : " + err.message);
+            showNotification("Erreur : " + err.message, "error");
         }
     };
 
@@ -99,9 +126,52 @@ const Classes: React.FC = () => {
         try {
             const res = await (window.electronAPI as any).deleteClass(id);
             if (res.error) throw new Error(res.error);
+            showNotification("Classe supprimée avec succès !", "success");
             await loadData();
         } catch (err: any) {
-            alert("Erreur : " + err.message);
+            showNotification("Erreur : " + err.message, "error");
+        }
+    };
+
+    const handleOpenAssignModal = async (cls: any) => {
+        if (!window.electronAPI) return;
+        try {
+            setSelectedClassForAssign(cls);
+            const subjs = await window.electronAPI.getClassSubjects(cls.id);
+            setClassSubjects(subjs || []);
+            
+            const currentAssignments = await (window.electronAPI as any).getClassTeacherAssignments(cls.id);
+            const initialAssignments: Record<number, number> = {};
+            if (currentAssignments && Array.isArray(currentAssignments)) {
+                currentAssignments.forEach((a: any) => {
+                    initialAssignments[a.subject_id] = a.teacher_id;
+                });
+            }
+            setAssignments(initialAssignments);
+            setIsAssignModalOpen(true);
+        } catch (e: any) {
+            showNotification("Erreur lors du chargement des affectations : " + e.message, "error");
+        }
+    };
+
+    const handleSaveAssignments = async () => {
+        if (!window.electronAPI || !selectedClassForAssign) return;
+        try {
+            const assignmentArray = Object.entries(assignments).map(([subjId, teachId]) => ({
+                subject_id: parseInt(subjId),
+                teacher_id: teachId
+            })).filter(a => a.teacher_id !== null && !isNaN(a.teacher_id));
+
+            const res = await (window.electronAPI as any).saveClassTeacherAssignments({
+                classId: selectedClassForAssign.id,
+                assignments: assignmentArray
+            });
+            if (res.error) throw new Error(res.error);
+            showNotification("Affectations de la classe enregistrées avec succès !", "success");
+            setIsAssignModalOpen(false);
+            loadData();
+        } catch (e: any) {
+            showNotification("Erreur lors de la sauvegarde : " + e.message, "error");
         }
     };
 
@@ -174,10 +244,17 @@ const Classes: React.FC = () => {
                                     </td>
                                     <td className="p-4">
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleOpenModal(c)} className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors">
+                                            <button 
+                                                onClick={() => handleOpenAssignModal(c)} 
+                                                className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
+                                                title="Affecter Enseignants aux Matières"
+                                            >
+                                                <Users className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleOpenModal(c)} className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Modifier">
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => handleDelete(c.id)} className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors">
+                                            <button onClick={() => handleDelete(c.id)} className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Supprimer">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -299,6 +376,22 @@ const Classes: React.FC = () => {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Barème / Échelle de notation</label>
+                                <select
+                                    className="input-field w-full mt-1"
+                                    value={formData.gradingScaleId}
+                                    onChange={(e) => setFormData({...formData, gradingScaleId: e.target.value})}
+                                >
+                                    <option value="">-- Notation standard (Saisie sur 20 brute) --</option>
+                                    {gradingScales.map(scale => (
+                                        <option key={scale.id} value={scale.id}>
+                                            {scale.name} ({scale.is_numerical ? 'Conversion numérique' : 'Saisie littérale'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="pt-4 flex gap-3">
                                 <button
                                     type="button"
@@ -316,6 +409,79 @@ const Classes: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Affectations Enseignants */}
+            {isAssignModalOpen && selectedClassForAssign && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center p-6 border-b border-white/5 bg-slate-800/50">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Users className="w-6 h-6 text-amber-500" />
+                                    Affectation des Enseignants aux Matières
+                                </h2>
+                                <p className="text-xs text-slate-400 mt-1">Classe : <span className="text-amber-500 font-bold">{selectedClassForAssign.name}</span></p>
+                            </div>
+                            <button onClick={() => setIsAssignModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 custom-scrollbar">
+                            {classSubjects.length === 0 ? (
+                                <p className="text-center text-slate-500 py-8">Aucune matière n'est assignée à cette classe.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {classSubjects.map((sub: any) => (
+                                        <div key={sub.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl gap-3">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white">{sub.name}</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{sub.domain}</p>
+                                            </div>
+                                            <div className="w-full md:w-64">
+                                                <select
+                                                    value={assignments[sub.id] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value ? parseInt(e.target.value) : '';
+                                                        setAssignments({
+                                                            ...assignments,
+                                                            [sub.id]: val as any
+                                                        });
+                                                    }}
+                                                    className="input-field w-full"
+                                                >
+                                                    <option value="">-- Non assigné --</option>
+                                                    {teachers.map(t => (
+                                                        <option key={t.id} value={t.id}>{t.fullName}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-white/5 bg-slate-900/50 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsAssignModalOpen(false)}
+                                className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveAssignments}
+                                className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
+                            >
+                                <Save className="w-5 h-5" />
+                                Enregistrer les Affectations
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

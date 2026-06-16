@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -51,46 +52,48 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/activate" element={<MobileProvisioning />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="students" element={<Students />} />
-            <Route path="subjects" element={<Subjects />} />
-            <Route path="grades" element={<Grades />} />
-            <Route path="finance" element={<Finance />} />
-            <Route path="tuition-config" element={<TuitionConfig />} />
-            <Route path="admin-workflow" element={<AdminWorkflow />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="tickets" element={<Tickets />} />
-            <Route path="transport" element={<Transport />} />
-            <Route path="users" element={<Users />} />
-            <Route path="parents" element={<Parents />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="mobile-access" element={<MobileAccess />} />
-            <Route path="sync" element={<SyncCenter />} />
-            <Route path="system-admin" element={<SystemAdmin />} />
-            <Route path="advisor" element={<AdvisorPortal />} />
-            <Route path="driver-portal" element={<DriverPortal />} />
-            <Route path="parent-portal" element={<ParentPortal />} />
-            <Route path="stats" element={<Statistics />} />
-            <Route path="customization" element={<CustomizationSettings />} />
-            <Route path="archives" element={<AnnualArchives />} />
-            <Route path="classes" element={<Classes />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <NotificationProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/activate" element={<MobileProvisioning />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="students" element={<Students />} />
+              <Route path="subjects" element={<Subjects />} />
+              <Route path="grades" element={<Grades />} />
+              <Route path="finance" element={<Finance />} />
+              <Route path="tuition-config" element={<TuitionConfig />} />
+              <Route path="admin-workflow" element={<AdminWorkflow />} />
+              <Route path="attendance" element={<Attendance />} />
+              <Route path="tickets" element={<Tickets />} />
+              <Route path="transport" element={<Transport />} />
+              <Route path="users" element={<Users />} />
+              <Route path="parents" element={<Parents />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="mobile-access" element={<MobileAccess />} />
+              <Route path="sync" element={<SyncCenter />} />
+              <Route path="system-admin" element={<SystemAdmin />} />
+              <Route path="advisor" element={<AdvisorPortal />} />
+              <Route path="driver-portal" element={<DriverPortal />} />
+              <Route path="parent-portal" element={<ParentPortal />} />
+              <Route path="stats" element={<Statistics />} />
+              <Route path="customization" element={<CustomizationSettings />} />
+              <Route path="archives" element={<AnnualArchives />} />
+              <Route path="classes" element={<Classes />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

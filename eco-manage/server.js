@@ -1,0 +1,185 @@
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { initDb, db } = require('./electron/database/db');
+const jwt = require('jsonwebtoken');
+const session = require('./electron/database/session');
+const JWT_SECRET = process.env.JWT_SECRET || 'eco-manage-super-secret-key';
+const apiHandlers = require('./electron/database/apiHandlers');
+
+// Initialisation de la base de données
+initDb();
+
+const app = express();
+// Le Cloud (Railway/VPS) injecte process.env.PORT, sinon on utilise 3001
+const port = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(bodyParser.json());
+
+app.use('/api', (req, res, next) => {
+    if (req.path === '/auth/login') return next();
+    
+    const authHeader = req.headers.authorization;
+    let user = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+            user = jwt.verify(token, JWT_SECRET);
+        } catch (e) {}
+    }
+    
+    if (req.path.startsWith('/saas/')) {
+        if (!user || user.role !== 'SUPERADMIN') {
+            return res.status(403).json({ error: 'Accès réservé au Super Admin' });
+        }
+    }
+    
+    session.run({ user }, () => {
+        next();
+    });
+});
+
+// ==========================================
+// ROUTES API (Migration de l'ancien IPC)
+// ==========================================
+
+// Route générique pour toutes les requêtes IPC
+app.post('/api/ipc', async (req, res) => {
+    const { channel, args } = req.body;
+    try {
+        if (apiHandlers[channel]) {
+            // L'application web envoie les arguments sous forme de tableau
+            const result = await apiHandlers[channel](...(args || []));
+            res.json({ success: true, result });
+        } else {
+            console.warn(`Channel IPC inconnu : ${channel}`);
+            res.status(404).json({ error: 'Endpoint introuvable' });
+        }
+    } catch (error) {
+        console.error(`[IPC Error Web] ${channel}:`, error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// Route de vérification de santé
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', message: 'SaaS Web API is running perfectly!' });
+});
+
+// Migration de 'auth:login'
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    try {
+        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR matricule = ?').get(username, username);
+        
+        if (!user) return res.status(401).json({ error: 'Utilisateur ou mot de passe incorrect' });
+        
+        user.full_name = user.fullName;
+
+        // Block login if school is deleted or suspended
+        if (user.role !== 'SUPERADMIN') {
+            const school = db.prepare('SELECT deleted_at, is_active FROM schools WHERE id = ?').get(user.schoolId);
+            if (school) {
+                if (school.deleted_at !== null) {
+                    return res.status(403).json({ error: "Cet établissement a été supprimé. Accès refusé." });
+                }
+                if (school.is_active === 0) {
+                    return res.status(403).json({ error: "L'accès de cet établissement a été temporairement suspendu. Veuillez contacter l'administrateur." });
+                }
+            }
+        }
+
+        let isValid = false;
+        if (user.hash.length === 64 && !user.hash.startsWith('$2a$')) {
+            const oldHash = crypto.createHash('sha256').update(password).digest('hex');
+            isValid = (oldHash === user.hash);
+            if (isValid) {
+                const newHash = bcrypt.hashSync(password, 10);
+                db.prepare('UPDATE users SET password = ? WHERE id = ?').run(newHash, user.id);
+            }
+        } else {
+            isValid = bcrypt.compareSync(password, user.hash);
+        }
+
+        if (isValid) {
+            delete user.hash;
+            // Todo: Implement standard web tokens (JWT/Session) for the SaaS version
+            // For now, we return the user object like Electron did
+                        const token = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({ success: true, user, token });
+        }
+        
+        return res.status(401).json({ error: 'Utilisateur ou mot de passe incorrect' });
+
+    } catch (error) {
+        console.error('Erreur login API:', error);
+        res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+});
+
+// ==========================================
+// ROUTES SUPER ADMIN (Gestion SaaS)
+// ==========================================
+
+// Récupérer toutes les écoles (Pour le tableau de bord SuperAdmin)
+app.get('/api/saas/schools', (req, res) => {
+    try {
+        // Todo: Add authentication middleware to verify SuperAdmin token
+        const schools = db.prepare('SELECT id, name, contact_email, contact_phone, subscription_status, subscription_end_date, is_active FROM schools WHERE deleted_at IS NULL').all();
+        res.json({ success: true, schools });
+    } catch (error) {
+        res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+});
+
+// Valider un paiement en espèces et activer/renouveler l'abonnement
+app.post('/api/saas/validate-payment', (req, res) => {
+    const { schoolId, monthsGranted, amount, superAdminId } = req.body;
+    
+    try {
+        const transaction = db.transaction(() => {
+            // 1. Enregistrer le paiement
+            db.prepare(`
+                INSERT INTO saas_subscriptions (school_id, amount, payment_method, months_granted, start_date, end_date, status, validated_by)
+                VALUES (?, ?, 'CASH', ?, date('now'), date('now', '+' || ? || ' months'), 'VALIDATED', ?)
+            `).run(schoolId, amount, monthsGranted, monthsGranted, superAdminId);
+
+            // 2. Mettre à jour la date de fin d'abonnement de l'école
+            db.prepare(`
+                UPDATE schools 
+                SET subscription_status = 'ACTIVE', 
+                    subscription_end_date = date(COALESCE(subscription_end_date, date('now')), '+' || ? || ' months'),
+                    is_active = 1
+                WHERE id = ?
+            `).run(monthsGranted, schoolId);
+        });
+
+        transaction();
+        res.json({ success: true, message: 'Paiement validé et abonnement renouvelé avec succès.' });
+    } catch (error) {
+        console.error('Erreur validation paiement:', error);
+        res.status(500).json({ error: 'Impossible de valider le paiement.' });
+    }
+});
+
+
+// ==========================================
+// SERVEUR FRONTEND (React)
+// ==========================================
+// Si on n'appelle pas l'API, on affiche le site web
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Démarrage
+app.listen(port, '0.0.0.0', () => {
+    console.log(`[🚀 SaaS Cloud] Serveur démarré et accessible sur le port ${port}`);
+});

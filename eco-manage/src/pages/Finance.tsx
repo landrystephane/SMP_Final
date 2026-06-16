@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 const Finance: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -69,7 +72,7 @@ const Finance: React.FC = () => {
             });
             
             if (res && res.error) {
-                alert(`Erreur de paiement: ${res.error}`);
+                showNotification(`Erreur de paiement: ${res.error}`, "error");
                 setIsAddingPayment(false);
                 return;
             }
@@ -98,10 +101,11 @@ const Finance: React.FC = () => {
 
             setIsAddingPayment(false);
             setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
+            showNotification("Paiement enregistré et reçu généré avec succès !", "success");
             loadData();
         } catch (err: any) {
             console.error(err);
-            alert("Erreur: " + err.message);
+            showNotification("Erreur: " + err.message, "error");
         }
     }
   };
@@ -127,11 +131,11 @@ const Finance: React.FC = () => {
             });
 
             setNewExpense({ amount: '', reason: '' });
-            alert("Demande de décaissement soumise pour validation.");
+            showNotification("Demande de décaissement soumise pour validation.", "success");
             loadData();
         } catch (err: any) {
             console.error(err);
-            alert("Erreur: " + err.message);
+            showNotification("Erreur: " + err.message, "error");
         }
     }
   };
@@ -160,31 +164,36 @@ const Finance: React.FC = () => {
             loadData();
         } catch (err: any) {
             console.error(err);
-            alert("Erreur: " + err.message);
+            showNotification("Erreur: " + err.message, "error");
         }
     }
   };
 
   const handleNotifyRetards = async (installmentId: number) => {
-      if (!window.confirm("Voulez-vous envoyer une notification d'échéance à tous les parents retardataires pour cette tranche ?")) return;
-      setIsNotifying(true);
-      try {
-          if (window.electronAPI && user) {
-              const res = await window.electronAPI.notifyLateInstallments({
-                  schoolId: user.schoolId,
-                  installmentId,
-                  senderId: user.id
-              });
-              if (res.success) {
-                  alert(`${res.notifiedCount} notifications envoyées avec succès.`);
-              } else {
-                  alert(`Erreur: ${res.error}`);
+      setConfirmModal({
+          title: "Envoyer les relances d'échéance",
+          message: "Voulez-vous envoyer une notification d'échéance à tous les parents retardataires pour cette tranche ?",
+          onConfirm: async () => {
+              setIsNotifying(true);
+              try {
+                  if (window.electronAPI && user) {
+                      const res = await window.electronAPI.notifyLateInstallments({
+                          schoolId: user.schoolId,
+                          installmentId,
+                          senderId: user.id
+                      });
+                      if (res.success) {
+                          showNotification(`${res.notifiedCount} notifications envoyées avec succès.`, "success");
+                      } else {
+                          showNotification(`Erreur: ${res.error}`, "error");
+                      }
+                  }
+              } catch (err: any) {
+                  showNotification(`Erreur: ${err.message}`, "error");
               }
+              setIsNotifying(false);
           }
-      } catch (err: any) {
-          alert(`Erreur: ${err.message}`);
-      }
-      setIsNotifying(false);
+      });
   };
 
   const getStudentFinancials = (student: any, feeType: string = 'Scolarité') => {
@@ -1060,6 +1069,33 @@ const Finance: React.FC = () => {
                     </div>
                 </div>
             </div>
+        </div>
+      )}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-white italic">{confirmModal.title}</h3>
+              <p className="text-slate-400 text-sm font-semibold">{confirmModal.message}</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -14,6 +14,18 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
   const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
+  const [phoneCountry, setPhoneCountry] = useState(() => {
+    const contact = student?.parent_contact || '';
+    if (contact.startsWith('237')) return '237';
+    if (contact.startsWith('241')) return '241';
+    if (contact.startsWith('225')) return '225';
+    if (contact.startsWith('221')) return '221';
+    if (contact.startsWith('242')) return '242';
+    if (contact.startsWith('236')) return '236';
+    if (contact.startsWith('240')) return '240';
+    return '237';
+  });
+
   const [formData, setFormData] = useState({
     firstName: student?.first_name || '',
     lastName: student?.last_name || '',
@@ -21,7 +33,14 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
     birthPlace: student?.birth_place || '',
     gender: student?.gender || 'M',
     parentName: student?.parent_name || '',
-    parentContact: student?.parent_contact || '',
+    parentContact: (() => {
+      const contact = student?.parent_contact || '';
+      const codes = ['237', '241', '225', '221', '242', '236', '240'];
+      for (const code of codes) {
+        if (contact.startsWith(code)) return contact.slice(code.length);
+      }
+      return contact;
+    })(),
     emergencyContact: student?.emergency_contact || '',
     medicalInfo: student?.medical_info || '',
     address: student?.address || '',
@@ -34,6 +53,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
     busRouteId: student?.bus_route_id?.toString() || '',
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -61,51 +81,101 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setFieldErrors({});
+    const errors: Record<string, string> = {};
+
     if (!formData.classId) {
-        setFormError(t('alert_select_class'));
-        return;
+        errors.classId = t('alert_select_class', 'Veuillez sélectionner une classe');
     }
 
-    // Name validations (Must contain only letters, spaces, hyphens)
-    const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
-    if (!nameRegex.test(formData.firstName.trim()) || !nameRegex.test(formData.lastName.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom et le Prénom de l'élève ne doivent contenir que des lettres.");
-        return;
+    // Name validations (Letters, spaces, hyphens, and numbers like "Bastos 2" allowed)
+    const nameRegex = /^[A-Za-zÀ-ÿ0-9\s\-]+$/;
+    if (!formData.lastName.trim()) {
+        errors.lastName = t('field_required', 'Ce champ est requis');
+    } else if (!nameRegex.test(formData.lastName.trim())) {
+        errors.lastName = t('invalid_name_chars', "Le nom ne doit contenir que des lettres, chiffres, espaces et tirets");
     }
+
+    if (!formData.firstName.trim()) {
+        errors.firstName = t('field_required', 'Ce champ est requis');
+    } else if (!nameRegex.test(formData.firstName.trim())) {
+        errors.firstName = t('invalid_name_chars', "Le prénom ne doit contenir que des lettres, chiffres, espaces et tirets");
+    }
+
     if (formData.parentName && !nameRegex.test(formData.parentName.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe nom du parent/tuteur ne doit contenir que des lettres.");
-        return;
+        errors.parentName = t('invalid_name_chars', "Le nom ne doit contenir que des lettres, chiffres, espaces et tirets");
     }
 
-    // Cameroonian phone validation for parentContact
+    // Birth date validation: must be N-2
+    const birthYear = new Date(formData.birthDate).getFullYear();
+    const currentYear = new Date().getFullYear();
+    if (!formData.birthDate) {
+        errors.birthDate = t('field_required', 'Ce champ est requis');
+    } else if (birthYear > currentYear - 2) {
+        errors.birthDate = t('invalid_birth_date_n2', `L'élève doit être né au plus tard le 31 décembre ${currentYear - 2}`);
+    }
+
+    // Phone validation based on countryCode selected
     let cleanPhone = formData.parentContact.replace(/[\s\-\(\)\+]/g, '');
-    if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
-        cleanPhone = cleanPhone.slice(3);
-    }
-    if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
-        setFormError(t('alert_invalid_phone_parent'));
-        return;
+    if (phoneCountry !== 'other' && cleanPhone.startsWith(phoneCountry) && cleanPhone.length > phoneCountry.length) {
+        cleanPhone = cleanPhone.slice(phoneCountry.length);
     }
 
-    // Secondary emergency contact validation if provided
+    let phoneIsValid = false;
+    if (phoneCountry === '237') {
+        phoneIsValid = /^(2|3|6)\d{8}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cm', 'Numéro camerounais invalide (9 chiffres attendus, ex: 699000000)');
+    } else if (phoneCountry === '241') {
+        phoneIsValid = /^[1-7]\d{7}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_ga', 'Numéro gabonais invalide (8 chiffres attendus, ex: 66000000)');
+    } else if (phoneCountry === '225') {
+        phoneIsValid = /^0\d{9}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_ci', 'Numéro ivoirien invalide (10 chiffres attendus, ex: 0700000000)');
+    } else if (phoneCountry === '221') {
+        phoneIsValid = /^7\d{8}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_sn', 'Numéro sénégalais invalide (9 chiffres attendus, ex: 770000000)');
+    } else if (phoneCountry === '242') {
+        phoneIsValid = /^(05|06)\d{7}$/.test(cleanPhone) || /^[0-9]\d{6,8}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cg', 'Numéro congolais invalide');
+    } else if (phoneCountry === '236') {
+        phoneIsValid = /^[7]\d{7}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cf', 'Numéro centrafricain invalide');
+    } else if (phoneCountry === '240') {
+        phoneIsValid = /^(2|5)\d{8}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_gq', 'Numéro équato-guinéen invalide');
+    } else {
+        phoneIsValid = /^\d{6,15}$/.test(cleanPhone);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_int', 'Numéro de téléphone invalide');
+    }
+
+    // Secondary contact check
     if (formData.emergencyContact && formData.emergencyContact.trim()) {
         const matches = formData.emergencyContact.match(/\d+/g);
         if (matches) {
             const digitStr = matches.join('');
             let cleanUrgence = digitStr;
-            if (cleanUrgence.startsWith('237') && cleanUrgence.length > 9) {
-                cleanUrgence = cleanUrgence.slice(3);
+            if (phoneCountry !== 'other' && cleanUrgence.startsWith(phoneCountry) && cleanUrgence.length > phoneCountry.length) {
+                cleanUrgence = cleanUrgence.slice(phoneCountry.length);
             }
-            if (!/^(2|6)\d{8}$/.test(cleanUrgence)) {
-                setFormError(t('alert_invalid_emergency_contact'));
-                return;
+            if (!/^\d{6,15}$/.test(cleanUrgence)) {
+                errors.emergencyContact = t('alert_invalid_emergency_contact', 'Contact urgence invalide');
             }
+        } else {
+            errors.emergencyContact = t('alert_invalid_emergency_contact', 'Contact urgence invalide');
         }
     }
 
+    if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setFormError("Veuillez corriger les erreurs de saisie dans le formulaire.");
+        return;
+    }
+
+    const finalParentContact = phoneCountry === 'other' ? cleanPhone : phoneCountry + cleanPhone;
+
     onSubmit({
         ...formData,
-        parentContact: cleanPhone
+        parentContact: finalParentContact
     });
   };
 
@@ -134,31 +204,41 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('last_name')}</label>
               <input
                 required
-                className="input-field w-full mt-1"
+                className={`input-field w-full mt-1 ${fieldErrors.lastName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.lastName}
                 onChange={(e) => setFormData({...formData, lastName: e.target.value.toUpperCase()})}
                 placeholder="Ex: TCHATCHOUANG"
               />
+              {fieldErrors.lastName && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.lastName}</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('first_name')}</label>
               <input
                 required
-                className="input-field w-full mt-1"
+                className={`input-field w-full mt-1 ${fieldErrors.firstName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.firstName}
                 onChange={(e) => setFormData({...formData, firstName: e.target.value})}
                 placeholder="Ex: Landry"
               />
+              {fieldErrors.firstName && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.firstName}</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('birth_date_label')}</label>
               <input
                 required
                 type="date"
-                className="input-field w-full mt-1"
+                max={`${new Date().getFullYear() - 2}-12-31`}
+                className={`input-field w-full mt-1 ${fieldErrors.birthDate ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.birthDate}
                 onChange={(e) => setFormData({...formData, birthDate: e.target.value})}
               />
+              {fieldErrors.birthDate && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.birthDate}</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('birth_place_label')}</label>
@@ -193,30 +273,55 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('parent_name_label')}</label>
               <input
                 required
-                className="input-field w-full mt-1"
+                className={`input-field w-full mt-1 ${fieldErrors.parentName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.parentName}
                 onChange={(e) => setFormData({...formData, parentName: e.target.value})}
                 placeholder="Ex: M. / Mme TCHATCHOUANG"
               />
+              {fieldErrors.parentName && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.parentName}</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('parent_contact_label')}</label>
-              <input
-                required
-                className="input-field w-full mt-1 text-amber-500 font-mono"
-                value={formData.parentContact}
-                onChange={(e) => setFormData({...formData, parentContact: e.target.value})}
-                placeholder="Ex: 699000000"
-              />
+              <div className="flex gap-2">
+                <select
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-white text-xs font-black mt-1"
+                  value={phoneCountry}
+                  onChange={(e) => setPhoneCountry(e.target.value)}
+                >
+                  <option value="237">🇨🇲 +237</option>
+                  <option value="241">🇬🇦 +241</option>
+                  <option value="225">🇨🇮 +225</option>
+                  <option value="221">🇸🇳 +221</option>
+                  <option value="242">🇨🇬 +242</option>
+                  <option value="236">🇨🇫 +236</option>
+                  <option value="240">🇬🇶 +240</option>
+                  <option value="other">🌐 Int.</option>
+                </select>
+                <input
+                  required
+                  className={`input-field flex-1 mt-1 text-amber-500 font-mono ${fieldErrors.parentContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
+                  value={formData.parentContact}
+                  onChange={(e) => setFormData({...formData, parentContact: e.target.value})}
+                  placeholder="Ex: 699000000"
+                />
+              </div>
+              {fieldErrors.parentContact && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.parentContact}</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('emergency_contact_secondary_label')}</label>
               <input
-                className="input-field w-full mt-1"
+                className={`input-field w-full mt-1 ${fieldErrors.emergencyContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.emergencyContact}
                 onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
                 placeholder={t('emergency_contact_placeholder')}
               />
+              {fieldErrors.emergencyContact && (
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.emergencyContact}</p>
+              )}
             </div>
             <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('section')}</label>

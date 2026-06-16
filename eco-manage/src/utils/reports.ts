@@ -22,7 +22,37 @@ export const generateReportCard = (data: any) => {
     const primary = primaryColor ? hexToRgb(primaryColor) : [30, 41, 59];
     const secondary = secondaryColor ? hexToRgb(secondaryColor) : [245, 158, 11];
 
-    const validatedGrades = data.ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1);
+    let validatedGrades = data.ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1);
+    
+    // Aggregate by subject for term averaging
+    const subjectGradesMap: Record<number, any> = {};
+    validatedGrades.forEach((g: any) => {
+        const subId = g.subject_id;
+        if (!subjectGradesMap[subId]) {
+            subjectGradesMap[subId] = {
+                ...g,
+                scores: [],
+                letter_scores: []
+            };
+        }
+        if (g.score !== null && g.score !== undefined) {
+            subjectGradesMap[subId].scores.push(g.score);
+        }
+        if (g.letter_score) {
+            subjectGradesMap[subId].letter_scores.push(g.letter_score);
+        }
+    });
+
+    validatedGrades = Object.values(subjectGradesMap).map((sg: any) => {
+        const avgScore = sg.scores.length > 0 ? (sg.scores.reduce((a: number, b: number) => a + b, 0) / sg.scores.length) : 0;
+        const letterScore = sg.letter_scores.length > 0 ? sg.letter_scores[sg.letter_scores.length - 1] : sg.letter_score;
+        return {
+            ...sg,
+            score: avgScore,
+            letter_score: letterScore
+        };
+    });
+
     const isEn = i18n.language.startsWith('en');
 
     // --- Watermark (Centered, all pages) ---
@@ -664,7 +694,37 @@ export const generateClassReportCards = (data: {
 
     studentsData.forEach((sData, index) => {
         const { student, grades, attendance, rank, totalStudents, validGrades, termAverages, termsArray, average: annualAvg } = sData;
-        const validatedGrades = isAnnual ? validGrades : (ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1));
+        let validatedGrades = isAnnual ? validGrades : (ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1));
+
+        if (!isAnnual) {
+            const subjectGradesMap: Record<number, any> = {};
+            validatedGrades.forEach((g: any) => {
+                const subId = g.subject_id;
+                if (!subjectGradesMap[subId]) {
+                    subjectGradesMap[subId] = {
+                        ...g,
+                        scores: [],
+                        letter_scores: []
+                    };
+                }
+                if (g.score !== null && g.score !== undefined) {
+                    subjectGradesMap[subId].scores.push(g.score);
+                }
+                if (g.letter_score) {
+                    subjectGradesMap[subId].letter_scores.push(g.letter_score);
+                }
+            });
+
+            validatedGrades = Object.values(subjectGradesMap).map((sg: any) => {
+                const avgScore = sg.scores.length > 0 ? (sg.scores.reduce((a: number, b: number) => a + b, 0) / sg.scores.length) : 0;
+                const letterScore = sg.letter_scores.length > 0 ? sg.letter_scores[sg.letter_scores.length - 1] : sg.letter_score;
+                return {
+                    ...sg,
+                    score: avgScore,
+                    letter_score: letterScore
+                };
+            });
+        }
 
         if (index > 0) {
             doc.addPage();

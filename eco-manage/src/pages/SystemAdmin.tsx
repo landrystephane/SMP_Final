@@ -42,6 +42,8 @@ const SystemAdmin: React.FC = () => {
   const [editSchoolBp, setEditSchoolBp] = useState('');
   const [editSchoolEmail, setEditSchoolEmail] = useState('');
   const [editSchoolPhone, setEditSchoolPhone] = useState('');
+  const [editSchoolRequiresCode, setEditSchoolRequiresCode] = useState(1);
+  const [editSchoolAllowTermEdit, setEditSchoolAllowTermEdit] = useState(0);
   const [isEditingMetadata, setIsEditingMetadata] = useState(false);
 
   // Founder editing states
@@ -222,6 +224,8 @@ const SystemAdmin: React.FC = () => {
       setEditSchoolBp(school.bp || '');
       setEditSchoolEmail(school.contact_email || '');
       setEditSchoolPhone(school.contact_phone || '');
+      setEditSchoolRequiresCode(school.requires_subject_code !== undefined ? school.requires_subject_code : 1);
+      setEditSchoolAllowTermEdit(school.allow_founder_term_edit !== undefined ? school.allow_founder_term_edit : 0);
       setIsEditingMetadata(false);
 
       if (window.electronAPI) {
@@ -271,6 +275,14 @@ const SystemAdmin: React.FC = () => {
               throw new Error(res.error);
           }
 
+          if ((window.electronAPI as any).updateSchoolSuperAdminSettings) {
+              await (window.electronAPI as any).updateSchoolSuperAdminSettings({
+                  schoolId: selectedSchool.id,
+                  requiresSubjectCode: editSchoolRequiresCode,
+                  allowFounderTermEdit: editSchoolAllowTermEdit
+              });
+          }
+
           const updatedSchool = {
               ...selectedSchool,
               name: editSchoolName,
@@ -278,7 +290,9 @@ const SystemAdmin: React.FC = () => {
               address: editSchoolAddress,
               bp: editSchoolBp,
               contact_email: editSchoolEmail,
-              contact_phone: cleanPhone
+              contact_phone: cleanPhone,
+              requires_subject_code: editSchoolRequiresCode,
+              allow_founder_term_edit: editSchoolAllowTermEdit
           };
           setSelectedSchool(updatedSchool);
           setIsEditingMetadata(false);
@@ -300,6 +314,30 @@ const SystemAdmin: React.FC = () => {
           setSchoolSubjects([...schoolSubjects, subjectId]);
       }
   }
+
+  const handleRenewSubscription = async (months: number, amount: number) => {
+      if (!selectedSchool || !window.electronAPI) return;
+      if (!window.confirm(`Confirmer la réception de ${amount} FCFA en espèces pour un renouvellement de ${months} mois ?`)) return;
+      
+      try {
+          if ((window.electronAPI as any).validatePayment) {
+              await (window.electronAPI as any).validatePayment({
+                  schoolId: selectedSchool.id,
+                  monthsGranted: months,
+                  amount: amount,
+                  superAdminId: user?.id
+              });
+              alert(t('Paiement validé avec succès. L\'abonnement a été prolongé.'));
+              loadSchools();
+              // Update local state to close the menu if needed
+              setSelectedSchool({...selectedSchool, subscription_status: 'ACTIVE'});
+          } else {
+              alert("L'API n'est pas encore connectée pour cette action.");
+          }
+      } catch (err: any) {
+          alert(t('sys_error') + ': ' + err.message);
+      }
+  };
 
   const handleDeleteSchool = (id: number, name: string) => {
       setConfirmPasswordInput('');
@@ -361,7 +399,7 @@ const SystemAdmin: React.FC = () => {
   };
 
   const handleDeleteSubject = async (id: number) => {
-      if (!window.confirm("Supprimer ce module du registre global ?")) return;
+      if (!window.confirm("sys_confirm_delete_module")) return;
       if (window.electronAPI) {
           await window.electronAPI.deleteGlobalSubject(id);
           loadGlobalSubjects();
@@ -859,6 +897,24 @@ const SystemAdmin: React.FC = () => {
                                   onChange={(e) => setEditSchoolBp(e.target.value)}
                                 />
                               </div>
+                              <div className="flex items-center justify-between pt-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Exiger code de matière</label>
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
+                                  checked={editSchoolRequiresCode === 1}
+                                  onChange={(e) => setEditSchoolRequiresCode(e.target.checked ? 1 : 0)}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between pt-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Autoriser modif. trimestres</label>
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
+                                  checked={editSchoolAllowTermEdit === 1}
+                                  onChange={(e) => setEditSchoolAllowTermEdit(e.target.checked ? 1 : 0)}
+                                />
+                              </div>
                             </div>
                           ) : (
                             <div className="space-y-6">
@@ -882,6 +938,20 @@ const SystemAdmin: React.FC = () => {
                                   </div>
                                 </div>
                               ))}
+                              <div className="pt-4 border-t border-white/5 space-y-3">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">Exiger code de matière :</span>
+                                  <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedSchool.requires_subject_code === 1 ? 'bg-amber-500/15 text-amber-500' : 'bg-slate-800 text-slate-400'}`}>
+                                    {selectedSchool.requires_subject_code === 1 ? 'ACTIF' : 'INACTIF'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">Modif. trimestres par fondateur :</span>
+                                  <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedSchool.allow_founder_term_edit === 1 ? 'bg-emerald-500/15 text-emerald-500' : 'bg-slate-800 text-slate-400'}`}>
+                                    {selectedSchool.allow_founder_term_edit === 1 ? 'AUTORISÉ' : 'REFUSÉ'}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           )}
                         </section>
@@ -973,6 +1043,48 @@ const SystemAdmin: React.FC = () => {
                             )}
                           </div>
                         </section>
+
+                        <section className="glass-card p-10 bg-slate-900 border-white/10">
+                          <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
+                              <Activity className="w-6 h-6 text-emerald-500" /> SaaS Abonnement
+                            </h3>
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedSchool.subscription_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                {selectedSchool.subscription_status || 'INCONNU'}
+                            </span>
+                          </div>
+                          <div className="space-y-4">
+                              <div>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Date d'expiration</p>
+                                  <p className="text-lg font-black text-white">{selectedSchool.subscription_end_date ? new Date(selectedSchool.subscription_end_date).toLocaleDateString() : 'Non définie'}</p>
+                              </div>
+                              <div className="pt-4 border-t border-white/5 space-y-3">
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Valider un paiement (Espèces)</p>
+                                  <div className="flex flex-col gap-3">
+                                      <div className="flex gap-3">
+                                          <div className="flex-1">
+                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Mois achetés</label>
+                                              <input type="number" id="sub_months" defaultValue={1} min={1} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
+                                          </div>
+                                          <div className="flex-1">
+                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Montant (FCFA)</label>
+                                              <input type="number" id="sub_amount" defaultValue={5000} min={0} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
+                                          </div>
+                                      </div>
+                                      <button 
+                                        onClick={() => {
+                                            const m = parseInt((document.getElementById('sub_months') as HTMLInputElement).value) || 1;
+                                            const a = parseInt((document.getElementById('sub_amount') as HTMLInputElement).value) || 0;
+                                            handleRenewSubscription(m, a);
+                                        }}
+                                        className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
+                                      >
+                                          Confirmer le Paiement
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                        </section>
                       </div>
 
                       {/* Right: Subject Permissions (authorized for this school) */}
@@ -1037,16 +1149,16 @@ const SystemAdmin: React.FC = () => {
                   <form onSubmit={handleAddSchool} className="p-6 md:p-10 space-y-6 md:space-y-8 overflow-y-auto flex-1">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_school_full_name')}</label>
-                          <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Groupe Scolaire Bilingue..." />
+                          <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder={t('sys_school_placeholder')} />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_city_neighborhood')}</label>
-                            <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Douala, Bonamoussadi" />
+                            <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder={t('sys_city_placeholder')} />
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_bp_box')}</label>
-                            <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="BP 450..." />
+                            <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder={t('sys_bp_placeholder')} />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1097,7 +1209,7 @@ const SystemAdmin: React.FC = () => {
                           <input required type="password" className="input-field w-full font-mono" value={newFounder.password} onChange={e => setNewFounder({...newFounder, password: e.target.value})} />
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
+                          <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">{t('cancel')}</button>
                           <button type="submit" className="btn-primary flex-[2] py-4">CRÉER LE FONDATEUR</button>
                       </div>
                   </form>
@@ -1122,26 +1234,26 @@ const SystemAdmin: React.FC = () => {
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
                             <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
-                                <option value="Science">Science</option>
-                                <option value="Langue">Langue</option>
+                                <option value="Science">{t('sys_domain_science')}</option>
+                                <option value="Langue">{t('sys_domain_language')}</option>
                                 <option value="Art & Culture">Art & Culture</option>
                                 <option value="Sport">Sport</option>
                                 <option value="Vie Pratique">Vie Pratique</option>
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subject_section')}</label>
                             <select className="input-field w-full" value={newSubject.section} onChange={e => setNewSubject({...newSubject, section: e.target.value})}>
-                                <option value="FRANCOPHONE">Francophone</option>
-                                <option value="ANGLOPHONE">Anglophone</option>
+                                <option value="FRANCOPHONE">{t('sys_section_fr')}</option>
+                                <option value="ANGLOPHONE">{t('sys_section_en')}</option>
                             </select>
                         </div>
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau Scolaire</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subject_level')}</label>
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
-                              <option value="MATERNELLE">Maternelle</option>
-                              <option value="PRIMAIRE">Primaire</option>
+                              <option value="MATERNELLE">{t('sys_level_kindergarten')}</option>
+                              <option value="PRIMAIRE">{t('sys_level_primary')}</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">

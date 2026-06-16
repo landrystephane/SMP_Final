@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle, Edit } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 
 const Subjects: React.FC = () => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [isManagingGlobal, setIsManagingGlobal] = useState(false);
   const [editingSubject, setEditingSubject] = useState<any | null>(null);
+  const [pendingSubjects, setPendingSubjects] = useState<any[]>([]);
   const [newSubject, setNewSubject] = useState({
     name: '',
     domain: '',
@@ -39,8 +42,20 @@ const Subjects: React.FC = () => {
     }
   };
 
+  const loadPendingSubjects = async () => {
+    if (window.electronAPI && user?.schoolId && user?.role !== 'SUPERADMIN') {
+      try {
+        const pending = await (window.electronAPI as any).getPendingSubjects(user.schoolId);
+        setPendingSubjects(pending || []);
+      } catch (e) {
+        console.error("Failed to load pending subjects", e);
+      }
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadPendingSubjects();
   }, []);
 
   useEffect(() => {
@@ -53,11 +68,17 @@ const Subjects: React.FC = () => {
     e.preventDefault();
     if (window.electronAPI) {
       try {
-        await window.electronAPI.addGlobalSubject(newSubject);
+        const res = await window.electronAPI.addGlobalSubject(newSubject);
         setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
+        if (res && res.pending) {
+          showNotification(res.message, "info");
+          loadPendingSubjects();
+        } else {
+          showNotification("Matière ajoutée avec succès", "success");
+        }
         loadData();
       } catch (err: any) {
-        alert(err.message);
+        showNotification(err.message, "error");
       }
     }
   };
@@ -67,10 +88,11 @@ const Subjects: React.FC = () => {
     if (window.electronAPI && editingSubject) {
       try {
         await window.electronAPI.updateGlobalSubject(editingSubject);
+        showNotification("Matière mise à jour avec succès", "success");
         setEditingSubject(null);
         loadData();
       } catch (err: any) {
-        alert(err.message);
+        showNotification(err.message, "error");
       }
     }
   };
@@ -80,9 +102,10 @@ const Subjects: React.FC = () => {
     if (window.electronAPI) {
       try {
         await window.electronAPI.deleteGlobalSubject(id);
+        showNotification("Matière supprimée avec succès", "success");
         loadData();
       } catch (err: any) {
-        alert(err.message);
+        showNotification(err.message, "error");
       }
     }
   };
@@ -261,6 +284,53 @@ const Subjects: React.FC = () => {
             
             <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-8">
                 <div className="flex-1 overflow-x-auto">
+                    {/* Pending Subjects Validation Section */}
+                    {pendingSubjects.length > 0 && (
+                      <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                        <h3 className="text-xs font-black text-amber-500 mb-3 uppercase tracking-wider">Matières en attente d'activation</h3>
+                        <div className="space-y-3">
+                          {pendingSubjects.map(ps => (
+                            <div key={ps.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                              <div>
+                                <div className="font-bold text-white text-sm">{ps.name}</div>
+                                <div className="text-[10px] text-slate-500 font-bold uppercase">{ps.domain} • {ps.level} - {ps.section}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  maxLength={6}
+                                  placeholder="Code à 6 lettres"
+                                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-500 font-mono text-center w-32 uppercase"
+                                  id={`code-input-${ps.id}`}
+                                />
+                                <button
+                                  onClick={async () => {
+                                    const inputEl = document.getElementById(`code-input-${ps.id}`) as HTMLInputElement;
+                                    const code = inputEl?.value?.trim()?.toUpperCase();
+                                    if (!code) {
+                                      showNotification("Veuillez saisir le code", "error");
+                                      return;
+                                    }
+                                    try {
+                                      await (window.electronAPI as any).validateSubjectCode({ pendingId: ps.id, code });
+                                      showNotification("Matière validée et activée avec succès !", "success");
+                                      loadPendingSubjects();
+                                      loadData();
+                                    } catch (err: any) {
+                                      showNotification(err.message, "error");
+                                    }
+                                  }}
+                                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all"
+                                >
+                                  Activer
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <h3 className="text-sm font-bold text-amber-500 mb-4 uppercase">Matières Enregistrées</h3>
                     <table className="w-full text-left">
                         <thead>

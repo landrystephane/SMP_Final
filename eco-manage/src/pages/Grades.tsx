@@ -1,17 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen } from 'lucide-react';
+import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 const Grades: React.FC = () => {
   const { t } = useTranslation();
   const { hasRole, user } = useAuth();
+  const { showNotification } = useNotification();
+
+  // Custom modal and notification states
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideDays, setOverrideDays] = useState('3');
+  const [showReactivationModal, setShowReactivationModal] = useState(false);
+  const [reactivationReason, setReactivationReason] = useState('');
+
   const [sections, _setSections] = useState(['FRANCOPHONE', 'ANGLOPHONE']);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
+  const [scaleConfig, setScaleConfig] = useState<any>(null);
 
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | ''>('FRANCOPHONE');
   const [selectedClass, setSelectedClass] = useState('');
@@ -72,23 +83,28 @@ const Grades: React.FC = () => {
         
         if (user?.role === 'TEACHER') {
             try {
-                const allSchedules = await window.electronAPI.getSchedules(user?.schoolId);
-                const classSchedules = allSchedules.filter((s: any) => 
-                    s.class_id?.toString() === selectedClass?.toString() && 
-                    s.teacher_id?.toString() === user?.id?.toString()
-                );
-                
-                const assignedSubjectIds = new Set(classSchedules.map((s: any) => s.subject_id));
-                
-                // If they have assigned subjects, only show those.
-                // If they don't have any schedules, they might see nothing. This enforces the restriction.
-                classSubs = classSubs.filter((sub: any) => assignedSubjectIds.has(sub.id));
+                const assignedSubs = await window.electronAPI.getTeacherAssignedSubjects({
+                    classId: parseInt(selectedClass),
+                    teacherId: user.id
+                });
+                classSubs = assignedSubs || [];
             } catch (e) {
-                console.error("Failed to load schedules for subject filtering", e);
+                console.error("Failed to load teacher assigned subjects", e);
+                classSubs = [];
             }
         }
         
         setSubjects(classSubs);
+
+        // Load grading scale config
+        let currentScale = null;
+        try {
+            currentScale = await window.electronAPI.getClassGradingScale(parseInt(selectedClass));
+            setScaleConfig(currentScale);
+        } catch (e) {
+            console.error("Failed to load grading scale config", e);
+            setScaleConfig(null);
+        }
 
         const existingGrades = await window.electronAPI.getGrades({
             classId: parseInt(selectedClass),
@@ -99,7 +115,10 @@ const Grades: React.FC = () => {
         let locked = false;
         existingGrades.forEach((g: any) => {
             if (g.month === selectedMonth) {
-                gradeMap[`${g.student_id}-${g.subject_id}`] = g.score !== null && g.score !== undefined ? g.score.toString() : '';
+                const val = (currentScale && currentScale.scale.is_numerical === 0)
+                  ? (g.letter_score || '')
+                  : (g.score !== null && g.score !== undefined ? g.score.toString() : '');
+                gradeMap[`${g.student_id}-${g.subject_id}`] = val;
                 if (g.locked) locked = true;
             }
         });
@@ -145,15 +164,25 @@ const Grades: React.FC = () => {
 
   const handleSave = async () => {
     if (isLocked || isPastDeadline) {
-        alert("La saisie est bloquée (période fermée ou délai dépassé).");
+        showNotification("La saisie est bloquée (période fermée ou délai dépassé).", "error");
         return;
     }
-    const formattedGrades = Object.entries(grades).map(([key, scoreStr]) => {
+    const formattedGrades = Object.entries(grades).map(([key, scoreOrLetter]) => {
         const [studentId, subjectId] = key.split('-');
-        let scoreNum = parseFloat(scoreStr.replace(',', '.'));
-        if (isNaN(scoreNum)) {
-            scoreNum = 0;
+        const isNumerical = !scaleConfig || scaleConfig.scale.is_numerical === 1;
+        
+        let scoreNum = 0;
+        let letterStr = null;
+
+        if (isNumerical) {
+            scoreNum = parseFloat(scoreOrLetter.replace(',', '.'));
+            if (isNaN(scoreNum)) {
+                scoreNum = 0;
+            }
+        } else {
+            letterStr = scoreOrLetter;
         }
+
         return {
           student_id: parseInt(studentId),
           subject_id: parseInt(subjectId),
@@ -161,6 +190,7 @@ const Grades: React.FC = () => {
           term: selectedTerm,
           month: selectedMonth,
           score: scoreNum,
+          letter_score: letterStr,
           teacher_id: user?.id
         };
       });
@@ -176,113 +206,153 @@ const Grades: React.FC = () => {
             school_id: user?.schoolId
         });
 
-        alert("✅ Les notes ont été enregistrées avec succès !\n\nNote : Actuellement en mode 'Brouillon'. N'oubliez pas de les VALIDER pour qu'elles apparaissent sur le bulletin de l'élève.");
+        showNotification("✅ Les notes ont été enregistrées avec succès !", "success");
         handleLoadContext();
       } else {
-        alert("Erreur: " + result.error);
+        showNotification("Erreur: " + result.error, "error");
       }
     } else {
       // Mobile / Web fallback
       const key = `pending_grades_${Date.now()}`;
       localStorage.setItem(key, JSON.stringify(formattedGrades));
-      alert("✅ Notes sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC.");
+      showNotification("✅ Notes sauvegardées localement !", "success");
     }
   };
 
   const handleUnlock = async () => {
     if (window.electronAPI) {
-        if (confirm(t('confirm_unlock'))) {
-            await window.electronAPI.unlockGrades({
-                classId: parseInt(selectedClass),
-                term: selectedTerm,
-                month: selectedMonth
-            });
-            setIsLocked(false);
-            handleLoadContext();
-        }
+        setConfirmModal({
+            title: t('confirm_unlock') || "Déverrouiller les notes",
+            message: "Êtes-vous sûr de vouloir déverrouiller toutes les notes pour cette classe, cette période et ce mois ?",
+            onConfirm: async () => {
+                await window.electronAPI.unlockGrades({
+                    classId: parseInt(selectedClass),
+                    term: selectedTerm,
+                    month: selectedMonth
+                });
+                setIsLocked(false);
+                showNotification("Notes déverrouillées avec succès !", "success");
+                handleLoadContext();
+            }
+        });
     }
   };
 
   const handleValidateClass = async () => {
     if (window.electronAPI) {
-        if (confirm("Voulez-vous valider et verrouiller toutes les notes de cette classe pour ce trimestre et ce mois ? Cela permettra d'imprimer les bulletins officiels.")) {
-            try {
-                const result = await (window.electronAPI as any).validateClassGrades({
-                    classId: parseInt(selectedClass),
-                    term: selectedTerm,
-                    month: selectedMonth
-                });
-                
-                // Notify Secretary/Advisor
-                await window.electronAPI.createNotification({
-                    role: 'SECRETARY',
-                    message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées par le Directeur. Les bulletins sont prêts pour l'impression.`,
-                    type: 'INFO',
-                    school_id: user?.schoolId
-                });
+        setConfirmModal({
+            title: "Valider et verrouiller",
+            message: "Voulez-vous valider et verrouiller toutes les notes de cette classe pour ce trimestre et ce mois ? Cela permettra d'imprimer les bulletins officiels.",
+            onConfirm: async () => {
+                try {
+                    const result = await (window.electronAPI as any).validateClassGrades({
+                        classId: parseInt(selectedClass),
+                        term: selectedTerm,
+                        month: selectedMonth
+                    });
+                    
+                    // Notify Secretary/Advisor
+                    await window.electronAPI.createNotification({
+                        role: 'SECRETARY',
+                        message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées par le Directeur. Les bulletins sont prêts pour l'impression.`,
+                        type: 'INFO',
+                        school_id: user?.schoolId
+                    });
 
-                alert("✅ Toutes les notes de cette classe ont été validées et verrouillées avec succès !");
-                handleLoadContext();
-            } catch (err: any) {
-                alert("Erreur lors de la validation : " + err.message);
+                    showNotification("✅ Toutes les notes ont été validées et verrouillées !", "success");
+                    handleLoadContext();
+                } catch (err: any) {
+                    showNotification("Erreur lors de la validation : " + err.message, "error");
+                }
             }
-        }
+        });
     }
   };
 
   const handleGrantOverride = async () => {
-    if (window.electronAPI) {
-        const days = prompt("Combien de jours supplémentaires souhaitez-vous accorder à l'enseignant de cette classe pour la saisie ? (ex: 3)", "3");
-        if (days && !isNaN(parseInt(days))) {
-            const classObj = classes.find(c => c.id.toString() === selectedClass);
-            
-            // Find the teacher assigned to this class
-            const allUsers = await window.electronAPI.getUsers(user?.schoolId);
-            const teacher = allUsers.find((u: any) => {
-                if (u.role !== 'TEACHER') return false;
-                try {
-                    const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
-                    return assigned.includes(parseInt(selectedClass));
-                } catch (e) {
-                    return false;
-                }
-            });
+      setShowOverrideModal(true);
+  };
 
-            if (!classObj || !teacher) {
-                alert("Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation.");
-                return;
-            }
-            
-            const newDeadline = new Date();
-            newDeadline.setDate(newDeadline.getDate() + parseInt(days));
-            const formattedDate = newDeadline.toISOString().split('T')[0];
+  const submitOverride = async () => {
+      if (window.electronAPI && !isNaN(parseInt(overrideDays))) {
+          const classObj = classes.find(c => c.id.toString() === selectedClass);
+          const allUsers = await window.electronAPI.getUsers(user?.schoolId);
+          const teacher = allUsers.find((u: any) => {
+              if (u.role !== 'TEACHER') return false;
+              try {
+                  const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
+                  return assigned.includes(parseInt(selectedClass));
+              } catch (e) {
+                  return false;
+              }
+          });
 
-            try {
-                await window.electronAPI.addGradeOverride({
-                    teacherId: teacher.id,
-                    classId: parseInt(selectedClass),
-                    term: selectedTerm,
-                    month: selectedMonth,
-                    deadline: formattedDate,
-                    grantedBy: user?.id
-                });
-            } catch (err) {
-                alert("Veuillez d'abord relancer l'application pour appliquer les mises à jour de base de données.");
-                return;
-            }
+          if (!classObj || !teacher) {
+              showNotification("Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation.", "error");
+              setShowOverrideModal(false);
+              return;
+          }
+          
+          const newDeadline = new Date();
+          newDeadline.setDate(newDeadline.getDate() + parseInt(overrideDays));
+          const formattedDate = newDeadline.toISOString().split('T')[0];
 
-            // Notify the teacher
-            await window.electronAPI.createNotification({
-                school_id: user?.schoolId,
-                user_id: teacher.id,
-                message: `Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe ${classObj.name} jusqu'au ${formattedDate}.`,
-                type: 'SYSTEM'
-            });
+          try {
+              await window.electronAPI.addGradeOverride({
+                  teacherId: teacher.id,
+                  classId: parseInt(selectedClass),
+                  term: selectedTerm,
+                  month: selectedMonth,
+                  deadline: formattedDate,
+                  grantedBy: user?.id
+              });
+          } catch (err) {
+              showNotification("Erreur lors de l'application de la dérogation.", "error");
+              setShowOverrideModal(false);
+              return;
+          }
 
-            alert(`Dérogation accordée jusqu'au ${formattedDate}.`);
-            handleLoadContext();
-        }
-    }
+          await window.electronAPI.createNotification({
+              school_id: user?.schoolId,
+              user_id: teacher.id,
+              message: `Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe ${classObj.name} jusqu'au ${formattedDate}.`,
+              type: 'SYSTEM'
+          });
+
+          showNotification(`Dérogation accordée jusqu'au ${formattedDate}.`, "success");
+          setShowOverrideModal(false);
+          handleLoadContext();
+      }
+  };
+
+  const handleRequestReactivation = async () => {
+      setShowReactivationModal(true);
+  };
+
+  const submitReactivationRequest = async () => {
+      if (window.electronAPI && selectedClass) {
+          const classObj = classes.find(c => c.id.toString() === selectedClass);
+          try {
+              await window.electronAPI.submitSystemRequest({
+                  schoolId: user?.schoolId,
+                  senderId: user?.id,
+                  requestType: 'GRADE_REACTIVATION',
+                  requestData: {
+                      teacherId: user?.id,
+                      classId: parseInt(selectedClass),
+                      className: classObj?.name || selectedClass,
+                      term: selectedTerm,
+                      month: selectedMonth,
+                      reason: reactivationReason
+                  }
+              });
+              showNotification("Demande de réactivation envoyée au directeur.", "success");
+              setShowReactivationModal(false);
+              setReactivationReason('');
+          } catch (e: any) {
+              showNotification("Erreur lors de l'envoi : " + e.message, "error");
+          }
+      }
   };
 
   const printStudentReport = async (student: any) => {
@@ -415,9 +485,19 @@ const Grades: React.FC = () => {
                         </span>
                     )}
                     {isPastDeadline && (
+                      <div className="flex items-center space-x-2">
                         <span className="flex items-center text-[10px] font-black text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-amber-500/20">
                             <AlertCircle className="w-3 h-3 mr-2" /> DÉLAI DÉPASSÉ
                         </span>
+                        {user?.role === 'TEACHER' && (
+                          <button
+                            onClick={handleRequestReactivation}
+                            className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full font-bold text-[10px] uppercase hover:bg-amber-500/30 transition-all border border-amber-500/30"
+                          >
+                            Demander Réactivation
+                          </button>
+                        )}
+                      </div>
                     )}
                 </div>
                 <div className="flex items-center space-x-4">
@@ -483,6 +563,70 @@ const Grades: React.FC = () => {
                       {subjects.map(subject => {
                         const classObj = classes.find(c => c.id.toString() === selectedClass);
                         const isNursery = classObj?.level === 'MATERNELLE';
+                        
+                        // Check if we have scale configuration
+                        if (scaleConfig) {
+                          if (scaleConfig.scale.is_numerical === 0) {
+                            // Literal direct scale
+                            return (
+                              <td key={subject.id} className="px-4 py-4">
+                                <select
+                                  disabled={isLocked || isPastDeadline}
+                                  value={grades[`${student.id}-${subject.id}`] ?? ''}
+                                  onChange={(e) => {
+                                      const val = e.target.value;
+                                      const updated = { ...grades };
+                                      if (val === '') {
+                                          delete updated[`${student.id}-${subject.id}`];
+                                      } else {
+                                          updated[`${student.id}-${subject.id}`] = val;
+                                      }
+                                      setGrades(updated);
+                                  }}
+                                  className="w-28 bg-slate-900/50 border border-slate-800 rounded-xl py-2 px-1 text-center text-white text-xs font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                >
+                                  <option value="">--</option>
+                                  {scaleConfig.options.map((opt: any) => (
+                                    <option key={opt.id} value={opt.symbol}>{opt.symbol} ({opt.description})</option>
+                                  ))}
+                                </select>
+                              </td>
+                            );
+                          } else {
+                            // Numerical with conversion (Mode A)
+                            const minVal = scaleConfig.scale.min_value ?? 0;
+                            const maxVal = scaleConfig.scale.max_value ?? 20;
+                            return (
+                              <td key={subject.id} className="px-4 py-4">
+                                <input
+                                  type="text"
+                                  disabled={isLocked || isPastDeadline}
+                                  value={grades[`${student.id}-${subject.id}`] ?? ''}
+                                  onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === '' || /^\d*[.,]?\d{0,2}$/.test(raw)) {
+                                          const cleanRaw = raw.replace(',', '.');
+                                          const parsed = parseFloat(cleanRaw);
+                                          if (raw === '' || raw === '.' || raw === ',' || (!isNaN(parsed) && parsed >= minVal && parsed <= maxVal)) {
+                                              const updated = { ...grades };
+                                              if (raw === '') {
+                                                  delete updated[`${student.id}-${subject.id}`];
+                                              } else {
+                                                  updated[`${student.id}-${subject.id}`] = raw;
+                                              }
+                                              setGrades(updated);
+                                          }
+                                      }
+                                  }}
+                                  placeholder={`${minVal.toFixed(1)}-${maxVal.toFixed(1)}`}
+                                  className="w-20 bg-slate-900/50 border border-slate-800 rounded-xl py-2 text-center text-white text-sm font-black focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                />
+                              </td>
+                            );
+                          }
+                        }
+
+                        // Fallback to legacy behavior
                         return (
                           <td key={subject.id} className="px-4 py-4">
                             {isNursery ? (
@@ -551,6 +695,114 @@ const Grades: React.FC = () => {
               </table>
             </div>
           </div>
+      )}
+      {/* Confirm Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-white italic">{confirmModal.title}</h3>
+              <p className="text-slate-400 text-sm font-semibold">{confirmModal.message}</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Override Days Modal */}
+      {showOverrideModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2 flex justify-between items-center">
+              <h3 className="text-lg font-black text-white italic">Accorder une dérogation</h3>
+              <button onClick={() => setShowOverrideModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nombre de jours supplémentaires</label>
+                <input
+                  type="number"
+                  value={overrideDays}
+                  onChange={e => setOverrideDays(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white font-bold"
+                  placeholder="ex: 3"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowOverrideModal(false)}
+                className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={submitOverride}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reactivation Request Modal */}
+      {showReactivationModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2 flex justify-between items-center">
+              <h3 className="text-lg font-black text-white italic">Demande de réactivation</h3>
+              <button onClick={() => setShowReactivationModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-slate-400 text-xs font-semibold">Le délai de saisie est dépassé. Vous pouvez soumettre une demande motivée de réactivation exceptionnelle au Directeur de l'école.</p>
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Motif de la demande</label>
+                <textarea
+                  value={reactivationReason}
+                  onChange={e => setReactivationReason(e.target.value)}
+                  className="w-full h-24 bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-semibold"
+                  placeholder="ex: Problème de connexion, notes reçues tardivement..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowReactivationModal(false)}
+                className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={submitReactivationRequest}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                Envoyer la demande
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

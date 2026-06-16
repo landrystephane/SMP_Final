@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert } from 'lucide-react';
+import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert, X, Plus, Trash2, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
 const CustomizationSettings: React.FC = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { showNotification } = useNotification();
     const [schools, setSchools] = useState<any[]>([]);
     const [activeSchool, setActiveSchool] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -28,6 +29,18 @@ const CustomizationSettings: React.FC = () => {
     const [honorRollThreshold, setHonorRollThreshold] = useState<number>(15.0);
     const [timetableSlots, setTimetableSlots] = useState<any[]>([]);
     const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
+    const [termStructure, setTermStructure] = useState<any[]>([]);
+    const [allowFounderTermEdit, setAllowFounderTermEdit] = useState(0);
+    const [gradingScales, setGradingScales] = useState<any[]>([]);
+    const [isEditingScale, setIsEditingScale] = useState(false);
+    const [editingScale, setEditingScale] = useState<any>({
+        id: null as number | null,
+        name: '',
+        is_numerical: 1,
+        min_value: 0,
+        max_value: 20,
+        options: [] as any[]
+    });
     const [installments, setInstallments] = useState<any[]>([]);
     const [installmentDeadlines, setInstallmentDeadlines] = useState<any[]>([]);
 
@@ -69,6 +82,7 @@ const CustomizationSettings: React.FC = () => {
                     setTimetableSlots([]);
                 }
 
+                setAllowFounderTermEdit(mySchool.allow_founder_term_edit || 0);
                 try {
                     setEvaluationPeriods(mySchool.evaluation_periods ? JSON.parse(mySchool.evaluation_periods) : [
                         { id: 1, name: '1ER TRIMESTRE' },
@@ -77,6 +91,16 @@ const CustomizationSettings: React.FC = () => {
                     ]);
                 } catch(e) {
                     setEvaluationPeriods([]);
+                }
+
+                try {
+                    setTermStructure(mySchool.term_structure ? JSON.parse(mySchool.term_structure) : [
+                        { term_id: 1, name: '1ER TRIMESTRE', sequences: [{ id: 1, name: 'Séquence 1' }, { id: 2, name: 'Séquence 2' }] },
+                        { term_id: 2, name: '2E TRIMESTRE', sequences: [{ id: 3, name: 'Séquence 3' }, { id: 4, name: 'Séquence 4' }] },
+                        { term_id: 3, name: '3E TRIMESTRE', sequences: [{ id: 5, name: 'Séquence 5' }, { id: 6, name: 'Séquence 6' }] }
+                    ]);
+                } catch(e) {
+                    setTermStructure([]);
                 }
                 const template = window.electronAPI.getReportTemplate ? await window.electronAPI.getReportTemplate(mySchool.id) : null;
                 
@@ -92,6 +116,9 @@ const CustomizationSettings: React.FC = () => {
                 setInstallments(insts || []);
                 const deadls = window.electronAPI.getInstallmentDeadlines ? await window.electronAPI.getInstallmentDeadlines(mySchool.id) : [];
                 setInstallmentDeadlines(deadls || []);
+
+                const scales = await (window.electronAPI as any).getGradingScales(mySchool.id);
+                setGradingScales(scales || []);
             }
         }
         setLoading(false);
@@ -100,6 +127,79 @@ const CustomizationSettings: React.FC = () => {
     useEffect(() => {
         loadSettings();
     }, [user]);
+
+    const handleAddScaleOption = () => {
+        setEditingScale({
+            ...editingScale,
+            options: [
+                ...editingScale.options,
+                { symbol: '', min_range: 0, max_range: 20, numeric_equivalent: 10, description: '' }
+            ]
+        });
+    };
+
+    const handleRemoveScaleOption = (index: number) => {
+        setEditingScale({
+            ...editingScale,
+            options: editingScale.options.filter((_: any, i: number) => i !== index)
+        });
+    };
+
+    const handleOptionChange = (index: number, field: string, value: any) => {
+        const updatedOptions = [...editingScale.options];
+        updatedOptions[index] = {
+            ...updatedOptions[index],
+            [field]: value
+        };
+        setEditingScale({
+            ...editingScale,
+            options: updatedOptions
+        });
+    };
+
+    const handleSaveScale = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!window.electronAPI || !activeSchool) return;
+
+        try {
+            const res = await (window.electronAPI as any).saveGradingScale({
+                id: editingScale.id,
+                schoolId: activeSchool.id,
+                name: editingScale.name,
+                is_numerical: parseInt(editingScale.is_numerical),
+                min_value: parseFloat(editingScale.min_value) || 0,
+                max_value: parseFloat(editingScale.max_value) || 20,
+                options: editingScale.options.map((opt: any) => ({
+                    ...opt,
+                    min_range: opt.min_range !== '' && opt.min_range !== null ? parseFloat(opt.min_range) : null,
+                    max_range: opt.max_range !== '' && opt.max_range !== null ? parseFloat(opt.max_range) : null,
+                    numeric_equivalent: parseFloat(opt.numeric_equivalent) || 0
+                }))
+            });
+
+            if (res.error) throw new Error(res.error);
+            showNotification(editingScale.id ? "Échelle de notation mise à jour !" : "Nouvelle échelle de notation créée !", "success");
+            setIsEditingScale(false);
+            loadSettings();
+        } catch (err: any) {
+            showNotification("Erreur lors de l'enregistrement du barème : " + err.message, "error");
+        }
+    };
+
+    const handleDeleteScale = async (scaleId: number) => {
+        if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce barème ? Les classes qui l'utilisent repasseront en notation standard.")) return;
+        if (!window.electronAPI) return;
+
+        try {
+            const res = await (window.electronAPI as any).deleteGradingScale(scaleId);
+            if (res.error) throw new Error(res.error);
+            showNotification("Échelle de notation supprimée avec succès !", "success");
+            setIsEditingScale(false);
+            loadSettings();
+        } catch (err: any) {
+            showNotification("Erreur lors de la suppression : " + err.message, "error");
+        }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -124,7 +224,8 @@ const CustomizationSettings: React.FC = () => {
                 header_english: headerEnglish,
                 honor_roll_threshold: honorRollThreshold,
                 timetable_slots: JSON.stringify(timetableSlots),
-                evaluation_periods: JSON.stringify(evaluationPeriods)
+                evaluation_periods: JSON.stringify(evaluationPeriods),
+                term_structure: JSON.stringify(termStructure)
             });
 
             await window.electronAPI.saveReportTemplate({
@@ -322,47 +423,117 @@ const CustomizationSettings: React.FC = () => {
                             </div>
 
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Périodes d'Évaluation (Trimestres / Séquences)</label>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setEvaluationPeriods([...evaluationPeriods, { id: evaluationPeriods.length + 1, name: `Période ${evaluationPeriods.length + 1}` }])}
-                                        className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
-                                    >
-                                        + Ajouter une période
-                                    </button>
+                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Structure des Périodes d'Évaluation (Trimestres / Séquences)</label>
+                                    {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                const newId = termStructure.length > 0 ? Math.max(...termStructure.map(t => t.term_id)) + 1 : 1;
+                                                setTermStructure([...termStructure, { term_id: newId, name: `Période ${newId}`, sequences: [] }]);
+                                            }}
+                                            className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
+                                        >
+                                            + Ajouter une Période
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="space-y-3">
-                                    {evaluationPeriods.map((period, index) => (
-                                        <div key={index} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
-                                            <span className="text-slate-500 font-bold text-xs w-8 text-center bg-white/5 rounded-lg py-2">ID: {period.id}</span>
-                                            <input 
-                                                type="text" 
-                                                value={period.name} 
-                                                onChange={(e) => {
-                                                    const newPeriods = [...evaluationPeriods];
-                                                    newPeriods[index].name = e.target.value;
-                                                    setEvaluationPeriods(newPeriods);
-                                                }}
-                                                placeholder="Ex: 1ER TRIMESTRE, 1ÈRE SÉQUENCE"
-                                                className="w-full md:flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500 uppercase"
-                                            />
-                                            <div className="flex items-center justify-between w-full md:w-auto gap-4">
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newPeriods = evaluationPeriods.filter((_, i) => i !== index);
-                                                        setEvaluationPeriods(newPeriods);
+
+                                {!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                    <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold flex items-start gap-2">
+                                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                                        <span>La modification de la structure des trimestres et séquences est verrouillée par l'administrateur système pour votre école. Contactez le support si vous devez changer cette configuration.</span>
+                                    </div>
+                                )}
+
+                                <div className="space-y-4">
+                                    {termStructure.map((term, tIdx) => (
+                                        <div key={term.term_id} className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-slate-500 font-bold text-xs bg-white/5 px-3 py-1.5 rounded-lg">ID: {term.term_id}</span>
+                                                <input 
+                                                    type="text" 
+                                                    value={term.name} 
+                                                    disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                                    onChange={(e) => {
+                                                        const newStruct = [...termStructure];
+                                                        newStruct[tIdx].name = e.target.value;
+                                                        setTermStructure(newStruct);
                                                     }}
-                                                    className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
-                                                >
-                                                    <ShieldAlert className="w-4 h-4" />
-                                                </button>
+                                                    placeholder="Ex: 1ER TRIMESTRE, 1ER SEMESTRE"
+                                                    className="flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-black text-white outline-none focus:border-amber-500 uppercase disabled:opacity-60"
+                                                />
+                                                {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newStruct = termStructure.filter((_, i) => i !== tIdx);
+                                                            setTermStructure(newStruct);
+                                                        }}
+                                                        className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
+                                                    >
+                                                        <ShieldAlert className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="pl-6 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Séquences associées :</span>
+                                                    {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const allSeqIds = termStructure.flatMap(t => t.sequences.map((s: any) => s.id));
+                                                                const nextSeqId = allSeqIds.length > 0 ? Math.max(...allSeqIds) + 1 : 1;
+                                                                const newStruct = [...termStructure];
+                                                                newStruct[tIdx].sequences.push({ id: nextSeqId, name: `Séquence ${nextSeqId}` });
+                                                                setTermStructure(newStruct);
+                                                            }}
+                                                            className="text-[8px] font-black text-amber-500 hover:underline uppercase tracking-wider"
+                                                        >
+                                                            + Ajouter une séquence
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {term.sequences.map((seq: any, sIdx: number) => (
+                                                    <div key={seq.id} className="flex gap-3 items-center bg-slate-900/40 px-4 py-2.5 rounded-xl border border-white/5">
+                                                        <span className="text-slate-600 font-bold text-[10px]">SEQ {seq.id}</span>
+                                                        <input 
+                                                            type="text" 
+                                                            value={seq.name}
+                                                            disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                                            onChange={(e) => {
+                                                                const newStruct = [...termStructure];
+                                                                newStruct[tIdx].sequences[sIdx].name = e.target.value;
+                                                                setTermStructure(newStruct);
+                                                            }}
+                                                            placeholder="Ex: Séquence 1"
+                                                            className="flex-1 bg-transparent border-b border-white/5 px-2 py-0.5 text-xs font-semibold text-slate-300 outline-none focus:border-amber-500 disabled:opacity-60"
+                                                        />
+                                                        {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newStruct = [...termStructure];
+                                                                    newStruct[tIdx].sequences = term.sequences.filter((_: any, i: number) => i !== sIdx);
+                                                                    setTermStructure(newStruct);
+                                                                }}
+                                                                className="text-rose-500 hover:text-rose-400 p-1"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {term.sequences.length === 0 && (
+                                                    <p className="text-[10px] text-slate-600 italic">Aucune séquence dans cette période.</p>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
-                                    {evaluationPeriods.length === 0 && (
-                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">Attention : Aucune période d'évaluation définie !</p>
+                                    {termStructure.length === 0 && (
+                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">Aucune période d'évaluation définie !</p>
                                     )}
                                 </div>
                             </div>
@@ -477,6 +648,256 @@ const CustomizationSettings: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Échelles et Barèmes de Notation */}
+                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                            <div className="flex items-center space-x-3 text-amber-500">
+                                <Palette className="w-5 h-5" />
+                                <h2 className="text-lg font-black uppercase text-white tracking-wide">Échelles & Barèmes de Notation</h2>
+                            </div>
+                            {!isEditingScale && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingScale({
+                                            id: null,
+                                            name: '',
+                                            is_numerical: 1,
+                                            min_value: 0,
+                                            max_value: 20,
+                                            options: []
+                                        });
+                                        setIsEditingScale(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-955 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Nouveau Barème
+                                </button>
+                            )}
+                        </div>
+
+                        {!isEditingScale ? (
+                            <div className="space-y-4">
+                                <p className="text-xs text-slate-400 leading-relaxed font-bold">
+                                    Configurez les échelles d'évaluation (ex: mentions cotes de la maternelle, plages de notes du primaire) pour ensuite les attribuer aux classes de votre école.
+                                </p>
+                                {gradingScales.length === 0 ? (
+                                    <p className="text-center text-slate-500 text-xs font-bold py-6 italic">Aucun barème personnalisé créé. Les classes utilisent par défaut la notation sur 20 brute.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {gradingScales.map((scale: any) => (
+                                            <div 
+                                                key={scale.id} 
+                                                onClick={() => {
+                                                    setEditingScale(scale);
+                                                    setIsEditingScale(true);
+                                                }}
+                                                className="p-5 bg-white/5 border border-white/5 hover:border-amber-500/30 rounded-2xl cursor-pointer transition-all hover:bg-white/[0.08]"
+                                            >
+                                                <h4 className="text-sm font-black text-white">{scale.name}</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                    Type : {scale.is_numerical ? 'Conversion de note' : 'Cote littérale directe'}
+                                                </p>
+                                                {scale.is_numerical ? (
+                                                    <p className="text-[10px] text-amber-500 font-black mt-1">
+                                                        Plage brute : {scale.min_value} à {scale.max_value}
+                                                    </p>
+                                                ) : null}
+                                                <div className="flex flex-wrap gap-1 mt-3">
+                                                    {(scale.options || []).map((o: any, idx: number) => (
+                                                        <span key={idx} className="bg-slate-800 border border-white/5 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded" title={o.description}>
+                                                            {o.symbol} {scale.is_numerical ? `[${o.min_range}-${o.max_range}]` : `(=${o.numeric_equivalent})`}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-6 animate-in fade-in duration-200">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nom de l'échelle</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            value={editingScale.name}
+                                            onChange={(e) => setEditingScale({ ...editingScale, name: e.target.value })}
+                                            placeholder="Ex: Évaluation Compétences Maternelle"
+                                            className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Modèle d'échelle</label>
+                                            <select
+                                                value={editingScale.is_numerical}
+                                                onChange={(e) => setEditingScale({ ...editingScale, is_numerical: parseInt(e.target.value) })}
+                                                className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                            >
+                                                <option value={1}>Numérique avec plages (Conversion)</option>
+                                                <option value={0}>Littérale pure (Saisie de symbole)</option>
+                                            </select>
+                                        </div>
+
+                                        {parseInt(editingScale.is_numerical) === 1 && (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Note minimale</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={editingScale.min_value}
+                                                        onChange={(e) => setEditingScale({ ...editingScale, min_value: e.target.value })}
+                                                        className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Note maximale</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={editingScale.max_value}
+                                                        onChange={(e) => setEditingScale({ ...editingScale, max_value: e.target.value })}
+                                                        className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 border-t border-white/5 pt-4">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xs font-black uppercase text-white tracking-widest">Options / Mentions de l'échelle</h3>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddScaleOption}
+                                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border border-white/5"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Ajouter Cote
+                                        </button>
+                                    </div>
+
+                                    {editingScale.options.length === 0 ? (
+                                        <p className="text-center text-slate-500 text-xs font-bold py-4 italic">Aucune mention ajoutée. Veuillez ajouter au moins une mention.</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {editingScale.options.map((opt: any, idx: number) => (
+                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-955/50 border border-white/5 rounded-2xl items-center relative">
+                                                    <div>
+                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Symbole (ex: NAD)</label>
+                                                        <input
+                                                            required
+                                                            type="text"
+                                                            value={opt.symbol}
+                                                            onChange={(e) => handleOptionChange(idx, 'symbol', e.target.value.toUpperCase())}
+                                                            className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+
+                                                    {parseInt(editingScale.is_numerical) === 1 ? (
+                                                        <>
+                                                            <div>
+                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Borne Min (inclus)</label>
+                                                                <input
+                                                                    required
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={opt.min_range}
+                                                                    onChange={(e) => handleOptionChange(idx, 'min_range', e.target.value)}
+                                                                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Borne Max (inclus)</label>
+                                                                <input
+                                                                    required
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={opt.max_range}
+                                                                    onChange={(e) => handleOptionChange(idx, 'max_range', e.target.value)}
+                                                                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    ) : null}
+
+                                                    <div className={parseInt(editingScale.is_numerical) === 1 ? 'md:col-span-1' : 'md:col-span-2'}>
+                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">
+                                                            {parseInt(editingScale.is_numerical) === 1 ? 'Équivalent (Moy.)' : 'Valeur numérique (ex: 20)'}
+                                                        </label>
+                                                        <input
+                                                            required
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={opt.numeric_equivalent}
+                                                            onChange={(e) => handleOptionChange(idx, 'numeric_equivalent', e.target.value)}
+                                                            className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-2 pt-4 md:pt-0">
+                                                        <div className="flex-1">
+                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Description (Optionnel)</label>
+                                                            <input
+                                                                type="text"
+                                                                value={opt.description}
+                                                                onChange={(e) => handleOptionChange(idx, 'description', e.target.value)}
+                                                                className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveScaleOption(idx)}
+                                                            className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl mt-5"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-4 border-t border-white/5 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingScale(false)}
+                                        className="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition-colors"
+                                    >
+                                        Retour / Annuler
+                                    </button>
+                                    
+                                    {editingScale.id && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteScale(editingScale.id)}
+                                            className="px-5 py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl font-bold hover:bg-rose-500/30 transition-colors"
+                                        >
+                                            Supprimer
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveScale}
+                                        className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-2xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
+                                    >
+                                        <Save className="w-5 h-5" />
+                                        Enregistrer
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Official Headers */}

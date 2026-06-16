@@ -4,10 +4,12 @@ import StudentForm from '../components/StudentForm';
 import { generateRegistrationSheet } from '../utils/reports';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 const Students: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | 'ALL'>('ALL');
@@ -35,9 +37,10 @@ const Students: React.FC = () => {
       if (window.electronAPI) {
           try {
               await window.electronAPI.deleteStudent(id);
+              showNotification(t('student_deleted_success', "Élève supprimé avec succès"), "success");
               loadData();
           } catch (err: any) {
-              alert(err.message);
+              showNotification(err.message, "error");
           }
       }
   };
@@ -219,14 +222,20 @@ const Students: React.FC = () => {
                             res = await window.electronAPI.addStudent({ ...data, schoolId: user?.schoolId });
                         }
                         if (res && res.error) {
-                            alert(`Error: ${res.error}`);
+                            showNotification(`Error: ${res.error}`, "error");
                             return;
                         }
+                        showNotification(
+                            editingStudent
+                                ? t('student_updated_success', "Informations de l'élève mises à jour avec succès")
+                                : t('student_added_success', "L'élève a été enregistré avec succès"),
+                            "success"
+                        );
                         loadData();
                         setIsAdding(false);
                         setEditingStudent(null);
                     } catch (err: any) {
-                        alert(err.message);
+                        showNotification(err.message, "error");
                     }
                 }
             }}

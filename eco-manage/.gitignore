@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Compiled and local files
+dist/
+dist-electron/
+build/
+data/
+*.db
+*.zip
+*.log
+scratch/
+fix*.js
+patch*.js
+test*.js
+check*.js
+dump*.js
+inspect*.js
+eco-manage/fix_assignments.js

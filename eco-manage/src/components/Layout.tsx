@@ -9,6 +9,7 @@ import ErrorBoundary from './ErrorBoundary';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useNotification } from '../context/NotificationContext';
 
 const Layout: React.FC = () => {
   const { user, logout, hasRole, exitImpersonation } = useAuth();
@@ -18,6 +19,66 @@ const Layout: React.FC = () => {
   const [schoolName, setSchoolName] = useState('Eco-Manage');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSgActing, setIsSgActing] = useState(false);
+
+  const { showNotification } = useNotification();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [durations, setDurations] = useState<Record<number, number>>({});
+
+  const loadNotifications = async () => {
+    if (window.electronAPI && user) {
+      try {
+        const notifs = await window.electronAPI.getNotifications({ 
+          userId: user.id, 
+          schoolId: user.schoolId,
+          role: user.role 
+        });
+        setNotifications(notifs || []);
+      } catch (e) {
+        console.error("Failed to load notifications", e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleResolveRequest = async (notifId: number, action: 'APPROVED' | 'REJECTED') => {
+    if (!window.electronAPI) return;
+    try {
+      const duration = durations[notifId] || 24;
+      await (window.electronAPI as any).resolveSystemRequest({
+        notificationId: notifId,
+        action,
+        durationHours: duration,
+        resolvedBy: user?.fullName || user?.username || 'Admin'
+      });
+      showNotification(
+        action === 'APPROVED' ? "Demande approuvée avec succès !" : "Demande refusée.",
+        action === 'APPROVED' ? "success" : "info"
+      );
+      loadNotifications();
+    } catch (e: any) {
+      showNotification(e.message || "Erreur lors du traitement", "error");
+    }
+  };
+
+  const handleMarkAsRead = async (notifId: number) => {
+    if (!window.electronAPI) return;
+    try {
+      await window.electronAPI.markNotificationRead(notifId);
+      loadNotifications();
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const pendingNotifsCount = notifications.filter(n => 
+    n.is_read === 0 || (n.type === 'ACTION_REQUIRED' && n.action_status === 'PENDING')
+  ).length;
 
   useEffect(() => {
     const loadActiveSchool = async () => {
@@ -117,12 +178,23 @@ const Layout: React.FC = () => {
           </div>
           <h2 className="text-sm font-black text-white leading-none tracking-tight truncate max-w-[180px]">{schoolName}</h2>
         </div>
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            className="relative p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all"
+          >
+            <Bell className="w-5 h-5" />
+            {pendingNotifsCount > 0 && (
+              <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
+            )}
+          </button>
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       {/* Sidebar Mobile Backdrop */}
@@ -159,6 +231,18 @@ const Layout: React.FC = () => {
             </button>
           </div>
           <LanguageSwitcher />
+          <div className="flex items-center justify-between mt-6 bg-white/5 p-3 rounded-2xl border border-white/5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Centre d'Alertes</span>
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="relative p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all animate-pulse-subtle"
+            >
+              <Bell className="w-4 h-4" />
+              {pendingNotifsCount > 0 && (
+                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
+              )}
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto min-h-0 custom-scrollbar">
@@ -225,6 +309,120 @@ const Layout: React.FC = () => {
           </ErrorBoundary>
         </div>
       </main>
+
+      {/* Notifications Drawer */}
+      {isNotifOpen && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-end p-6 pointer-events-none animate-in fade-in duration-200">
+          <div 
+            onClick={() => setIsNotifOpen(false)} 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+          />
+          
+          <div className="relative w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-6 pointer-events-auto mt-16 md:mt-0 animate-in fade-in slide-in-from-top-5 duration-300 max-h-[85vh] flex flex-col z-50">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+              <div className="flex items-center space-x-2">
+                <Bell className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Centre d'Alertes</h3>
+                {pendingNotifsCount > 0 && (
+                  <span className="bg-rose-500/20 text-rose-400 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                    {pendingNotifsCount} active(s)
+                  </span>
+                )}
+              </div>
+              <button 
+                onClick={() => setIsNotifOpen(false)}
+                className="p-1.5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-xs text-slate-500 font-bold">Aucune notification pour le moment.</p>
+                </div>
+              ) : (
+                notifications.map((n) => {
+                  const isPending = n.type === 'ACTION_REQUIRED' && n.action_status === 'PENDING';
+                  return (
+                    <div 
+                      key={n.id} 
+                      className={`p-4 rounded-2xl border transition-all ${
+                        isPending 
+                          ? 'bg-amber-500/10 border-amber-500/20 shadow-lg' 
+                          : 'bg-white/5 border-white/5'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                          n.type === 'ACTION_REQUIRED' 
+                            ? 'bg-amber-500/20 text-amber-400' 
+                            : 'bg-white/10 text-slate-300'
+                        }`}>
+                          {n.type === 'ACTION_REQUIRED' ? 'Action Requise' : 'Message'}
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-bold">
+                          {new Date(n.created_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-200 leading-relaxed font-bold mb-3">{n.message}</p>
+
+                      {isPending && (
+                        <div className="space-y-3 border-t border-white/5 pt-3 mt-2">
+                          {n.request_type === 'GRADE_REACTIVATION' && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-400 font-bold">Durée de réactivation :</span>
+                              <select 
+                                value={durations[n.id] || 24}
+                                onChange={(e) => setDurations({...durations, [n.id]: parseInt(e.target.value)})}
+                                className="bg-slate-950 border border-white/10 text-white rounded-xl px-2 py-1 outline-none text-xs font-black"
+                              >
+                                <option value={2}>2 heures</option>
+                                <option value={6}>6 heures</option>
+                                <option value={12}>12 heures</option>
+                                <option value={24}>24 heures</option>
+                                <option value={48}>48 heures</option>
+                              </select>
+                            </div>
+                          )}
+
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleResolveRequest(n.id, 'APPROVED')}
+                              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                            >
+                              Approuver
+                            </button>
+                            <button
+                              onClick={() => handleResolveRequest(n.id, 'REJECTED')}
+                              className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
+                            >
+                              Refuser
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!isPending && n.is_read === 0 && (
+                        <div className="flex justify-end pt-2">
+                          <button
+                            onClick={() => handleMarkAsRead(n.id)}
+                            className="text-[10px] text-amber-500 hover:text-amber-400 font-black uppercase tracking-wider transition-all"
+                          >
+                            Marquer comme lu
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

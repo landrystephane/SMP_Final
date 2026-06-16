@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Clock, Users, Phone, Bell, CheckCircle2, AlertCircle, Play, Square, Map as MapIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-
+import { Geolocation } from '@capacitor/geolocation';
 const DriverPortal: React.FC = () => {
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -43,6 +43,24 @@ const DriverPortal: React.FC = () => {
                 { id: 'p4', name: 'Carrefour Warda', estimated_time_from_start: 40, latitude: 3.858, longitude: 11.532 }
             ]);
         }
+
+        // Load today's attendance for passenger roll call
+        try {
+            const direction = new Date().getHours() < 12 ? 'MORNING_PICKUP' : 'EVENING_DROPOFF';
+            const todayAttendance = await window.electronAPI.getTodayTransportAttendance({
+                routeId: myRoute.id,
+                direction
+            });
+            const attendanceMap: Record<number, boolean> = {};
+            if (todayAttendance && Array.isArray(todayAttendance)) {
+                todayAttendance.forEach((att: any) => {
+                    attendanceMap[att.student_id] = att.status === 'PRESENT';
+                });
+            }
+            setAttendance(attendanceMap);
+        } catch (err) {
+            console.error("Failed to load today's transport attendance:", err);
+        }
       }
 
       // Load eligible students that paid for transport but are not assigned
@@ -58,6 +76,41 @@ const DriverPortal: React.FC = () => {
     loadRouteData();
   }, [user]);
 
+  useEffect(() => {
+    let watchId: string | null = null;
+    const startWatching = async () => {
+      if (isDriving && activeRoute) {
+        try {
+          // @ts-ignore
+          watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            async (position, err) => {
+              if (position && window.electronAPI) {
+                await window.electronAPI.logTransport({
+                  route_id: activeRoute.id,
+                  event_type: 'GPS_UPDATE',
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude
+                });
+              }
+            }
+          );
+        } catch (err) {
+          console.error("Error starting Geolocation.watchPosition:", err);
+        }
+      }
+    };
+
+    startWatching();
+
+    return () => {
+      if (watchId) {
+        // @ts-ignore
+        Geolocation.clearWatch({ id: watchId });
+      }
+    };
+  }, [isDriving, activeRoute]);
+
   const handleAddPoint = async () => {
       if (!activeRoute || !newPoint.name) return;
       
@@ -66,18 +119,14 @@ const DriverPortal: React.FC = () => {
       let lng = 0;
       
       // Try to get GPS coordinates
-      if ('geolocation' in navigator) {
-          try {
-              const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                  navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
-              });
-              lat = position.coords.latitude;
-              lng = position.coords.longitude;
-          } catch (err) {
-              console.warn("GPS failed or denied:", err);
-              // Fallback to 0,0 but alert driver
-              alert("Impossible d'obtenir la position GPS exacte. L'arrêt sera créé sans coordonnées précises.");
-          }
+      try {
+          const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 5000 });
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+      } catch (err) {
+          console.warn("GPS failed or denied:", err);
+          // Fallback to 0,0 but alert driver
+          alert("Impossible d'obtenir la position GPS exacte. L'arrêt sera créé sans coordonnées précises.");
       }
 
       if (window.electronAPI) {

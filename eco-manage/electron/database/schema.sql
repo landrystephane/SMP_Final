@@ -26,8 +26,13 @@ CREATE TABLE IF NOT EXISTS schools (
     honor_roll_threshold REAL DEFAULT 15.0,
     transport_fee_model TEXT DEFAULT 'ANNUAL',
     transport_fee_amount REAL DEFAULT 0,
+    subscription_end_date DATE,
+    subscription_status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'EXPIRED', 'SUSPENDED'
     deleted_at TEXT DEFAULT NULL,
     is_active INTEGER DEFAULT 1,
+    requires_subject_code INTEGER DEFAULT 1,
+    allow_founder_term_edit INTEGER DEFAULT 0,
+    term_structure TEXT DEFAULT '[{"term_id":1,"name":"1ER TRIMESTRE","sequences":[{"id":1,"name":"Séquence 1"},{"id":2,"name":"Séquence 2"}]},{"term_id":2,"name":"2E TRIMESTRE","sequences":[{"id":3,"name":"Séquence 3"},{"id":4,"name":"Séquence 4"}]},{"term_id":3,"name":"3E TRIMESTRE","sequences":[{"id":5,"name":"Séquence 5"},{"id":6,"name":"Séquence 6"}]}]',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -57,9 +62,11 @@ CREATE TABLE IF NOT EXISTS classes (
     level TEXT NOT NULL, -- 'MATERNELLE' or 'PRIMAIRE'
     main_teacher_id INTEGER,
     assistant_teacher_id INTEGER,
+    grading_scale_id INTEGER,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (main_teacher_id) REFERENCES users(id),
-    FOREIGN KEY (assistant_teacher_id) REFERENCES users(id)
+    FOREIGN KEY (assistant_teacher_id) REFERENCES users(id),
+    FOREIGN KEY (grading_scale_id) REFERENCES grading_scales(id)
 );
 
 -- Global subjects registry
@@ -130,6 +137,7 @@ CREATE TABLE IF NOT EXISTS grades (
     term INTEGER NOT NULL,
     score REAL,
     max_score REAL DEFAULT 20.0,
+    letter_score TEXT,
     locked INTEGER DEFAULT 0,
     teacher_id INTEGER,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -320,6 +328,9 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     is_read INTEGER DEFAULT 0,
     type TEXT DEFAULT 'INFO', -- 'INFO', 'WARNING', 'ACTION_REQUIRED'
+    request_type TEXT, -- e.g., 'GRADE_REACTIVATION', 'ABSENCE_JUSTIFICATION'
+    request_data TEXT, -- JSON string containing parameters for resolving the request
+    action_status TEXT DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -364,4 +375,69 @@ CREATE TABLE IF NOT EXISTS report_templates (
     footer_image TEXT,
     watermark_image TEXT,
     FOREIGN KEY (school_id) REFERENCES schools(id)
+);
+
+-- SaaS Subscriptions (Payments from schools to the platform owner)
+CREATE TABLE IF NOT EXISTS saas_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    payment_method TEXT NOT NULL, -- 'CASH', 'ORANGE_MONEY', 'MTN_MOMO', 'CARD'
+    transaction_id TEXT, -- For mobile money / card reference
+    months_granted INTEGER NOT NULL, -- How many months did they pay for
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status TEXT DEFAULT 'PENDING', -- 'PENDING', 'VALIDATED', 'REJECTED'
+    validated_by INTEGER, -- The SuperAdmin who validated the cash payment
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (validated_by) REFERENCES users(id)
+);
+
+-- Subject creation activation requests
+CREATE TABLE IF NOT EXISTS pending_subjects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER,
+    name TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    level TEXT NOT NULL,
+    section TEXT NOT NULL,
+    activation_code TEXT NOT NULL,
+    status TEXT DEFAULT 'PENDING', -- 'PENDING', 'APPROVED'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id)
+);
+
+-- Precise Teacher Class Subject assignments
+CREATE TABLE IF NOT EXISTS class_teacher_subjects (
+    class_id INTEGER,
+    subject_id INTEGER,
+    teacher_id INTEGER,
+    PRIMARY KEY (class_id, subject_id, teacher_id),
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id),
+    FOREIGN KEY (teacher_id) REFERENCES users(id)
+);
+
+-- Custom Grading Scales per school
+CREATE TABLE IF NOT EXISTS grading_scales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER,
+    name TEXT NOT NULL,
+    is_numerical INTEGER DEFAULT 0, -- 1 = numerical input with auto ranges, 0 = literal direct selection
+    min_value REAL,
+    max_value REAL,
+    FOREIGN KEY (school_id) REFERENCES schools(id)
+);
+
+-- Grading options and range mappings
+CREATE TABLE IF NOT EXISTS grading_scale_options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scale_id INTEGER,
+    symbol TEXT NOT NULL, -- e.g., 'NAD', 'ECA', 'NA'
+    min_range REAL, -- e.g., 18.0 - NULL for is_numerical = 0
+    max_range REAL, -- e.g., 20.0 - NULL for is_numerical = 0
+    numeric_equivalent REAL NOT NULL, -- weight for computations (e.g., 20.0)
+    description TEXT,
+    FOREIGN KEY (scale_id) REFERENCES grading_scales(id)
 );
