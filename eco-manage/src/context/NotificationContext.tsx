@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export type NotificationType = 'success' | 'error' | 'info';
@@ -25,12 +25,27 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const showNotification = useCallback((message: string, type: NotificationType = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     setNotifications((prev) => [...prev, { id, message, type }]);
-
-    // Auto-remove after 4 seconds
-    setTimeout(() => {
-      removeNotification(id);
-    }, 4000);
+    // Notifications must now be manually dismissed by clicking the cross
   }, [removeNotification]);
+
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message) => {
+      // Determine type based on common error words
+      const msgLower = String(message).toLowerCase();
+      let type: NotificationType = 'success';
+      if (msgLower.includes('erreur') || msgLower.includes('error') || msgLower.includes('impossible') || msgLower.includes('échoué') || msgLower.includes('invalide')) {
+        type = 'error';
+      } else if (msgLower.includes('attention') || msgLower.includes('warning') || msgLower.includes('veuillez')) {
+        type = 'info';
+      }
+      showNotification(String(message), type);
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, [showNotification]);
 
   return (
     <NotificationContext.Provider value={{ showNotification }}>

@@ -21,7 +21,8 @@ export const initSaaSBridge = () => {
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                }
+                },
+                cache: 'no-store'
             };
             if (body) {
                 config.body = JSON.stringify(body);
@@ -86,8 +87,12 @@ export const initSaaSBridge = () => {
                         args: args
                     });
                     return res.result;
-                } catch (error) {
+                } catch (error: any) {
                     console.error(`[SaaS Bridge Error] ${prop} (${channel}):`, error);
+                    // Si c'est une erreur de validation ou métier venant du backend, on la relance
+                    if (error && error.message && error.message !== 'Erreur réseau API') {
+                        throw error;
+                    }
                     // Pour éviter que l'UI crashe brutalement si une route n'est pas encore prête
                     return prop.startsWith('get') ? [] : { error: String(error) };
                 }

@@ -24,6 +24,7 @@ const Layout: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [durations, setDurations] = useState<Record<number, number>>({});
+  const [unreadTicketsCount, setUnreadTicketsCount] = useState(0);
 
   const loadNotifications = async () => {
     if (window.electronAPI && user) {
@@ -34,6 +35,13 @@ const Layout: React.FC = () => {
           role: user.role 
         });
         setNotifications(notifs || []);
+        
+        const count = await window.electronAPI.getUnreadTicketsCount({
+          userId: user.id,
+          role: user.role,
+          schoolId: user.schoolId
+        });
+        setUnreadTicketsCount(count || 0);
       } catch (e) {
         console.error("Failed to load notifications", e);
       }
@@ -262,8 +270,15 @@ const Layout: React.FC = () => {
                 }`
               }
             >
-              <item.icon className="w-5 h-5 mr-4 opacity-70" />
-              <span>{t(item.key) || item.key.replace('_', ' ')}</span>
+              <item.icon className="w-5 h-5 mr-4 opacity-70 relative" />
+              <div className="flex-1 flex justify-between items-center">
+                  <span>{t(item.key) || item.key.replace('_', ' ')}</span>
+                  {item.key === 'tickets' && unreadTicketsCount > 0 && (
+                      <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/20">
+                          {unreadTicketsCount}
+                      </span>
+                  )}
+              </div>
             </NavLink>
           ))}
         </nav>
@@ -389,18 +404,29 @@ const Layout: React.FC = () => {
                           )}
 
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleResolveRequest(n.id, 'APPROVED')}
-                              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
-                            >
-                              Approuver
-                            </button>
-                            <button
-                              onClick={() => handleResolveRequest(n.id, 'REJECTED')}
-                              className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
-                            >
-                              Refuser
-                            </button>
+                            {n.request_type === 'SUBJECT_ACTIVATION' ? (
+                              <button
+                                onClick={() => handleResolveRequest(n.id, 'APPROVED')}
+                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                              >
+                                Marquer comme traité
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleResolveRequest(n.id, 'APPROVED')}
+                                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                                >
+                                  Approuver
+                                </button>
+                                <button
+                                  onClick={() => handleResolveRequest(n.id, 'REJECTED')}
+                                  className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
+                                >
+                                  Refuser
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}

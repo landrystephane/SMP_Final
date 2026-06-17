@@ -46,6 +46,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addGlobalSubject: (subject) => ipcRenderer.invoke('db:addGlobalSubject', subject),
   updateGlobalSubject: (subject) => ipcRenderer.invoke('db:updateGlobalSubject', subject),
   deleteGlobalSubject: (id) => ipcRenderer.invoke('db:deleteGlobalSubject', id),
+  getPendingSubjects: (schoolId) => ipcRenderer.invoke('db:getPendingSubjects', schoolId),
+  validateSubjectCode: (data) => ipcRenderer.invoke('db:validateSubjectCode', data),
+  resendSubjectCode: (id) => ipcRenderer.invoke('db:resendSubjectCode', id),
+  cancelPendingSubject: (id) => ipcRenderer.invoke('db:cancelPendingSubject', id),
   getSchoolSubjects: (schoolId) => ipcRenderer.invoke('db:getSchoolSubjects', schoolId),
   toggleSchoolSubject: (data) => ipcRenderer.invoke('db:toggleSchoolSubject', data),
   getClassSubjects: (classId) => ipcRenderer.invoke('db:getClassSubjects', classId),
@@ -67,6 +71,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Communication & Notifications
   sendTicket: (ticket) => ipcRenderer.invoke('db:sendTicket', ticket),
   getTickets: (params) => ipcRenderer.invoke('db:getTickets', params),
+  getUnreadTicketsCount: (params) => ipcRenderer.invoke('db:getUnreadTicketsCount', params),
+  resolveTicket: (params) => ipcRenderer.invoke('db:resolveTicket', params),
   getAnnouncements: (schoolId) => ipcRenderer.invoke('db:getAnnouncements', schoolId),
   sendAnnouncement: (announcement) => ipcRenderer.invoke('db:sendAnnouncement', announcement),
   createNotification: (notification) => ipcRenderer.invoke('db:createNotification', notification),
@@ -134,6 +140,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getErrorLogs: () => ipcRenderer.invoke('db:getErrorLogs'),
   clearErrorLogs: () => ipcRenderer.invoke('db:clearErrorLogs'),
   validatePayment: (data) => ipcRenderer.invoke('db:validatePayment', data),
+  submitSystemRequest: (request) => ipcRenderer.invoke('db:submitSystemRequest', request),
+  getSystemRequests: (params) => ipcRenderer.invoke('db:getSystemRequests', params),
+
+  // Grading Scales
+  getGradingScales: (schoolId) => ipcRenderer.invoke('db:getGradingScales', schoolId),
+  getClassGradingScale: (classId) => ipcRenderer.invoke('db:getClassGradingScale', classId),
+  saveGradingScale: (scaleData) => ipcRenderer.invoke('db:saveGradingScale', scaleData),
+  deleteGradingScale: (id) => ipcRenderer.invoke('db:deleteGradingScale', id),
   
   // Reports
   getReportTemplate: (schoolId) => ipcRenderer.invoke('db:getReportTemplate', schoolId),

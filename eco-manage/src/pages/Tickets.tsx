@@ -16,6 +16,11 @@ const Tickets: React.FC = () => {
   const [newTicketSubject, setNewTicketSubject] = useState(t('internal_message_default', 'Message interne'));
   const [receiverRole, setReceiverRole] = useState('DIRECTOR');
   const [receiverId, setReceiverId] = useState<number | ''>('');
+  
+  const [requestType, setRequestType] = useState('STANDARD');
+  const [requestData, setRequestData] = useState<any>({});
+  const [classes, setClasses] = useState<any[]>([]);
+  const [termStructure, setTermStructure] = useState<any[]>([]);
 
   // States for announcements
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -41,7 +46,15 @@ const Tickets: React.FC = () => {
             const currentSchool = schools.find((s: any) => s.id?.toString() === user.schoolId?.toString());
             if (currentSchool) {
                 setSchoolName(currentSchool.name);
+                if (currentSchool.term_structure) {
+                    try {
+                        setTermStructure(JSON.parse(currentSchool.term_structure));
+                    } catch(e) {}
+                }
             }
+            
+            const classData = await window.electronAPI.getClasses(user.schoolId);
+            setClasses(classData || []);
         } catch (err) {
             console.error('Failed to load data', err);
         }
@@ -61,7 +74,9 @@ const Tickets: React.FC = () => {
               receiver_id: receiverId ? receiverId : null,
               subject: newTicketSubject,
               message: newTicketMessage,
-              school_id: user.schoolId
+              school_id: user.schoolId,
+              request_type: requestType !== 'STANDARD' ? requestType : null,
+              request_data: requestType !== 'STANDARD' ? requestData : null
           });
           
           if (receiverId) {
@@ -77,10 +92,29 @@ const Tickets: React.FC = () => {
           setNewTicketSubject('Message interne');
           setReceiverId('');
           setReceiverRole('DIRECTOR');
+          setRequestType('STANDARD');
+          setRequestData({});
           loadData();
           alert("Message envoyé !");
       } catch (err: any) {
           alert(err.message);
+      }
+  };
+
+  const [extensionHours, setExtensionHours] = useState<Record<number, number>>({});
+
+  const handleResolveTicket = async (ticketId: number, status: string, requestType?: string) => {
+      if (!window.electronAPI) return;
+      try {
+          const actionData: any = {};
+          if (requestType === 'GRADE_EXTENSION') {
+              actionData.hours = extensionHours[ticketId] || 24;
+          }
+          await window.electronAPI.resolveTicket({ ticketId, status, actionData });
+          alert("Action effectuée avec succès !");
+          loadData();
+      } catch (err: any) {
+          alert("Erreur lors de l'action : " + err.message);
       }
   };
 
@@ -315,13 +349,49 @@ const Tickets: React.FC = () => {
                       <p className="text-slate-400 text-xs leading-relaxed">{ticket.message}</p>
                       <span className="text-[10px] text-slate-500 block uppercase pt-2">{new Date(ticket.created_at || Date.now()).toLocaleString('fr-FR')}</span>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      ticket.status === 'OPEN' 
-                        ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
-                        : 'bg-green-500/10 text-green-500 border border-green-500/20'
-                    }`}>
-                      {ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          ticket.status === 'OPEN' 
+                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
+                            : 'bg-green-500/10 text-green-500 border border-green-500/20'
+                        }`}>
+                          {ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
+                        </span>
+                        
+                        {ticket.status === 'OPEN' && ticket.request_type && ticket.sender_id !== user?.id && (
+                            <div className="mt-2 flex flex-col items-end gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                                {ticket.request_type === 'GRADE_EXTENSION' && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] text-slate-400 font-bold uppercase">Durée :</span>
+                                        <select 
+                                            value={extensionHours[ticket.id] || 24}
+                                            onChange={(e) => setExtensionHours({...extensionHours, [ticket.id]: parseInt(e.target.value)})}
+                                            className="bg-slate-800 text-white text-[10px] p-1 rounded border border-slate-700 outline-none"
+                                        >
+                                            <option value={2}>2 Heures</option>
+                                            <option value={12}>12 Heures</option>
+                                            <option value={24}>24 Heures</option>
+                                            <option value={48}>48 Heures</option>
+                                        </select>
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleResolveTicket(ticket.id, 'RESOLVED', ticket.request_type)}
+                                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all shadow-lg"
+                                    >
+                                        {ticket.request_type === 'GRADE_EXTENSION' ? 'Valider Extension' : 'Approuver'}
+                                    </button>
+                                    <button 
+                                        onClick={() => handleResolveTicket(ticket.id, 'REJECTED', ticket.request_type)}
+                                        className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all"
+                                    >
+                                        Refuser
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                   </div>
                   );
                 })}
@@ -337,14 +407,88 @@ const Tickets: React.FC = () => {
             </h2>
             <div className="glass-card p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('request_subject', 'Sujet de la Requête')}</label>
-                <input
-                  value={newTicketSubject}
-                  onChange={(e) => setNewTicketSubject(e.target.value)}
-                  placeholder={t('request_subject_placeholder', 'Ex: Problème d\'accès informatique')}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
-                />
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('request_subject', 'Type de Requête')}</label>
+                <select
+                    value={requestType}
+                    onChange={(e) => {
+                        const type = e.target.value;
+                        setRequestType(type);
+                        setNewTicketSubject(type === 'STANDARD' ? 'Message interne' : e.target.options[e.target.selectedIndex].text);
+                        if (type === 'GRADE_EXTENSION') setRequestData({ term: termStructure[0]?.term_id, sequence: termStructure[0]?.sequences?.[0]?.id, classId: classes[0]?.id });
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                >
+                    <option value="STANDARD">Message standard / Autre</option>
+                    {(user?.role === 'TEACHER' || user?.role === 'DIRECTOR') && (
+                        <>
+                            <option value="GRADE_EXTENSION">Demande d'extension de délai (Saisie des notes)</option>
+                            <option value="ABSENCE_JUSTIFICATION">Justificatif de saisie d'absences</option>
+                        </>
+                    )}
+                    {(user?.role === 'BURSAR' || user?.role === 'FOUNDER') && (
+                        <option value="CASH_WITHDRAWAL">Demande de décaissement / retrait d'argent</option>
+                    )}
+                    {user?.role === 'SECRETARY' && (
+                        <option value="PRINT_AUTHORIZATION">Autorisation d'impression des bulletins</option>
+                    )}
+                </select>
               </div>
+
+              {requestType === 'GRADE_EXTENSION' && (
+                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe concernée</label>
+                          <select 
+                            value={requestData.classId}
+                            onChange={(e) => setRequestData({...requestData, classId: parseInt(e.target.value)})}
+                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"
+                          >
+                              <option value="">Sélectionner...</option>
+                              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                      </div>
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Période / Séquence</label>
+                          <select 
+                            value={`${requestData.term}_${requestData.sequence}`}
+                            onChange={(e) => {
+                                const [t, s] = e.target.value.split('_');
+                                setRequestData({...requestData, term: parseInt(t), sequence: parseInt(s)});
+                            }}
+                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"
+                          >
+                              <option value="_">Sélectionner...</option>
+                              {termStructure.flatMap(t => t.sequences?.map((s: any) => (
+                                  <option key={`${t.term_id}_${s.id}`} value={`${t.term_id}_${s.id}`}>{t.name} - {s.name}</option>
+                              )))}
+                          </select>
+                      </div>
+                  </div>
+              )}
+              
+              {requestType === 'ABSENCE_JUSTIFICATION' && (
+                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Date / Période</label>
+                          <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs" />
+                      </div>
+                  </div>
+              )}
+              
+              {requestType === 'CASH_WITHDRAWAL' && (
+                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Montant demandé</label>
+                          <input 
+                            type="number" 
+                            placeholder="Ex: 50000"
+                            value={requestData.amount || ''}
+                            onChange={(e) => setRequestData({...requestData, amount: e.target.value})}
+                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs" 
+                          />
+                      </div>
+                  </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">

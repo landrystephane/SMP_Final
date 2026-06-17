@@ -7,11 +7,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 
 const SystemAdmin: React.FC = () => {
   const { t } = useTranslation();
   const { user, switchSchool } = useAuth();
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<'INSTANCES' | 'REGISTRY' | 'HEALTH' | 'TRASH'>('INSTANCES');
   const [schools, setSchools] = useState<any[]>([]);
   const [deletedSchools, setDeletedSchools] = useState<any[]>([]);
@@ -52,7 +54,7 @@ const SystemAdmin: React.FC = () => {
   const [editFounderFullName, setEditFounderFullName] = useState('');
   const [editFounderPassword, setEditFounderPassword] = useState('');
 
-  const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
+  const [newSchool, setNewSchool] = useState({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '', requires_subject_code: 1, allow_founder_term_edit: 0, term_structure: '3_TERMS_2_SEQS' });
   const [newSubject, setNewSubject] = useState({ name: '', domain: 'Science', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
   const [newFounder, setNewFounder] = useState({ username: '', password: '', fullName: '' });
   const [founderError, setFounderError] = useState<string | null>(null);
@@ -140,7 +142,7 @@ const SystemAdmin: React.FC = () => {
               ...newSchool,
               contact_phone: cleanPhone
           });
-          setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '' });
+          setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '', requires_subject_code: 1, allow_founder_term_edit: 0, term_structure: '3_TERMS_2_SEQS' });
           setIsAdding(false);
           loadSchools();
       }
@@ -149,10 +151,19 @@ const SystemAdmin: React.FC = () => {
   const handleAddSubject = async (e: React.FormEvent) => {
       e.preventDefault();
       if (window.electronAPI) {
-          await window.electronAPI.addGlobalSubject(newSubject);
-          setNewSubject({ name: '', domain: 'Science', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
-          setIsAddingSubject(false);
-          loadGlobalSubjects();
+          try {
+              const res = await window.electronAPI.addGlobalSubject(newSubject);
+              if (res?.error) {
+                  showNotification(res.error, "error");
+              } else {
+                  showNotification(`La matière "${newSubject.name}" a été ajoutée au répertoire global.`, "success");
+                  setNewSubject({ name: '', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
+                  setIsAddingSubject(false);
+                  loadGlobalSubjects();
+              }
+          } catch (err: any) {
+              showNotification(err.message || "Erreur lors de l'ajout de la matière", "error");
+          }
       }
   }
 
@@ -358,6 +369,7 @@ const SystemAdmin: React.FC = () => {
                           setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
+                          showNotification(`École "${name}" mise à la corbeille avec succès.`, "success");
                           loadSchools();
                           loadDeletedSchools();
                       }
@@ -388,6 +400,7 @@ const SystemAdmin: React.FC = () => {
                           setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
+                          showNotification(`École "${name}" supprimée DÉFINITIVEMENT.`, "success");
                           loadDeletedSchools();
                       }
                   } catch (err: any) {
@@ -399,7 +412,7 @@ const SystemAdmin: React.FC = () => {
   };
 
   const handleDeleteSubject = async (id: number) => {
-      if (!window.confirm("sys_confirm_delete_module")) return;
+      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette matière ? Cette action est irréversible.")) return;
       if (window.electronAPI) {
           await window.electronAPI.deleteGlobalSubject(id);
           loadGlobalSubjects();
@@ -751,9 +764,9 @@ const SystemAdmin: React.FC = () => {
                                       await (window.electronAPI as any).restoreSchool(s.id);
                                       loadSchools();
                                       loadDeletedSchools();
-                                      alert(t('sys_alert_restore_success', { name: s.name }));
+                                      showNotification(t('sys_alert_restore_success', { name: s.name }), "success");
                                   } catch (err: any) {
-                                      alert(t('sys_alert_restore_error') + ': ' + err.message);
+                                      showNotification(t('sys_alert_restore_error') + ': ' + err.message, "error");
                                   }
                               }
                             }}
@@ -914,6 +927,11 @@ const SystemAdmin: React.FC = () => {
                                   checked={editSchoolAllowTermEdit === 1}
                                   onChange={(e) => setEditSchoolAllowTermEdit(e.target.checked ? 1 : 0)}
                                 />
+                              </div>
+                              <div className="pt-6 border-t border-white/5 mt-6">
+                                <button onClick={handleSaveMetadata} className="w-full py-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-400 transition-all flex justify-center items-center gap-2">
+                                  {t('save')} les métadonnées
+                                </button>
                               </div>
                             </div>
                           ) : (
@@ -1171,6 +1189,59 @@ const SystemAdmin: React.FC = () => {
                             <input className="input-field w-full" value={newSchool.contact_phone} onChange={e => setNewSchool({...newSchool, contact_phone: e.target.value})} />
                         </div>
                       </div>
+
+                      <div className="pt-4 border-t border-white/10 space-y-4">
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest">Configuration Avancée</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Structure Académique</label>
+                              <select 
+                                  className="input-field w-full"
+                                  value={newSchool.term_structure}
+                                  onChange={e => setNewSchool({...newSchool, term_structure: e.target.value})}
+                              >
+                                  <option value="3_TERMS_2_SEQS">3 Trimestres (2 Séquences chacun)</option>
+                                  <option value="3_TERMS_NO_SEQS">3 Trimestres (Sans séquences)</option>
+                                  <option value="2_SEMESTERS_2_SEQS">2 Semestres (2 Séquences chacun)</option>
+                                  <option value="2_SEMESTERS_3_SEQS">2 Semestres (3 Séquences chacun)</option>
+                              </select>
+                          </div>
+                          
+                          <label className="flex items-center gap-3 cursor-pointer bg-slate-950/50 p-4 rounded-xl border border-white/5 hover:border-amber-500/30 transition-colors">
+                              <div className="relative flex items-center">
+                                  <input 
+                                      type="checkbox" 
+                                      className="sr-only peer"
+                                      checked={newSchool.allow_founder_term_edit === 1}
+                                      onChange={(e) => setNewSchool({...newSchool, allow_founder_term_edit: e.target.checked ? 1 : 0})}
+                                  />
+                                  <div className="w-10 h-6 bg-slate-800 rounded-full peer peer-checked:bg-amber-500 transition-all duration-300"></div>
+                                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                              </div>
+                              <div>
+                                  <div className="text-xs font-bold text-white">Fondateur modifie les trimestres</div>
+                                  <div className="text-[10px] text-slate-400">Autorise le fondateur à éditer la structure</div>
+                              </div>
+                          </label>
+
+                          <label className="flex items-center gap-3 cursor-pointer bg-slate-950/50 p-4 rounded-xl border border-white/5 hover:border-amber-500/30 transition-colors">
+                              <div className="relative flex items-center">
+                                  <input 
+                                      type="checkbox" 
+                                      className="sr-only peer"
+                                      checked={newSchool.requires_subject_code === 1}
+                                      onChange={(e) => setNewSchool({...newSchool, requires_subject_code: e.target.checked ? 1 : 0})}
+                                  />
+                                  <div className="w-10 h-6 bg-slate-800 rounded-full peer peer-checked:bg-amber-500 transition-all duration-300"></div>
+                                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                              </div>
+                              <div>
+                                  <div className="text-xs font-bold text-white">Code requis pour les matières</div>
+                                  <div className="text-[10px] text-slate-400">Exige un code d'activation SuperAdmin</div>
+                              </div>
+                          </label>
+                        </div>
+                      </div>
                       <div className="pt-8 flex gap-4">
                           <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-5 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">{t('cancel')}</button>
                           <button type="submit" className="btn-primary flex-[2] py-5 flex items-center justify-center gap-3">
@@ -1233,27 +1304,23 @@ const SystemAdmin: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
-                            <select className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})}>
-                                <option value="Science">{t('sys_domain_science')}</option>
-                                <option value="Langue">{t('sys_domain_language')}</option>
-                                <option value="Art & Culture">Art & Culture</option>
-                                <option value="Sport">Sport</option>
-                                <option value="Vie Pratique">Vie Pratique</option>
-                            </select>
+                            <input required className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})} placeholder="Ex: Sciences et Technologie" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subject_section')}</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
                             <select className="input-field w-full" value={newSubject.section} onChange={e => setNewSubject({...newSubject, section: e.target.value})}>
-                                <option value="FRANCOPHONE">{t('sys_section_fr')}</option>
-                                <option value="ANGLOPHONE">{t('sys_section_en')}</option>
+                                <option value="FRANCOPHONE">Francophone</option>
+                                <option value="ANGLOPHONE">Anglophone</option>
                             </select>
                         </div>
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subject_level')}</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau</label>
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
-                              <option value="MATERNELLE">{t('sys_level_kindergarten')}</option>
-                              <option value="PRIMAIRE">{t('sys_level_primary')}</option>
+                              <option value="MATERNELLE">Maternelle</option>
+                              <option value="PRIMAIRE">Primaire</option>
+                              <option value="COLLEGE">Collège</option>
+                              <option value="LYCEE">Lycée</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">

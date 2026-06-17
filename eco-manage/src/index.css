@@ -84,3 +84,29 @@ body {
     color-scheme: dark;
   }
 }
+
+/* react-phone-number-input overrides */
+.phone-input-glass .PhoneInputInput {
+  @apply bg-transparent border-none outline-none text-white font-bold placeholder:text-slate-500 flex-1 ml-2 shadow-none ring-0;
+}
+.phone-input-glass .PhoneInputInput:focus {
+  @apply ring-0 outline-none;
+}
+.phone-input-glass .PhoneInputCountry {
+  @apply border-r border-slate-700 pr-2 mr-2 flex-shrink-0;
+}
+.phone-input-glass .PhoneInputCountrySelect {
+  @apply bg-slate-900 text-white border-none;
+}
+.phone-input-glass .PhoneInputCountrySelect option {
+  @apply bg-slate-900 text-white;
+}
+.PhoneInputCountryIcon--border {
+  @apply border-none shadow-none bg-transparent !important;
+}
+.PhoneInputCountryIcon {
+  @apply shadow-none !important;
+}
+.phone-input-glass {
+  @apply flex items-center p-0 px-3;
+}

@@ -14,7 +14,8 @@ const ParentPortal: React.FC = () => {
     const [selectedChild, setSelectedChild] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
-    const [selectedTerm, setSelectedTerm] = useState<number>(1);
+    const [termStructure, setTermStructure] = useState<any[]>([]);
+    const [selectedTerm, setSelectedTerm] = useState<number | ''>('');
     const [isBusMapOpen, setIsBusMapOpen] = useState(false);
 
     // Financial metadata
@@ -52,6 +53,21 @@ const ParentPortal: React.FC = () => {
                 setClasses(cls || []);
                 setUsers(usrs || []);
                 setAnnouncements(msgs || []);
+
+                const mySchool = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString()) || schs[0];
+                if (mySchool && mySchool.term_structure) {
+                    try {
+                        const ts = JSON.parse(mySchool.term_structure);
+                        setTermStructure(ts);
+                        if (ts.length > 0) {
+                            setSelectedTerm(ts[0].term_id);
+                        }
+                    } catch(e) {
+                        setTermStructure([]);
+                    }
+                } else {
+                    setTermStructure([]);
+                }
 
                 if (studs.length > 0) {
                     setSelectedChild(studs[0]);
@@ -357,9 +373,10 @@ const ParentPortal: React.FC = () => {
                                     value={selectedTerm}
                                     onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
                                 >
-                                    <option value={1}>Trimestre 1</option>
-                                    <option value={2}>Trimestre 2</option>
-                                    <option value={3}>Trimestre 3</option>
+                                    {termStructure.length === 0 && <option value="">-- Aucune période configurée --</option>}
+                                    {termStructure.map(ts => (
+                                        <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>

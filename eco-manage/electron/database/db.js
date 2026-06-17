@@ -68,6 +68,11 @@ function initDb() {
         // Harmonize class code CP1 to CP
         db.prepare("UPDATE classes SET code = 'CP' WHERE code = 'CP1'").run();
         console.log(`[Migration] Harmonized class code CP1 to CP`);
+
+        // Clean class codes that mistakenly include the year (e.g., CE1026 or CE12026)
+        db.prepare("UPDATE classes SET code = REPLACE(code, '2026', '') WHERE code LIKE '%2026'").run();
+        db.prepare("UPDATE classes SET code = REPLACE(code, '026', '') WHERE code LIKE '%026'").run();
+        console.log(`[Migration] Cleaned year from class codes`);
     } catch (e) {
         console.error(`[Migration] Classes table migration failed:`, e.message);
     }

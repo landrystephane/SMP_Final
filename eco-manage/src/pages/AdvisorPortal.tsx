@@ -2,21 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 
 const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
     const { t } = useTranslation();
-    const MONTHS = [
-        { key: 'month_oct', label: t('month_oct', 'Octobre') },
-        { key: 'month_nov', label: t('month_nov', 'Novembre') },
-        { key: 'month_dec', label: t('month_dec', 'Décembre') },
-        { key: 'month_jan', label: t('month_jan', 'Janvier') },
-        { key: 'month_feb', label: t('month_feb', 'Février') },
-        { key: 'month_mar', label: t('month_mar', 'Mars') },
-        { key: 'month_apr', label: t('month_apr', 'Avril') },
-        { key: 'month_may', label: t('month_may', 'Mai') },
-        { key: 'month_jun', label: t('month_jun', 'Juin') }
-    ];
+    const { showNotification } = useNotification();
+    const [termStructure, setTermStructure] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS'>('PLANNING');
     const [classes, setClasses] = useState<any[]>([]);
     const [routes, setRoutes] = useState<any[]>([]);
@@ -26,10 +18,10 @@ const AdvisorPortal: React.FC = () => {
 
     // Evaluation Validation states
     const [selectedClass, setSelectedClass] = useState<string>('');
-    const [selectedTerm, setSelectedTerm] = useState<number>(1);
-    const [selectedMonth, setSelectedMonth] = useState<string>('month_oct');
+    const [selectedTerm, setSelectedTerm] = useState<number | ''>('');
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
 
-    const monthLabel = MONTHS.find(m => m.key === selectedMonth)?.label || selectedMonth;
+    const monthLabel = termStructure.flatMap(t => t.sequences).find(s => s?.id?.toString() === selectedMonth)?.name || selectedMonth;
     const [subjectStatuses, setSubjectStatuses] = useState<any[]>([]);
     const [selectedSubjectForDetail, setSelectedSubjectForDetail] = useState<any>(null);
     const [detailGrades, setDetailGrades] = useState<any[]>([]);
@@ -70,6 +62,22 @@ const AdvisorPortal: React.FC = () => {
                 try {
                     setTimetableSlots(JSON.parse(mySchool.timetable_slots));
                 } catch(e) {}
+            }
+            if (mySchool && mySchool.term_structure) {
+                try {
+                    const ts = JSON.parse(mySchool.term_structure);
+                    setTermStructure(ts);
+                    if (ts.length > 0) {
+                        setSelectedTerm(ts[0].term_id);
+                        if (ts[0].sequences && ts[0].sequences.length > 0) {
+                            setSelectedMonth(ts[0].sequences[0].id.toString());
+                        }
+                    }
+                } catch(e) {
+                    setTermStructure([]);
+                }
+            } else {
+                setTermStructure([]);
             }
         }
     };
@@ -156,11 +164,11 @@ const AdvisorPortal: React.FC = () => {
         if (!window.electronAPI || !selectedClass) return;
         if (schedType !== 'PAUSE') {
             if (!schedSubject) {
-                alert("Veuillez sélectionner une matière.");
+                showNotification("Veuillez sélectionner une matière.", "warning");
                 return;
             }
             if (!schedTeacher) {
-                alert("Veuillez sélectionner un enseignant.");
+                showNotification("Veuillez sélectionner un enseignant.", "warning");
                 return;
             }
         }
@@ -177,25 +185,27 @@ const AdvisorPortal: React.FC = () => {
                 school_id: user?.schoolId
             };
             
-            await window.electronAPI.updateSchedule(payload);
-            alert("Emploi du temps mis à jour avec succès !");
+            const res = await window.electronAPI.updateSchedule(payload);
+            if (res && res.error) throw new Error(res.error);
+            showNotification("Emploi du temps mis à jour avec succès !", "success");
             setShowScheduleModal(false);
             loadSchedules();
         } catch (err: any) {
-            alert("Erreur lors de l'enregistrement de l'emploi du temps : " + err.message);
+            showNotification("Erreur lors de l'enregistrement de l'emploi du temps : " + err.message, "error");
         }
     };
 
     const handleDeleteSchedule = async (id: number) => {
         if (!window.electronAPI) return;
-        if (confirm("Voulez-vous supprimer ce cours de l'emploi du temps ?")) {
+        if (window.confirm("Voulez-vous supprimer ce cours de l'emploi du temps ?")) {
             try {
-                await (window.electronAPI as any).deleteSchedule(id);
-                alert("Cours supprimé avec succès !");
+                const res = await (window.electronAPI as any).deleteSchedule(id);
+                if (res && res.error) throw new Error(res.error);
+                showNotification("Cours supprimé avec succès !", "success");
                 setShowScheduleModal(false);
                 loadSchedules();
             } catch (err: any) {
-                alert("Erreur lors de la suppression : " + err.message);
+                showNotification("Erreur lors de la suppression : " + err.message, "error");
             }
         }
     };
@@ -253,10 +263,10 @@ const AdvisorPortal: React.FC = () => {
                 school_id: user?.schoolId
             });
 
-            alert(t('grades_validated_success', "Notes validées avec succès ! Cette matière est désormais visible sur les bulletins."));
+            showNotification(t('grades_validated_success', "Notes validées avec succès ! Cette matière est désormais visible sur les bulletins."), "success");
             loadValidationStatuses();
         } catch (err: any) {
-            alert(t('validation_error', "Erreur lors de la validation: ") + err.message);
+            showNotification(t('validation_error', "Erreur lors de la validation: ") + err.message, "error");
         }
     };
 
@@ -276,12 +286,12 @@ const AdvisorPortal: React.FC = () => {
             });
             
             if (res && res.error) {
-                alert("Erreur base de données : " + res.error);
+                showNotification("Erreur base de données : " + res.error, "error");
             } else {
-                alert("Tous les enseignants ont été notifiés !");
+                showNotification("Tous les enseignants ont été notifiés !", "success");
             }
         } catch (err: any) {
-            alert("Erreur lors de la notification: " + err.message);
+            showNotification("Erreur lors de la notification: " + err.message, "error");
         }
     };
 
@@ -338,12 +348,22 @@ const AdvisorPortal: React.FC = () => {
                             <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('term', 'Trimestre')}</label>
                             <select
                                 value={selectedTerm}
-                                onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
+                                onChange={(e) => {
+                                    const newTerm = parseInt(e.target.value);
+                                    setSelectedTerm(newTerm);
+                                    const termObj = termStructure.find(t => t.term_id === newTerm);
+                                    if (termObj && termObj.sequences && termObj.sequences.length > 0) {
+                                        setSelectedMonth(termObj.sequences[0].id.toString());
+                                    } else {
+                                        setSelectedMonth('');
+                                    }
+                                }}
                                 className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-32"
                             >
-                                <option value={1}>{t('term_1', '1er Trimestre')}</option>
-                                <option value={2}>{t('term_2', '2e Trimestre')}</option>
-                                <option value={3}>{t('term_3', '3e Trimestre')}</option>
+                                {termStructure.length === 0 && <option value="">-- Aucune période --</option>}
+                                {termStructure.map(ts => (
+                                    <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
+                                ))}
                             </select>
                         </div>
                     )}
@@ -357,9 +377,13 @@ const AdvisorPortal: React.FC = () => {
                                     onChange={(e) => setSelectedMonth(e.target.value)}
                                     className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-40"
                                 >
-                                    {MONTHS.map(m => (
-                                        <option key={m.key} value={m.key}>{m.label}</option>
-                                    ))}
+                                    {termStructure.find(t => t.term_id === selectedTerm)?.sequences?.length ? (
+                                        termStructure.find(t => t.term_id === selectedTerm)?.sequences.map((seq: any) => (
+                                            <option key={seq.id} value={seq.id}>{seq.name}</option>
+                                        ))
+                                    ) : (
+                                        <option value="">-- Aucune séquence --</option>
+                                    )}
                                 </select>
                             </div>
                             
@@ -398,7 +422,7 @@ const AdvisorPortal: React.FC = () => {
                                 <button 
                                     onClick={() => {
                                         if (!selectedClass) {
-                                            alert("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.");
+                                            showNotification("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.", "warning");
                                             return;
                                         }
                                         handleOpenScheduleModal();

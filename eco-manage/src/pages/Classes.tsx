@@ -318,8 +318,8 @@ const Classes: React.FC = () => {
                                         onChange={(e) => {
                                             const name = e.target.value;
                                             const nameClean = name.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '');
-                                            const yearShort = new Date().getFullYear().toString().slice(-2);
-                                            const code = nameClean ? `${nameClean}0${yearShort}` : '';
+                                            // Ensure class code doesn't include the year to avoid duplication in matricule
+                                            const code = nameClean || '';
                                             setFormData({...formData, name, code: formData.id ? formData.code : code});
                                         }}
                                     />

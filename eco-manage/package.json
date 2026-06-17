@@ -45,10 +45,12 @@
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "libphonenumber-js": "^1.13.6",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^14.1.0",
+    "react-phone-number-input": "^3.4.17",
     "react-router-dom": "^6.22.2",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7"

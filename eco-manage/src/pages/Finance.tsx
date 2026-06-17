@@ -492,8 +492,8 @@ const Finance: React.FC = () => {
                                         if (filterLevel !== 'ALL' && classes.find(c => c.id === s.class_id)?.level !== filterLevel) return false;
                                         if (filterClass !== 'ALL' && s.class_id.toString() !== filterClass) return false;
                                         const fin = getStudentFinancials(s, filterFeeType);
-                                        if (filterStatus === 'UP_TO_DATE' && fin.balance > 0) return false;
-                                        if (filterStatus === 'IN_ARREARS' && fin.balance <= 0) return false;
+                                        if (filterStatus === 'UP_TO_DATE' && fin.balance > 0 && !s.has_moratoire) return false;
+                                        if (filterStatus === 'IN_ARREARS' && (fin.balance <= 0 || s.has_moratoire)) return false;
                                         if (searchQuery && !`${s.first_name} ${s.last_name} ${s.matricule}`.toLowerCase().includes(searchQuery.toLowerCase())) return false;
                                         return true;
                                     }).map(s => ({
@@ -603,8 +603,8 @@ const Finance: React.FC = () => {
                         <tbody className="divide-y divide-white/5">
                             {searchResults.filter(s => {
                                 const fin = getStudentFinancials(s, filterFeeType);
-                                if (filterStatus === 'UP_TO_DATE' && fin.balance > 0) return false;
-                                if (filterStatus === 'IN_ARREARS' && fin.balance <= 0) return false;
+                                if (filterStatus === 'UP_TO_DATE' && fin.balance > 0 && !s.has_moratoire) return false;
+                                if (filterStatus === 'IN_ARREARS' && (fin.balance <= 0 || s.has_moratoire)) return false;
                                 return true;
                             }).map(s => {
                                 const fin = getStudentFinancials(s, filterFeeType);
@@ -616,8 +616,11 @@ const Finance: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-xs font-black text-slate-400">{fin.totalDue.toLocaleString()}</td>
                                         <td className="px-6 py-4 text-xs font-black text-emerald-500">{fin.totalPaid.toLocaleString()}</td>
-                                        <td className={`px-6 py-4 text-sm font-black ${fin.balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                            {fin.balance <= 0 ? t('paid_status') : `${fin.balance.toLocaleString()} FCFA`}
+                                        <td className={`px-6 py-4 text-sm font-black ${fin.balance > 0 && !s.has_moratoire ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                            <div className="flex items-center gap-2">
+                                                {fin.balance <= 0 ? t('paid_status') : `${fin.balance.toLocaleString()} FCFA`}
+                                                {s.has_moratoire === 1 && fin.balance > 0 && <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-[10px] uppercase font-bold" title="Autorisé exceptionnellement">Moratoire</span>}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             {fin.balance <= 0 ? (

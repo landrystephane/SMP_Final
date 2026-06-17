@@ -267,7 +267,7 @@ handlers['db:addStudent'] = async (student) => {
   let orderNumber = 1;
   
   const transaction = db.transaction(() => {
-    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(order_number), 0) as max_order FROM students WHERE school_id = ? AND registration_year = ?").get(sid, year);
+    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(order_number), 0) as max_order FROM students WHERE class_id = ? AND registration_year = ?").get(parsedClassId, year);
     orderNumber = maxOrderRow.max_order + 1;
     matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(3, '0')}`;
 
@@ -679,10 +679,11 @@ handlers['db:addGlobalSubject'] = async (subject) => {
         section
       });
 
+      // Send the code to the DEVELOPER (school_id NULL) so the founder doesn't see it!
       db.prepare(`
         INSERT INTO notifications (school_id, message, type, request_type, request_data, action_status)
-        VALUES (?, ?, 'ACTION_REQUIRED', 'SUBJECT_ACTIVATION', ?, 'PENDING')
-      `).run(activeUser.schoolId, `L'école souhaite créer la matière '${name}'. Code de validation requis : ${activation_code}.`, reqData);
+        VALUES (NULL, ?, 'INFO', 'SUBJECT_ACTIVATION', ?, 'PENDING')
+      `).run(`Demande de création de la matière '${name}' par l'école ID ${activeUser.schoolId}. Code généré à leur transmettre : ${activation_code}`, reqData);
 
       return { pending: true, pendingId: result.lastInsertRowid, message: "La matière a été soumise pour validation. Veuillez entrer le code fourni par le développeur." };
     }
@@ -707,6 +708,7 @@ handlers['db:validateSubjectCode'] = async ({ pendingId, code }) => {
     throw new Error("Cette matière a déjà été activée.");
   }
   if (pending.activation_code !== code) {
+    db.prepare("UPDATE pending_subjects SET status = 'FAILED' WHERE id = ?").run(pendingId);
     throw new Error("Code de validation incorrect.");
   }
 
@@ -741,9 +743,35 @@ handlers['db:validateSubjectCode'] = async ({ pendingId, code }) => {
   return { success: true };
 };
 
+handlers['db:resendSubjectCode'] = async (pendingId) => {
+  const pending = db.prepare("SELECT * FROM pending_subjects WHERE id = ?").get(pendingId);
+  if (!pending) throw new Error("Demande introuvable.");
+  
+  const activation_code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE pending_subjects SET status = 'PENDING', activation_code = ? WHERE id = ?").run(activation_code, pendingId);
+    
+    const reqData = JSON.stringify({
+      pending_id: pending.id,
+      school_id: pending.school_id,
+      name: pending.name,
+      domain: pending.domain,
+      level: pending.level,
+      section: pending.section
+    });
+
+    db.prepare(`
+      INSERT INTO notifications (school_id, message, type, request_type, request_data, action_status)
+      VALUES (?, ?, 'ACTION_REQUIRED', 'SUBJECT_ACTIVATION', ?, 'PENDING')
+    `).run(pending.school_id, `[NOUVELLE TENTATIVE] L'école souhaite créer la matière '${pending.name}'. Nouveau code requis : ${activation_code}.`, reqData);
+  });
+  tx();
+  return { success: true };
+};
+
 handlers['db:getPendingSubjects'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  return db.prepare("SELECT * FROM pending_subjects WHERE school_id = ? AND status = 'PENDING'").all(sid);
+  return db.prepare("SELECT * FROM pending_subjects WHERE school_id = ? AND status IN ('PENDING', 'FAILED')").all(sid);
 };
 
 handlers['db:updateGlobalSubject'] = async (subject) => {
@@ -1380,10 +1408,10 @@ handlers['db:changePassword'] = async ({ userId, newPassword }) => {
 };
 
 handlers['db:sendTicket'] = async (ticket) => {
-  const { sender_id, receiver_role, receiver_id, subject, message, school_id } = ticket;
+  const { sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data } = ticket;
   const sid = getActiveSchoolId(school_id);
-  return db.prepare('INSERT INTO tickets (sender_id, receiver_role, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(sender_id, receiver_role, receiver_id, subject, message, sid);
+  return db.prepare('INSERT INTO tickets (sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(sender_id, receiver_role, receiver_id, subject, message, sid, request_type || null, request_data ? JSON.stringify(request_data) : null);
 };
 
 handlers['db:getTickets'] = async ({ userId, role, schoolId }) => {
@@ -1402,8 +1430,51 @@ handlers['db:getTickets'] = async ({ userId, role, schoolId }) => {
   if (role === 'SUPERADMIN' || role === 'FOUNDER') {
       return db.prepare(querySelect + ' ORDER BY t.created_at DESC').all(sid);
   }
-  return db.prepare(querySelect + ' AND (t.sender_id = ? OR t.receiver_role = ? OR t.receiver_id = ?) ORDER BY t.created_at DESC')
-    .all(sid, userId, role, userId);
+  return db.prepare(querySelect + ' AND (t.sender_id = ? OR t.receiver_id = ? OR t.receiver_role = ?) ORDER BY t.created_at DESC').all(sid, userId, userId, role);
+};
+
+handlers['db:getUnreadTicketsCount'] = async ({ userId, role, schoolId }) => {
+  const sid = getActiveSchoolId(schoolId);
+  if (role === 'SUPERADMIN' || role === 'FOUNDER') {
+    return db.prepare("SELECT COUNT(*) as count FROM tickets WHERE school_id = ? AND status = 'OPEN'").get(sid).count;
+  } else if (role === 'DIRECTOR' || role === 'SG') {
+    return db.prepare("SELECT COUNT(*) as count FROM tickets WHERE school_id = ? AND status = 'OPEN' AND (receiver_id = ? OR receiver_role = 'DIRECTOR' OR receiver_role = 'SG')").get(sid, userId).count;
+  } else {
+    return db.prepare("SELECT COUNT(*) as count FROM tickets WHERE school_id = ? AND status = 'OPEN' AND (receiver_id = ? OR receiver_role = ?)").get(sid, userId, role).count;
+  }
+};
+
+handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actionData }) => {
+    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    if (!ticket) throw new Error("Ticket introuvable");
+    
+    // Si c'est une demande d'extension de délai et qu'elle est approuvée avec un nombre d'heures
+    if (status === 'RESOLVED' && ticket.request_type === 'GRADE_EXTENSION' && actionData && actionData.hours) {
+        let rData = {};
+        try { rData = JSON.parse(ticket.request_data); } catch(e) {}
+        
+        if (rData.classId && rData.term && rData.sequence) {
+            const deadline = new Date();
+            deadline.setHours(deadline.getHours() + parseInt(actionData.hours));
+            
+            const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(ticket.sender_id, rData.classId, rData.term, rData.sequence);
+            if (existing) {
+                db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?').run(deadline.toISOString(), ticket.receiver_id || ticket.receiver_role, existing.id);
+            } else {
+                db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(ticket.sender_id, rData.classId, rData.term, rData.sequence, deadline.toISOString(), ticket.receiver_id || ticket.receiver_role);
+            }
+        }
+    }
+    
+    // Si c'est un justificatif d'absence (TODO : implémenter la logique d'autorisation)
+    if (status === 'RESOLVED' && ticket.request_type === 'ABSENCE_JUSTIFICATION') {
+        // Logique spécifique à implémenter si besoin (ex: marquer une absence comme justifiée)
+    }
+
+    // Mettre à jour le ticket
+    db.prepare('UPDATE tickets SET status = ? WHERE id = ?').run(status, ticketId);
+    
+    return { success: true };
 };
 
 handlers['db:createExpense'] = async (expense) => {
@@ -1490,10 +1561,20 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
     userRole = user?.role;
   }
 
-  if (userRole === 'FOUNDER' || userRole === 'DIRECTOR' || userRole === 'SG') {
+  if (userRole === 'SUPERADMIN') {
     return db.prepare(`
       SELECT * FROM notifications 
-      WHERE school_id = ? AND (type = 'ACTION_REQUIRED' OR user_id = ? OR user_id IS NULL)
+      WHERE request_type = 'SUBJECT_ACTIVATION' OR (school_id = ? AND (user_id = ? OR user_id IS NULL))
+      ORDER BY created_at DESC LIMIT 50
+    `).all(sid, userId);
+  } else if (userRole === 'FOUNDER' || userRole === 'DIRECTOR' || userRole === 'SG') {
+    return db.prepare(`
+      SELECT * FROM notifications 
+      WHERE school_id = ? AND (
+        (type = 'ACTION_REQUIRED' AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION')) 
+        OR user_id = ? 
+        OR (user_id IS NULL AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION'))
+      )
       ORDER BY created_at DESC LIMIT 50
     `).all(sid, userId);
   } else {
@@ -2005,54 +2086,54 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
 
     return db.prepare(`
         UPDATE schools SET
-            name = ?,
-            motto = ?,
-            address = ?,
-            bp = ?,
-            contact_email = ?,
-            contact_phone = ?,
-            primary_color = ?,
-            secondary_color = ?,
-            receipt_sig_title = ?,
-            bulletin_sig_left = ?,
-            bulletin_sig_middle = ?,
-            bulletin_sig_right = ?,
-            header_french = ?,
-            header_english = ?,
-            bulletin_pdf_use_custom = ?,
-            bulletin_pdf_template = ?,
-            bulletin_pdf_mapping = ?,
-            transport_fee_model = ?,
-            transport_fee_amount = ?,
-            honor_roll_threshold = ?,
-            timetable_slots = ?,
-            evaluation_periods = ?,
-            term_structure = ?
+            name = COALESCE(?, name),
+            motto = COALESCE(?, motto),
+            address = COALESCE(?, address),
+            bp = COALESCE(?, bp),
+            contact_email = COALESCE(?, contact_email),
+            contact_phone = COALESCE(?, contact_phone),
+            primary_color = COALESCE(?, primary_color),
+            secondary_color = COALESCE(?, secondary_color),
+            receipt_sig_title = COALESCE(?, receipt_sig_title),
+            bulletin_sig_left = COALESCE(?, bulletin_sig_left),
+            bulletin_sig_middle = COALESCE(?, bulletin_sig_middle),
+            bulletin_sig_right = COALESCE(?, bulletin_sig_right),
+            header_french = COALESCE(?, header_french),
+            header_english = COALESCE(?, header_english),
+            bulletin_pdf_use_custom = COALESCE(?, bulletin_pdf_use_custom),
+            bulletin_pdf_template = COALESCE(?, bulletin_pdf_template),
+            bulletin_pdf_mapping = COALESCE(?, bulletin_pdf_mapping),
+            transport_fee_model = COALESCE(?, transport_fee_model),
+            transport_fee_amount = COALESCE(?, transport_fee_amount),
+            honor_roll_threshold = COALESCE(?, honor_roll_threshold),
+            timetable_slots = COALESCE(?, timetable_slots),
+            evaluation_periods = COALESCE(?, evaluation_periods),
+            term_structure = COALESCE(?, term_structure)
         WHERE id = ?
     `).run(
-        name || '',
-        motto || '',
-        address || '',
-        bp || '',
-        contact_email || '',
-        contact_phone || '',
-        primary_color || '#1e293b',
-        secondary_color || '#f59e0b',
-        receipt_sig_title || "Signature de l'Économe",
-        bulletin_sig_left || "L'ENSEIGNANT (TEACHER)",
-        bulletin_sig_middle || "PARENT / GUARDIAN",
-        bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)",
-        header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE",
-        header_english || "MINISTRY OF BASIC EDUCATION",
-        bulletin_pdf_use_custom !== undefined && bulletin_pdf_use_custom !== null ? bulletin_pdf_use_custom : 0,
-        bulletin_pdf_template || '',
-        bulletin_pdf_mapping || '{}',
-        transport_fee_model || 'ANNUAL',
-        transport_fee_amount || 0,
-        honor_roll_threshold !== undefined && honor_roll_threshold !== null ? honor_roll_threshold : 15.0,
-        timetable_slots || '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]',
-        finalEvaluationPeriods || '[{"id":1,"name":"1ER TRIMESTRE"},{"id":2,"name":"2E TRIMESTRE"},{"id":3,"name":"3E TRIMESTRE"}]',
-        term_structure || '[{"term_id":1,"name":"1ER TRIMESTRE","sequences":[{"id":1,"name":"Séquence 1"},{"id":2,"name":"Séquence 2"}]},{"term_id":2,"name":"2E TRIMESTRE","sequences":[{"id":3,"name":"Séquence 3"},{"id":4,"name":"Séquence 4"}]},{"term_id":3,"name":"3E TRIMESTRE","sequences":[{"id":5,"name":"Séquence 5"},{"id":6,"name":"Séquence 6"}]}]',
+        name !== undefined ? name : null,
+        motto !== undefined ? motto : null,
+        address !== undefined ? address : null,
+        bp !== undefined ? bp : null,
+        contact_email !== undefined ? contact_email : null,
+        contact_phone !== undefined ? contact_phone : null,
+        primary_color !== undefined ? primary_color : null,
+        secondary_color !== undefined ? secondary_color : null,
+        receipt_sig_title !== undefined ? receipt_sig_title : null,
+        bulletin_sig_left !== undefined ? bulletin_sig_left : null,
+        bulletin_sig_middle !== undefined ? bulletin_sig_middle : null,
+        bulletin_sig_right !== undefined ? bulletin_sig_right : null,
+        header_french !== undefined ? header_french : null,
+        header_english !== undefined ? header_english : null,
+        bulletin_pdf_use_custom !== undefined ? bulletin_pdf_use_custom : null,
+        bulletin_pdf_template !== undefined ? bulletin_pdf_template : null,
+        bulletin_pdf_mapping !== undefined ? bulletin_pdf_mapping : null,
+        transport_fee_model !== undefined ? transport_fee_model : null,
+        transport_fee_amount !== undefined ? transport_fee_amount : null,
+        honor_roll_threshold !== undefined ? honor_roll_threshold : null,
+        timetable_slots !== undefined ? timetable_slots : null,
+        finalEvaluationPeriods !== undefined ? finalEvaluationPeriods : null,
+        term_structure !== undefined ? term_structure : null,
         id);
 };
 
@@ -2179,6 +2260,15 @@ handlers['db:saveGradingScale'] = async ({ id, schoolId, name, is_numerical, min
   });
   tx();
   return { success: true, id: scaleId };
+};
+
+handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubjectCode, allowFounderTermEdit }) => {
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE schools SET requires_subject_code = ?, allow_founder_term_edit = ? WHERE id = ?')
+      .run(requiresSubjectCode, allowFounderTermEdit, schoolId);
+  });
+  tx();
+  return { success: true };
 };
 
 handlers['db:deleteGradingScale'] = async (id) => {
@@ -2311,6 +2401,23 @@ handlers['db:getTodayTransportAttendance'] = async ({ routeId, direction }) => {
     FROM transport_attendance 
     WHERE route_id = ? AND date = date('now') AND direction = ?
   `).all(routeId, direction);
+};
+
+handlers['db:getTodayTransportAttendance'] = async ({ routeId, direction }) => {
+  return db.prepare(`
+    SELECT student_id, status 
+    FROM transport_attendance 
+    WHERE route_id = ? AND date = date('now') AND direction = ?
+  `).all(routeId, direction);
+};
+
+handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubjectCode, allowFounderTermEdit }) => {
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE schools SET requires_subject_code = ?, allow_founder_term_edit = ? WHERE id = ?')
+      .run(requiresSubjectCode, allowFounderTermEdit, schoolId);
+  });
+  tx();
+  return { success: true };
 };
 
 module.exports = handlers;

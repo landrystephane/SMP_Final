@@ -13,6 +13,8 @@ const Subjects: React.FC = () => {
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [isManagingGlobal, setIsManagingGlobal] = useState(false);
   const [editingSubject, setEditingSubject] = useState<any | null>(null);
+  const [filterLevel, setFilterLevel] = useState<string>('');
+  const [filterSection, setFilterSection] = useState<string>('');
   const [pendingSubjects, setPendingSubjects] = useState<any[]>([]);
   const [newSubject, setNewSubject] = useState({
     name: '',
@@ -20,10 +22,10 @@ const Subjects: React.FC = () => {
     level: 'PRIMAIRE',
     section: 'FRANCOPHONE'
   });
+  const [requiresCode, setRequiresCode] = useState(false);
 
   const { hasRole, user } = useAuth();
   const canManageRegistry = hasRole(['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG']);
-  const canConfigClass = hasRole(['ADVISOR', 'DIRECTOR', 'FOUNDER', 'SG']);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -32,6 +34,12 @@ const Subjects: React.FC = () => {
       setGlobalSubjects(gSubjects?.filter((s: any) => s.is_active) || []);
       const cls = await window.electronAPI.getClasses(user?.schoolId);
       setClasses(cls || []);
+
+      const schools = await window.electronAPI.getSchools();
+      const mySchool = schools.find((s: any) => s.id === user?.schoolId);
+      if (mySchool && mySchool.requires_subject_code === 1) {
+          setRequiresCode(true);
+      }
     }
   };
 
@@ -43,12 +51,24 @@ const Subjects: React.FC = () => {
   };
 
   const loadPendingSubjects = async () => {
-    if (window.electronAPI && user?.schoolId && user?.role !== 'SUPERADMIN') {
+    if (window.electronAPI && user?.schoolId) {
       try {
         const pending = await (window.electronAPI as any).getPendingSubjects(user.schoolId);
         setPendingSubjects(pending || []);
       } catch (e) {
         console.error("Failed to load pending subjects", e);
+      }
+    }
+  };
+
+  const handleCancelPendingSubject = async (id: number) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir annuler cette demande ?")) return;
+    if (window.electronAPI) {
+      try {
+        await (window.electronAPI as any).cancelPendingSubject(id);
+        loadPendingSubjects();
+      } catch (err: any) {
+        showNotification(err.message, "error");
       }
     }
   };
@@ -69,12 +89,13 @@ const Subjects: React.FC = () => {
     if (window.electronAPI) {
       try {
         const res = await window.electronAPI.addGlobalSubject(newSubject);
+        const addedName = newSubject.name;
         setNewSubject({ name: '', domain: '', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
         if (res && res.pending) {
           showNotification(res.message, "info");
           loadPendingSubjects();
         } else {
-          showNotification("Matière ajoutée avec succès", "success");
+          showNotification(`La matière "${addedName}" a été ajoutée avec succès !`, "success");
         }
         loadData();
       } catch (err: any) {
@@ -87,8 +108,9 @@ const Subjects: React.FC = () => {
     e.preventDefault();
     if (window.electronAPI && editingSubject) {
       try {
+        const updatedName = editingSubject.name;
         await window.electronAPI.updateGlobalSubject(editingSubject);
-        showNotification("Matière mise à jour avec succès", "success");
+        showNotification(`Les modifications pour la matière "${updatedName}" ont été enregistrées.`, "success");
         setEditingSubject(null);
         loadData();
       } catch (err: any) {
@@ -97,12 +119,12 @@ const Subjects: React.FC = () => {
     }
   };
 
-  const handleDeleteGlobalSubject = async (id: number) => {
-    if (!window.confirm(t('confirm_delete_global_module', 'Voulez-vous vraiment supprimer cette matière ?'))) return;
+  const handleDeleteGlobalSubject = async (id: number, name: string) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer la matière "${name}" de votre répertoire ?`)) return;
     if (window.electronAPI) {
       try {
         await window.electronAPI.deleteGlobalSubject(id);
-        showNotification("Matière supprimée avec succès", "success");
+        showNotification(`La matière "${name}" a été définitivement supprimée.`, "success");
         loadData();
       } catch (err: any) {
         showNotification(err.message, "error");
@@ -170,7 +192,6 @@ const Subjects: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Liste des Classes */}
         <div className="glass-card p-6">
           <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider">{t('classes')}</h2>
           <div className="space-y-2">
@@ -193,7 +214,6 @@ const Subjects: React.FC = () => {
           </div>
         </div>
 
-        {/* Configuration des Matières pour la classe sélectionnée */}
         <div className="lg:col-span-2 glass-card p-6">
           {!selectedClassId ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 py-12">
@@ -271,7 +291,6 @@ const Subjects: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Gestion Répertoire Global */}
       {isManagingGlobal && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
@@ -284,7 +303,6 @@ const Subjects: React.FC = () => {
             
             <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-8">
                 <div className="flex-1 overflow-x-auto">
-                    {/* Pending Subjects Validation Section */}
                     {pendingSubjects.length > 0 && (
                       <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
                         <h3 className="text-xs font-black text-amber-500 mb-3 uppercase tracking-wider">Matières en attente d'activation</h3>
@@ -303,27 +321,54 @@ const Subjects: React.FC = () => {
                                   className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-500 font-mono text-center w-32 uppercase"
                                   id={`code-input-${ps.id}`}
                                 />
-                                <button
-                                  onClick={async () => {
-                                    const inputEl = document.getElementById(`code-input-${ps.id}`) as HTMLInputElement;
-                                    const code = inputEl?.value?.trim()?.toUpperCase();
-                                    if (!code) {
-                                      showNotification("Veuillez saisir le code", "error");
-                                      return;
-                                    }
-                                    try {
-                                      await (window.electronAPI as any).validateSubjectCode({ pendingId: ps.id, code });
-                                      showNotification("Matière validée et activée avec succès !", "success");
-                                      loadPendingSubjects();
-                                      loadData();
-                                    } catch (err: any) {
-                                      showNotification(err.message, "error");
-                                    }
-                                  }}
-                                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all"
-                                >
-                                  Activer
-                                </button>
+                                {ps.status === 'FAILED' ? (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const res = await (window.electronAPI as any).resendSubjectCode(ps.id);
+                                          if (res?.error) throw new Error(res.error);
+                                          showNotification("Une nouvelle demande de code a été envoyée au développeur.", "info");
+                                          loadPendingSubjects();
+                                        } catch (err: any) {
+                                          showNotification(err.message, "error");
+                                        }
+                                      }}
+                                      className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all"
+                                    >
+                                      Renvoyer un code
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        const inputEl = document.getElementById(`code-input-${ps.id}`) as HTMLInputElement;
+                                        const code = inputEl?.value?.trim()?.toUpperCase();
+                                        if (!code) {
+                                          showNotification("Veuillez saisir le code", "error");
+                                          return;
+                                        }
+                                        try {
+                                          const res = await (window.electronAPI as any).validateSubjectCode({ pendingId: ps.id, code });
+                                          if (res?.error) throw new Error(res.error);
+                                          showNotification("Matière validée et activée avec succès !", "success");
+                                          loadPendingSubjects();
+                                          loadData();
+                                        } catch (err: any) {
+                                          showNotification(err.message, "error");
+                                          loadPendingSubjects();
+                                        }
+                                      }}
+                                      className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all"
+                                    >
+                                      Activer
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleCancelPendingSubject(ps.id)}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-all"
+                                    title="Annuler la demande"
+                                  >
+                                    Annuler
+                                  </button>
                               </div>
                             </div>
                           ))}
@@ -331,7 +376,29 @@ const Subjects: React.FC = () => {
                       </div>
                     )}
 
-                    <h3 className="text-sm font-bold text-amber-500 mb-4 uppercase">Matières Enregistrées</h3>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                      <h3 className="text-sm font-bold text-amber-500 uppercase">Matières Enregistrées</h3>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <select
+                          className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 flex-1"
+                          value={filterLevel}
+                          onChange={(e) => setFilterLevel(e.target.value)}
+                        >
+                          <option value="">Tous Niveaux</option>
+                          <option value="PRIMAIRE">Primaire</option>
+                          <option value="MATERNELLE">Maternelle</option>
+                        </select>
+                        <select
+                          className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 flex-1"
+                          value={filterSection}
+                          onChange={(e) => setFilterSection(e.target.value)}
+                        >
+                          <option value="">Toutes Sections</option>
+                          <option value="FRANCOPHONE">Francophone</option>
+                          <option value="ANGLOPHONE">Anglophone</option>
+                        </select>
+                      </div>
+                    </div>
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-900 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-800">
@@ -341,7 +408,10 @@ const Subjects: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50 text-slate-300">
-                            {globalSubjects.map(subj => (
+                            {globalSubjects
+                                .filter(subj => (filterLevel ? subj.level === filterLevel : true))
+                                .filter(subj => (filterSection ? subj.section === filterSection : true))
+                                .map(subj => (
                                 <tr key={subj.id} className="hover:bg-slate-800/50">
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-sm text-white">{subj.name}</div>
@@ -352,7 +422,7 @@ const Subjects: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3 text-right space-x-2">
                                         <button onClick={() => setEditingSubject(subj)} className="p-1.5 text-slate-400 hover:text-amber-500"><Edit className="w-4 h-4" /></button>
-                                        <button onClick={() => handleDeleteGlobalSubject(subj.id)} className="p-1.5 text-slate-400 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteGlobalSubject(subj.id, subj.name)} className="p-1.5 text-slate-400 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>
                                     </td>
                                 </tr>
                             ))}
@@ -431,7 +501,7 @@ const Subjects: React.FC = () => {
                                 className="btn-primary flex-1 flex items-center justify-center"
                             >
                                 <Save className="w-4 h-4 mr-2" />
-                                {editingSubject ? 'Mettre à jour' : 'Ajouter'}
+                                {editingSubject ? 'Mettre à jour' : (requiresCode ? 'Demander un code' : 'Ajouter')}
                             </button>
                         </div>
                     </form>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert, X, Plus, Trash2, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 
 const CustomizationSettings: React.FC = () => {
     const { t } = useTranslation();
@@ -51,77 +52,89 @@ const CustomizationSettings: React.FC = () => {
 
     const loadSettings = async () => {
         setLoading(true);
-        if (window.electronAPI && user) {
-            const schs = await window.electronAPI.getSchools();
-            setSchools(schs);
-            const mySchool = schs.find(s => s.id?.toString() === user.schoolId?.toString()) || schs[0];
-            if (mySchool) {
-                setActiveSchool(mySchool);
-                setSchoolName(mySchool.name || '');
-                setSchoolMotto(mySchool.motto || '');
-                setSchoolAddress(mySchool.address || '');
-                setSchoolBp(mySchool.bp || '');
-                setPrimaryColor(mySchool.primary_color || '#1e293b');
-                setSecondaryColor(mySchool.secondary_color || '#f59e0b');
-                setReceiptSigTitle(mySchool.receipt_sig_title || "Signature de l'Économe");
-                setBulletinSigLeft(mySchool.bulletin_sig_left || "L'ENSEIGNANT (TEACHER)");
-                setBulletinSigMiddle(mySchool.bulletin_sig_middle || "PARENT / GUARDIAN");
-                setBulletinSigRight(mySchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)");
-                setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
-                setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
-                setHonorRollThreshold(mySchool.honor_roll_threshold !== undefined && mySchool.honor_roll_threshold !== null ? mySchool.honor_roll_threshold : 15.0);
-                try {
-                    setTimetableSlots(mySchool.timetable_slots ? JSON.parse(mySchool.timetable_slots) : [
-                        { label: '08:00 - 10:00', start: '08:00', end: '10:00', isBreak: false },
-                        { label: '10:00 - 12:00', start: '10:00', end: '12:00', isBreak: false },
-                        { label: '12:00 - 13:00', start: '12:00', end: '13:00', isBreak: true },
-                        { label: '13:00 - 15:00', start: '13:00', end: '15:00', isBreak: false },
-                        { label: '15:00 - 17:00', start: '15:00', end: '17:00', isBreak: false }
-                    ]);
-                } catch(e) {
-                    setTimetableSlots([]);
-                }
+        try {
+            if (window.electronAPI && user) {
+                const schs = await window.electronAPI.getSchools();
+                setSchools(schs);
+                const mySchool = schs.find(s => s.id?.toString() === user.schoolId?.toString()) || schs[0];
+                if (mySchool) {
+                    setActiveSchool(mySchool);
+                    setSchoolName(mySchool.name || '');
+                    setSchoolMotto(mySchool.motto || '');
+                    setSchoolAddress(mySchool.address || '');
+                    setSchoolBp(mySchool.bp || '');
+                    setHonorRollThreshold(mySchool.honor_roll_threshold || 15.0);
 
-                setAllowFounderTermEdit(mySchool.allow_founder_term_edit || 0);
-                try {
-                    setEvaluationPeriods(mySchool.evaluation_periods ? JSON.parse(mySchool.evaluation_periods) : [
-                        { id: 1, name: '1ER TRIMESTRE' },
-                        { id: 2, name: '2E TRIMESTRE' },
-                        { id: 3, name: '3E TRIMESTRE' }
-                    ]);
-                } catch(e) {
-                    setEvaluationPeriods([]);
-                }
+                    // Signatures pour les bulletins et reçus
+                    setReceiptSigTitle(mySchool.receipt_sig_title || "Signature de l'Économe");
+                    setBulletinSigLeft(mySchool.bulletin_sig_left || "L'ENSEIGNANT (TEACHER)");
+                    setBulletinSigMiddle(mySchool.bulletin_sig_middle || "PARENT / GUARDIAN");
+                    setBulletinSigRight(mySchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)");
+                    setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
+                    setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
 
-                try {
-                    setTermStructure(mySchool.term_structure ? JSON.parse(mySchool.term_structure) : [
-                        { term_id: 1, name: '1ER TRIMESTRE', sequences: [{ id: 1, name: 'Séquence 1' }, { id: 2, name: 'Séquence 2' }] },
-                        { term_id: 2, name: '2E TRIMESTRE', sequences: [{ id: 3, name: 'Séquence 3' }, { id: 4, name: 'Séquence 4' }] },
-                        { term_id: 3, name: '3E TRIMESTRE', sequences: [{ id: 5, name: 'Séquence 5' }, { id: 6, name: 'Séquence 6' }] }
-                    ]);
-                } catch(e) {
-                    setTermStructure([]);
-                }
-                const template = window.electronAPI.getReportTemplate ? await window.electronAPI.getReportTemplate(mySchool.id) : null;
-                
-                if (template) {
-                    setHeaderImage(template.header_image || '');
-                    setWatermarkImage(template.watermark_image || '');
-                    setFooterImage(template.footer_image || '');
-                    setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
-                    setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
-                }
-                
-                const insts = window.electronAPI.getInstallments ? await window.electronAPI.getInstallments() : [];
-                setInstallments(insts || []);
-                const deadls = window.electronAPI.getInstallmentDeadlines ? await window.electronAPI.getInstallmentDeadlines(mySchool.id) : [];
-                setInstallmentDeadlines(deadls || []);
+                    try {
+                        setTimetableSlots(mySchool.timetable_slots ? JSON.parse(mySchool.timetable_slots) : [
+                            { label: '08:00 - 10:00', start: '08:00', end: '10:00', isBreak: false },
+                            { label: '10:00 - 10:30', start: '10:00', end: '10:30', isBreak: true },
+                            { label: '10:30 - 12:30', start: '10:30', end: '12:30', isBreak: false },
+                            { label: '12:30 - 13:00', start: '12:30', end: '13:00', isBreak: true },
+                            { label: '13:00 - 15:00', start: '13:00', end: '15:00', isBreak: false },
+                            { label: '15:00 - 17:00', start: '15:00', end: '17:00', isBreak: false }
+                        ]);
+                    } catch(e) {
+                        setTimetableSlots([]);
+                    }
 
-                const scales = await (window.electronAPI as any).getGradingScales(mySchool.id);
-                setGradingScales(scales || []);
+                    setAllowFounderTermEdit(mySchool.allow_founder_term_edit || 0);
+                    try {
+                        setEvaluationPeriods(mySchool.evaluation_periods ? JSON.parse(mySchool.evaluation_periods) : [
+                            { id: 1, name: '1ER TRIMESTRE' },
+                            { id: 2, name: '2E TRIMESTRE' },
+                            { id: 3, name: '3E TRIMESTRE' }
+                        ]);
+                    } catch(e) {
+                        setEvaluationPeriods([]);
+                    }
+
+                    try {
+                        setTermStructure(mySchool.term_structure ? JSON.parse(mySchool.term_structure) : [
+                            { term_id: 1, name: '1ER TRIMESTRE', sequences: [{ id: 1, name: 'Séquence 1' }, { id: 2, name: 'Séquence 2' }] },
+                            { term_id: 2, name: '2E TRIMESTRE', sequences: [{ id: 3, name: 'Séquence 3' }, { id: 4, name: 'Séquence 4' }] },
+                            { term_id: 3, name: '3E TRIMESTRE', sequences: [{ id: 5, name: 'Séquence 5' }, { id: 6, name: 'Séquence 6' }] }
+                        ]);
+                    } catch(e) {
+                        setTermStructure([]);
+                    }
+                    const template = window.electronAPI.getReportTemplate ? await window.electronAPI.getReportTemplate(mySchool.id) : null;
+                    
+                    if (template) {
+                        setHeaderImage(template.header_image || '');
+                        setWatermarkImage(template.watermark_image || '');
+                        setFooterImage(template.footer_image || '');
+                        setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
+                        setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
+                    }
+                    
+                    const insts = window.electronAPI.getInstallments ? await window.electronAPI.getInstallments() : [];
+                    setInstallments(insts || []);
+                    const deadls = window.electronAPI.getInstallmentDeadlines ? await window.electronAPI.getInstallmentDeadlines(mySchool.id) : [];
+                    setInstallmentDeadlines(deadls || []);
+
+                    try {
+                        const scales = await (window.electronAPI as any).getGradingScales(mySchool.id);
+                        setGradingScales(scales || []);
+                    } catch(e: any) {
+                        console.error('Failed to load grading scales', e);
+                        setGradingScales([]);
+                    }
+                }
             }
+        } catch (e: any) {
+            console.error("Erreur lors du chargement des paramètres:", e);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
@@ -245,6 +258,7 @@ const CustomizationSettings: React.FC = () => {
             }
 
             setSuccess(true);
+            showNotification("Paramètres enregistrés avec succès !", "success");
             setTimeout(() => setSuccess(false), 3000);
             loadSettings();
         } catch (err: any) {
@@ -442,7 +456,7 @@ const CustomizationSettings: React.FC = () => {
                                 {!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
                                     <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold flex items-start gap-2">
                                         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span>La modification de la structure des trimestres et séquences est verrouillée par l'administrateur système pour votre école. Contactez le support si vous devez changer cette configuration.</span>
+                                        <span>La modification de la structure des trimestres et séquences n'est pas activée. Cette section est en mode lecture seule pour des raisons de sécurité.</span>
                                     </div>
                                 )}
 
@@ -487,7 +501,7 @@ const CustomizationSettings: React.FC = () => {
                                                                 const allSeqIds = termStructure.flatMap(t => t.sequences.map((s: any) => s.id));
                                                                 const nextSeqId = allSeqIds.length > 0 ? Math.max(...allSeqIds) + 1 : 1;
                                                                 const newStruct = [...termStructure];
-                                                                newStruct[tIdx].sequences.push({ id: nextSeqId, name: `Séquence ${nextSeqId}` });
+                                                                newStruct[tIdx].sequences.push({ id: nextSeqId, name: `Séquence ${nextSeqId}`, weight: 1 });
                                                                 setTermStructure(newStruct);
                                                             }}
                                                             className="text-[8px] font-black text-amber-500 hover:underline uppercase tracking-wider"
@@ -511,6 +525,22 @@ const CustomizationSettings: React.FC = () => {
                                                             placeholder="Ex: Séquence 1"
                                                             className="flex-1 bg-transparent border-b border-white/5 px-2 py-0.5 text-xs font-semibold text-slate-300 outline-none focus:border-amber-500 disabled:opacity-60"
                                                         />
+                                                        <div className="flex items-center gap-1.5 border-l border-white/10 pl-3">
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase">Poids</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0.1"
+                                                                step="0.1"
+                                                                disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                                                value={seq.weight !== undefined ? seq.weight : 1}
+                                                                onChange={(e) => {
+                                                                    const newStruct = [...termStructure];
+                                                                    newStruct[tIdx].sequences[sIdx].weight = parseFloat(e.target.value) || 1;
+                                                                    setTermStructure(newStruct);
+                                                                }}
+                                                                className="w-12 bg-slate-800 border border-white/10 rounded px-1.5 py-0.5 text-xs font-bold text-center text-white outline-none focus:border-amber-500 disabled:opacity-60"
+                                                            />
+                                                        </div>
                                                         {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
                                                             <button 
                                                                 type="button"
@@ -729,7 +759,7 @@ const CustomizationSettings: React.FC = () => {
                                             value={editingScale.name}
                                             onChange={(e) => setEditingScale({ ...editingScale, name: e.target.value })}
                                             placeholder="Ex: Évaluation Compétences Maternelle"
-                                            className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                            className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                         />
                                     </div>
 
@@ -739,7 +769,7 @@ const CustomizationSettings: React.FC = () => {
                                             <select
                                                 value={editingScale.is_numerical}
                                                 onChange={(e) => setEditingScale({ ...editingScale, is_numerical: parseInt(e.target.value) })}
-                                                className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                                className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                             >
                                                 <option value={1}>Numérique avec plages (Conversion)</option>
                                                 <option value={0}>Littérale pure (Saisie de symbole)</option>
@@ -755,7 +785,7 @@ const CustomizationSettings: React.FC = () => {
                                                         step="0.1"
                                                         value={editingScale.min_value}
                                                         onChange={(e) => setEditingScale({ ...editingScale, min_value: e.target.value })}
-                                                        className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                                        className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
@@ -765,7 +795,7 @@ const CustomizationSettings: React.FC = () => {
                                                         step="0.1"
                                                         value={editingScale.max_value}
                                                         onChange={(e) => setEditingScale({ ...editingScale, max_value: e.target.value })}
-                                                        className="w-full bg-slate-955 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                                        className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                                     />
                                                 </div>
                                             </>
@@ -791,7 +821,7 @@ const CustomizationSettings: React.FC = () => {
                                     ) : (
                                         <div className="space-y-3">
                                             {editingScale.options.map((opt: any, idx: number) => (
-                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-955/50 border border-white/5 rounded-2xl items-center relative">
+                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-950/50 border border-white/5 rounded-2xl items-center relative">
                                                     <div>
                                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Symbole (ex: NAD)</label>
                                                         <input

@@ -45,7 +45,12 @@ export interface ElectronAPI {
   toggleSchoolStatus: (data: { id: number, isActive: boolean }) => Promise<any>;
   getGlobalSubjects: () => Promise<any[]>;
   addGlobalSubject: (subject: any) => Promise<any>;
+  updateGlobalSubject: (subject: any) => Promise<any>;
   deleteGlobalSubject: (id: number) => Promise<any>;
+  getPendingSubjects: (schoolId: number) => Promise<any>;
+  validateSubjectCode: (data: any) => Promise<any>;
+  resendSubjectCode: (id: number) => Promise<any>;
+  cancelPendingSubject: (id: number) => Promise<any>;
   getSchoolSubjects: (schoolId: number) => Promise<any[]>;
   toggleSchoolSubject: (data: { schoolId: number, subjectId: number, isActive: boolean }) => Promise<any>;
   getClassSubjects: (classId: number) => Promise<any[]>;

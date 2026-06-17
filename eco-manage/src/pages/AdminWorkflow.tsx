@@ -16,7 +16,7 @@ const AdminWorkflow: React.FC = () => {
   const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
 
   const [period, setPeriod] = useState({
-    term: 1,
+    activeId: '1',
     start: '2026-04-20',
     end: '2026-05-15',
     active: true,
@@ -49,18 +49,44 @@ const AdminWorkflow: React.FC = () => {
         const end = await window.electronAPI.getSetting('period_end') || '2026-05-15';
         const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
         const activeTerm = await window.electronAPI.getSetting('active_term') || '1';
-        setPeriod(prev => ({ ...prev, start, end, editingAllowed, term: parseInt(activeTerm) }));
+        const activeSequence = await window.electronAPI.getSetting('active_sequence') || '';
+        const activeId = activeSequence ? `${activeTerm}_${activeSequence}` : activeTerm;
+        setPeriod(prev => ({ ...prev, start, end, editingAllowed, activeId }));
 
         const schoolsList = await window.electronAPI.getSchools();
         const curSchool = schoolsList.find((s: any) => s.id?.toString() === user?.schoolId?.toString()) || schoolsList[0];
-        if (curSchool && curSchool.evaluation_periods) {
+        if (curSchool && curSchool.term_structure) {
             try {
-                setEvaluationPeriods(JSON.parse(curSchool.evaluation_periods));
+                const parsed = JSON.parse(curSchool.term_structure);
+                const flattened: any[] = [];
+                parsed.forEach((t: any) => {
+                    if (t.sequences && t.sequences.length > 0) {
+                        t.sequences.forEach((s: any) => {
+                            flattened.push({
+                                id: `${t.term_id}_${s.id}`,
+                                name: `${t.name} - ${s.name}`
+                            });
+                        });
+                    } else {
+                        flattened.push({
+                            id: t.term_id.toString(),
+                            name: t.name
+                        });
+                    }
+                });
+                setEvaluationPeriods(flattened);
             } catch(e) {
-                setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+                setEvaluationPeriods([{ id: '1', name: '1ER TRIMESTRE' }, { id: '2', name: '2E TRIMESTRE' }, { id: '3', name: '3E TRIMESTRE' }]);
+            }
+        } else if (curSchool && curSchool.evaluation_periods) {
+            try {
+                const parsed = JSON.parse(curSchool.evaluation_periods);
+                setEvaluationPeriods(parsed.map((t: any) => ({ id: t.id.toString(), name: t.name })));
+            } catch(e) {
+                setEvaluationPeriods([{ id: '1', name: '1ER TRIMESTRE' }, { id: '2', name: '2E TRIMESTRE' }, { id: '3', name: '3E TRIMESTRE' }]);
             }
         } else {
-            setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+            setEvaluationPeriods([{ id: '1', name: '1ER TRIMESTRE' }, { id: '2', name: '2E TRIMESTRE' }, { id: '3', name: '3E TRIMESTRE' }]);
         }
     }
   };
@@ -76,7 +102,12 @@ const AdminWorkflow: React.FC = () => {
         await window.electronAPI.setSetting({ key: 'period_start', value: period.start });
         await window.electronAPI.setSetting({ key: 'period_end', value: period.end });
         await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: period.editingAllowed.toString() });
-        await window.electronAPI.setSetting({ key: 'active_term', value: period.term.toString() });
+        
+        const parts = period.activeId.toString().split('_');
+        const activeTerm = parts[0];
+        const activeSequence = parts[1] || '';
+        await window.electronAPI.setSetting({ key: 'active_term', value: activeTerm });
+        await window.electronAPI.setSetting({ key: 'active_sequence', value: activeSequence });
         
         if (period.editingAllowed) {
             await window.electronAPI.createNotification({
@@ -350,8 +381,8 @@ const AdminWorkflow: React.FC = () => {
                 <label className="text-xs uppercase text-slate-500 font-bold">Période Active</label>
                 <select 
                     className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1 outline-none focus:border-amber-500"
-                    value={period.term}
-                    onChange={(e) => setPeriod(prev => ({ ...prev, term: parseInt(e.target.value) }))}
+                    value={period.activeId}
+                    onChange={(e) => setPeriod(prev => ({ ...prev, activeId: e.target.value }))}
                 >
                     {evaluationPeriods.map(ep => (
                         <option key={ep.id} value={ep.id}>{ep.name}</option>

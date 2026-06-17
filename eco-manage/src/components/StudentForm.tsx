@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 interface StudentFormProps {
   onClose: () => void;
@@ -14,18 +16,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
   const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
-  const [phoneCountry, setPhoneCountry] = useState(() => {
-    const contact = student?.parent_contact || '';
-    if (contact.startsWith('237')) return '237';
-    if (contact.startsWith('241')) return '241';
-    if (contact.startsWith('225')) return '225';
-    if (contact.startsWith('221')) return '221';
-    if (contact.startsWith('242')) return '242';
-    if (contact.startsWith('236')) return '236';
-    if (contact.startsWith('240')) return '240';
-    return '237';
-  });
-
   const [formData, setFormData] = useState({
     firstName: student?.first_name || '',
     lastName: student?.last_name || '',
@@ -33,14 +23,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
     birthPlace: student?.birth_place || '',
     gender: student?.gender || 'M',
     parentName: student?.parent_name || '',
-    parentContact: (() => {
-      const contact = student?.parent_contact || '';
-      const codes = ['237', '241', '225', '221', '242', '236', '240'];
-      for (const code of codes) {
-        if (contact.startsWith(code)) return contact.slice(code.length);
-      }
-      return contact;
-    })(),
+    parentContact: student?.parent_contact || '',
     emergencyContact: student?.emergency_contact || '',
     medicalInfo: student?.medical_info || '',
     address: student?.address || '',
@@ -88,22 +71,22 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         errors.classId = t('alert_select_class', 'Veuillez sélectionner une classe');
     }
 
-    // Name validations (Letters, spaces, hyphens, and numbers like "Bastos 2" allowed)
-    const nameRegex = /^[A-Za-zÀ-ÿ0-9\s\-]+$/;
+    // Name validations (Letters, spaces, hyphens, and numbers like "Bastos 2" allowed, but must start with a letter)
+    const nameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
     if (!formData.lastName.trim()) {
         errors.lastName = t('field_required', 'Ce champ est requis');
     } else if (!nameRegex.test(formData.lastName.trim())) {
-        errors.lastName = t('invalid_name_chars', "Le nom ne doit contenir que des lettres, chiffres, espaces et tirets");
+        errors.lastName = t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
     }
 
     if (!formData.firstName.trim()) {
         errors.firstName = t('field_required', 'Ce champ est requis');
     } else if (!nameRegex.test(formData.firstName.trim())) {
-        errors.firstName = t('invalid_name_chars', "Le prénom ne doit contenir que des lettres, chiffres, espaces et tirets");
+        errors.firstName = t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
     }
 
     if (formData.parentName && !nameRegex.test(formData.parentName.trim())) {
-        errors.parentName = t('invalid_name_chars', "Le nom ne doit contenir que des lettres, chiffres, espaces et tirets");
+        errors.parentName = t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
     }
 
     // Birth date validation: must be N-2
@@ -115,52 +98,18 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         errors.birthDate = t('invalid_birth_date_n2', `L'élève doit être né au plus tard le 31 décembre ${currentYear - 2}`);
     }
 
-    // Phone validation based on countryCode selected
-    let cleanPhone = formData.parentContact.replace(/[\s\-\(\)\+]/g, '');
-    if (phoneCountry !== 'other' && cleanPhone.startsWith(phoneCountry) && cleanPhone.length > phoneCountry.length) {
-        cleanPhone = cleanPhone.slice(phoneCountry.length);
-    }
-
+        // Phone validation based on countryCode selected
     let phoneIsValid = false;
-    if (phoneCountry === '237') {
-        phoneIsValid = /^(2|3|6)\d{8}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cm', 'Numéro camerounais invalide (9 chiffres attendus, ex: 699000000)');
-    } else if (phoneCountry === '241') {
-        phoneIsValid = /^[1-7]\d{7}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_ga', 'Numéro gabonais invalide (8 chiffres attendus, ex: 66000000)');
-    } else if (phoneCountry === '225') {
-        phoneIsValid = /^0\d{9}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_ci', 'Numéro ivoirien invalide (10 chiffres attendus, ex: 0700000000)');
-    } else if (phoneCountry === '221') {
-        phoneIsValid = /^7\d{8}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_sn', 'Numéro sénégalais invalide (9 chiffres attendus, ex: 770000000)');
-    } else if (phoneCountry === '242') {
-        phoneIsValid = /^(05|06)\d{7}$/.test(cleanPhone) || /^[0-9]\d{6,8}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cg', 'Numéro congolais invalide');
-    } else if (phoneCountry === '236') {
-        phoneIsValid = /^[7]\d{7}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_cf', 'Numéro centrafricain invalide');
-    } else if (phoneCountry === '240') {
-        phoneIsValid = /^(2|5)\d{8}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_gq', 'Numéro équato-guinéen invalide');
+    if (formData.parentContact) {
+        phoneIsValid = isValidPhoneNumber(formData.parentContact);
+        if (!phoneIsValid) errors.parentContact = t('invalid_phone_int', 'Numéro de téléphone invalide pour ce pays');
     } else {
-        phoneIsValid = /^\d{6,15}$/.test(cleanPhone);
-        if (!phoneIsValid) errors.parentContact = t('invalid_phone_int', 'Numéro de téléphone invalide');
+        errors.parentContact = t('field_required', 'Ce champ est requis');
     }
 
     // Secondary contact check
     if (formData.emergencyContact && formData.emergencyContact.trim()) {
-        const matches = formData.emergencyContact.match(/\d+/g);
-        if (matches) {
-            const digitStr = matches.join('');
-            let cleanUrgence = digitStr;
-            if (phoneCountry !== 'other' && cleanUrgence.startsWith(phoneCountry) && cleanUrgence.length > phoneCountry.length) {
-                cleanUrgence = cleanUrgence.slice(phoneCountry.length);
-            }
-            if (!/^\d{6,15}$/.test(cleanUrgence)) {
-                errors.emergencyContact = t('alert_invalid_emergency_contact', 'Contact urgence invalide');
-            }
-        } else {
+        if (!isValidPhoneNumber(formData.emergencyContact)) {
             errors.emergencyContact = t('alert_invalid_emergency_contact', 'Contact urgence invalide');
         }
     }
@@ -171,11 +120,10 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
         return;
     }
 
-    const finalParentContact = phoneCountry === 'other' ? cleanPhone : phoneCountry + cleanPhone;
+    
 
     onSubmit({
-        ...formData,
-        parentContact: finalParentContact
+        ...formData
     });
   };
 
@@ -206,7 +154,14 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 required
                 className={`input-field w-full mt-1 ${fieldErrors.lastName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.lastName}
-                onChange={(e) => setFormData({...formData, lastName: e.target.value.toUpperCase()})}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setFormData({...formData, lastName: val});
+                  const nameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
+                  if (!val.trim()) setFieldErrors(prev => ({...prev, lastName: t('field_required', 'Ce champ est requis')}));
+                  else if (!nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, lastName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
+                  else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.lastName; return newErr; });
+              }}
                 placeholder="Ex: TCHATCHOUANG"
               />
               {fieldErrors.lastName && (
@@ -219,7 +174,14 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 required
                 className={`input-field w-full mt-1 ${fieldErrors.firstName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.firstName}
-                onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({...formData, firstName: val});
+                  const nameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
+                  if (!val.trim()) setFieldErrors(prev => ({...prev, firstName: t('field_required', 'Ce champ est requis')}));
+                  else if (!nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, firstName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
+                  else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.firstName; return newErr; });
+              }}
                 placeholder="Ex: Landry"
               />
               {fieldErrors.firstName && (
@@ -275,7 +237,13 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 required
                 className={`input-field w-full mt-1 ${fieldErrors.parentName ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 value={formData.parentName}
-                onChange={(e) => setFormData({...formData, parentName: e.target.value})}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({...formData, parentName: val});
+                  const nameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
+                  if (val.trim() && !nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, parentName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
+                  else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.parentName; return newErr; });
+              }}
                 placeholder="Ex: M. / Mme TCHATCHOUANG"
               />
               {fieldErrors.parentName && (
@@ -284,27 +252,22 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('parent_contact_label')}</label>
-              <div className="flex gap-2">
-                <select
-                  className="bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-white text-xs font-black mt-1"
-                  value={phoneCountry}
-                  onChange={(e) => setPhoneCountry(e.target.value)}
-                >
-                  <option value="237">🇨🇲 +237</option>
-                  <option value="241">🇬🇦 +241</option>
-                  <option value="225">🇨🇮 +225</option>
-                  <option value="221">🇸🇳 +221</option>
-                  <option value="242">🇨🇬 +242</option>
-                  <option value="236">🇨🇫 +236</option>
-                  <option value="240">🇬🇶 +240</option>
-                  <option value="other">🌐 Int.</option>
-                </select>
-                <input
-                  required
-                  className={`input-field flex-1 mt-1 text-amber-500 font-mono ${fieldErrors.parentContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
+              <div className="mt-1">
+                <PhoneInput
+                  international
+                  defaultCountry="CM"
                   value={formData.parentContact}
-                  onChange={(e) => setFormData({...formData, parentContact: e.target.value})}
-                  placeholder="Ex: 699000000"
+                  onChange={(val) => {
+                      setFormData({...formData, parentContact: val || ''});
+                      if (val && !isValidPhoneNumber(val)) {
+                          setFieldErrors(prev => ({...prev, parentContact: t('invalid_phone_int', 'Numéro de téléphone invalide pour ce pays')}));
+                      } else if (!val) {
+                          setFieldErrors(prev => ({...prev, parentContact: t('field_required', 'Ce champ est requis')}));
+                      } else {
+                          setFieldErrors(prev => { const newErr = {...prev}; delete newErr.parentContact; return newErr; });
+                      }
+                  }}
+                  className={`input-field w-full flex items-center phone-input-glass ${fieldErrors.parentContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
                 />
               </div>
               {fieldErrors.parentContact && (
@@ -313,12 +276,23 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('emergency_contact_secondary_label')}</label>
-              <input
-                className={`input-field w-full mt-1 ${fieldErrors.emergencyContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
-                value={formData.emergencyContact}
-                onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
-                placeholder={t('emergency_contact_placeholder')}
-              />
+              <div className="mt-1">
+                <PhoneInput
+                  international
+                  defaultCountry="CM"
+                  value={formData.emergencyContact}
+                  onChange={(val) => {
+                      setFormData({...formData, emergencyContact: val || ''});
+                      if (val && !isValidPhoneNumber(val)) {
+                          setFieldErrors(prev => ({...prev, emergencyContact: t('alert_invalid_emergency_contact', 'Contact urgence invalide')}));
+                      } else {
+                          setFieldErrors(prev => { const newErr = {...prev}; delete newErr.emergencyContact; return newErr; });
+                      }
+                  }}
+                  className={`input-field w-full flex items-center phone-input-glass ${fieldErrors.emergencyContact ? 'border-rose-500 bg-rose-500/10 focus:ring-rose-500' : ''}`}
+                  placeholder={t('emergency_contact_placeholder')}
+                />
+              </div>
               {fieldErrors.emergencyContact && (
                 <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.emergencyContact}</p>
               )}

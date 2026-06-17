@@ -24,6 +24,17 @@ export const generateReportCard = (data: any) => {
 
     let validatedGrades = data.ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1);
     
+    let termSequences: any[] = [];
+    try {
+        if (school.term_structure) {
+            const ts = JSON.parse(school.term_structure);
+            const currentTerm = ts.find((t: any) => t.term_id?.toString() === term?.toString());
+            if (currentTerm && currentTerm.sequences) {
+                termSequences = currentTerm.sequences;
+            }
+        }
+    } catch(e) {}
+
     // Aggregate by subject for term averaging
     const subjectGradesMap: Record<number, any> = {};
     validatedGrades.forEach((g: any) => {
@@ -36,7 +47,7 @@ export const generateReportCard = (data: any) => {
             };
         }
         if (g.score !== null && g.score !== undefined) {
-            subjectGradesMap[subId].scores.push(g.score);
+            subjectGradesMap[subId].scores.push({ score: g.score, month: g.month });
         }
         if (g.letter_score) {
             subjectGradesMap[subId].letter_scores.push(g.letter_score);
@@ -44,7 +55,16 @@ export const generateReportCard = (data: any) => {
     });
 
     validatedGrades = Object.values(subjectGradesMap).map((sg: any) => {
-        const avgScore = sg.scores.length > 0 ? (sg.scores.reduce((a: number, b: number) => a + b, 0) / sg.scores.length) : 0;
+        let totalWeight = 0;
+        let weightedSum = 0;
+        sg.scores.forEach((sObj: any) => {
+            const seqConfig = termSequences.find(s => s.id?.toString() === sObj.month?.toString());
+            const weight = seqConfig && seqConfig.weight !== undefined ? Number(seqConfig.weight) : 1;
+            weightedSum += sObj.score * weight;
+            totalWeight += weight;
+        });
+
+        const avgScore = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
         const letterScore = sg.letter_scores.length > 0 ? sg.letter_scores[sg.letter_scores.length - 1] : sg.letter_score;
         return {
             ...sg,
@@ -696,6 +716,17 @@ export const generateClassReportCards = (data: {
         const { student, grades, attendance, rank, totalStudents, validGrades, termAverages, termsArray, average: annualAvg } = sData;
         let validatedGrades = isAnnual ? validGrades : (ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1));
 
+        let termSequences: any[] = [];
+        try {
+            if (school.term_structure) {
+                const ts = JSON.parse(school.term_structure);
+                const currentTerm = ts.find((t: any) => t.term_id?.toString() === term?.toString());
+                if (currentTerm && currentTerm.sequences) {
+                    termSequences = currentTerm.sequences;
+                }
+            }
+        } catch(e) {}
+
         if (!isAnnual) {
             const subjectGradesMap: Record<number, any> = {};
             validatedGrades.forEach((g: any) => {
@@ -708,7 +739,7 @@ export const generateClassReportCards = (data: {
                     };
                 }
                 if (g.score !== null && g.score !== undefined) {
-                    subjectGradesMap[subId].scores.push(g.score);
+                    subjectGradesMap[subId].scores.push({ score: g.score, month: g.month });
                 }
                 if (g.letter_score) {
                     subjectGradesMap[subId].letter_scores.push(g.letter_score);
@@ -716,7 +747,16 @@ export const generateClassReportCards = (data: {
             });
 
             validatedGrades = Object.values(subjectGradesMap).map((sg: any) => {
-                const avgScore = sg.scores.length > 0 ? (sg.scores.reduce((a: number, b: number) => a + b, 0) / sg.scores.length) : 0;
+                let totalWeight = 0;
+                let weightedSum = 0;
+                sg.scores.forEach((sObj: any) => {
+                    const seqConfig = termSequences.find(s => s.id?.toString() === sObj.month?.toString());
+                    const weight = seqConfig && seqConfig.weight !== undefined ? Number(seqConfig.weight) : 1;
+                    weightedSum += sObj.score * weight;
+                    totalWeight += weight;
+                });
+
+                const avgScore = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
                 const letterScore = sg.letter_scores.length > 0 ? sg.letter_scores[sg.letter_scores.length - 1] : sg.letter_score;
                 return {
                     ...sg,

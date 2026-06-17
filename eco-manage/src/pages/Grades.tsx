@@ -21,13 +21,13 @@ const Grades: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
+  const [termStructure, setTermStructure] = useState<any[]>([]);
   const [scaleConfig, setScaleConfig] = useState<any>(null);
 
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE' | ''>('FRANCOPHONE');
   const [selectedClass, setSelectedClass] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState(1);
-  const [selectedMonth, setSelectedMonth] = useState('month_oct');
+  const [selectedTerm, setSelectedTerm] = useState<number | ''>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [isLocked, setIsLocked] = useState(false);
@@ -57,16 +57,31 @@ const Grades: React.FC = () => {
         const bv = await window.electronAPI.getSetting('bulletins_validated');
         setBulletinsValidated(bv === 'true');
 
+        const activeTerm = await window.electronAPI.getSetting('active_term');
+        const activeSequence = await window.electronAPI.getSetting('active_sequence');
+
         const schools = await window.electronAPI.getSchools();
         const mySchool = schools.find((s: any) => s.id?.toString() === user?.schoolId?.toString()) || schools[0];
-        if (mySchool && mySchool.evaluation_periods) {
+        if (mySchool && mySchool.term_structure) {
             try {
-                setEvaluationPeriods(JSON.parse(mySchool.evaluation_periods));
+                const ts = JSON.parse(mySchool.term_structure);
+                setTermStructure(ts);
+                if (ts.length > 0) {
+                    const defaultTerm = activeTerm ? parseInt(activeTerm) : ts[0].term_id;
+                    setSelectedTerm(defaultTerm);
+                    
+                    const termObj = ts.find((t: any) => t.term_id === defaultTerm) || ts[0];
+                    if (activeSequence && termObj.sequences?.find((s: any) => s.id.toString() === activeSequence)) {
+                        setSelectedMonth(activeSequence);
+                    } else if (termObj.sequences && termObj.sequences.length > 0) {
+                        setSelectedMonth(termObj.sequences[0].id.toString());
+                    }
+                }
             } catch(e) {
-                setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+                setTermStructure([]);
             }
         } else {
-            setEvaluationPeriods([{ id: 1, name: '1ER TRIMESTRE' }, { id: 2, name: '2E TRIMESTRE' }, { id: 3, name: '3E TRIMESTRE' }]);
+            setTermStructure([]);
         }
       }
   }
@@ -157,7 +172,7 @@ const Grades: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedClass && selectedMonth) {
+    if (selectedClass && selectedTerm && selectedMonth) {
         handleLoadContext();
     }
   }, [selectedClass, selectedMonth, selectedTerm]);
@@ -448,20 +463,33 @@ const Grades: React.FC = () => {
         <div className="space-y-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('term', 'Période')}</label>
           <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-            value={selectedTerm} onChange={(e) => setSelectedTerm(parseInt(e.target.value))}>
-            {evaluationPeriods.map(ep => (
-                <option key={ep.id} value={ep.id}>{ep.name}</option>
+            value={selectedTerm} onChange={(e) => {
+                const newTerm = parseInt(e.target.value);
+                setSelectedTerm(newTerm);
+                const termObj = termStructure.find(t => t.term_id === newTerm);
+                if (termObj && termObj.sequences && termObj.sequences.length > 0) {
+                    setSelectedMonth(termObj.sequences[0].id.toString());
+                } else {
+                    setSelectedMonth('');
+                }
+            }}>
+            {termStructure.length === 0 && <option value="">-- Aucune période configurée --</option>}
+            {termStructure.map(ts => (
+                <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
             ))}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('evaluation_month')}</label>
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('evaluation_month', 'Séquence / Mois')}</label>
           <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
             value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-            <option value="month_oct">{t('month_oct')}</option>
-            <option value="month_nov">{t('month_nov')}</option>
-            <option value="month_dec">{t('month_dec')}</option>
-            <option value="month_jan">{t('month_jan')}</option>
+            {termStructure.find(t => t.term_id === selectedTerm)?.sequences?.length ? (
+                termStructure.find(t => t.term_id === selectedTerm)?.sequences.map((seq: any) => (
+                    <option key={seq.id} value={seq.id}>{seq.name}</option>
+                ))
+            ) : (
+                <option value="">-- Aucune séquence --</option>
+            )}
           </select>
         </div>
       </div>

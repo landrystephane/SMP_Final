@@ -21,6 +21,10 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     if (req.path === '/auth/login') return next();
     
     const authHeader = req.headers.authorization;
@@ -32,7 +36,7 @@ app.use('/api', (req, res, next) => {
         } catch (e) {}
     }
     
-    if (req.path.startsWith('/saas/')) {
+    if (req.path.startsWith('/saas/') && req.path !== '/saas/schools') {
         if (!user || user.role !== 'SUPERADMIN') {
             return res.status(403).json({ error: 'Accès réservé au Super Admin' });
         }
@@ -131,7 +135,7 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/saas/schools', (req, res) => {
     try {
         // Todo: Add authentication middleware to verify SuperAdmin token
-        const schools = db.prepare('SELECT id, name, contact_email, contact_phone, subscription_status, subscription_end_date, is_active FROM schools WHERE deleted_at IS NULL').all();
+        const schools = db.prepare('SELECT * FROM schools WHERE deleted_at IS NULL').all();
         res.json({ success: true, schools });
     } catch (error) {
         res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -174,8 +178,17 @@ app.post('/api/saas/validate-payment', (req, res) => {
 // ==========================================
 // Si on n'appelle pas l'API, on affiche le site web
 const distPath = path.join(__dirname, 'dist');
-app.use(express.static(distPath));
+app.use(express.static(distPath, {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 app.get(/.*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(distPath, 'index.html'));
 });
 
