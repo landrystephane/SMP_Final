@@ -291,7 +291,7 @@ const Attendance: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
+      <div className="glass-card p-6 grid grid-cols-1 grid-cols-1 gap-6 bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
         <div className="space-y-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('select_section')}</label>
           <select

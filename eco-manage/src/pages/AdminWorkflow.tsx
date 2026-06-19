@@ -368,7 +368,7 @@ const AdminWorkflow: React.FC = () => {
         <p className="text-slate-400 mt-1">{t('admin_control_desc')}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 grid-cols-1 gap-8">
         {/* Evaluation Period Control */}
         <div className="glass-card p-6 space-y-4">
           <div className="flex items-center space-x-3 text-slate-gold-gold">
@@ -376,7 +376,7 @@ const AdminWorkflow: React.FC = () => {
             <h2 className="text-xl font-semibold">{t('evaluation_period')}</h2>
           </div>
           <div className="space-y-4 pt-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="col-span-2">
                 <label className="text-xs uppercase text-slate-500 font-bold">Période Active</label>
                 <select 

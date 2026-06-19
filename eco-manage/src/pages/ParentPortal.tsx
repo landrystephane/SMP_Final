@@ -358,7 +358,7 @@ const ParentPortal: React.FC = () => {
                     <Activity className="w-10 h-10 text-amber-500 animate-spin" />
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 grid-cols-1 gap-8">
                     {/* Performance / Bulletins */}
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center justify-between">
@@ -513,7 +513,7 @@ const ParentPortal: React.FC = () => {
                         </div>
 
                         {selectedChild.has_transport === 1 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div className="grid grid-cols-1 grid-cols-1 gap-6 items-center">
                                 <div className="p-6 bg-slate-950 rounded-2xl border border-white/5 space-y-4">
                                     <div className="flex items-start space-x-3">
                                         <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
@@ -689,7 +689,7 @@ const ParentPortal: React.FC = () => {
                         </div>
 
                         {/* Driver & vehicle card */}
-                        <div className="mt-6 grid grid-cols-2 gap-4">
+                        <div className="mt-6 grid grid-cols-1 gap-4">
                             <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
                                 <span className="text-[9px] text-slate-500 font-black uppercase block">Conducteur principal</span>
                                 <span className="text-white font-black text-sm mt-0.5 block">M. Landry Stephane</span>

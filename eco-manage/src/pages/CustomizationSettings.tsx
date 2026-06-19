@@ -320,7 +320,7 @@ const CustomizationSettings: React.FC = () => {
                             <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_school_identity', 'Identité de l\'Établissement')}</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_name', 'Nom de l\'École')}</label>
                                 <input
@@ -374,7 +374,7 @@ const CustomizationSettings: React.FC = () => {
                             <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_color_palette', 'Palette Graphique de l\'École')}</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
                             {/* Primary color */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_primary_color', 'Couleur Primaire (Cadres et En-têtes)')}</label>
@@ -717,7 +717,7 @@ const CustomizationSettings: React.FC = () => {
                                 {gradingScales.length === 0 ? (
                                     <p className="text-center text-slate-500 text-xs font-bold py-6 italic">Aucun barème personnalisé créé. Les classes utilisent par défaut la notation sur 20 brute.</p>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 grid-cols-1 gap-4">
                                         {gradingScales.map((scale: any) => (
                                             <div 
                                                 key={scale.id} 

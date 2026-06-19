@@ -535,7 +535,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
+      <div className={`grid grid-cols-1 grid-cols-1 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
         <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
@@ -616,7 +616,7 @@ const Dashboard: React.FC = () => {
                 </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 grid-cols-1 gap-4">
                 {filteredClassStats && filteredClassStats.length > 0 ? (
                 filteredClassStats.map((item: any) => (
                     <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all border-l-4 border-l-amber-500 bg-slate-900/60 group hover:bg-slate-900/80">

@@ -313,7 +313,7 @@ const Users: React.FC = () => {
                              placeholder="Ex: 699000000"
                          />
                      </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('username')}</label>
                             <input
@@ -357,7 +357,7 @@ const Users: React.FC = () => {
 
                     {newUser.role === 'TEACHER' && (
                         <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('section')}</label>
                                     <select
@@ -381,7 +381,7 @@ const Users: React.FC = () => {
                                     </select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
                                     <select
@@ -558,7 +558,7 @@ const Users: React.FC = () => {
                               />
                           </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('username')}</label>
                               <input
@@ -580,7 +580,7 @@ const Users: React.FC = () => {
                               />
                           </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                           <div className="space-y-1">
                                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('role_label')}</label>
                                   <select
@@ -613,7 +613,7 @@ const Users: React.FC = () => {
 
                       {editUserForm.role === 'TEACHER' && (
                           <div className="space-y-4 pt-2">
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 gap-4">
                                   <div className="space-y-2">
                                       <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('section')}</label>
                                       <select
@@ -637,7 +637,7 @@ const Users: React.FC = () => {
                                       </select>
                                   </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 gap-4">
                                   <div className="space-y-2">
                                       <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('assigned_class_label')}</label>
                                       <select

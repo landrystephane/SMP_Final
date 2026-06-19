@@ -228,7 +228,7 @@ const Subjects: React.FC = () => {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 grid-cols-1 gap-4">
                 {globalSubjects
                   .filter(s => s.level === classes.find(c => c.id === selectedClassId)?.level && s.section === classes.find(c => c.id === selectedClassId)?.section)
                   .map(s => {

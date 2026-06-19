@@ -438,7 +438,7 @@ const DriverPortal: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 grid-cols-1 gap-8">
                 <div className="glass-card p-8 bg-rose-500/5 border-none shadow-xl">
                     <h3 className="rose-500 font-black text-[10px] uppercase mb-6 flex items-center tracking-widest text-rose-500">
                         <AlertCircle className="w-4 h-4 mr-3" /> {t('security_reminder', 'Rappel Sécurité')}

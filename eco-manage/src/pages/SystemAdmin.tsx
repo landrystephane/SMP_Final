@@ -549,7 +549,7 @@ const SystemAdmin: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                     <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
                   </div>
-                  <div className="pt-4 grid grid-cols-2 gap-3">
+                  <div className="pt-4 grid grid-cols-1 gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}
                       className="w-full py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
@@ -1120,7 +1120,7 @@ const SystemAdmin: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 grid-cols-1 gap-4">
                             {globalSubjects.map(subj => {
                                 const isActive = schoolSubjects.includes(subj.id);
                                 return (
@@ -1169,7 +1169,7 @@ const SystemAdmin: React.FC = () => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_school_full_name')}</label>
                           <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder={t('sys_school_placeholder')} />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_city_neighborhood')}</label>
                             <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder={t('sys_city_placeholder')} />
@@ -1179,7 +1179,7 @@ const SystemAdmin: React.FC = () => {
                             <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder={t('sys_bp_placeholder')} />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_email_contact')}</label>
                             <input type="email" className="input-field w-full" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
@@ -1192,7 +1192,7 @@ const SystemAdmin: React.FC = () => {
 
                       <div className="pt-4 border-t border-white/10 space-y-4">
                         <h3 className="text-sm font-black text-white uppercase tracking-widest">Configuration Avancée</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Structure Académique</label>
                               <select 
@@ -1301,7 +1301,7 @@ const SystemAdmin: React.FC = () => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la Matière</label>
                           <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 grid-cols-1 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
                             <input required className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})} placeholder="Ex: Sciences et Technologie" />

@@ -140,7 +140,7 @@ const Transport: React.FC = () => {
 
             <div className="glass-card p-6">
                 <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">{t('fleet_stats', 'Statistiques Flotte')}</h2>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5">
                         <p className="text-slate-500 font-black text-[10px] uppercase">{t('buses', 'Bus')}</p>
                         <p className="text-white text-xl font-black">{routes.length.toString().padStart(2, '0')}</p>
@@ -220,7 +220,7 @@ const Transport: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 grid-cols-1 gap-6">
                 <div className="glass-card p-6">
                     <h3 className="text-white font-black text-sm uppercase mb-4 flex items-center">
                         <Users className="w-4 h-4 mr-2 text-blue-400" />

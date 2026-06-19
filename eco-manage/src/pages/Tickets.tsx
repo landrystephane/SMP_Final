@@ -435,7 +435,7 @@ const Tickets: React.FC = () => {
               </div>
 
               {requestType === 'GRADE_EXTENSION' && (
-                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe concernée</label>
                           <select 
@@ -467,7 +467,7 @@ const Tickets: React.FC = () => {
               )}
               
               {requestType === 'ABSENCE_JUSTIFICATION' && (
-                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Date / Période</label>
                           <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs" />
@@ -476,7 +476,7 @@ const Tickets: React.FC = () => {
               )}
               
               {requestType === 'CASH_WITHDRAWAL' && (
-                  <div className="grid grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Montant demandé</label>
                           <input 
@@ -490,7 +490,7 @@ const Tickets: React.FC = () => {
                   </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cible (Rôle)</label>
                     <select

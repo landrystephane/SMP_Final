@@ -202,6 +202,44 @@ handlers['db:restoreSchool'] = async (id) => {
 
 };
 
+const permanentlyDeleteSchool = (id) => {
+    const transaction = db.transaction(() => {
+        const queries = [
+            'DELETE FROM grades WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+            'DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+            'DELETE FROM grade_overrides WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+            'DELETE FROM class_subject_validation WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+            'DELETE FROM students WHERE school_id = ?',
+            'DELETE FROM classes WHERE school_id = ?',
+            'DELETE FROM subjects WHERE school_id = ?',
+            'DELETE FROM attendance WHERE school_id = ?',
+            'DELETE FROM payments WHERE school_id = ?',
+            'DELETE FROM tuition_fees WHERE school_id = ?',
+            'DELETE FROM school_installment_deadlines WHERE school_id = ?',
+            'DELETE FROM tickets WHERE school_id = ?',
+            'DELETE FROM announcements WHERE school_id = ?',
+            'DELETE FROM notifications WHERE school_id = ?',
+            'DELETE FROM grading_scales WHERE school_id = ?',
+            'DELETE FROM archives WHERE school_id = ?',
+            'DELETE FROM transport_points WHERE school_id = ?',
+            'DELETE FROM report_templates WHERE school_id = ?',
+            'DELETE FROM expenses WHERE school_id = ?',
+            'DELETE FROM bursar_balances WHERE school_id = ?',
+            'DELETE FROM users WHERE school_id = ?',
+            'DELETE FROM schools WHERE id = ?'
+        ];
+
+        for (const q of queries) {
+            try {
+                db.prepare(q).run(id);
+            } catch (err) {
+                console.error(`Failed to execute: ${q}`, err);
+            }
+        }
+    });
+    transaction();
+};
+
 handlers['db:permanentlyDeleteSchool'] = async ({ id, password }) => {
     if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     

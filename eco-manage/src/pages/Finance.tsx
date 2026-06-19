@@ -794,7 +794,7 @@ const Finance: React.FC = () => {
                           </div>
                       )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
                                 <Wallet className="w-3 h-3 mr-2" /> {t('amount_to_pay')}
@@ -980,7 +980,7 @@ const Finance: React.FC = () => {
 
       {activeTab === 'SPECIAL_FEES' && (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 grid-cols-1 gap-8">
                 {/* Transport Section */}
                 <div className="glass-card overflow-hidden border-none shadow-2xl">
                     <div className="p-6 border-b border-white/5 bg-indigo-500/10">

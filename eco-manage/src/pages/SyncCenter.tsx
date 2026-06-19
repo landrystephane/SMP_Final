@@ -66,7 +66,7 @@ const SyncCenter: React.FC = () => {
           </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 grid-cols-1 gap-8">
         <div className="glass-card p-8 space-y-6">
             <div className="flex items-center space-x-3 text-amber-500 mb-4">
                 <Settings className="w-6 h-6" />

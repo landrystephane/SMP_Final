@@ -288,7 +288,7 @@ const AnnualArchives: React.FC = () => {
                                             </span>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-2 text-[9px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5 pt-2">
+                                        <div className="grid grid-cols-1 gap-2 text-[9px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5 pt-2">
                                             <div>
                                                 <p className="text-slate-600">Élèves</p>
                                                 <p className="text-white text-xs mt-0.5">{a.total_students}</p>
