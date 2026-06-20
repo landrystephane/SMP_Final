@@ -22,7 +22,7 @@ const Parents: React.FC = () => {
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  const [targetStudentId, setTargetStudentId] = useState<number | null>(null);
+  const [targetParent, setTargetParent] = useState<any>(null);
 
   const loadData = async () => {
     if (window.electronAPI && currentUser) {
@@ -83,15 +83,19 @@ const Parents: React.FC = () => {
               filter_cycle: filterCycle,
               filter_section: filterSection,
               filter_class: filterClass,
-              target_student_id: targetStudentId
+              target_student_id: targetParent ? targetParent.student_id : null
           });
           
           if (res && res.success) {
-              alert(`Communiqué envoyé avec succès à ${res.count} parent(s).`);
+              if (targetParent) {
+                  alert(`Communiqué envoyé avec succès au parent ${targetParent.parent_name || targetParent.parent_contact || ''} (Élève: ${targetParent.first_name} ${targetParent.last_name}).`);
+              } else {
+                  alert(`Communiqué envoyé avec succès à ${res.count} parent(s).`);
+              }
               setShowAnnouncementModal(false);
               setAnnouncementSubject('');
               setAnnouncementMessage('');
-              setTargetStudentId(null);
+              setTargetParent(null);
           } else {
               alert("Erreur lors de l'envoi du communiqué.");
           }
@@ -223,7 +227,7 @@ const Parents: React.FC = () => {
                     </td>
                     <td className="px-8 py-6">
                         <button
-                            onClick={() => { setTargetStudentId(p.student_id); setShowAnnouncementModal(true); }}
+                            onClick={() => { setTargetParent(p); setShowAnnouncementModal(true); }}
                             className="p-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-slate-950 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest flex items-center"
                         >
                             <Shield className="w-3 h-3 mr-1" /> Message
@@ -244,7 +248,7 @@ const Parents: React.FC = () => {
                       <div>
                           <h3 className="text-xl font-black text-white">Envoyer un Communiqué</h3>
                           <p className="text-xs text-slate-400 mt-1">
-                              Destinataires: {targetStudentId ? "1 parent" : `${filteredParents.length} parent(s) correspondant aux filtres`}
+                              Destinataires: {targetParent ? `1 parent: ${targetParent.parent_name || targetParent.parent_contact || ''} (Élève: ${targetParent.first_name} ${targetParent.last_name})` : `${filteredParents.length} parent(s) correspondant aux filtres`}
                           </p>
                       </div>
                   </div>
@@ -271,7 +275,7 @@ const Parents: React.FC = () => {
                   </div>
                   <div className="p-6 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
                       <button 
-                          onClick={() => { setShowAnnouncementModal(false); setTargetStudentId(null); }}
+                          onClick={() => { setShowAnnouncementModal(false); setTargetParent(null); }}
                           className="flex-1 px-6 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-white/10 active:scale-95 transition-all"
                       >
                           Annuler
