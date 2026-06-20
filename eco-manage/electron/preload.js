@@ -109,6 +109,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSchedules: (schoolId) => ipcRenderer.invoke('db:getSchedules', schoolId),
   updateSchedule: (schedule) => ipcRenderer.invoke('db:updateSchedule', schedule),
   deleteSchedule: (id) => ipcRenderer.invoke('db:deleteSchedule', id),
+  getEvaluationSchedules: (schoolId) => ipcRenderer.invoke('db:getEvaluationSchedules', schoolId),
+  addEvaluationSchedule: (schedule) => ipcRenderer.invoke('db:addEvaluationSchedule', schedule),
+  deleteEvaluationSchedule: (id) => ipcRenderer.invoke('db:deleteEvaluationSchedule', id),
 
   // Attendance
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),

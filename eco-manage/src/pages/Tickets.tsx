@@ -82,7 +82,13 @@ const Tickets: React.FC = () => {
           if (receiverId) {
              await window.electronAPI.createNotification({
                  user_id: receiverId,
-                 message: `Nouvelle requête de ${user.fullName || user.username} : ${newTicketSubject}`,
+                 message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                 type: 'INFO',
+                 school_id: user.schoolId
+             });
+          } else if (receiverRole) {
+             await window.electronAPI.createNotification({
+                 message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
                  type: 'INFO',
                  school_id: user.schoolId
              });
@@ -107,7 +113,7 @@ const Tickets: React.FC = () => {
       if (!window.electronAPI) return;
       try {
           const actionData: any = {};
-          if (requestType === 'GRADE_EXTENSION') {
+          if (requestType === 'GRADE_EXTENSION' || requestType === 'GRADE_REACTIVATION') {
               actionData.hours = extensionHours[ticketId] || 24;
           }
           await window.electronAPI.resolveTicket({ ticketId, status, actionData });
@@ -351,11 +357,15 @@ const Tickets: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          ticket.status === 'OPEN' 
-                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
-                            : 'bg-green-500/10 text-green-500 border border-green-500/20'
+                          (ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système')
+                            ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                            : ticket.status === 'OPEN' 
+                              ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
+                              : 'bg-green-500/10 text-green-500 border border-green-500/20'
                         }`}>
-                          {ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
+                          {(ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système')
+                            ? t('status_info', 'INFORMATION')
+                            : ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
                         </span>
                         
                         {ticket.status === 'OPEN' && ticket.request_type && ticket.sender_id !== user?.id && (

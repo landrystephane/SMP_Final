@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS payments (
     installment_id INTEGER, -- Specified which installment is being paid
     received_by INTEGER,
     receipt_number TEXT UNIQUE NOT NULL,
+    depositor_name TEXT DEFAULT '',
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (received_by) REFERENCES users(id),
     FOREIGN KEY (installment_id) REFERENCES installments(id)
@@ -205,10 +206,13 @@ CREATE TABLE IF NOT EXISTS attendance (
     status TEXT NOT NULL, -- 'PRESENT', 'ABSENT', 'LATE'
     hours_absent INTEGER DEFAULT 0,
     recorded_by INTEGER,
+    schedule_id INTEGER DEFAULT 0,
+    school_id INTEGER DEFAULT 1,
     notes TEXT,
-    UNIQUE(student_id, date),
+    UNIQUE(student_id, date, schedule_id),
     FOREIGN KEY (student_id) REFERENCES students(id),
-    FOREIGN KEY (recorded_by) REFERENCES users(id)
+    FOREIGN KEY (recorded_by) REFERENCES users(id),
+    FOREIGN KEY (schedule_id) REFERENCES schedules(id)
 );
 
 -- Schedules (Pedagogical Advisor)
@@ -226,6 +230,24 @@ CREATE TABLE IF NOT EXISTS schedules (
     FOREIGN KEY (class_id) REFERENCES classes(id),
     FOREIGN KEY (teacher_id) REFERENCES users(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id)
+);
+
+-- Evaluation Schedules (Pedagogical Advisor)
+CREATE TABLE IF NOT EXISTS evaluation_schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id INTEGER,
+    class_id INTEGER,
+    subject_id INTEGER,
+    teacher_id INTEGER,
+    evaluation_period_id INTEGER, -- e.g. from evaluation_periods JSON in schools
+    date DATE NOT NULL,
+    start_time TEXT, -- HH:MM
+    end_time TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (school_id) REFERENCES schools(id),
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id),
+    FOREIGN KEY (teacher_id) REFERENCES users(id)
 );
 
 -- Transport

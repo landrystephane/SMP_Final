@@ -1258,3 +1258,83 @@ export const generateParentsListReport = async (parents: any[], schoolInfo: any,
     const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
     doc.save(`repertoire_parents_${safeTitle}.pdf`);
 };
+
+export const generateSchedulePdf = (data: any) => {
+    const { school, title, columns, rows } = data;
+    const doc = new jsPDF('landscape');
+    
+    let yPos = 20;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(school?.name?.toUpperCase() || 'ECO-MANAGE', 148, yPos, { align: 'center' });
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.text(title.toUpperCase(), 148, yPos, { align: 'center' });
+    yPos += 15;
+
+    (doc as any).autoTable({
+        head: [columns],
+        body: rows,
+        startY: yPos,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [30, 41, 59],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        bodyStyles: {
+            textColor: [51, 65, 85],
+            fontSize: 9,
+            halign: 'center',
+            valign: 'middle'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        },
+        styles: {
+            cellPadding: 4,
+            lineWidth: 0.1,
+            lineColor: [203, 213, 225]
+        }
+    });
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    doc.save(`${safeTitle}.pdf`);
+};
+
+export const generateExamSchedulePdf = (data: any) => {
+    const { school, title, columns, rows } = data;
+    const doc = new jsPDF();
+    
+    let yPos = 20;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(school?.name?.toUpperCase() || 'ECO-MANAGE', 105, yPos, { align: 'center' });
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.text(title.toUpperCase(), 105, yPos, { align: 'center' });
+    yPos += 15;
+
+    (doc as any).autoTable({
+        head: [columns],
+        body: rows,
+        startY: yPos,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [30, 41, 59],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold'
+        },
+        bodyStyles: {
+            textColor: [51, 65, 85],
+            fontSize: 10
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        }
+    });
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    doc.save(`${safeTitle}.pdf`);
+};

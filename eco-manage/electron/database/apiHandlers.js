@@ -55,7 +55,7 @@ handlers['auth:restoreSession'] = async (user) => {
 };
 
 handlers['auth:login'] = async ({ username, password }) => {
-  const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR matricule = ?').get(username, username);
+  const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(matricule) = LOWER(?)').get(username, username);
   
   if (!user) return null;
   user.full_name = user.fullName;
@@ -105,12 +105,12 @@ handlers['auth:login'] = async ({ username, password }) => {
                   if (diffDays >= 0 && diffDays <= 3) {
                       // Only insert if not already warned today
                       const todayDateStr = now.toISOString().split('T')[0];
-                      const recentNotif = db.prepare("SELECT id FROM notifications WHERE recipient_id = ? AND title = 'Délai de saisie imminent' AND DATE(created_at) = ?").get(user.id, todayDateStr);
+                      const recentNotif = db.prepare("SELECT id FROM notifications WHERE user_id = ? AND message LIKE 'Attention: Il vous reste%' AND DATE(created_at) = ?").get(user.id, todayDateStr);
                       if (!recentNotif) {
                           db.prepare(`
-                              INSERT INTO notifications (school_id, recipient_id, title, message, type)
-                              VALUES (?, ?, ?, ?, ?)
-                          `).run(user.schoolId, user.id, 'Délai de saisie imminent', `Attention: Il vous reste ${diffDays} jour(s) pour terminer la saisie de vos notes (jusqu'au ${periodEndSetting.value}).`, 'SYSTEM');
+                              INSERT INTO notifications (school_id, user_id, message, type)
+                              VALUES (?, ?, ?, ?)
+                          `).run(user.schoolId, user.id, `Attention: Il vous reste ${diffDays} jour(s) pour terminer la saisie de vos notes (jusqu'au ${periodEndSetting.value}).`, 'SYSTEM');
                       }
                   }
               }
@@ -360,10 +360,32 @@ handlers['db:getAnnouncements'] = async (schoolId) => {
 handlers['db:sendAnnouncement'] = async (announcement) => {
   const { sender_id, target, title, content, school_id } = announcement;
   const sid = getActiveSchoolId(school_id);
-  return db.prepare(`
-    INSERT INTO announcements (school_id, sender_id, target, title, content) 
-    VALUES (?, ?, ?, ?, ?)
-  `).run(sid, sender_id, target, title, content);
+  
+  const transaction = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO announcements (school_id, sender_id, target, title, content) 
+        VALUES (?, ?, ?, ?, ?)
+      `).run(sid, sender_id, target, title, content);
+      
+      let usersToNotify = [];
+      if (target === 'ALL') {
+          usersToNotify = db.prepare("SELECT id FROM users WHERE school_id = ? AND is_active = 1 AND id != ?").all(sid, sender_id);
+      } else if (target === 'PARENTS') {
+          usersToNotify = db.prepare("SELECT id FROM users WHERE school_id = ? AND role = 'PARENT' AND is_active = 1 AND id != ?").all(sid, sender_id);
+      } else if (target === 'STAFF') {
+          usersToNotify = db.prepare("SELECT id FROM users WHERE school_id = ? AND role != 'PARENT' AND role != 'SUPERADMIN' AND is_active = 1 AND id != ?").all(sid, sender_id);
+      }
+
+      if (usersToNotify.length > 0) {
+          const insertNotif = db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')");
+          for (const u of usersToNotify) {
+              insertNotif.run(sid, u.id, `Nouveau communiqué : ${title}`);
+          }
+      }
+  });
+  
+  transaction();
+  return { success: true };
 };
 
 handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
@@ -913,20 +935,22 @@ handlers['db:addClass'] = async (classData) => {
         newClassId = info.lastInsertRowid;
 
         // Sync teacher's assigned_classes
-        if (mainTeacherId) {
-            const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(mainTeacherId);
+        const updateTeacherAssignedClasses = (teacherId, classId) => {
+            if (!teacherId) return;
+            const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(teacherId);
             let teacherClasses = [];
             if (teacher && teacher.assigned_classes) {
-                try {
-                    teacherClasses = JSON.parse(teacher.assigned_classes);
-                } catch(e) {}
+                try { teacherClasses = JSON.parse(teacher.assigned_classes); } catch(e) {}
             }
             if (!Array.isArray(teacherClasses)) teacherClasses = [];
-            if (!teacherClasses.includes(newClassId)) {
-                teacherClasses.push(newClassId);
+            if (!teacherClasses.includes(classId) && !teacherClasses.includes(String(classId))) {
+                teacherClasses.push(Number(classId));
             }
-            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(teacherClasses), mainTeacherId);
-        }
+            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(teacherClasses), teacherId);
+        };
+
+        if (mainTeacherId) updateTeacherAssignedClasses(mainTeacherId, newClassId);
+        if (assistantTeacherId) updateTeacherAssignedClasses(assistantTeacherId, newClassId);
 
         if (baseClassId) {
             // Duplicate class subjects
@@ -959,42 +983,41 @@ handlers['db:updateClass'] = async (classData) => {
     const { id, name, code, section, level, mainTeacherId, assistantTeacherId } = classData;
     
     db.transaction(() => {
-        // Find previous teacher of this class
-        const prevClass = db.prepare('SELECT main_teacher_id FROM classes WHERE id = ?').get(id);
+        // Find previous teachers of this class
+        const prevClass = db.prepare('SELECT main_teacher_id, assistant_teacher_id FROM classes WHERE id = ?').get(id);
         const prevTeacherId = prevClass ? prevClass.main_teacher_id : null;
+        const prevAssistantId = prevClass ? prevClass.assistant_teacher_id : null;
 
-        // If new teacher is different
+        const updateTeacherAssignedClasses = (teacherId, removeClassId, addClassId) => {
+            if (!teacherId) return;
+            const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(teacherId);
+            let classesArr = [];
+            if (teacher && teacher.assigned_classes) {
+                try { classesArr = JSON.parse(teacher.assigned_classes); } catch(e) {}
+            }
+            if (!Array.isArray(classesArr)) classesArr = [];
+            
+            if (removeClassId) {
+                classesArr = classesArr.filter(cid => Number(cid) !== Number(removeClassId));
+            }
+            if (addClassId) {
+                if (!classesArr.includes(Number(addClassId)) && !classesArr.includes(String(addClassId))) {
+                    classesArr.push(Number(addClassId));
+                }
+            }
+            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(classesArr), teacherId);
+        };
+
+        // If main teacher is different
         if (mainTeacherId !== prevTeacherId) {
-            // Remove class from previous teacher's assigned_classes
-            if (prevTeacherId) {
-                const prevTeacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(prevTeacherId);
-                let prevClasses = [];
-                if (prevTeacher && prevTeacher.assigned_classes) {
-                    try {
-                        prevClasses = JSON.parse(prevTeacher.assigned_classes);
-                    } catch(e) {}
-                }
-                if (Array.isArray(prevClasses)) {
-                    prevClasses = prevClasses.filter(cid => Number(cid) !== Number(id));
-                    db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(prevClasses), prevTeacherId);
-                }
-            }
+            updateTeacherAssignedClasses(prevTeacherId, id, null); // Remove from old
+            updateTeacherAssignedClasses(mainTeacherId, null, id); // Add to new
+        }
 
-            // Add class to new teacher's assigned_classes
-            if (mainTeacherId) {
-                const newTeacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(mainTeacherId);
-                let newClasses = [];
-                if (newTeacher && newTeacher.assigned_classes) {
-                    try {
-                        newClasses = JSON.parse(newTeacher.assigned_classes);
-                    } catch(e) {}
-                }
-                if (!Array.isArray(newClasses)) newClasses = [];
-                if (!newClasses.includes(Number(id)) && !newClasses.includes(String(id))) {
-                    newClasses.push(Number(id));
-                }
-                db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(newClasses), mainTeacherId);
-            }
+        // If assistant teacher is different
+        if (assistantTeacherId !== prevAssistantId) {
+            updateTeacherAssignedClasses(prevAssistantId, id, null); // Remove from old
+            updateTeacherAssignedClasses(assistantTeacherId, null, id); // Add to new
         }
 
         db.prepare(`
@@ -1059,6 +1082,21 @@ handlers['db:updateSchedule'] = async (schedule) => {
 
 handlers['db:deleteSchedule'] = async (id) => {
     return db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
+};
+
+handlers['db:getEvaluationSchedules'] = async (schoolId) => {
+    const sid = getActiveSchoolId(schoolId);
+    return db.prepare('SELECT * FROM evaluation_schedules WHERE school_id = ?').all(sid);
+};
+
+handlers['db:addEvaluationSchedule'] = async (schedule) => {
+    const { school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time } = schedule;
+    const sid = getActiveSchoolId(school_id);
+    return db.prepare(`INSERT INTO evaluation_schedules (school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(sid, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time);
+};
+
+handlers['db:deleteEvaluationSchedule'] = async (id) => {
+    return db.prepare('DELETE FROM evaluation_schedules WHERE id = ?').run(id);
 };
 
 handlers['db:getBusRoutes'] = async (schoolId) => {
@@ -1226,9 +1264,9 @@ handlers['db:setSetting'] = async ({ key, value }) => {
 
 handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
     const upsert = db.prepare(`
-        INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(student_id, date) DO UPDATE SET
+        INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by, schedule_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(student_id, date, schedule_id) DO UPDATE SET
             status = excluded.status,
             hours_absent = excluded.hours_absent,
             recorded_by = excluded.recorded_by
@@ -1243,7 +1281,8 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
             // Get previous total to avoid spamming (only notify when crossing the 15h threshold)
             const prevTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
             
-            upsert.run(r.studentId, r.date, status, r.hours, userId);
+            const schedId = r.scheduleId ? parseInt(r.scheduleId) : 0;
+            upsert.run(r.studentId, r.date, status, r.hours, userId, schedId);
             
             const newTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
             
@@ -1274,21 +1313,32 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
 
 };
 
-handlers['db:getAttendance'] = async ({ classId, date }) => {
-    return db.prepare(`
-      SELECT a.*, s.first_name, s.last_name
-      FROM attendance a
-      JOIN students s ON a.student_id = s.id
-      WHERE s.class_id = ? AND a.date = ?
-    `).all(classId, date);
+handlers['db:getAttendance'] = async ({ classId, date, scheduleId }) => {
+    if (scheduleId !== undefined && scheduleId !== null && scheduleId !== '') {
+        return db.prepare(`
+          SELECT a.*, s.first_name, s.last_name
+          FROM attendance a
+          JOIN students s ON a.student_id = s.id
+          WHERE s.class_id = ? AND a.date = ? AND a.schedule_id = ?
+        `).all(classId, date, scheduleId);
+    } else {
+        return db.prepare(`
+          SELECT a.*, s.first_name, s.last_name
+          FROM attendance a
+          JOIN students s ON a.student_id = s.id
+          WHERE s.class_id = ? AND a.date = ? AND (a.schedule_id = 0 OR a.schedule_id IS NULL)
+        `).all(classId, date);
+    }
 };
 
 handlers['db:getAttendanceReport'] = async ({ classId, startDate, endDate }) => {
+    // Return all schedules summed per student, per date
     return db.prepare(`
-      SELECT a.*, s.first_name, s.last_name, s.matricule
+      SELECT a.student_id, a.date, s.first_name, s.last_name, s.matricule, SUM(a.hours_absent) as hours_absent
       FROM attendance a
       JOIN students s ON a.student_id = s.id
       WHERE s.class_id = ? AND a.date >= ? AND a.date <= ?
+      GROUP BY a.student_id, a.date
     `).all(classId, startDate, endDate);
 };
 
@@ -1487,26 +1537,35 @@ handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actio
     if (!ticket) throw new Error("Ticket introuvable");
     
     // Si c'est une demande d'extension de délai et qu'elle est approuvée avec un nombre d'heures
-    if (status === 'RESOLVED' && ticket.request_type === 'GRADE_EXTENSION' && actionData && actionData.hours) {
+    if (status === 'RESOLVED' && (ticket.request_type === 'GRADE_EXTENSION' || ticket.request_type === 'GRADE_REACTIVATION') && actionData && actionData.hours) {
         let rData = {};
         try { rData = JSON.parse(ticket.request_data); } catch(e) {}
         
-        if (rData.classId && rData.term && rData.sequence) {
+        const classId = rData.classId || rData.class_id;
+        const term = rData.term;
+        const sequence = rData.sequence || rData.month;
+
+        if (classId && term && sequence) {
             const deadline = new Date();
             deadline.setHours(deadline.getHours() + parseInt(actionData.hours));
             
-            const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(ticket.sender_id, rData.classId, rData.term, rData.sequence);
+            const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(ticket.sender_id, classId, term, sequence);
             if (existing) {
-                db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?').run(deadline.toISOString(), ticket.receiver_id || ticket.receiver_role, existing.id);
+                db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?').run(deadline.toISOString(), ticket.receiver_id || ticket.receiver_role || 1, existing.id);
             } else {
-                db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(ticket.sender_id, rData.classId, rData.term, rData.sequence, deadline.toISOString(), ticket.receiver_id || ticket.receiver_role);
+                db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(ticket.sender_id, classId, term, sequence, deadline.toISOString(), ticket.receiver_id || ticket.receiver_role || 1);
             }
         }
     }
     
-    // Si c'est un justificatif d'absence (TODO : implémenter la logique d'autorisation)
+    // Si c'est un justificatif d'absence
     if (status === 'RESOLVED' && ticket.request_type === 'ABSENCE_JUSTIFICATION') {
-        // Logique spécifique à implémenter si besoin (ex: marquer une absence comme justifiée)
+        let rData = {};
+        try { rData = JSON.parse(ticket.request_data); } catch(e) {}
+        if (rData.studentId && rData.date) {
+            db.prepare("UPDATE attendance SET status = 'JUSTIFIED', remark = ? WHERE student_id = ? AND date = ?")
+              .run(rData.reason || 'Justifiée par la direction', rData.studentId, rData.date);
+        }
     }
 
     // Mettre à jour le ticket
@@ -1532,20 +1591,17 @@ handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) 
 };
 
 handlers['db:createNotification'] = async (notification) => {
-  const { user_id, role, message, type, school_id } = notification;
+  const { user_id, message, type, school_id } = notification;
   const sid = getActiveSchoolId(school_id);
-  const systemId = 1; // System or superadmin
 
-  if (role) {
-      // Send as ticket to role
-      return db.prepare('INSERT INTO tickets (sender_id, receiver_role, subject, message, school_id) VALUES (?, ?, ?, ?, ?)')
-        .run(systemId, role, 'Alerte Système', message, sid);
+  if (user_id) {
+      return db.prepare('INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, ?)')
+        .run(sid, user_id, message, type || 'INFO');
   } else {
-      // Send as ticket to specific user
-      return db.prepare('INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)')
-        .run(systemId, user_id, 'Notification Système', message, sid);
+      // If no user_id, it's a global/admin notification
+      return db.prepare('INSERT INTO notifications (school_id, message, type) VALUES (?, ?, ?)')
+        .run(sid, message, type || 'INFO');
   }
-
 };
 
 handlers['db:sendParentAnnouncement'] = async ({ sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class, target_student_id }) => {
@@ -1581,9 +1637,11 @@ handlers['db:sendParentAnnouncement'] = async ({ sender_id, school_id, subject, 
     if (parents.length === 0) return { success: true, count: 0 };
 
     const transaction = db.transaction(() => {
-        const stmt = db.prepare('INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)');
+        const stmtTicket = db.prepare('INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)');
+        const stmtNotif = db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')");
         for (const p of parents) {
-            stmt.run(sender_id, p.id, subject, message, sid);
+            stmtTicket.run(sender_id, p.id, subject, message, sid);
+            stmtNotif.run(sid, p.id, `Nouveau communiqué : ${subject}`);
         }
     });
     transaction();
@@ -2062,12 +2120,21 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
     const subjects = db.prepare('SELECT id, name FROM subjects').all();
     
     let schedules = [];
+    let examSchedules = [];
     if (tId) {
         if (classIds.length > 0) {
             schedules = db.prepare(`SELECT * FROM schedules WHERE school_id = ? AND (teacher_id = ? OR (type = 'PAUSE' AND class_id IN (${classIds.join(',')})))`).all(sid, tId);
         } else {
             schedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND teacher_id = ?').all(sid, tId);
         }
+        
+        examSchedules = db.prepare(`
+            SELECT e.*, c.name as class_name, s.name as subject_name
+            FROM evaluation_schedules e
+            LEFT JOIN classes c ON e.class_id = c.id
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            WHERE e.school_id = ? AND e.teacher_id = ?
+        `).all(sid, tId);
     }
 
     return {
@@ -2077,6 +2144,7 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
         subjects,
         students: studentsAverages.map(s => ({ ...s, average: s.average || 0 })),
         schedules,
+        examSchedules,
         timetable_slots: schoolConfig ? schoolConfig.timetable_slots : null
     };
 
@@ -2375,8 +2443,8 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
   }
 
   return db.prepare(`
-    INSERT INTO notifications (school_id, sender_id, role, message, type, request_type, request_data, action_status)
-    VALUES (?, ?, 'FOUNDER', ?, 'ACTION_REQUIRED', ?, ?, 'PENDING')
+    INSERT INTO tickets (school_id, sender_id, receiver_role, subject, message, request_type, request_data)
+    VALUES (?, ?, 'DIRECTOR', 'Demande Système', ?, ?, ?)
   `).run(sid, senderId, message, requestType, reqDataStr);
 };
 

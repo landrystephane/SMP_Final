@@ -13,6 +13,11 @@ const Attendance: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [absences, setAbsences] = useState<Record<string, number>>({});
+  const [maxAllowedHours, setMaxAllowedHours] = useState<number>(8);
+  const [notProgrammedMsg, setNotProgrammedMsg] = useState<string>('');
+  const [availableSchedules, setAvailableSchedules] = useState<any[]>([]);
+  const [selectedSchedule, setSelectedSchedule] = useState<string>('');
+  const [subjectsMap, setSubjectsMap] = useState<Record<number, string>>({});
   
   // New States for Reports
   const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT'>(() => {
@@ -38,17 +43,44 @@ const Attendance: React.FC = () => {
   const loadExistingAttendance = async () => {
     if (window.electronAPI && selectedClass && currentDate) {
       try {
-        const records = await window.electronAPI.getAttendance({ classId: parseInt(selectedClass), date: currentDate });
+        const schedIdStr = user?.role === 'TEACHER' ? selectedSchedule : '';
+        const records = await window.electronAPI.getAttendance({ classId: parseInt(selectedClass), date: currentDate, scheduleId: schedIdStr });
         const hasRecords = records.length > 0;
         
-        const unlockSetting = await window.electronAPI.getSetting(`attendance_unlock_${selectedClass}_${currentDate}`);
+        const unlockKey = `attendance_unlock_${selectedClass}_${currentDate}`;
+        const unlockSetting = await window.electronAPI.getSetting(unlockKey);
         const unlocked = unlockSetting === 'true';
         setIsUnlockedByAdmin(unlocked);
         
         if (user?.role === 'TEACHER') {
+            if (!selectedSchedule) {
+                setIsLocked(true);
+                setNotProgrammedMsg("Veuillez sélectionner un créneau horaire pour faire l'appel.");
+                setMaxAllowedHours(0);
+                setAbsences({});
+                return;
+            }
+
             setIsLocked(hasRecords && !unlocked);
+            
+            // Calculate programmed hours for the SELECTED schedule
+            const schedule = availableSchedules.find(s => s.id.toString() === selectedSchedule);
+            if (schedule && schedule.start_time && schedule.end_time) {
+                const [startH, startM] = schedule.start_time.split(':').map(Number);
+                const [endH, endM] = schedule.end_time.split(':').map(Number);
+                const diffMins = (endH * 60 + endM) - (startH * 60 + startM);
+                const maxH = Math.max(0, Math.ceil(diffMins / 60));
+                setMaxAllowedHours(maxH);
+                setNotProgrammedMsg('');
+            } else {
+                setMaxAllowedHours(0);
+                setIsLocked(true);
+                setNotProgrammedMsg("Créneau invalide ou introuvable.");
+            }
         } else {
             setIsLocked(false);
+            setMaxAllowedHours(8);
+            setNotProgrammedMsg('');
         }
 
         const newAbsences: Record<string, number> = {};
@@ -63,12 +95,47 @@ const Attendance: React.FC = () => {
         setAbsences({});
         setIsLocked(false);
         setIsUnlockedByAdmin(false);
+        setMaxAllowedHours(8);
+        setNotProgrammedMsg('');
     }
   };
 
+  // Load schedules and subjects when date or class changes
+  useEffect(() => {
+      const loadTeacherSchedules = async () => {
+          if (user?.role === 'TEACHER' && window.electronAPI && selectedClass && currentDate) {
+              try {
+                  const [allSchedules, allSubjects] = await Promise.all([
+                      window.electronAPI.getSchedules(user?.schoolId),
+                      window.electronAPI.getGlobalSubjects()
+                  ]);
+                  
+                  const subMap: Record<number, string> = {};
+                  allSubjects.forEach((sub: any) => { subMap[sub.id] = sub.name; });
+                  setSubjectsMap(subMap);
+
+                  const dayOfWeek = new Date(currentDate).getDay() || 7;
+                  const teacherSchedules = allSchedules.filter((s: any) => 
+                      s.teacher_id === user.id && 
+                      s.class_id?.toString() === selectedClass && 
+                      s.day_of_week === dayOfWeek
+                  );
+                  
+                  // Sort by start_time
+                  teacherSchedules.sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''));
+                  setAvailableSchedules(teacherSchedules);
+                  setSelectedSchedule(''); // Reset selection when date/class changes
+              } catch (e) {
+                  console.error("Failed to load schedules", e);
+              }
+          }
+      };
+      loadTeacherSchedules();
+  }, [selectedClass, currentDate, user]);
+
   useEffect(() => {
       loadExistingAttendance();
-  }, [selectedClass, currentDate, user]);
+  }, [selectedClass, currentDate, user, selectedSchedule]);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -150,7 +217,8 @@ const Attendance: React.FC = () => {
           const records = Object.keys(absences).map(studentId => ({
               studentId: parseInt(studentId),
               date: currentDate,
-              hours: absences[studentId]
+              hours: absences[studentId],
+              scheduleId: user?.role === 'TEACHER' ? selectedSchedule : null
           }));
 
           if (records.length > 0) {
@@ -164,6 +232,13 @@ const Attendance: React.FC = () => {
                       setExceedersToNotify(res.exceeders);
                   } else {
                       alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
+                      if (isUnlockedByAdmin) {
+                          await window.electronAPI.setSetting({
+                              key: `attendance_unlock_${selectedClass}_${currentDate}`,
+                              value: 'false'
+                          });
+                      }
+                      await loadExistingAttendance();
                   }
               } catch (err: any) {
                   alert(err.message);
@@ -320,6 +395,43 @@ const Attendance: React.FC = () => {
             ))}
           </select>
         </div>
+        
+        {user?.role === 'TEACHER' && selectedClass && activeTab === 'INPUT' && (
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sélectionner le cours (Créneau)</label>
+              <select
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all disabled:opacity-30"
+                value={selectedSchedule}
+                onChange={(e) => setSelectedSchedule(e.target.value)}
+              >
+                <option value="">-- Choisir un créneau --</option>
+                {availableSchedules.length === 0 ? (
+                    <option value="" disabled>Aucun cours programmé ce jour</option>
+                ) : (
+                    availableSchedules.map(s => {
+                        const today = new Date().toISOString().split('T')[0];
+                        let isFuture = false;
+                        if (currentDate === today && s.start_time) {
+                            const now = new Date();
+                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                            const [startH, startM] = s.start_time.split(':').map(Number);
+                            const startMinutes = startH * 60 + startM;
+                            // Block if the class hasn't started yet
+                            if (startMinutes > currentMinutes) {
+                                isFuture = true;
+                            }
+                        }
+                        
+                        return (
+                            <option key={s.id} value={s.id} disabled={isFuture}>
+                                {s.start_time} - {s.end_time} : {subjectsMap[s.subject_id] || 'Matière inconnue'} {isFuture ? '(Pas encore commencé)' : ''}
+                            </option>
+                        );
+                    })
+                )}
+              </select>
+            </div>
+        )}
       </div>
 
       {!selectedClass ? (
@@ -337,7 +449,9 @@ const Attendance: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-lg font-bold">{t('daily_call')} : {classes.find(c => c.id.toString() === selectedClass)?.name}</h2>
-                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">{isLocked ? "Fiche de présence verrouillée" : t('zero_for_full_presence')}</p>
+                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">
+                            {isLocked && notProgrammedMsg ? notProgrammedMsg : isLocked ? "Fiche de présence verrouillée" : `Maximum : ${maxAllowedHours}h d'absence`}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
@@ -369,8 +483,12 @@ const Attendance: React.FC = () => {
                     <div className="flex items-center space-x-3">
                         <AlertCircle className="w-6 h-6 flex-shrink-0" />
                         <div>
-                            <p className="font-bold text-sm">Fiche de présence verrouillée</p>
-                            <p className="text-xs text-slate-400">Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage.</p>
+                            <p className="font-bold text-sm">{notProgrammedMsg ? "Absence d'horaire" : "Fiche de présence verrouillée"}</p>
+                            <p className="text-xs text-slate-400">
+                                {notProgrammedMsg 
+                                    ? "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans l'emploi du temps pour cette classe aujourd'hui."
+                                    : "Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage."}
+                            </p>
                         </div>
                     </div>
                     {user?.role === 'TEACHER' && (
@@ -417,13 +535,13 @@ const Attendance: React.FC = () => {
                                                     type="number"
                                                     value={h}
                                                     disabled={isLocked}
-                                                    onChange={(e) => setAbsences({...absences, [student.id]: Math.min(8, Math.max(0, parseInt(e.target.value) || 0))})}
+                                                    onChange={(e) => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, Math.max(0, parseInt(e.target.value) || 0))})}
                                                     className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none disabled:opacity-50"
-                                                    max="8"
+                                                    max={maxAllowedHours}
                                                     min="0"
                                                 />
                                                 <button
-                                                    onClick={() => setAbsences({...absences, [student.id]: Math.min(8, h + 1)})}
+                                                    onClick={() => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, h + 1)})}
                                                     disabled={isLocked}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
@@ -579,7 +697,16 @@ const Attendance: React.FC = () => {
                       ))}
                   </div>
                   <button
-                      onClick={() => setExceedersToNotify([])}
+                      onClick={async () => {
+                          setExceedersToNotify([]);
+                          if (isUnlockedByAdmin) {
+                              await window.electronAPI.setSetting({
+                                  key: `attendance_unlock_${selectedClass}_${currentDate}`,
+                                  value: 'false'
+                              });
+                          }
+                          await loadExistingAttendance();
+                      }}
                       className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black transition-all shadow-lg hover:shadow-amber-500/25 active:scale-95"
                   >
                       Compris

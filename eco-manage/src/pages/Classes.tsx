@@ -4,6 +4,90 @@ import { useAuth } from '../context/AuthContext';
 import { Building2, Plus, Edit2, Trash2, Users, Search, Save, X, Copy, BookOpen } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
+const generateClassCode = (name: string, existingClasses: any[]) => {
+    if (!name) return '';
+    let clean = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    
+    const map: Record<string, string> = {
+        'COURS MOYEN 1': 'CM1',
+        'COURS MOYEN 2': 'CM2',
+        'COURS MOYEN': 'CM',
+        'COURS PREPARATOIRE': 'CP',
+        'COURS ELEMENTAIRE 1': 'CE1',
+        'COURS ELEMENTAIRE 2': 'CE2',
+        'COURS ELEMENTAIRE': 'CE',
+        "SECTION D'INITIATION AU LANGAGE": 'SIL',
+        'SECTION D INITIATION AU LANGAGE': 'SIL',
+        'MATERNELLE': 'MAT',
+        'PRE-NURSERY': 'PN',
+        'NURSERY': 'NUR',
+        'SIXIEME': '6EME',
+        'CINQUIEME': '5EME',
+        'QUATRIEME': '4EME',
+        'TROISIEME': '3EME',
+        'SECONDE': '2NDE',
+        'PREMIERE': '1ERE',
+        'TERMINALE': 'TLE'
+    };
+
+    for (const key in map) {
+        if (clean.includes(key)) {
+            clean = clean.replace(key, map[key]);
+        }
+    }
+
+    let baseCode = '';
+    const words = clean.split(/[\s\-]+/);
+    if (words.length > 1) {
+        const firstWord = words[0];
+        if (['SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2', 'MAT', 'FORM', 'CLASS', '6EME', '5EME', '4EME', '3EME', '2NDE', '1ERE', 'TLE', 'PN', 'NUR'].includes(firstWord)) {
+             baseCode = words.join('');
+        } else {
+            let code = '';
+            words.forEach(w => {
+                if (/\d/.test(w)) {
+                    const nums = w.match(/\d+/g);
+                    if (nums) code += nums.join('');
+                    else code += w.charAt(0);
+                } else if (w.length > 0) {
+                    code += w.charAt(0);
+                }
+            });
+            baseCode = code;
+        }
+    } else {
+        if (clean.length <= 4) baseCode = clean;
+        else baseCode = clean.substring(0, 3);
+    }
+
+    // Determine the year suffix (e.g. 26 for 2025-2026)
+    const d = new Date();
+    // If we are past July (month 6), academic year ends next year
+    const yearSuffix = (d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear()).toString().slice(-2);
+    
+    // Always append the year initially
+    const targetCode = baseCode + yearSuffix;
+
+    if (!existingClasses || existingClasses.length === 0) return targetCode;
+
+    // Check for duplicates
+    let finalCode = targetCode;
+    let letterIndex = 1; // 1 = B, 2 = C, etc.
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    while (existingClasses.some(c => c.code === finalCode)) {
+        if (letterIndex < alphabet.length) {
+            finalCode = baseCode + alphabet[letterIndex] + yearSuffix;
+            letterIndex++;
+        } else {
+            finalCode = baseCode + Math.floor(Math.random() * 1000) + yearSuffix;
+            break; // Fallback if too many duplicates
+        }
+    }
+
+    return finalCode;
+};
+
 const Classes: React.FC = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
@@ -317,10 +401,8 @@ const Classes: React.FC = () => {
                                         value={formData.name}
                                         onChange={(e) => {
                                             const name = e.target.value;
-                                            const nameClean = name.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '');
-                                            // Ensure class code doesn't include the year to avoid duplication in matricule
-                                            const code = nameClean || '';
-                                            setFormData({...formData, name, code: formData.id ? formData.code : code});
+                                            const newCode = generateClassCode(name, classes.filter((c: any) => c.id !== formData.id));
+                                            setFormData({...formData, name, code: formData.id ? formData.code : newCode});
                                         }}
                                     />
                                 </div>
@@ -330,10 +412,11 @@ const Classes: React.FC = () => {
                                         required
                                         disabled
                                         type="text"
-                                        placeholder="Généré automatiquement"
-                                        className="input-field w-full mt-1 bg-slate-800 text-slate-400 cursor-not-allowed opacity-60"
+                                        placeholder="Généré de façon intelligente"
+                                        className="input-field w-full mt-1 bg-slate-800 text-slate-400 cursor-not-allowed opacity-60 font-mono"
                                         value={formData.code}
                                     />
+                                    <p className="text-[9px] text-slate-500 mt-1 italic">Ce code court intelligent est utilisé pour générer les matricules.</p>
                                 </div>
                             </div>
 
@@ -362,18 +445,33 @@ const Classes: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Titulaire de la classe</label>
-                                <select
-                                    className="input-field w-full mt-1"
-                                    value={formData.mainTeacherId}
-                                    onChange={(e) => setFormData({...formData, mainTeacherId: e.target.value})}
-                                >
-                                    <option value="">-- Sélectionner un enseignant --</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.fullName}</option>
-                                    ))}
-                                </select>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Titulaire de la classe</label>
+                                    <select
+                                        className="input-field w-full mt-1"
+                                        value={formData.mainTeacherId}
+                                        onChange={(e) => setFormData({...formData, mainTeacherId: e.target.value})}
+                                    >
+                                        <option value="">-- Sélectionner un enseignant --</option>
+                                        {teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assistant(e)</label>
+                                    <select
+                                        className="input-field w-full mt-1"
+                                        value={formData.assistantTeacherId}
+                                        onChange={(e) => setFormData({...formData, assistantTeacherId: e.target.value})}
+                                    >
+                                        <option value="">-- Aucun assistant --</option>
+                                        {teachers.filter(t => t.id.toString() !== formData.mainTeacherId).map(t => (
+                                            <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div>

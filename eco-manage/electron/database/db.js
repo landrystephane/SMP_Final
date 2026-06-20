@@ -89,7 +89,22 @@ function initDb() {
     } catch (e) {
         console.error(`[Migration] Tuition fees migration failed:`, e.message);
     }
-
+    // 3.7 Attendance table migration for schedule_id
+    try {
+        const attCols = db.prepare(`PRAGMA table_info(attendance)`).all();
+        if (!attCols.find(c => c.name === 'schedule_id')) {
+            console.log(`[Migration] Migrating attendance table for schedule_id`);
+            db.prepare(`ALTER TABLE attendance RENAME TO attendance_old`).run();
+            db.exec(fs.readFileSync(schemaPath, 'utf8')); // Recreate the new attendance table
+            db.prepare(`
+                INSERT INTO attendance (id, student_id, date, status, hours_absent, recorded_by, notes, school_id)
+                SELECT id, student_id, date, status, hours_absent, recorded_by, notes, school_id FROM attendance_old
+            `).run();
+            db.prepare(`DROP TABLE attendance_old`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Attendance table migration failed:`, e.message);
+    }
 
     // 4. Student Table Migration: Add parent_name if missing
     try {

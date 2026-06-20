@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet } from 'lucide-react';
+import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download } from 'lucide-react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import SystemAdmin from './SystemAdmin';
+import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ const Dashboard: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
-  const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE'>('OVERVIEW');
+  const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE' | 'EXAMS_PROGRAM'>('OVERVIEW');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -101,14 +102,67 @@ const Dashboard: React.FC = () => {
                 <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mes Classes</button>
                     <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mon Emploi du Temps</button>
+                    <button onClick={() => setTeacherTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Programme Évaluations</button>
                 </div>
             </div>
 
             {teacherTab === 'TIMETABLE' ? (
                 <div className="glass-card p-6 border-none shadow-xl">
-                    <div className="flex items-center space-x-3 text-amber-500 mb-6 border-b border-white/5 pb-4">
-                        <LayoutGrid className="w-5 h-5" />
-                        <h2 className="text-lg font-black uppercase text-white tracking-wide">Mon Emploi du Temps Hebdomadaire</h2>
+                    <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+                        <div className="flex items-center space-x-3 text-amber-500">
+                            <LayoutGrid className="w-5 h-5" />
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Mon Emploi du Temps Hebdomadaire</h2>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                const columns = [t('hour', 'Heure'), t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi'), t('saturday', 'Samedi'), t('sunday', 'Dimanche')];
+                                const rows: any[] = [];
+                                const allSlots: any[] = [];
+                                if (stats.schedules) {
+                                    stats.schedules.forEach((s: any) => {
+                                        if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
+                                            allSlots.push({
+                                                label: `${s.start_time} - ${s.end_time || '?'}`,
+                                                start: s.start_time.trim(),
+                                                end: s.end_time?.trim() || '',
+                                                isBreak: false
+                                            });
+                                        }
+                                    });
+                                }
+                                allSlots.sort((a, b) => (a.start || '00:00').localeCompare(b.start || '00:00'));
+                                
+                                allSlots.forEach(slot => {
+                                    const rowData = [slot.label];
+                                    [1, 2, 3, 4, 5, 6, 7].forEach(day => {
+                                        const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
+                                        if (sData) {
+                                            if (sData.type === 'PAUSE') {
+                                                rowData.push('PAUSE');
+                                            } else {
+                                                const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
+                                                rowData.push(`${className}\n${subjectName}`);
+                                            }
+                                        } else {
+                                            rowData.push('-');
+                                        }
+                                    });
+                                    rows.push(rowData);
+                                });
+                                
+                                generateSchedulePdf({
+                                    school: { name: user?.schoolName || 'ECO-MANAGE' }, 
+                                    title: `Emploi du Temps - ${user?.fullName}`,
+                                    columns,
+                                    rows
+                                });
+                            }}
+                            className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center"
+                        >
+                            <Download className="w-3 h-3 mr-2" />
+                            Télécharger PDF
+                        </button>
                     </div>
                     
                     <div className="overflow-x-auto pb-4">
@@ -212,6 +266,64 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            ) : teacherTab === 'EXAMS_PROGRAM' ? (
+                <div className="glass-card p-6 border-none shadow-xl">
+                    <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+                        <div className="flex items-center space-x-3 text-amber-500">
+                            <BookOpen className="w-5 h-5" />
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Mes Surveillances d'Évaluations</h2>
+                        </div>
+                        {stats.examSchedules && stats.examSchedules.length > 0 && (
+                            <button 
+                                onClick={() => {
+                                    const columns = ['Date', 'Horaires', 'Classe', 'Matière'];
+                                    const rows = stats.examSchedules.map((exam: any) => {
+                                        return [exam.date, `${exam.start_time} - ${exam.end_time}`, exam.class_name, exam.subject_name];
+                                    });
+                                    generateExamSchedulePdf({
+                                        school: { name: user?.schoolName || 'ECO-MANAGE' },
+                                        title: `Programme des Évaluations - ${user?.fullName}`,
+                                        columns,
+                                        rows
+                                    });
+                                }}
+                                className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center"
+                            >
+                                <Download className="w-3 h-3 mr-2" />
+                                Télécharger PDF
+                            </button>
+                        )}
+                    </div>
+                    
+                    {(!stats.examSchedules || stats.examSchedules.length === 0) ? (
+                        <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                            <p className="text-slate-400 font-bold mb-4">Aucune surveillance d'évaluation programmée.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto pb-4">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Horaires</th>
+                                        <th className="px-6 py-4">Classe</th>
+                                        <th className="px-6 py-4">Matière</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 bg-slate-900/30">
+                                    {stats.examSchedules.map((exam: any) => (
+                                        <tr key={exam.id} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-6 py-4 text-white font-black text-sm">{exam.date}</td>
+                                            <td className="px-6 py-4 text-slate-400 text-sm font-bold">{exam.start_time} - {exam.end_time}</td>
+                                            <td className="px-6 py-4 text-white text-xs">{exam.class_name}</td>
+                                            <td className="px-6 py-4 text-amber-500 font-bold uppercase text-xs">{exam.subject_name}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             ) : (
                 <>
             {/* KPI Cards */}
@@ -296,7 +408,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Financier</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-4 gap-6">
                 {/* Total Recouvrements (Recettes) */}
                 <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
                   <div className="flex items-center justify-between mb-4">
@@ -559,9 +671,11 @@ const Dashboard: React.FC = () => {
             <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">{t('quality')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('success_rate')}</p>
-          <p className="text-3xl font-black text-white mt-1">82.4%</p>
+          <p className="text-3xl font-black text-white mt-1">
+             {stats?.classStats?.length > 0 ? (stats.classStats.reduce((acc: number, c: any) => acc + (c.passRate || 0), 0) / stats.classStats.length).toFixed(1) : '0.0'}%
+          </p>
           <p className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center uppercase">
-              <ChevronRight className="w-3 h-3 rotate-[-90deg] mr-1" /> +2.1% {t('compared_to_t1')}
+              <ChevronRight className="w-3 h-3 rotate-[-90deg] mr-1" /> +0.0% {t('compared_to_t1')}
           </p>
         </div>
 
@@ -592,7 +706,7 @@ const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest">{t('staff')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('classrooms')}</p>
-          <p className="text-3xl font-black text-white mt-1">20</p>
+          <p className="text-3xl font-black text-white mt-1">{stats?.classStats?.length || 0}</p>
           <p className="text-[10px] text-purple-400 font-bold mt-2 uppercase tracking-tight italic">100% {t('active_staff')}</p>
         </div>
       </div>
@@ -694,10 +808,10 @@ const Dashboard: React.FC = () => {
                     <div className="space-y-3">
                         <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest">
                             <span>{t('completed_classes')}</span>
-                            <span className="text-white">14 / 20</span>
+                            <span className="text-white">0 / {stats?.classStats?.length || 0}</span>
                         </div>
                         <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden p-[1px] border border-slate-700">
-                            <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/20" style={{ width: '70%' }} />
+                            <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/20" style={{ width: '0%' }} />
                         </div>
                     </div>
                     <div className="pt-2">

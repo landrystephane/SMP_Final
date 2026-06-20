@@ -29,7 +29,7 @@ const Finance: React.FC = () => {
 
   const loadData = async () => {
     if (window.electronAPI) {
-      const sid = user?.schoolId;
+      const sid = localStorage.getItem('impersonated_school_id') || user?.schoolId;
       const p = await window.electronAPI.getPayments(sid);
       const s = await window.electronAPI.getStudents(sid);
       const c = await window.electronAPI.getClasses(sid);
@@ -61,13 +61,32 @@ const Finance: React.FC = () => {
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newPayment.depositorName.trim()) {
+        showNotification("Le nom de celui qui fait le versement est obligatoire.", "warning");
+        return;
+    }
+
+    if (newPayment.type !== 'Inscription') {
+        const studentObj = students.find(s => s.id.toString() === newPayment.studentId);
+        const classConfig = tuitionFees.find(f => f.classId === studentObj?.class_id);
+        const totalRegRequired = classConfig?.registrationFee || 0;
+        const studentPayments = payments.filter(p => p.student_id.toString() === newPayment.studentId && p.payment_type === 'Inscription');
+        const totalRegPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
+
+        if (totalRegRequired > 0 && totalRegPaid < totalRegRequired) {
+            showNotification(`Le premier versement d'un élève doit obligatoirement être l'Inscription. Reste à payer pour l'inscription : ${totalRegRequired - totalRegPaid} FCFA.`, "warning");
+            return;
+        }
+    }
+
     if (window.electronAPI) {
         try {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await window.electronAPI.addPayment({
                 ...newPayment,
-                amount: parseFloat(newPayment.amount.replace(/\s+/g, '')),
-                userId: user.id,
+                studentId: parseInt(newPayment.studentId),
+                amount: parseFloat(newPayment.amount.toString().replace(/\s+/g, '')),
+                userId: parseInt(user.id),
                 installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
             });
             
@@ -87,7 +106,7 @@ const Finance: React.FC = () => {
                 financials.totalPaid += amountPaid;
                 financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
 
-                const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
+                const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
                 const paymentData = {
                     ...newPayment,
                     receipt_number: res.receiptNumber,
@@ -102,6 +121,16 @@ const Finance: React.FC = () => {
             setIsAddingPayment(false);
             setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
             showNotification("Paiement enregistré et reçu généré avec succès !", "success");
+            
+            // Notify system
+            const studentInfo = students.find(s => s.id.toString() === newPayment.studentId);
+            await window.electronAPI.createNotification({
+                school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
+                role: 'FOUNDER', // or general notification
+                message: `Un paiement de ${newPayment.amount} FCFA a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (${newPayment.type}).`,
+                type: 'FINANCE'
+            });
+
             loadData();
         } catch (err: any) {
             console.error(err);
@@ -119,12 +148,12 @@ const Finance: React.FC = () => {
                 amount: parseFloat(newExpense.amount.replace(/\s+/g, '')),
                 reason: newExpense.reason,
                 requested_by: user.id,
-                school_id: user.schoolId
+                school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId
             });
             
             // Notify FOUNDER
             await window.electronAPI.createNotification({
-                school_id: user.schoolId,
+                school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
                 role: 'FOUNDER',
                 message: `Une demande de ${newExpense.amount} FCFA a été soumise par l'Économe pour: ${newExpense.reason}. \n\nVeuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`,
                 type: 'FINANCE'
@@ -154,7 +183,7 @@ const Finance: React.FC = () => {
             const exp = expenses.find(e => e.id === expenseId);
             if (exp) {
                 await window.electronAPI.createNotification({
-                    school_id: user.schoolId,
+                    school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
                     user_id: exp.requested_by,
                     message: `Votre demande de ${exp.amount} FCFA a été ${status === 'VALIDATED' ? 'approuvée' : 'rejetée'} par ${user.fullName}.`,
                     type: 'FINANCE'
@@ -178,7 +207,7 @@ const Finance: React.FC = () => {
               try {
                   if (window.electronAPI && user) {
                       const res = await window.electronAPI.notifyLateInstallments({
-                          schoolId: user.schoolId,
+                          schoolId: localStorage.getItem('impersonated_school_id') || user?.schoolId,
                           installmentId,
                           senderId: user.id
                       });
@@ -199,7 +228,7 @@ const Finance: React.FC = () => {
   const getStudentFinancials = (student: any, feeType: string = 'Scolarité') => {
       if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
       
-      const activeSchool = schools.find(s => s.id === user?.schoolId) || schools[0] || {};
+      const activeSchool = schools.find(s => s.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0] || {};
       
       let totalDue = 0;
       const isTuitionOrReg = feeType === 'Scolarité' || feeType === 'Inscription';
@@ -264,7 +293,7 @@ const Finance: React.FC = () => {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         const results = await window.electronAPI.searchStudentsDetailed({
             name: searchQuery,
-            schoolId: user.schoolId,
+            schoolId: localStorage.getItem('impersonated_school_id') || user?.schoolId,
             section: filterSection,
             level: filterLevel,
             classId: filterClass
@@ -307,14 +336,14 @@ const Finance: React.FC = () => {
                 onClick={() => setActiveTab('SPECIAL_FEES')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'SPECIAL_FEES' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}
             >
-                Services
+                {t('services')}
             </button>
             {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER' || user?.role === 'BURSAR') && (
                 <button
                     onClick={() => setActiveTab('EXPENSES')}
                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXPENSES' ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                 >
-                    Décaissements
+                    {t('expenses')}
                 </button>
             )}
         </div>
@@ -437,7 +466,7 @@ const Finance: React.FC = () => {
                                                 const s = students.find(stud => stud.id === p.student_id);
                                                 const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id }, p.payment_type);
                                                 const user = JSON.parse(localStorage.getItem('user') || '{}');
-                                                const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
+                                                const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
                                                 // @ts-ignore
                                                 import('../utils/reports').then(m => m.generatePaymentReceipt(p, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials, activeSchool));
                                             }}
@@ -503,7 +532,7 @@ const Finance: React.FC = () => {
                                     }));
                                     
                                     const user = JSON.parse(localStorage.getItem('user') || '{}');
-                                    const activeSchool = schools.find(sch => sch.id === user.schoolId) || schools[0];
+                                    const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
                                     
                                     // @ts-ignore
                                     import('../utils/reports').then(m => m.generateFinancialList(filteredStudentsForPrint, filterFeeType, filterStatus, activeSchool));
@@ -803,11 +832,10 @@ const Finance: React.FC = () => {
                                 <input
                                     required
                                     type="number"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 pl-6 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 pl-6 pr-20 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     value={newPayment.amount}
                                     onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
                                     placeholder="0"
-                                    disabled={['Inscription', 'Transport', 'Examen'].includes(newPayment.type)}
                                 />
                                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600 uppercase tracking-widest">FCFA</span>
                             </div>
@@ -844,9 +872,10 @@ const Finance: React.FC = () => {
 
                       <div className="space-y-2 pt-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                              <User className="w-3 h-3 mr-2" /> NOM DU DÉPOSANT / PAYEUR
+                              <User className="w-3 h-3 mr-2" /> NOM DU DÉPOSANT / PAYEUR <span className="text-rose-500 ml-1">*</span>
                           </label>
                           <input
+                              required
                               type="text"
                               className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                               value={newPayment.depositorName}
@@ -951,7 +980,7 @@ const Finance: React.FC = () => {
                     value={newExpense.amount}
                     onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
                     placeholder="0"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 

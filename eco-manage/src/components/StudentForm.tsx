@@ -147,7 +147,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
               {formError}
             </div>
           )}
-          <div className="grid grid-cols-1 grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('last_name')}</label>
               <input
@@ -319,7 +319,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     <option value="MATERNELLE" className="bg-slate-900 text-white">Maternelle</option>
                 </select>
             </div>
-            <div className="space-y-1 col-span-1 md:col-span-2">
+            <div className="space-y-1">
                 <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t('class_assignment_label')}</label>
                 <select
                     required
@@ -356,7 +356,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                   {t('moratoire_eligible_label')}
                 </label>
             </div>
-            <div className="space-y-1 col-span-1 md:col-span-2">
+            <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('medical_info_title')}</label>
               <textarea
                 className="input-field w-full mt-1 h-24 resize-none"

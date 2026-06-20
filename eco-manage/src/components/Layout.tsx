@@ -134,7 +134,7 @@ const Layout: React.FC = () => {
         if (window.electronAPI && (window.electronAPI as any).showAlert) {
             (window.electronAPI as any).showAlert(message, schoolName);
         } else {
-            originalAlert(message);
+            originalAlert.call(window, message);
         }
     };
 

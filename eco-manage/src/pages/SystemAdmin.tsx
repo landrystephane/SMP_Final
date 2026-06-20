@@ -520,7 +520,7 @@ const SystemAdmin: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-3 gap-6">
             {schools.map(s => (
               <div key={s.id} className="glass-card group hover:border-amber-500/50 transition-all p-0 overflow-hidden bg-slate-900/50">
                 <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
@@ -729,7 +729,7 @@ const SystemAdmin: React.FC = () => {
               <p className="font-black uppercase text-xs tracking-widest">{t('sys_trash_empty')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-3 gap-6">
               {deletedSchools.map(s => {
                   const deletedDate = s.deleted_at ? new Date(s.deleted_at) : new Date();
                   const expireDate = new Date(deletedDate.getTime() + 30 * 24 * 60 * 60 * 1000);

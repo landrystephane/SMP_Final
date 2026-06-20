@@ -92,7 +92,7 @@ const Grades: React.FC = () => {
     if (window.electronAPI && selectedClass) {
         const classObj = classes.find(c => c.id.toString() === selectedClass);
         const allStudents = await window.electronAPI.getStudents(user?.schoolId);
-        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString() && s.has_paid_registration === 1));
+        setStudents(allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString()));
 
         let classSubs = await window.electronAPI.getClassSubjects(parseInt(selectedClass));
         
@@ -143,10 +143,27 @@ const Grades: React.FC = () => {
         // Check deadline and permissions
         let pastDeadline = false;
         const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed');
-        if (editingAllowed === 'false') {
+        const periodStartStr = await window.electronAPI.getSetting('period_start');
+        const periodEndStr = await window.electronAPI.getSetting('period_end');
+        
+        let isOutsideDateRange = false;
+        if (periodStartStr && periodEndStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const start = new Date(periodStartStr);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(periodEndStr);
+            end.setHours(23, 59, 59, 999);
+            
+            if (today < start || today > end) {
+                isOutsideDateRange = true;
+            }
+        }
+
+        if (editingAllowed === 'false' || isOutsideDateRange) {
             pastDeadline = true;
             
-            // Check for override if master toggle is false
+            // Check for override if master toggle is false or outside date range
             if (user?.role === 'TEACHER') {
                 try {
                     const override = await window.electronAPI.getGradeOverrides({

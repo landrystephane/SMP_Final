@@ -396,7 +396,7 @@ const DriverPortal: React.FC = () => {
                         <span className="text-xl font-black text-amber-500">{Object.values(attendance).filter(v => v).length} <span className="text-xs text-slate-700">/ {students.length}</span></span>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-y divide-white/5 bg-slate-950/20">
+                <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 divide-x divide-y divide-white/5 bg-slate-950/20">
                     {students.map(s => (
                         <div key={s.id} className={`p-8 flex items-center justify-between hover:bg-white/5 transition-all group ${attendance[s.id] ? 'bg-emerald-500/[0.03]' : ''}`}>
                             <div className="flex items-center space-x-5">

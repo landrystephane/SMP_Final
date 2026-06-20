@@ -3,13 +3,21 @@ import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert,
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
+import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
 
 const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
     const { t } = useTranslation();
     const { showNotification } = useNotification();
     const [termStructure, setTermStructure] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS'>('PLANNING');
+    const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS' | 'EXAMS_PROGRAM'>('PLANNING');
+    const [examSchedules, setExamSchedules] = useState<any[]>([]);
+    const [showExamModal, setShowExamModal] = useState(false);
+    const [examDate, setExamDate] = useState('');
+    const [examStart, setExamStart] = useState('');
+    const [examEnd, setExamEnd] = useState('');
+    const [examSubject, setExamSubject] = useState('');
+    const [examTeacher, setExamTeacher] = useState('');
     const [classes, setClasses] = useState<any[]>([]);
     const [routes, setRoutes] = useState<any[]>([]);
     const [students, setStudents] = useState<any[]>([]);
@@ -99,6 +107,12 @@ const AdvisorPortal: React.FC = () => {
                 const allSchedules = await window.electronAPI.getSchedules(user?.schoolId);
                 const filtered = allSchedules.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
                 setSchedules(filtered);
+
+                if (window.electronAPI.getEvaluationSchedules) {
+                    const allExams = await window.electronAPI.getEvaluationSchedules(user?.schoolId);
+                    const filteredExams = allExams.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
+                    setExamSchedules(filteredExams);
+                }
             } catch (e) {
                 console.error("Failed to load schedules", e);
             }
@@ -203,6 +217,58 @@ const AdvisorPortal: React.FC = () => {
                 if (res && res.error) throw new Error(res.error);
                 showNotification("Cours supprimé avec succès !", "success");
                 setShowScheduleModal(false);
+                loadSchedules();
+            } catch (err: any) {
+                showNotification("Erreur lors de la suppression : " + err.message, "error");
+            }
+        }
+    };
+
+    const handleSaveExam = async () => {
+        if (!window.electronAPI || !selectedClass) return;
+        if (!examSubject || !examTeacher || !examDate || !examStart || !examEnd) {
+            showNotification("Veuillez remplir tous les champs (Matière, Surveillant, Date, Heures).", "warning");
+            return;
+        }
+        try {
+            const payload = {
+                school_id: user?.schoolId,
+                class_id: parseInt(selectedClass),
+                subject_id: parseInt(examSubject),
+                teacher_id: parseInt(examTeacher),
+                evaluation_period_id: selectedTerm, // or sequence
+                date: examDate,
+                start_time: examStart,
+                end_time: examEnd
+            };
+            const res = await window.electronAPI.addEvaluationSchedule(payload);
+            if (res && res.error) throw new Error(res.error);
+
+            // Notify the teacher
+            const teacherObj = teachers.find(t => t.id.toString() === examTeacher);
+            const subjObj = getSubjectName(parseInt(examSubject));
+            await window.electronAPI.createNotification({
+                role: 'TEACHER',
+                message: `Vous êtes programmé(e) pour surveiller l'évaluation de ${subjObj} le ${examDate} de ${examStart} à ${examEnd}.`,
+                type: 'ACTION_REQUIRED',
+                school_id: user?.schoolId
+            });
+
+            showNotification("Évaluation programmée avec succès !", "success");
+            setShowExamModal(false);
+            loadSchedules();
+        } catch (err: any) {
+            showNotification("Erreur lors de l'enregistrement de l'évaluation : " + err.message, "error");
+        }
+    };
+
+    const handleDeleteExam = async (id: number) => {
+        if (!window.electronAPI) return;
+        if (window.confirm("Voulez-vous supprimer cette évaluation du programme ?")) {
+            try {
+                const res = await window.electronAPI.deleteEvaluationSchedule(id);
+                if (res && res.error) throw new Error(res.error);
+                showNotification("Évaluation supprimée avec succès !", "success");
                 loadSchedules();
             } catch (err: any) {
                 showNotification("Erreur lors de la suppression : " + err.message, "error");
@@ -322,7 +388,8 @@ const AdvisorPortal: React.FC = () => {
                 </div>
                 <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => setActiveTab('PLANNING')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PLANNING' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_planning', 'Plannings')}</button>
-                    <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_evaluations', 'Évaluations')}</button>
+                    <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_evaluations', 'Validation Notes')}</button>
+                    <button onClick={() => setActiveTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_exams_program', 'Programme Évaluations')}</button>
                 </div>
             </div>
 
@@ -343,7 +410,7 @@ const AdvisorPortal: React.FC = () => {
                         </select>
                     </div>
 
-                    {(activeTab === 'PLANNING' || activeTab === 'EVALUATIONS') && (
+                    {(activeTab === 'PLANNING' || activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('term', 'Trimestre')}</label>
                             <select
@@ -368,7 +435,7 @@ const AdvisorPortal: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'EVALUATIONS' && (
+                    {(activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
                         <>
                             <div>
                                 <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('evaluation_month', 'Mois d\'Évaluation')}</label>
@@ -419,18 +486,72 @@ const AdvisorPortal: React.FC = () => {
                                     <Calendar className="w-6 h-6 mr-3 text-amber-500" />
                                     {t('weekly_schedule', 'Emploi du Temps Hebdomadaire')}
                                 </h2>
-                                <button 
-                                    onClick={() => {
-                                        if (!selectedClass) {
-                                            showNotification("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.", "warning");
-                                            return;
-                                        }
-                                        handleOpenScheduleModal();
-                                    }} 
-                                    className="btn-primary text-[10px]"
-                                >
-                                    {t('schedule_class', 'PROGRAMMER COURS')}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            if (!selectedClass) {
+                                                showNotification("Veuillez sélectionner une classe.", "warning");
+                                                return;
+                                            }
+                                            const classObj = classes.find(c => c.id.toString() === selectedClass);
+                                            const columns = [t('hour', 'Heure'), t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi'), t('saturday', 'Samedi'), t('sunday', 'Dimanche')];
+                                            const rows: any[] = [];
+                                            const allSlots: any[] = [];
+                                            schedules.forEach(s => {
+                                                if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
+                                                    allSlots.push({
+                                                        label: `${s.start_time} - ${s.end_time || '?'}`,
+                                                        start: s.start_time.trim(),
+                                                        end: s.end_time?.trim() || '',
+                                                        isBreak: false
+                                                    });
+                                                }
+                                            });
+                                            allSlots.sort((a, b) => (a.start || '00:00').localeCompare(b.start || '00:00'));
+                                            
+                                            allSlots.forEach(slot => {
+                                                const rowData = [slot.label];
+                                                [1, 2, 3, 4, 5, 6, 7].forEach(day => {
+                                                    const sData = getScheduleForSlot(day, slot.start);
+                                                    if (sData) {
+                                                        if (sData.type === 'PAUSE') {
+                                                            rowData.push('PAUSE');
+                                                        } else {
+                                                            const subjectName = getSubjectName(sData.subject_id);
+                                                            const teacherName = getTeacherName(sData.teacher_id);
+                                                            rowData.push(`${subjectName}\n${teacherName}`);
+                                                        }
+                                                    } else {
+                                                        rowData.push('-');
+                                                    }
+                                                });
+                                                rows.push(rowData);
+                                            });
+                                            
+                                            generateSchedulePdf({
+                                                school: { name: user?.schoolName || 'ECO-MANAGE' }, 
+                                                title: `Emploi du Temps - ${classObj?.name}`,
+                                                columns,
+                                                rows
+                                            });
+                                        }} 
+                                        className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                    >
+                                        Télécharger PDF
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            if (!selectedClass) {
+                                                showNotification("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.", "warning");
+                                                return;
+                                            }
+                                            handleOpenScheduleModal();
+                                        }} 
+                                        className="btn-primary text-[10px]"
+                                    >
+                                        {t('schedule_class', 'PROGRAMMER COURS')}
+                                    </button>
+                                </div>
                             </div>
 
                             {!selectedClass ? (
@@ -643,6 +764,107 @@ const AdvisorPortal: React.FC = () => {
                 </div>
             )}
 
+            {activeTab === 'EXAMS_PROGRAM' && (
+                <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
+                    <div className="space-y-6">
+                        <div className="glass-card p-6 border-slate-800">
+                            <div className="flex justify-between items-center mb-8">
+                                <h2 className="text-xl font-black text-white flex items-center">
+                                    <BookOpen className="w-6 h-6 mr-3 text-amber-500" />
+                                    Programme des Évaluations
+                                </h2>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            if (!selectedClass) {
+                                                showNotification("Veuillez sélectionner une classe.", "warning");
+                                                return;
+                                            }
+                                            const classObj = classes.find(c => c.id.toString() === selectedClass);
+                                            const columns = ['Date', 'Horaires', 'Matière', 'Enseignant/Surveillant'];
+                                            const rows = examSchedules.map(exam => {
+                                                const subjectName = getSubjectName(parseInt(exam.subject_id));
+                                                const teacherName = getTeacherName(parseInt(exam.teacher_id));
+                                                return [exam.date, `${exam.start_time} - ${exam.end_time}`, subjectName, teacherName];
+                                            });
+                                            generateExamSchedulePdf({
+                                                school: { name: user?.schoolName || 'ECO-MANAGE' },
+                                                title: `Programme des Évaluations - ${classObj?.name}`,
+                                                columns,
+                                                rows
+                                            });
+                                        }} 
+                                        className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                    >
+                                        Télécharger PDF
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            if (!selectedClass) {
+                                                showNotification("Veuillez sélectionner une classe dans le filtre.", "warning");
+                                                return;
+                                            }
+                                            setShowExamModal(true);
+                                        }} 
+                                        className="btn-primary text-[10px]"
+                                    >
+                                        PROGRAMMER UNE ÉVALUATION
+                                    </button>
+                                </div>
+                            </div>
+
+                            {!selectedClass ? (
+                                <div className="p-10 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                                    Veuillez choisir une classe dans le filtre ci-dessus.
+                                </div>
+                            ) : examSchedules.length === 0 ? (
+                                <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                                    <p className="text-slate-400 font-bold mb-4">Aucune évaluation programmée pour cette classe.</p>
+                                    <button 
+                                        onClick={() => setShowExamModal(true)} 
+                                        className="px-6 py-2 bg-amber-500 text-slate-950 font-black text-[10px] rounded-xl uppercase tracking-widest hover:bg-amber-400 transition-all"
+                                    >
+                                        + Programmer la première évaluation
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
+                                                <th className="px-6 py-4">Date</th>
+                                                <th className="px-6 py-4">Horaires</th>
+                                                <th className="px-6 py-4">Matière</th>
+                                                <th className="px-6 py-4">Surveillant</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5 bg-slate-900/30">
+                                            {examSchedules.map(exam => (
+                                                <tr key={exam.id} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-6 py-4 text-white font-black text-sm">{exam.date}</td>
+                                                    <td className="px-6 py-4 text-slate-400 text-sm font-bold">{exam.start_time} - {exam.end_time}</td>
+                                                    <td className="px-6 py-4 text-amber-500 font-bold uppercase text-xs">{getSubjectName(exam.subject_id)}</td>
+                                                    <td className="px-6 py-4 text-slate-300 text-xs">{getTeacherName(exam.teacher_id)}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button
+                                                            onClick={() => handleDeleteExam(exam.id)}
+                                                            className="p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Grades Inspection Slide-over Drawer / Modal */}
             {showDetailModal && selectedSubjectForDetail && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -833,6 +1055,103 @@ const AdvisorPortal: React.FC = () => {
                                     Enregistrer
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Exam Programming Modal */}
+            {showExamModal && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
+                            <div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                                    Programmer une Évaluation
+                                </h3>
+                                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">
+                                    Classe: {classObj?.name}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowExamModal(false)}
+                                className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 text-slate-400 hover:text-white transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
+                                <select
+                                    value={examSubject}
+                                    onChange={(e) => setExamSubject(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                >
+                                    <option value="">Sélectionnez une matière</option>
+                                    {classSubjects.map(sub => (
+                                        <option key={sub.id} value={sub.id}>{sub.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Enseignant Surveillant</label>
+                                <select
+                                    value={examTeacher}
+                                    onChange={(e) => setExamTeacher(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                >
+                                    <option value="">Sélectionnez un surveillant</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Date de l'évaluation</label>
+                                <input
+                                    type="date"
+                                    value={examDate}
+                                    onChange={(e) => setExamDate(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Début</label>
+                                    <input
+                                        type="time"
+                                        value={examStart}
+                                        onChange={(e) => setExamStart(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Fin</label>
+                                    <input
+                                        type="time"
+                                        value={examEnd}
+                                        onChange={(e) => setExamEnd(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-white/5 bg-slate-950/50 flex justify-end">
+                            <button
+                                onClick={handleSaveExam}
+                                className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg"
+                            >
+                                Enregistrer
+                            </button>
                         </div>
                     </div>
                 </div>

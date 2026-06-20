@@ -77,7 +77,7 @@ export const initSaaSBridge = () => {
                     localStorage.removeItem('saas_token');
                 }
             } else if (prop === 'showAlert') {
-                return (msg: string, title: string) => alert(`${title}\n\n${msg}`);
+                return undefined;
             }
 
             return async (...args: any[]) => {

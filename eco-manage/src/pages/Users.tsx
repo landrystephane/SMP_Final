@@ -390,9 +390,7 @@ const Users: React.FC = () => {
                                         onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
                                     >
                                         <option value="">{t('no_assignment')}</option>
-                                        {classes
-                                            .filter(c => c.section === newUser.section && c.level === (newUser.cycle || 'PRIMAIRE'))
-                                            .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level === 'PRIMAIRE' ? 'Prim.' : 'Mat.'} - {c.section === 'FRANCOPHONE' ? 'FR' : 'EN'})</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -468,6 +466,24 @@ const Users: React.FC = () => {
                                          <span>{u.section}</span>
                                      </>
                                  )}
+                                 {u.role === 'TEACHER' && (() => {
+                                     try {
+                                         const parsed = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : u.assignedClasses;
+                                         if (Array.isArray(parsed) && parsed.length > 0) {
+                                             const classId = parsed[0].toString();
+                                             const cls = classes.find(c => c.id.toString() === classId);
+                                             if (cls) {
+                                                 return (
+                                                     <>
+                                                         <span>•</span>
+                                                         <span className="text-emerald-500">CLASSE: {cls.name}</span>
+                                                     </>
+                                                 );
+                                             }
+                                         }
+                                     } catch(e) {}
+                                     return null;
+                                 })()}
                              </div>
                         </div>
                       </div>
@@ -499,6 +515,11 @@ const Users: React.FC = () => {
                          {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
                              <button onClick={() => setEditingUser(u)} className="p-3 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all shadow-md" title={t('save')}>
                                  <Edit className="w-4 h-4" />
+                             </button>
+                         )}
+                         {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
+                             <button onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)} className={`p-3 rounded-2xl border border-transparent transition-all ${u.is_active !== 0 ? 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20'}`} title={u.is_active !== 0 ? "Désactiver l'accès" : "Réactiver l'accès"}>
+                                 {u.is_active !== 0 ? <Lock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                              </button>
                          )}
                          {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
@@ -646,9 +667,7 @@ const Users: React.FC = () => {
                                           onChange={(e) => setEditUserForm({...editUserForm, classId: e.target.value})}
                                       >
                                           <option value="">{t('no_assignment')}</option>
-                                          {classes
-                                              .filter(c => c.section === editUserForm.section && c.level === editUserForm.cycle)
-                                              .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                          {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level === 'PRIMAIRE' ? 'Prim.' : 'Mat.'} - {c.section === 'FRANCOPHONE' ? 'FR' : 'EN'})</option>)}
                                       </select>
                                   </div>
                                   <div className="space-y-2">
