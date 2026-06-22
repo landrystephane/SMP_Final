@@ -101,7 +101,10 @@ body {
 
 /* react-phone-number-input overrides */
 .phone-input-glass .PhoneInputInput {
-  @apply bg-transparent border-none outline-none text-white font-bold placeholder:text-slate-500 flex-1 ml-2 shadow-none ring-0;
+  @apply bg-transparent border-none outline-none text-inherit placeholder:text-slate-500 flex-1 ml-2 shadow-none ring-0;
+  font-family: inherit;
+  font-weight: inherit;
+  color: inherit;
 }
 .phone-input-glass .PhoneInputInput:focus {
   @apply ring-0 outline-none;
