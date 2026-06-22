@@ -212,6 +212,7 @@ const permanentlyDeleteSchool = (id) => {
             'DELETE FROM students WHERE school_id = ?',
             'DELETE FROM classes WHERE school_id = ?',
             'DELETE FROM subjects WHERE school_id = ?',
+            'DELETE FROM school_subjects WHERE school_id = ?',
             'DELETE FROM attendance WHERE school_id = ?',
             'DELETE FROM payments WHERE school_id = ?',
             'DELETE FROM tuition_fees WHERE school_id = ?',
@@ -226,6 +227,11 @@ const permanentlyDeleteSchool = (id) => {
             'DELETE FROM expenses WHERE school_id = ?',
             'DELETE FROM bursar_balances WHERE school_id = ?',
             'DELETE FROM users WHERE school_id = ?',
+            'DELETE FROM schedules WHERE school_id = ?',
+            'DELETE FROM evaluation_schedules WHERE school_id = ?',
+            'DELETE FROM bus_routes WHERE school_id = ?',
+            'DELETE FROM saas_subscriptions WHERE school_id = ?',
+            'DELETE FROM pending_subjects WHERE school_id = ?',
             'DELETE FROM schools WHERE id = ?'
         ];
 
