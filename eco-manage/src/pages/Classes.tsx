@@ -60,13 +60,8 @@ const generateClassCode = (name: string, existingClasses: any[]) => {
         else baseCode = clean.substring(0, 3);
     }
 
-    // Determine the year suffix (e.g. 26 for 2025-2026)
-    const d = new Date();
-    // If we are past July (month 6), academic year ends next year
-    const yearSuffix = (d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear()).toString().slice(-2);
-    
-    // Always append the year initially
-    const targetCode = baseCode + yearSuffix;
+    // Do not append year to class codes to keep them clean (e.g. 'SIL' instead of 'SIL26')
+    const targetCode = baseCode;
 
     if (!existingClasses || existingClasses.length === 0) return targetCode;
 
@@ -77,10 +72,10 @@ const generateClassCode = (name: string, existingClasses: any[]) => {
 
     while (existingClasses.some(c => c.code === finalCode)) {
         if (letterIndex < alphabet.length) {
-            finalCode = baseCode + alphabet[letterIndex] + yearSuffix;
+            finalCode = baseCode + alphabet[letterIndex];
             letterIndex++;
         } else {
-            finalCode = baseCode + Math.floor(Math.random() * 1000) + yearSuffix;
+            finalCode = baseCode + Math.floor(Math.random() * 1000);
             break; // Fallback if too many duplicates
         }
     }
