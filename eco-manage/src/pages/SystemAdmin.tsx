@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 const SystemAdmin: React.FC = () => {
   const { t } = useTranslation();
@@ -894,11 +896,12 @@ const SystemAdmin: React.FC = () => {
                               </div>
                               <div className="space-y-1">
                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('sys_phone_contact')}</label>
-                                <input
-                                  type="text"
-                                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
+                                <PhoneInput
+                                  international
+                                  defaultCountry="CM"
+                                  className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
                                   value={editSchoolPhone}
-                                  onChange={(e) => setEditSchoolPhone(e.target.value)}
+                                  onChange={(val) => setEditSchoolPhone(val || '')}
                                 />
                               </div>
                               <div className="space-y-1">
@@ -1186,7 +1189,13 @@ const SystemAdmin: React.FC = () => {
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_phone_contact')}</label>
-                            <input className="input-field w-full" value={newSchool.contact_phone} onChange={e => setNewSchool({...newSchool, contact_phone: e.target.value})} />
+                            <PhoneInput
+                                international
+                                defaultCountry="CM"
+                                className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
+                                value={newSchool.contact_phone}
+                                onChange={val => setNewSchool({...newSchool, contact_phone: val || ''})}
+                            />
                         </div>
                       </div>
 

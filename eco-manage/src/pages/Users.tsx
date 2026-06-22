@@ -3,6 +3,8 @@ import { UserPlus, Shield, Trash2, CheckCircle, Lock, Search, Edit, X } from 'lu
 import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 const Users: React.FC = () => {
   const { t } = useTranslation();
@@ -112,11 +114,7 @@ const Users: React.FC = () => {
     }
 
     // Phone validation
-    let cleanPhone = newUser.phone.replace(/[\s\-\(\)\+]/g, '');
-    if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
-        cleanPhone = cleanPhone.slice(3);
-    }
-    if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
+    if (!newUser.phone || !isValidPhoneNumber(newUser.phone)) {
         setFormError(t('alert_invalid_phone'));
         return;
     }
@@ -124,7 +122,6 @@ const Users: React.FC = () => {
     if (window.electronAPI && currentUser) {
       const res = await window.electronAPI.addUser({
           ...newUser,
-          phone: cleanPhone,
           schoolId: currentUser.schoolId,
           assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : [],
           classRole: newUser.classRole
@@ -165,11 +162,7 @@ const Users: React.FC = () => {
           return;
       }
 
-      let cleanPhone = editUserForm.phone.replace(/[\s\-\(\)\+]/g, '');
-      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
-          cleanPhone = cleanPhone.slice(3);
-      }
-      if (!/^(2|6)\d{8}$/.test(cleanPhone)) {
+      if (!editUserForm.phone || !isValidPhoneNumber(editUserForm.phone)) {
           setEditFormError(t('alert_invalid_phone'));
           return;
       }
@@ -181,7 +174,7 @@ const Users: React.FC = () => {
                   civility: editUserForm.civility,
                   fullName: editUserForm.fullName,
                   username: editUserForm.username,
-                  phone: cleanPhone,
+                  phone: editUserForm.phone,
                   role: editUserForm.role,
                   password: editUserForm.password || undefined,
                   section: editUserForm.section,
@@ -304,13 +297,13 @@ const Users: React.FC = () => {
                      </div>
                      <div className="space-y-2">
                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('cameroonian_phone_label')}</label>
-                         <input
-                             type="text"
-                             className="input-field w-full text-amber-500 font-mono"
+                         <PhoneInput
+                             international
+                             defaultCountry="CM"
                              value={newUser.phone}
-                             onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
-                             required
-                             placeholder="Ex: 699000000"
+                             onChange={(val) => setNewUser({...newUser, phone: val || ''})}
+                             className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
+                             placeholder="Ex: +237 699000000"
                          />
                      </div>
                     <div className="grid grid-cols-1 gap-4">
@@ -592,12 +585,12 @@ const Users: React.FC = () => {
                           </div>
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('cameroonian_phone_label')}</label>
-                              <input
-                                  type="text"
-                                  className="input-field w-full text-amber-500 font-mono"
+                              <PhoneInput
+                                  international
+                                  defaultCountry="CM"
                                   value={editUserForm.phone}
-                                  onChange={(e) => setEditUserForm({...editUserForm, phone: e.target.value})}
-                                  required
+                                  onChange={(val) => setEditUserForm({...editUserForm, phone: val || ''})}
+                                  className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
                               />
                           </div>
                       </div>
