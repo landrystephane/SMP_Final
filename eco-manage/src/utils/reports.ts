@@ -1392,6 +1392,6 @@ export const generateStudentsListReport = (data: { students: any[], classes: any
         }
     });
 
-    const safeTitle = reportTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const safeTitle = reportTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/_+/g, "_").replace(/_$/, "");
     doc.save(`${safeTitle}.pdf`);
 };

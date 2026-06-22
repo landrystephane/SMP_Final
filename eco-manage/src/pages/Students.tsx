@@ -61,6 +61,23 @@ const Students: React.FC = () => {
     return matchSection && matchClass && matchCycle && matchSearch;
   });
 
+  const getReportTitle = () => {
+      let title = t('students_list', 'LISTE DES ÉLÈVES');
+      if (selectedClass !== 'ALL') {
+          const c = classes.find(c => c.id?.toString() === selectedClass?.toString());
+          if (c) title += ` - CLASSE ${c.name}`;
+      } else if (selectedCycle !== 'ALL' || selectedSection !== 'ALL') {
+          title += ` - ${selectedCycle !== 'ALL' ? selectedCycle : ''} ${selectedSection !== 'ALL' ? selectedSection : ''}`.trim();
+      }
+      return title;
+  };
+
+  const stats = {
+      total: filteredStudents.length,
+      boys: filteredStudents.filter(s => s.gender === 'M').length,
+      girls: filteredStudents.filter(s => s.gender === 'F').length,
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -133,12 +150,28 @@ const Students: React.FC = () => {
         </div>
 
         <button 
-            onClick={() => generateStudentsListReport({ students: filteredStudents, classes, school: schoolInfo })}
+            onClick={() => generateStudentsListReport({ students: filteredStudents, classes, school: schoolInfo, title: getReportTitle() })}
             className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white"
             title={t('download_list', 'Télécharger la liste')}
         >
             <Download className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Statistiques Rapides */}
+      <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="glass-card p-4 text-center">
+              <div className="text-sm text-slate-400 font-bold uppercase tracking-wider">{t('total_students', 'Effectif Total')}</div>
+              <div className="text-2xl font-black text-white mt-1">{stats.total}</div>
+          </div>
+          <div className="glass-card p-4 text-center">
+              <div className="text-sm text-blue-400 font-bold uppercase tracking-wider">{t('boys', 'Garçons')}</div>
+              <div className="text-2xl font-black text-blue-400 mt-1">{stats.boys}</div>
+          </div>
+          <div className="glass-card p-4 text-center">
+              <div className="text-sm text-pink-400 font-bold uppercase tracking-wider">{t('girls', 'Filles')}</div>
+              <div className="text-2xl font-black text-pink-400 mt-1">{stats.girls}</div>
+          </div>
       </div>
 
       {/* Liste des Élèves */}
