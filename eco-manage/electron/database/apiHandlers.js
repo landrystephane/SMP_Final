@@ -325,14 +325,14 @@ handlers['db:addStudent'] = async (student) => {
   if (!classObj) throw new Error(`Classe introuvable ou non autorisée (ClassID: ${parsedClassId}, SchoolID: ${sid})`);
   const classCode = classObj.code;
 
-  // Generate order number securely using transaction (global per school/year)
+  // Generate order number securely using transaction (global per class, all-time)
   let matricule = '';
   let orderNumber = 1;
   
   const transaction = db.transaction(() => {
-    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(order_number), 0) as max_order FROM students WHERE class_id = ? AND registration_year = ?").get(parsedClassId, year);
+    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(order_number), 0) as max_order FROM students WHERE class_id = ?").get(parsedClassId);
     orderNumber = maxOrderRow.max_order + 1;
-    matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(3, '0')}`;
+    matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
 
     db.prepare(`
       INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire, bus_route_id)
