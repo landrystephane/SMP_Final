@@ -18,13 +18,18 @@ const Students: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
 
   const loadData = async () => {
     if (window.electronAPI) {
       const s = await window.electronAPI.getStudents(user?.schoolId);
       const c = await window.electronAPI.getClasses(user?.schoolId);
+      const schools = await window.electronAPI.getSchools();
+      const currentSchool = schools.find((sch: any) => Number(sch.id) === Number(user?.schoolId));
+      
       setStudents(s);
       setClasses(c);
+      setSchoolInfo(currentSchool);
     }
   };
 
@@ -128,7 +133,7 @@ const Students: React.FC = () => {
         </div>
 
         <button 
-            onClick={() => generateStudentsListReport({ students: filteredStudents, classes, school: user?.school })}
+            onClick={() => generateStudentsListReport({ students: filteredStudents, classes, school: schoolInfo })}
             className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white"
             title={t('download_list', 'Télécharger la liste')}
         >
