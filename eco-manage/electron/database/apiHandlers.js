@@ -203,52 +203,66 @@ handlers['db:restoreSchool'] = async (id) => {
 };
 
 const permanentlyDeleteSchool = (id) => {
-    const transaction = db.transaction(() => {
-        const queries = [
-            'DELETE FROM grades WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM class_teacher_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM grade_overrides WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM class_subject_validation WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
-            'DELETE FROM transport_attendance WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
-            'DELETE FROM transport_logs WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
-            'DELETE FROM transport_points WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
-            'DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)',
-            'DELETE FROM grading_scale_options WHERE scale_id IN (SELECT id FROM grading_scales WHERE school_id = ?)',
-            'DELETE FROM attendance WHERE school_id = ?',
-            'DELETE FROM payments WHERE school_id = ?',
-            'DELETE FROM tickets WHERE school_id = ?',
-            'DELETE FROM announcements WHERE school_id = ?',
-            'DELETE FROM notifications WHERE school_id = ?',
-            'DELETE FROM archives WHERE school_id = ?',
-            'DELETE FROM report_templates WHERE school_id = ?',
-            'DELETE FROM expenses WHERE school_id = ?',
-            'DELETE FROM saas_subscriptions WHERE school_id = ?',
-            'DELETE FROM pending_subjects WHERE school_id = ?',
-            'DELETE FROM tuition_fees WHERE school_id = ?',
-            'DELETE FROM school_installment_deadlines WHERE school_id = ?',
-            'DELETE FROM school_subjects WHERE school_id = ?',
-            'DELETE FROM schedules WHERE school_id = ?',
-            'DELETE FROM evaluation_schedules WHERE school_id = ?',
-            'DELETE FROM students WHERE school_id = ?',
-            'DELETE FROM bus_routes WHERE school_id = ?',
-            'DELETE FROM classes WHERE school_id = ?',
-            'DELETE FROM grading_scales WHERE school_id = ?',
-            'DELETE FROM subjects WHERE school_id = ?',
-            'DELETE FROM users WHERE school_id = ?',
-            'DELETE FROM schools WHERE id = ?'
-        ];
+    db.pragma('foreign_keys = OFF');
+    try {
+        const transaction = db.transaction(() => {
+            const queries = [
+                // Leaf tables
+                'DELETE FROM grades WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM grades WHERE subject_id IN (SELECT id FROM subjects WHERE school_id = ?)',
+                'DELETE FROM class_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM class_subjects WHERE subject_id IN (SELECT id FROM subjects WHERE school_id = ?)',
+                'DELETE FROM class_teacher_subjects WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM class_teacher_subjects WHERE subject_id IN (SELECT id FROM subjects WHERE school_id = ?)',
+                'DELETE FROM grade_overrides WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM class_subject_validation WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM class_installment_fees WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)',
+                'DELETE FROM transport_attendance WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
+                'DELETE FROM transport_logs WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
+                'DELETE FROM transport_points WHERE route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)',
+                'DELETE FROM mobile_access_keys WHERE assigned_to_user_id IN (SELECT id FROM users WHERE school_id = ?)',
+                'DELETE FROM grading_scale_options WHERE scale_id IN (SELECT id FROM grading_scales WHERE school_id = ?)',
+                
+                // Direct dependents
+                'DELETE FROM attendance WHERE school_id = ?',
+                'DELETE FROM payments WHERE school_id = ?',
+                'DELETE FROM tickets WHERE school_id = ?',
+                'DELETE FROM announcements WHERE school_id = ?',
+                'DELETE FROM notifications WHERE school_id = ?',
+                'DELETE FROM archives WHERE school_id = ?',
+                'DELETE FROM report_templates WHERE school_id = ?',
+                'DELETE FROM expenses WHERE school_id = ?',
+                'DELETE FROM saas_subscriptions WHERE school_id = ?',
+                'DELETE FROM pending_subjects WHERE school_id = ?',
+                'DELETE FROM tuition_fees WHERE school_id = ?',
+                'DELETE FROM school_installment_deadlines WHERE school_id = ?',
+                'DELETE FROM school_subjects WHERE school_id = ?',
+                'DELETE FROM school_subjects WHERE subject_id IN (SELECT id FROM subjects WHERE school_id = ?)',
+                'DELETE FROM schedules WHERE school_id = ?',
+                'DELETE FROM evaluation_schedules WHERE school_id = ?',
+                
+                // Entities
+                'DELETE FROM students WHERE school_id = ?',
+                'DELETE FROM bus_routes WHERE school_id = ?',
+                'DELETE FROM classes WHERE school_id = ?',
+                'DELETE FROM grading_scales WHERE school_id = ?',
+                'DELETE FROM subjects WHERE school_id = ?',
+                'DELETE FROM users WHERE school_id = ?',
+                'DELETE FROM schools WHERE id = ?'
+            ];
 
-        for (const q of queries) {
-            try {
-                db.prepare(q).run(id);
-            } catch (err) {
-                console.error(`Failed to execute: ${q}`, err);
+            for (const q of queries) {
+                try {
+                    db.prepare(q).run(id);
+                } catch (err) {
+                    // Ignore missing tables or minor errors
+                }
             }
-        }
-    });
-    transaction();
+        });
+        transaction();
+    } finally {
+        db.pragma('foreign_keys = ON');
+    }
 };
 
 handlers['db:permanentlyDeleteSchool'] = async ({ id, password }) => {
