@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
-import { generateRegistrationSheet } from '../utils/reports';
+import { generateRegistrationSheet, generateStudentsListReport } from '../utils/reports';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -127,10 +127,11 @@ const Students: React.FC = () => {
             </select>
         </div>
 
-        <button className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
-            <Filter className="w-4 h-4" />
-        </button>
-        <button className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
+        <button 
+            onClick={() => generateStudentsListReport({ students: filteredStudents, classes, school: user?.school })}
+            className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white"
+            title={t('download_list', 'Télécharger la liste')}
+        >
             <Download className="w-4 h-4" />
         </button>
       </div>

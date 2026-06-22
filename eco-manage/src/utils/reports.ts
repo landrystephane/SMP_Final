@@ -1338,3 +1338,60 @@ export const generateExamSchedulePdf = (data: any) => {
     const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
     doc.save(`${safeTitle}.pdf`);
 };
+
+export const generateStudentsListReport = (data: { students: any[], classes: any[], school?: any, title?: string }) => {
+    const { students, classes, school, title } = data;
+    const doc = new jsPDF();
+    const isEn = i18n.language?.startsWith('en') ?? false;
+    const primary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+    
+    let yPos = 20;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(school?.name?.toUpperCase() || 'ECO-MANAGE', 105, yPos, { align: 'center' });
+    yPos += 10;
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    const reportTitle = title || (isEn ? "STUDENTS LIST" : "LISTE DES ÉLÈVES");
+    doc.text(reportTitle.toUpperCase(), 105, yPos, { align: 'center' });
+    yPos += 15;
+
+    const headers = isEn 
+        ? [['REG. NUMBER', 'FULL NAME', 'GENDER', 'CLASS', 'SECTION']]
+        : [['MATRICULE', 'NOM ET PRÉNOM', 'GENRE', 'CLASSE', 'SECTION']];
+
+    const rows = students.map(s => {
+        const classObj = classes.find(c => c.id === s.class_id);
+        return [
+            s.matricule,
+            `${s.last_name} ${s.first_name}`.trim(),
+            s.gender,
+            classObj ? classObj.name : 'N/A',
+            s.section
+        ];
+    });
+
+    (doc as any).autoTable({
+        head: headers,
+        body: rows,
+        startY: yPos,
+        theme: 'striped',
+        headStyles: {
+            fillColor: primary,
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        bodyStyles: {
+            textColor: [51, 65, 85],
+            fontSize: 9
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        }
+    });
+
+    const safeTitle = reportTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    doc.save(`${safeTitle}.pdf`);
+};
