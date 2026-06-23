@@ -251,12 +251,13 @@ const permanentlyDeleteSchool = (id) => {
                 'DELETE FROM school_subjects WHERE subject_id IN (SELECT id FROM subjects WHERE school_id = ?)',
                 'DELETE FROM schedules WHERE school_id = ?',
                 'DELETE FROM evaluation_schedules WHERE school_id = ?',
+                'DELETE FROM grading_scales WHERE school_id = ?',
+                'DELETE FROM grading_scale_options WHERE scale_id IN (SELECT id FROM grading_scales WHERE school_id = ?)',
                 
                 // Entities
                 'DELETE FROM students WHERE school_id = ?',
                 'DELETE FROM bus_routes WHERE school_id = ?',
                 'DELETE FROM classes WHERE school_id = ?',
-                'DELETE FROM grading_scales WHERE school_id = ?',
                 'DELETE FROM subjects WHERE school_id = ?',
                 'DELETE FROM users WHERE school_id = ?',
                 'DELETE FROM schools WHERE id = ?'
@@ -266,7 +267,10 @@ const permanentlyDeleteSchool = (id) => {
                 try {
                     db.prepare(q).run(id);
                 } catch (err) {
-                    // Ignore missing tables or minor errors
+                    if (!err.message.includes('no such table') && !err.message.includes('no such column')) {
+                        console.error('Error executing deletion query:', q, err.message);
+                        throw err;
+                    }
                 }
             }
         });
