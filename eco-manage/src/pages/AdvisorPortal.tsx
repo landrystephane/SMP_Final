@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X } from 'lucide-react';
+import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
@@ -25,11 +25,14 @@ const AdvisorPortal: React.FC = () => {
     const [selectedRoute, setSelectedRoute] = useState<string>('');
 
     // Evaluation Validation states
+    const [selectedCycle, setSelectedCycle] = useState<string>('ALL');
+    const [selectedSection, setSelectedSection] = useState<string>('ALL');
     const [selectedClass, setSelectedClass] = useState<string>('');
     const [selectedTerm, setSelectedTerm] = useState<number | ''>('');
-    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedSequence, setSelectedSequence] = useState<string>('');
+    const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<string>('ALL');
 
-    const monthLabel = termStructure.flatMap(t => t.sequences).find(s => s?.id?.toString() === selectedMonth)?.name || selectedMonth;
+    const monthLabel = termStructure.flatMap(t => t.sequences).find(s => s?.id?.toString() === selectedSequence)?.name || selectedSequence;
     const [subjectStatuses, setSubjectStatuses] = useState<any[]>([]);
     const [selectedSubjectForDetail, setSelectedSubjectForDetail] = useState<any>(null);
     const [detailGrades, setDetailGrades] = useState<any[]>([]);
@@ -39,6 +42,7 @@ const AdvisorPortal: React.FC = () => {
     const [schedules, setSchedules] = useState<any[]>([]);
     const [teachers, setTeachers] = useState<any[]>([]);
     const [classSubjects, setClassSubjects] = useState<any[]>([]);
+    const [teacherAssignments, setTeacherAssignments] = useState<Record<number, number>>({});
 
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<any>(null);
@@ -78,7 +82,7 @@ const AdvisorPortal: React.FC = () => {
                     if (ts.length > 0) {
                         setSelectedTerm(ts[0].term_id);
                         if (ts[0].sequences && ts[0].sequences.length > 0) {
-                            setSelectedMonth(ts[0].sequences[0].id.toString());
+                            setSelectedSequence(ts[0].sequences[0].id.toString());
                         }
                     }
                 } catch(e) {
@@ -95,7 +99,7 @@ const AdvisorPortal: React.FC = () => {
             const data = await window.electronAPI.getClassSubjectsValidationStatus({
                 classId: parseInt(selectedClass),
                 term: selectedTerm,
-                month: selectedMonth
+                month: selectedSequence
             });
             setSubjectStatuses(data);
         }
@@ -139,13 +143,32 @@ const AdvisorPortal: React.FC = () => {
             loadValidationStatuses();
             loadSchedules();
             loadClassSubjects();
+            loadTeacherAssignments();
         }
-    }, [selectedClass, selectedTerm, selectedMonth]);
+    }, [selectedClass, selectedTerm, selectedSequence]);
+
+    const loadTeacherAssignments = async () => {
+        if (window.electronAPI && selectedClass) {
+            try {
+                const assignments = await (window.electronAPI as any).getClassTeacherAssignments(parseInt(selectedClass));
+                const initialAssignments: Record<number, number> = {};
+                if (assignments && Array.isArray(assignments)) {
+                    assignments.forEach((a: any) => {
+                        initialAssignments[a.subject_id] = a.teacher_id;
+                    });
+                }
+                setTeacherAssignments(initialAssignments);
+            } catch (e) {
+                console.error("Failed to load teacher assignments", e);
+            }
+        }
+    };
 
     const classObj = classes.find(c => c.id.toString() === selectedClass);
     const availableTeachers = teachers.filter(t => {
         if (classObj?.main_teacher_id === t.id) return true;
         if (classObj?.assistant_teacher_id === t.id) return true;
+        if (Object.values(teacherAssignments).includes(t.id)) return true;
         try {
             const assigned = JSON.parse(t.assigned_classes || '[]');
             if (assigned.includes(classObj?.id?.toString()) || assigned.includes(Number(classObj?.id))) return true;
@@ -167,8 +190,15 @@ const AdvisorPortal: React.FC = () => {
             setSchedDay(day);
             setSchedStart(start);
             setSchedEnd(end);
-            setSchedSubject(classSubjects[0]?.id?.toString() || '');
-            setSchedTeacher(availableTeachers[0]?.id?.toString() || '');
+            
+            const defaultSubject = classSubjects[0]?.id?.toString() || '';
+            setSchedSubject(defaultSubject);
+            
+            const assignedTeacher = defaultSubject && teacherAssignments[parseInt(defaultSubject)] 
+                ? teacherAssignments[parseInt(defaultSubject)].toString() 
+                : '';
+            setSchedTeacher(assignedTeacher);
+            
             setSchedType('COURSE');
         }
         setShowScheduleModal(true);
@@ -248,9 +278,11 @@ const AdvisorPortal: React.FC = () => {
             const teacherObj = teachers.find(t => t.id.toString() === examTeacher);
             const subjObj = getSubjectName(parseInt(examSubject));
             await window.electronAPI.createNotification({
-                role: 'TEACHER',
+                user_id: teacherObj?.id, // Send only to this teacher
                 message: `Vous êtes programmé(e) pour surveiller l'évaluation de ${subjObj} le ${examDate} de ${examStart} à ${examEnd}.`,
                 type: 'ACTION_REQUIRED',
+                request_type: 'EXAM_SURVEILLANCE_REQUEST',
+                request_data: JSON.stringify({ exam_id: res.id }),
                 school_id: user?.schoolId
             });
 
@@ -289,7 +321,7 @@ const AdvisorPortal: React.FC = () => {
         const allGrades = await window.electronAPI.getGrades({
             classId: parseInt(selectedClass),
             term: selectedTerm,
-            month: selectedMonth
+            month: selectedSequence
         });
         
         // Filter grades for this subject
@@ -319,7 +351,7 @@ const AdvisorPortal: React.FC = () => {
                 classId: parseInt(selectedClass),
                 subjectId: subjId,
                 term: selectedTerm,
-                month: selectedMonth
+                month: selectedSequence
             });
             
             await window.electronAPI.createNotification({
@@ -367,8 +399,7 @@ const AdvisorPortal: React.FC = () => {
         { key: 3, label: t('wednesday', 'Mercredi') },
         { key: 4, label: t('thursday', 'Jeudi') },
         { key: 5, label: t('friday', 'Vendredi') },
-        { key: 6, label: t('saturday', 'Samedi') },
-        { key: 7, label: t('sunday', 'Dimanche') }
+        { key: 6, label: t('saturday', 'Samedi') }
     ];
 
     const [timetableSlots, setTimetableSlots] = useState<any[]>([
@@ -397,22 +428,50 @@ const AdvisorPortal: React.FC = () => {
             <div className="glass-card p-6 flex flex-wrap gap-4 items-center justify-between bg-slate-900/40 border-slate-800">
                 <div className="flex flex-wrap gap-4 items-center">
                     <div>
-                        <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('class_label', 'Classe')}</label>
+                        <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('cycle', 'Cycle')}</label>
+                        <select
+                            value={selectedCycle}
+                            onChange={(e) => { setSelectedCycle(e.target.value); setSelectedClass(''); }}
+                            className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
+                        >
+                            <option value="ALL">TOUS</option>
+                            <option value="PRIMAIRE">PRIMAIRE</option>
+                            <option value="MATERNELLE">MATERNELLE</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('section', 'Section')}</label>
+                        <select
+                            value={selectedSection}
+                            onChange={(e) => { setSelectedSection(e.target.value); setSelectedClass(''); }}
+                            className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
+                        >
+                            <option value="ALL">TOUTES</option>
+                            <option value="FRANCOPHONE">FRANCOPHONE</option>
+                            <option value="ANGLOPHONE">ANGLOPHONE</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('class_label', 'Classes')}</label>
                         <select
                             value={selectedClass}
                             onChange={(e) => setSelectedClass(e.target.value)}
-                            className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-44"
+                            className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-44 disabled:opacity-30"
                         >
                             <option value="">{t('choose_class', 'Choisir une classe')}</option>
-                            {classes.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({t(`section_${c.section?.toLowerCase()}`)})</option>
+                            {classes
+                                .filter(c => (selectedSection === 'ALL' || c.section === selectedSection) && (selectedCycle === 'ALL' || c.level === selectedCycle))
+                                .map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
                     </div>
 
                     {(activeTab === 'PLANNING' || activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
                         <div>
-                            <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('term', 'Trimestre')}</label>
+                            <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('term', 'Évaluation Globale')}</label>
                             <select
                                 value={selectedTerm}
                                 onChange={(e) => {
@@ -420,9 +479,9 @@ const AdvisorPortal: React.FC = () => {
                                     setSelectedTerm(newTerm);
                                     const termObj = termStructure.find(t => t.term_id === newTerm);
                                     if (termObj && termObj.sequences && termObj.sequences.length > 0) {
-                                        setSelectedMonth(termObj.sequences[0].id.toString());
+                                        setSelectedSequence(termObj.sequences[0].id.toString());
                                     } else {
-                                        setSelectedMonth('');
+                                        setSelectedSequence('');
                                     }
                                 }}
                                 className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-32"
@@ -438,10 +497,10 @@ const AdvisorPortal: React.FC = () => {
                     {(activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
                         <>
                             <div>
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('evaluation_month', 'Mois d\'Évaluation')}</label>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('evaluation_month', 'Séquence')}</label>
                                 <select
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    value={selectedSequence}
+                                    onChange={(e) => setSelectedSequence(e.target.value)}
                                     className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-40"
                                 >
                                     {termStructure.find(t => t.term_id === selectedTerm)?.sequences?.length ? (
@@ -453,6 +512,31 @@ const AdvisorPortal: React.FC = () => {
                                     )}
                                 </select>
                             </div>
+
+                            {activeTab === 'EXAMS_PROGRAM' && (
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Mois</label>
+                                    <select
+                                        value={selectedCalendarMonth}
+                                        onChange={(e) => setSelectedCalendarMonth(e.target.value)}
+                                        className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
+                                    >
+                                        <option value="ALL">TOUS LES MOIS</option>
+                                        <option value="01">Janvier</option>
+                                        <option value="02">Février</option>
+                                        <option value="03">Mars</option>
+                                        <option value="04">Avril</option>
+                                        <option value="05">Mai</option>
+                                        <option value="06">Juin</option>
+                                        <option value="07">Juillet</option>
+                                        <option value="08">Août</option>
+                                        <option value="09">Septembre</option>
+                                        <option value="10">Octobre</option>
+                                        <option value="11">Novembre</option>
+                                        <option value="12">Décembre</option>
+                                    </select>
+                                </div>
+                            )}
                             
                             {user?.role !== 'ADVISOR' && (
                                 <div className="flex flex-col justify-end h-full">
@@ -494,9 +578,9 @@ const AdvisorPortal: React.FC = () => {
                                                 return;
                                             }
                                             const classObj = classes.find(c => c.id.toString() === selectedClass);
-                                            const columns = [t('hour', 'Heure'), t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi'), t('saturday', 'Samedi'), t('sunday', 'Dimanche')];
+                                            const columns = [t('hour', 'Heure'), t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi'), t('saturday', 'Samedi')];
                                             const rows: any[] = [];
-                                            const allSlots: any[] = [];
+                                            const allSlots: any[] = [...timetableSlots];
                                             schedules.forEach(s => {
                                                 if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
                                                     allSlots.push({
@@ -511,26 +595,36 @@ const AdvisorPortal: React.FC = () => {
                                             
                                             allSlots.forEach(slot => {
                                                 const rowData = [slot.label];
-                                                [1, 2, 3, 4, 5, 6, 7].forEach(day => {
-                                                    const sData = getScheduleForSlot(day, slot.start);
-                                                    if (sData) {
-                                                        if (sData.type === 'PAUSE') {
-                                                            rowData.push('PAUSE');
+                                                if (slot.isBreak) {
+                                                    [1, 2, 3, 4, 5, 6].forEach(() => rowData.push('PAUSE'));
+                                                } else {
+                                                    [1, 2, 3, 4, 5, 6].forEach(day => {
+                                                        const sData = getScheduleForSlot(day, slot.start);
+                                                        if (sData) {
+                                                            if (sData.type === 'PAUSE') {
+                                                                rowData.push('PAUSE');
+                                                            } else {
+                                                                const subjectName = getSubjectName(sData.subject_id);
+                                                                const teacherName = getTeacherName(sData.teacher_id);
+                                                                rowData.push(`${subjectName}\n${teacherName}`);
+                                                            }
                                                         } else {
-                                                            const subjectName = getSubjectName(sData.subject_id);
-                                                            const teacherName = getTeacherName(sData.teacher_id);
-                                                            rowData.push(`${subjectName}\n${teacherName}`);
+                                                            rowData.push('-');
                                                         }
-                                                    } else {
-                                                        rowData.push('-');
-                                                    }
-                                                });
+                                                    });
+                                                }
                                                 rows.push(rowData);
                                             });
                                             
+                                            const curr = new Date();
+                                            const firstDay = curr.getDate() - curr.getDay() + 1; // Lundi
+                                            const monday = new Date(curr.setDate(firstDay)).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                            const saturday = new Date(curr.setDate(firstDay + 5)).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
                                             generateSchedulePdf({
                                                 school: { name: user?.schoolName || 'ECO-MANAGE' }, 
-                                                title: `Emploi du Temps - ${classObj?.name}`,
+                                                title: `Programme des cours du Lundi ${monday} au Samedi ${saturday}`,
+                                                subtitle: `Emploi du Temps - Classe : ${classObj?.name}`,
                                                 columns,
                                                 rows
                                             });
@@ -560,8 +654,8 @@ const AdvisorPortal: React.FC = () => {
                                 </div>
                             ) : (
                                 (() => {
-                                    // Generate slots PURELY from schedules
-                                    const allSlots: any[] = [];
+                                    // Generate slots PURELY from schedules mixed with configured slots
+                                    const allSlots: any[] = [...timetableSlots];
                                     schedules.forEach(s => {
                                         if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
                                             allSlots.push({
@@ -595,7 +689,7 @@ const AdvisorPortal: React.FC = () => {
                                     }
 
                                     return (
-                                <div className="grid grid-cols-8 gap-3">
+                                <div className="grid grid-cols-7 gap-3">
                                     {/* Header */}
                                     <div className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{t('hour', 'Heure')}</div>
                                     {DAYS_OF_WEEK.map(d => (
@@ -606,13 +700,21 @@ const AdvisorPortal: React.FC = () => {
                                     {allSlots.map((slot, index) => (
                                         <React.Fragment key={`${slot.label}-${index}`}>
                                             {/* Time slot column */}
-                                            <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex items-center justify-center border border-slate-800">
-                                                {slot.label}
+                                            <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex flex-col items-center justify-center border border-slate-800 gap-1">
+                                                {slot.label && slot.label !== 'Nouveau' && slot.label !== `${slot.start} - ${slot.end}` && (
+                                                    <span className="text-amber-500/70">{slot.label}</span>
+                                                )}
+                                                <span>{slot.start} - {slot.end}</span>
                                             </div>
 
                                             {/* Days columns */}
-                                            {DAYS_OF_WEEK.map(day => {
-                                                const sData = getScheduleForSlot(day.key, slot.start);
+                                            {slot.isBreak ? (
+                                                <div className="col-span-6 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                </div>
+                                            ) : (
+                                                DAYS_OF_WEEK.map(day => {
+                                                    const sData = getScheduleForSlot(day.key, slot.start);
                                                 
                                                 if (sData) {
                                                     const typeColor = sData.type === 'EVALUATION' 
@@ -661,7 +763,8 @@ const AdvisorPortal: React.FC = () => {
                                                         <span className="hidden group-hover:block opacity-100">+ PROG.</span>
                                                     </button>
                                                 );
-                                            })}
+                                            })
+                                            )}
                                         </React.Fragment>
                                     ))}
                                 </div>
@@ -782,7 +885,11 @@ const AdvisorPortal: React.FC = () => {
                                             }
                                             const classObj = classes.find(c => c.id.toString() === selectedClass);
                                             const columns = ['Date', 'Horaires', 'Matière', 'Enseignant/Surveillant'];
-                                            const rows = examSchedules.map(exam => {
+                                            const filteredForPdf = examSchedules.filter(exam => {
+                                                if (selectedCalendarMonth === 'ALL') return true;
+                                                return exam.date.split('-')[1] === selectedCalendarMonth;
+                                            });
+                                            const rows = filteredForPdf.map(exam => {
                                                 const subjectName = getSubjectName(parseInt(exam.subject_id));
                                                 const teacherName = getTeacherName(parseInt(exam.teacher_id));
                                                 return [exam.date, `${exam.start_time} - ${exam.end_time}`, subjectName, teacherName];
@@ -840,7 +947,7 @@ const AdvisorPortal: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5 bg-slate-900/30">
-                                            {examSchedules.map(exam => (
+                                            {examSchedules.filter(exam => selectedCalendarMonth === 'ALL' || exam.date.split('-')[1] === selectedCalendarMonth).map(exam => (
                                                 <tr key={exam.id} className="hover:bg-white/5 transition-colors">
                                                     <td className="px-6 py-4 text-white font-black text-sm">{exam.date}</td>
                                                     <td className="px-6 py-4 text-slate-400 text-sm font-bold">{exam.start_time} - {exam.end_time}</td>
@@ -868,7 +975,7 @@ const AdvisorPortal: React.FC = () => {
             {/* Grades Inspection Slide-over Drawer / Modal */}
             {showDetailModal && selectedSubjectForDetail && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh] shadow-2xl animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
@@ -925,7 +1032,7 @@ const AdvisorPortal: React.FC = () => {
             {/* Course Programming Modal */}
             {showScheduleModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh] shadow-2xl animate-in zoom-in-95 duration-200 text-left">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
@@ -988,7 +1095,15 @@ const AdvisorPortal: React.FC = () => {
                                         <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
                                         <select
                                             value={schedSubject}
-                                            onChange={(e) => setSchedSubject(e.target.value)}
+                                            onChange={(e) => {
+                                                const newSubjId = e.target.value;
+                                                setSchedSubject(newSubjId);
+                                                if (newSubjId && teacherAssignments[parseInt(newSubjId)]) {
+                                                    setSchedTeacher(teacherAssignments[parseInt(newSubjId)].toString());
+                                                } else {
+                                                    setSchedTeacher(''); // Clear teacher or fallback to empty
+                                                }
+                                            }}
                                             className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                         >
                                             <option value="">Sélectionner une matière</option>
@@ -1006,7 +1121,7 @@ const AdvisorPortal: React.FC = () => {
                                             className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                         >
                                             <option value="">Sélectionner un enseignant</option>
-                                            {availableTeachers.map(t => (
+                                            {availableTeachers.filter(t => !schedSubject || teacherAssignments[parseInt(schedSubject)] === t.id).map(t => (
                                                 <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                             ))}
                                         </select>
@@ -1063,7 +1178,7 @@ const AdvisorPortal: React.FC = () => {
             {/* Exam Programming Modal */}
             {showExamModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+                    <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh] shadow-2xl animate-in zoom-in-95 duration-200 text-left">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>

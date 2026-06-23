@@ -55,13 +55,15 @@ handlers['auth:restoreSession'] = async (user) => {
 };
 
 handlers['auth:login'] = async ({ username, password }) => {
-  const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(matricule) = LOWER(?)').get(username, username);
+  const normalizedUsername = username.replace(/\\s+/g, '');
+  const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(matricule) = LOWER(?) OR LOWER(username) = LOWER(?)').get(username, username, normalizedUsername);
   
   if (!user) return null;
   user.full_name = user.fullName;
 
-  // Block login if school is deleted or suspended
-  if (user.role !== 'SUPERADMIN') {
+  // Block login if school is deleted or suspended (skip for SUPERADMIN and PARENT)
+  // Parents are global and can have children in multiple schools, we handle their access per-child
+  if (user.role !== 'SUPERADMIN' && user.role !== 'PARENT') {
       const school = db.prepare('SELECT deleted_at, is_active FROM schools WHERE id = ?').get(user.schoolId);
       if (school) {
           if (school.deleted_at !== null) {
@@ -76,8 +78,13 @@ handlers['auth:login'] = async ({ username, password }) => {
   // Fallback for existing SHA256 passwords
   let isValid = false;
   if (user.hash.length === 64 && !user.hash.startsWith('$2a$')) {
-      const oldHash = crypto.createHash('sha256').update(password).digest('hex');
+      let oldHash = crypto.createHash('sha256').update(password).digest('hex');
       isValid = (oldHash === user.hash);
+      if (!isValid && user.role === 'PARENT') {
+          const normalizedPassword = password.replace(/\\s+/g, '');
+          oldHash = crypto.createHash('sha256').update(normalizedPassword).digest('hex');
+          isValid = (oldHash === user.hash);
+      }
       // Auto-migrate to bcrypt
       if (isValid) {
           const newHash = bcrypt.hashSync(password, 10);
@@ -85,6 +92,10 @@ handlers['auth:login'] = async ({ username, password }) => {
       }
   } else {
       isValid = bcrypt.compareSync(password, user.hash);
+      if (!isValid && user.role === 'PARENT') {
+          const normalizedPassword = password.replace(/\\s+/g, '');
+          isValid = bcrypt.compareSync(normalizedPassword, user.hash);
+      }
   }
 
   if (isValid) {
@@ -302,7 +313,7 @@ handlers['db:getStudents'] = async (schoolId) => {
            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
     FROM students s
     LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
-    WHERE s.school_id = ?
+    WHERE s.school_id = ? AND s.status != 'DELETED'
     ORDER BY s.last_name ASC, s.first_name ASC
   `).all(sid);
 };
@@ -330,9 +341,11 @@ handlers['db:addStudent'] = async (student) => {
   let orderNumber = 1;
   
   const transaction = db.transaction(() => {
-    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(order_number), 0) as max_order FROM students WHERE class_id = ?").get(parsedClassId);
+    const cleanClassCode = classCode.replace(/\d+$/, '');
+    const prefix = `${yearShort}${cleanClassCode}`;
+    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(CAST(SUBSTR(matricule, -4) AS INTEGER)), 0) as max_order FROM students WHERE matricule LIKE ?").get(`${prefix}%`);
     orderNumber = maxOrderRow.max_order + 1;
-    matricule = `${yearShort}${classCode}${orderNumber.toString().padStart(4, '0')}`;
+    matricule = `${prefix}${orderNumber.toString().padStart(4, '0')}`;
 
     db.prepare(`
       INSERT INTO students (matricule, registration_year, order_number, first_name, last_name, birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact, medical_info, address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire, bus_route_id)
@@ -676,7 +689,9 @@ handlers['db:getInstallmentDeadlines'] = async (schoolId) => {
     return db.prepare('SELECT * FROM school_installment_deadlines WHERE school_id = ?').all(sid);
 };
 
-handlers['db:saveInstallmentDeadlines'] = async ({ schoolId, deadlines }) => {
+handlers['db:saveInstallmentDeadlines'] = async (arg1, arg2) => {
+    const schoolId = arg2 !== undefined ? arg1 : arg1.schoolId;
+    const deadlines = arg2 !== undefined ? arg2 : arg1.deadlines;
     const sid = getActiveSchoolId(schoolId);
     const stmt = db.prepare(`
         INSERT INTO school_installment_deadlines (school_id, installment_id, deadline_date)
@@ -947,9 +962,17 @@ handlers['db:getClasses'] = async (schoolId) => {
 };
 
 handlers['db:addClass'] = async (classData) => {
-    const { name, code, section, level, mainTeacherId, assistantTeacherId, schoolId, baseClassId } = classData;
+    let { name, code } = classData;
+    const { section, level, mainTeacherId, assistantTeacherId, schoolId, baseClassId } = classData;
     const sid = getActiveSchoolId(schoolId);
     
+    // Append current year to code if not present
+    const currentYear = new Date().getFullYear().toString().slice(-2);
+    if (!code.endsWith(currentYear)) {
+        const baseCode = code.replace(/\\d+$/, '');
+        code = baseCode + currentYear;
+    }
+
     let newClassId;
     db.transaction(() => {
         const info = db.prepare(`
@@ -1097,12 +1120,44 @@ handlers['db:getSchedules'] = async (schoolId) => {
 handlers['db:updateSchedule'] = async (schedule) => {
     const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id } = schedule;
     const sid = getActiveSchoolId(school_id);
+
+    // Check class conflict
+    if (type !== 'PAUSE') {
+        const classConflictQuery = id
+            ? `SELECT s.start_time, s.end_time FROM schedules s WHERE s.class_id = ? AND s.day_of_week = ? AND s.start_time < ? AND ? < s.end_time AND s.id != ? AND s.type != 'PAUSE'`
+            : `SELECT s.start_time, s.end_time FROM schedules s WHERE s.class_id = ? AND s.day_of_week = ? AND s.start_time < ? AND ? < s.end_time AND s.type != 'PAUSE'`;
+        
+        const classConflictParams = id
+            ? [class_id, day_of_week, end_time, start_time, id]
+            : [class_id, day_of_week, end_time, start_time];
+            
+        const classConflict = db.prepare(classConflictQuery).get(...classConflictParams);
+        if (classConflict) {
+            throw new Error(`Conflit d'horaire : La classe a déjà un cours programmé entre ${classConflict.start_time} et ${classConflict.end_time}.`);
+        }
+    }
+
+    // Check teacher conflict
+    if (teacher_id && type !== 'PAUSE') {
+        const teacherConflictQuery = id 
+            ? `SELECT c.name as class_name, s.start_time, s.end_time FROM schedules s JOIN classes c ON s.class_id = c.id WHERE s.teacher_id = ? AND s.day_of_week = ? AND s.start_time < ? AND ? < s.end_time AND s.id != ? AND s.type != 'PAUSE'`
+            : `SELECT c.name as class_name, s.start_time, s.end_time FROM schedules s JOIN classes c ON s.class_id = c.id WHERE s.teacher_id = ? AND s.day_of_week = ? AND s.start_time < ? AND ? < s.end_time AND s.type != 'PAUSE'`;
+            
+        const teacherConflictParams = id 
+            ? [teacher_id, day_of_week, end_time, start_time, id]
+            : [teacher_id, day_of_week, end_time, start_time];
+            
+        const teacherConflict = db.prepare(teacherConflictQuery).get(...teacherConflictParams);
+        if (teacherConflict) {
+            throw new Error(`Conflit d'horaire : Cet enseignant est déjà programmé en classe de ${teacherConflict.class_name} entre ${teacherConflict.start_time} et ${teacherConflict.end_time}.`);
+        }
+    }
+
     if (id) {
         return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, id);
     } else {
         return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, sid);
     }
-
 };
 
 handlers['db:deleteSchedule'] = async (id) => {
@@ -1117,7 +1172,8 @@ handlers['db:getEvaluationSchedules'] = async (schoolId) => {
 handlers['db:addEvaluationSchedule'] = async (schedule) => {
     const { school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time } = schedule;
     const sid = getActiveSchoolId(school_id);
-    return db.prepare(`INSERT INTO evaluation_schedules (school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(sid, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time);
+    const result = db.prepare(`INSERT INTO evaluation_schedules (school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(sid, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time);
+    return { id: result.lastInsertRowid };
 };
 
 handlers['db:deleteEvaluationSchedule'] = async (id) => {
@@ -1297,6 +1353,16 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
             recorded_by = excluded.recorded_by
     `);
     
+    // Ensure schedule 0 exists to prevent FOREIGN KEY constraint failed
+    db.prepare("INSERT OR IGNORE INTO schedules (id, school_id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type) VALUES (0, NULL, NULL, NULL, NULL, 0, '00:00', '00:00', 'DUMMY')").run();
+
+    // Ensure userId exists
+    let validUserId = null;
+    if (userId) {
+        const userExists = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+        if (userExists) validUserId = userId;
+    }
+
     const exceeders = [];
     
     const transaction = db.transaction(() => {
@@ -1304,12 +1370,14 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
             const status = r.hours > 0 ? 'ABSENT' : 'PRESENT';
             
             // Get previous total to avoid spamming (only notify when crossing the 15h threshold)
-            const prevTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
+            const prevRow = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId);
+            const prevTotal = prevRow ? prevRow.total : 0;
             
             const schedId = r.scheduleId ? parseInt(r.scheduleId) : 0;
-            upsert.run(r.studentId, r.date, status, r.hours, userId, schedId);
+            upsert.run(r.studentId, r.date, status, r.hours, validUserId, schedId);
             
-            const newTotal = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId).total;
+            const newRow = db.prepare('SELECT COALESCE(SUM(hours_absent), 0) as total FROM attendance WHERE student_id = ?').get(r.studentId);
+            const newTotal = newRow ? newRow.total : 0;
             
             if (newTotal >= 15 && prevTotal < 15) {
                 const student = db.prepare('SELECT first_name, last_name, parent_contact, school_id FROM students WHERE id = ?').get(r.studentId);
@@ -1616,17 +1684,69 @@ handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) 
 };
 
 handlers['db:createNotification'] = async (notification) => {
-  const { user_id, message, type, school_id } = notification;
+  const { user_id, message, type, school_id, request_type, request_data } = notification;
   const sid = getActiveSchoolId(school_id);
 
   if (user_id) {
-      return db.prepare('INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, ?)')
-        .run(sid, user_id, message, type || 'INFO');
+      return db.prepare('INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(sid, user_id, message, type || 'INFO', request_type || null, request_data || null);
   } else {
       // If no user_id, it's a global/admin notification
-      return db.prepare('INSERT INTO notifications (school_id, message, type) VALUES (?, ?, ?)')
-        .run(sid, message, type || 'INFO');
+      return db.prepare('INSERT INTO notifications (school_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?)')
+        .run(sid, message, type || 'INFO', request_type || null, request_data || null);
   }
+};
+
+handlers['db:respondExamSurveillance'] = async ({ notificationId, examId, status, rejectionReason, schoolId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    
+    // Update the exam schedule
+    db.prepare('UPDATE evaluation_schedules SET status = ?, rejection_reason = ? WHERE id = ?').run(status, rejectionReason || null, examId);
+    
+    // Delete the original ACTION_REQUIRED notification sent to the teacher
+    db.prepare('DELETE FROM notifications WHERE id = ?').run(notificationId);
+
+    const exam = db.prepare('SELECT e.*, u.full_name as teacher_name FROM evaluation_schedules e JOIN users u ON e.teacher_id = u.id WHERE e.id = ?').get(examId);
+
+    if (status === 'PENDING_ADMIN') {
+        // Send notification to Admin/Advisor
+        const requestData = JSON.stringify({
+            exam_id: examId,
+            teacher_name: exam.teacher_name,
+            reason: rejectionReason
+        });
+        db.prepare('INSERT INTO notifications (school_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?)')
+            .run(sid, `L'enseignant ${exam.teacher_name} a refusé de surveiller l'évaluation du ${exam.date}. Motif : ${rejectionReason}`, 'ACTION_REQUIRED', 'EXAM_SURVEILLANCE_REFUSAL', requestData);
+    } else if (status === 'APPROVED') {
+        // Inform administration that it was accepted
+        db.prepare('INSERT INTO notifications (school_id, message, type) VALUES (?, ?, ?)')
+            .run(sid, `L'enseignant ${exam.teacher_name} a accepté la surveillance de l'évaluation du ${exam.date}.`, 'INFO');
+    }
+    return { success: true };
+};
+
+handlers['db:adminResolveExamRefusal'] = async ({ notificationId, examId, adminAction, schoolId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    
+    // adminAction can be 'ACCEPT_REFUSAL' or 'FORCE_ASSIGNMENT'
+    const newStatus = adminAction === 'ACCEPT_REFUSAL' ? 'REJECTED' : 'FORCED_APPROVED';
+    
+    db.prepare('UPDATE evaluation_schedules SET status = ? WHERE id = ?').run(newStatus, examId);
+    
+    // Mark admin notification as read or delete it
+    db.prepare('DELETE FROM notifications WHERE id = ?').run(notificationId);
+    
+    // Notify the teacher about the admin's decision
+    const exam = db.prepare('SELECT teacher_id, date FROM evaluation_schedules WHERE id = ?').get(examId);
+    if (exam && exam.teacher_id) {
+        const msg = adminAction === 'ACCEPT_REFUSAL' 
+            ? `Votre refus de surveiller l'évaluation du ${exam.date} a été accepté. Vous avez été remplacé.`
+            : `L'administration a refusé votre motif pour l'évaluation du ${exam.date}. Votre surveillance est maintenue.`;
+        db.prepare('INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, ?)')
+            .run(sid, exam.teacher_id, msg, 'INFO');
+    }
+
+    return { success: true };
 };
 
 handlers['db:sendParentAnnouncement'] = async ({ sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class, target_student_id }) => {
@@ -1729,7 +1849,7 @@ handlers['db:searchStudentsDetailed'] = async ({ name, schoolId, section, level,
         FROM students s 
         JOIN classes c ON s.class_id = c.id 
         LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
-        WHERE s.school_id = ?
+        WHERE s.school_id = ? AND s.status != 'DELETED'
     `;
     const params = [sid];
 
@@ -1753,6 +1873,15 @@ handlers['db:searchStudentsDetailed'] = async ({ name, schoolId, section, level,
     query += ` ORDER BY c.name ASC, s.last_name ASC LIMIT 50`;
     
     return db.prepare(query).all(...params);
+};
+
+handlers['db:updateStudentStatus'] = async ({ id, status }) => {
+    return db.prepare('UPDATE students SET status = ? WHERE id = ?').run(status, id);
+};
+
+handlers['db:deleteStudent'] = async (id) => {
+    // Soft delete to avoid breaking historical data (grades, attendance, etc.)
+    return db.prepare('UPDATE students SET status = ? WHERE id = ?').run('DELETED', id);
 };
 
 handlers['db:updateStudent'] = async (student) => {

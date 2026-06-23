@@ -532,7 +532,7 @@ const Users: React.FC = () => {
       {/* Edit User Modal */}
       {editingUser && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in zoom-in duration-300">
-              <div className="glass-card w-full max-w-lg bg-slate-900 border border-white/10 shadow-2xl p-0 overflow-hidden">
+              <div className="glass-card w-full max-w-lg bg-slate-900 border border-white/10 shadow-2xl p-0 overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 border-b border-white/5 bg-slate-950/50 flex justify-between items-center">
                       <div>
                         <h2 className="text-xl font-black text-white tracking-tight">{t('edit_agent_title')}</h2>

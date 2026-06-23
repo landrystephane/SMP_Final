@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStudentDetails: (id) => ipcRenderer.invoke('db:getStudentDetails', id),
   addStudent: (student) => ipcRenderer.invoke('db:addStudent', student),
   updateStudent: (student) => ipcRenderer.invoke('db:updateStudent', student),
+  updateStudentStatus: (data) => ipcRenderer.invoke('db:updateStudentStatus', data),
   deleteStudent: (id) => ipcRenderer.invoke('db:deleteStudent', id),
   assignStudentToBus: (data) => ipcRenderer.invoke('db:assignStudentToBus', data),
   getParentStudents: (parentPhone) => ipcRenderer.invoke('db:getParentStudents', parentPhone),
@@ -112,6 +113,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getEvaluationSchedules: (schoolId) => ipcRenderer.invoke('db:getEvaluationSchedules', schoolId),
   addEvaluationSchedule: (schedule) => ipcRenderer.invoke('db:addEvaluationSchedule', schedule),
   deleteEvaluationSchedule: (id) => ipcRenderer.invoke('db:deleteEvaluationSchedule', id),
+  respondExamSurveillance: (data) => ipcRenderer.invoke('db:respondExamSurveillance', data),
+  adminResolveExamRefusal: (data) => ipcRenderer.invoke('db:adminResolveExamRefusal', data),
 
   // Attendance
   saveAttendance: (data) => ipcRenderer.invoke('db:saveAttendance', data),

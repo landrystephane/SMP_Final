@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS students (
     bus_route_id INTEGER,
     scholarship_reduction REAL DEFAULT 0, -- Scholarship amount or percentage
     has_moratoire INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'BLOCKED'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),
@@ -243,6 +244,8 @@ CREATE TABLE IF NOT EXISTS evaluation_schedules (
     date DATE NOT NULL,
     start_time TEXT, -- HH:MM
     end_time TEXT,
+    status TEXT DEFAULT 'PENDING_TEACHER', -- PENDING_TEACHER, APPROVED, PENDING_ADMIN, REJECTED, FORCED_APPROVED
+    rejection_reason TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),

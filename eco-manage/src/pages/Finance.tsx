@@ -112,7 +112,8 @@ const Finance: React.FC = () => {
                     receipt_number: res.receiptNumber,
                     payment_date: new Date().toISOString(),
                     amount: amountPaid,
-                    payment_type: newPayment.type
+                    payment_type: newPayment.type,
+                    depositor_name: newPayment.depositorName
                 };
                 // @ts-ignore
                 import('../utils/reports').then(m => m.generatePaymentReceipt(paymentData, s, financials, activeSchool));
@@ -124,12 +125,14 @@ const Finance: React.FC = () => {
             
             // Notify system
             const studentInfo = students.find(s => s.id.toString() === newPayment.studentId);
-            await window.electronAPI.createNotification({
-                school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
-                role: 'FOUNDER', // or general notification
-                message: `Un paiement de ${newPayment.amount} FCFA a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (${newPayment.type}).`,
-                type: 'FINANCE'
-            });
+            try {
+                await window.electronAPI.createNotification({
+                    school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
+                    role: user?.role || 'ALL', 
+                    message: `Un paiement de ${newPayment.amount} FCFA a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (${newPayment.type}).`,
+                    type: 'FINANCE'
+                });
+            } catch(e) { console.error("Notification failed", e); }
 
             loadData();
         } catch (err: any) {
@@ -689,7 +692,7 @@ const Finance: React.FC = () => {
       {/* Modal Nouveau Paiement */}
       {isAddingPayment && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in zoom-in duration-300">
-              <div className="glass-card w-full max-w-lg max-h-[90vh] bg-slate-900 border-slate-800 shadow-2xl p-0 flex flex-col overflow-hidden">
+              <div className="glass-card w-full max-w-lg max-h-[90vh] bg-slate-900 border-slate-800 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50 flex-shrink-0">
                       <div>
                         <h2 className="text-2xl font-black text-white tracking-tight">{t('register_payment')}</h2>

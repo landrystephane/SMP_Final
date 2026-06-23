@@ -54,20 +54,53 @@ const Layout: React.FC = () => {
     return () => clearInterval(interval);
   }, [user]);
 
-  const handleResolveRequest = async (notifId: number, action: 'APPROVED' | 'REJECTED') => {
+  const handleResolveRequest = async (notifId: number, action: 'APPROVED' | 'REJECTED', n: any) => {
     if (!window.electronAPI) return;
     try {
-      const duration = durations[notifId] || 24;
-      await (window.electronAPI as any).resolveSystemRequest({
-        notificationId: notifId,
-        action,
-        durationHours: duration,
-        resolvedBy: user?.fullName || user?.username || 'Admin'
-      });
-      showNotification(
-        action === 'APPROVED' ? "Demande approuvée avec succès !" : "Demande refusée.",
-        action === 'APPROVED' ? "success" : "info"
-      );
+      if (n.request_type === 'EXAM_SURVEILLANCE_REQUEST') {
+          const reqData = JSON.parse(n.request_data || '{}');
+          if (action === 'REJECTED') {
+              const reason = window.prompt("Veuillez indiquer le motif de votre refus :");
+              if (!reason) return;
+              await (window.electronAPI as any).respondExamSurveillance({
+                  notificationId: notifId,
+                  examId: reqData.exam_id,
+                  status: 'PENDING_ADMIN',
+                  rejectionReason: reason,
+                  schoolId: user?.schoolId
+              });
+              showNotification("Refus envoyé à l'administration.", "info");
+          } else {
+              await (window.electronAPI as any).respondExamSurveillance({
+                  notificationId: notifId,
+                  examId: reqData.exam_id,
+                  status: 'APPROVED',
+                  schoolId: user?.schoolId
+              });
+              showNotification("Surveillance approuvée avec succès !", "success");
+          }
+      } else if (n.request_type === 'EXAM_SURVEILLANCE_REFUSAL') {
+          const reqData = JSON.parse(n.request_data || '{}');
+          await (window.electronAPI as any).adminResolveExamRefusal({
+              notificationId: notifId,
+              examId: reqData.exam_id,
+              adminAction: action === 'APPROVED' ? 'ACCEPT_REFUSAL' : 'FORCE_ASSIGNMENT',
+              schoolId: user?.schoolId
+          });
+          showNotification("Décision enregistrée avec succès.", "success");
+      } else {
+          const duration = durations[notifId] || 24;
+          await (window.electronAPI as any).resolveSystemRequest({
+            notificationId: notifId,
+            action,
+            durationHours: duration,
+            resolvedBy: user?.fullName || user?.username || 'Admin'
+          });
+          showNotification(
+            action === 'APPROVED' ? "Demande approuvée avec succès !" : "Demande refusée.",
+            action === 'APPROVED' ? "success" : "info"
+          );
+      }
       loadNotifications();
     } catch (e: any) {
       showNotification(e.message || "Erreur lors du traitement", "error");
@@ -406,21 +439,36 @@ const Layout: React.FC = () => {
                           <div className="flex space-x-2">
                             {n.request_type === 'SUBJECT_ACTIVATION' ? (
                               <button
-                                onClick={() => handleResolveRequest(n.id, 'APPROVED')}
+                                onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                               >
                                 Marquer comme traité
                               </button>
+                            ) : n.request_type === 'EXAM_SURVEILLANCE_REFUSAL' ? (
+                              <>
+                                <button
+                                  onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
+                                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                                >
+                                  Accepter le refus (Remplacer)
+                                </button>
+                                <button
+                                  onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
+                                  className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                                >
+                                  Forcer (Maintenir)
+                                </button>
+                              </>
                             ) : (
                               <>
                                 <button
-                                  onClick={() => handleResolveRequest(n.id, 'APPROVED')}
+                                  onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                   className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                                 >
                                   Approuver
                                 </button>
                                 <button
-                                  onClick={() => handleResolveRequest(n.id, 'REJECTED')}
+                                  onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
                                   className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
                                 >
                                   Refuser

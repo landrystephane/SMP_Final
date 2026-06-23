@@ -69,12 +69,40 @@ function initDb() {
         db.prepare("UPDATE classes SET code = 'CP' WHERE code = 'CP1'").run();
         console.log(`[Migration] Harmonized class code CP1 to CP`);
 
-        // Clean class codes that mistakenly include the year (e.g., CE1026 or CE12026)
-        db.prepare("UPDATE classes SET code = REPLACE(code, '2026', '') WHERE code LIKE '%2026'").run();
-        db.prepare("UPDATE classes SET code = REPLACE(code, '026', '') WHERE code LIKE '%026'").run();
-        console.log(`[Migration] Cleaned year from class codes`);
+        // Ensure all class codes end with the current year (e.g. 26) as requested
+        const currentYear = new Date().getFullYear().toString().slice(-2);
+        const classes = db.prepare('SELECT id, code FROM classes').all();
+        db.transaction(() => {
+            for (const c of classes) {
+                if (!c.code.endsWith(currentYear)) {
+                    // Remove any trailing numbers (like old years) before appending
+                    const baseCode = c.code.replace(/\d+$/, '');
+                    db.prepare('UPDATE classes SET code = ? WHERE id = ?').run(baseCode + currentYear, c.id);
+                }
+            }
+        })();
+        console.log(`[Migration] Appended year ${currentYear} to class codes`);
     } catch (e) {
         console.error(`[Migration] Classes table migration failed:`, e.message);
+    }
+
+    // 3.5.5 Fix student matricules with duplicated years (e.g. 26SIL260001 -> 26SIL0001)
+    try {
+        const students = db.prepare('SELECT id, matricule FROM students').all();
+        db.transaction(() => {
+            for (const s of students) {
+                if (s.matricule) {
+                    const match = s.matricule.match(/^(\d{2})([A-Z]+)(\d{2})(\d{4})$/);
+                    if (match && match[1] === match[3]) {
+                        const newMatricule = `${match[1]}${match[2]}${match[4]}`;
+                        db.prepare('UPDATE students SET matricule = ? WHERE id = ?').run(newMatricule, s.id);
+                    }
+                }
+            }
+        })();
+        console.log(`[Migration] Fixed duplicated years in student matricules`);
+    } catch (e) {
+        console.error(`[Migration] Student matricules migration failed:`, e.message);
     }
 
     // 3.6 Tuition Fees Migration
@@ -106,12 +134,15 @@ function initDb() {
         console.error(`[Migration] Attendance table migration failed:`, e.message);
     }
 
-    // 4. Student Table Migration: Add parent_name if missing
+    // 4. Student Table Migration: Add parent_name, status if missing
     try {
         const studentCols = db.prepare(`PRAGMA table_info(students)`).all();
         if (!studentCols.find(c => c.name === 'parent_name')) {
-            console.log(`[Migration] Adding parent_name to students`);
             db.prepare(`ALTER TABLE students ADD COLUMN parent_name TEXT`).run();
+        }
+        if (!studentCols.find(c => c.name === 'status')) {
+            console.log(`[Migration] Adding status to students`);
+            db.prepare(`ALTER TABLE students ADD COLUMN status TEXT DEFAULT 'ACTIVE'`).run();
         }
         if (!studentCols.find(c => c.name === 'has_transport')) {
             console.log(`[Migration] Adding has_transport to students`);

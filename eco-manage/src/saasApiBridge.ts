@@ -28,7 +28,11 @@ export const initSaaSBridge = () => {
                 config.body = JSON.stringify(body);
             }
             
-            const response = await fetch(`${API_BASE}${endpoint}`, config);
+            // Ajouter un cache buster pour les requêtes GET pour forcer le rafraîchissement
+            const cacheBuster = method === 'GET' ? (endpoint.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`) : '';
+            const finalUrl = `${API_BASE}${endpoint}${cacheBuster}`;
+            
+            const response = await fetch(finalUrl, config);
             const data = await response.json();
             
             if (!response.ok) {

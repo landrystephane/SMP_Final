@@ -517,10 +517,10 @@ const Attendance: React.FC = () => {
                             {students.map(student => {
                                 const h = absences[student.id] || 0;
                                 return (
-                                    <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                    <tr key={student.id} className="hover:bg-slate-800/50 dark:hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4">
-                                            <div className="text-slate-900 dark:text-white font-bold uppercase text-sm">{student.last_name}</div>
-                                            <div className="text-[10px] text-slate-500 font-bold">{student.first_name} • {student.matricule}</div>
+                                            <div className="text-white font-bold uppercase text-sm">{student.last_name}</div>
+                                            <div className="text-[10px] text-slate-500 font-bold group-hover:text-slate-300 transition-colors">{student.first_name} • {student.matricule}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center space-x-3">

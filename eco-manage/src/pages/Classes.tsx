@@ -60,8 +60,9 @@ const generateClassCode = (name: string, existingClasses: any[]) => {
         else baseCode = clean.substring(0, 3);
     }
 
-    // Do not append year to class codes to keep them clean (e.g. 'SIL' instead of 'SIL26')
-    const targetCode = baseCode;
+    // Append current year to class codes (e.g. 'SIL26')
+    const currentYear = new Date().getFullYear().toString().slice(-2);
+    const targetCode = baseCode + currentYear;
 
     if (!existingClasses || existingClasses.length === 0) return targetCode;
 
@@ -354,7 +355,7 @@ const Classes: React.FC = () => {
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto custom-scrollbar max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-slate-800/50">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                 {formData.id ? 'Modifier la classe' : 'Nouvelle classe'}
@@ -509,7 +510,7 @@ const Classes: React.FC = () => {
             {/* Modal Affectations Enseignants */}
             {isAssignModalOpen && selectedClassForAssign && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-y-auto custom-scrollbar max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-slate-800/50">
                             <div>
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">

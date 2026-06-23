@@ -243,7 +243,7 @@ const Parents: React.FC = () => {
       {/* Announcement Modal */}
       {showAnnouncementModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col">
+              <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-2xl shadow-2xl overflow-y-auto custom-scrollbar max-h-[90vh] flex flex-col">
                   <div className="p-6 border-b border-white/5 bg-slate-800/50 flex items-center justify-between">
                       <div>
                           <h3 className="text-xl font-black text-white">Envoyer un Communiqué</h3>

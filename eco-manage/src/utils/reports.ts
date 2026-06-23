@@ -1260,7 +1260,7 @@ export const generateParentsListReport = async (parents: any[], schoolInfo: any,
 };
 
 export const generateSchedulePdf = (data: any) => {
-    const { school, title, columns, rows } = data;
+    const { school, title, subtitle, columns, rows } = data;
     const doc = new jsPDF('landscape');
     
     let yPos = 20;
@@ -1270,7 +1270,16 @@ export const generateSchedulePdf = (data: any) => {
     yPos += 10;
     doc.setFontSize(12);
     doc.text(title.toUpperCase(), 148, yPos, { align: 'center' });
-    yPos += 15;
+    yPos += 10;
+    
+    if (subtitle) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(subtitle.toUpperCase(), 148, yPos, { align: 'center' });
+        yPos += 10;
+    } else {
+        yPos += 5;
+    }
 
     (doc as any).autoTable({
         head: [columns],

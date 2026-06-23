@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText } from 'lucide-react';
+import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText, Lock, Unlock } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
 import { generateRegistrationSheet, generateStudentsListReport } from '../utils/reports';
 import { useTranslation } from 'react-i18next';
@@ -38,11 +38,29 @@ const Students: React.FC = () => {
   }, []);
 
   const handleDeleteStudent = async (id: number) => {
-      if (!window.confirm(t('confirm_delete_student'))) return;
+      if (!window.confirm(t('confirm_delete_student', "Êtes-vous sûr de vouloir supprimer cet élève ?"))) return;
       if (window.electronAPI) {
           try {
               await window.electronAPI.deleteStudent(id);
               showNotification(t('student_deleted_success', "Élève supprimé avec succès"), "success");
+              loadData();
+          } catch (err: any) {
+              showNotification(err.message, "error");
+          }
+      }
+  };
+
+  const handleToggleBlockStatus = async (student: any) => {
+      const newStatus = student.status === 'BLOCKED' ? 'ACTIVE' : 'BLOCKED';
+      const confirmMsg = newStatus === 'BLOCKED' 
+          ? "Voulez-vous vraiment bloquer cet élève ? Il n'aura plus accès à certaines fonctionnalités."
+          : "Voulez-vous débloquer cet élève ?";
+      if (!window.confirm(confirmMsg)) return;
+
+      if (window.electronAPI) {
+          try {
+              await window.electronAPI.updateStudentStatus({ id: student.id, status: newStatus });
+              showNotification(`Élève ${newStatus === 'BLOCKED' ? 'bloqué' : 'débloqué'} avec succès`, "success");
               loadData();
           } catch (err: any) {
               showNotification(err.message, "error");
@@ -193,7 +211,14 @@ const Students: React.FC = () => {
                 <tr key={s.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-4 text-sm font-mono text-blue-400">{s.matricule}</td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-white uppercase">{s.last_name}</div>
+                    <div className="flex items-center gap-2">
+                        <div className="font-bold text-white uppercase">{s.last_name}</div>
+                        {s.status === 'BLOCKED' && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title="Cet élève a été bloqué par l'administration.">
+                                Bloqué
+                            </span>
+                        )}
+                    </div>
                     <div className="text-xs text-slate-500">{s.first_name}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -225,13 +250,23 @@ const Students: React.FC = () => {
                     <button onClick={() => setEditingStudent(s)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>
-                    {user?.role === 'DIRECTOR' && (
-                        <button
-                            onClick={() => handleDeleteStudent(s.id)}
-                            className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                    {['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(user?.role || '') && (
+                        <>
+                            <button
+                                onClick={() => handleToggleBlockStatus(s)}
+                                className={`p-1.5 rounded-md transition-all ${s.status === 'BLOCKED' ? 'text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-400' : 'text-amber-500 hover:bg-amber-500/10 hover:text-amber-400'}`}
+                                title={s.status === 'BLOCKED' ? 'Débloquer cet élève' : 'Bloquer cet élève'}
+                            >
+                                {s.status === 'BLOCKED' ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                            </button>
+                            <button
+                                onClick={() => handleDeleteStudent(s.id)}
+                                className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
+                                title="Supprimer cet élève"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </>
                     )}
                   </td>
                 </tr>

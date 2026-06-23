@@ -118,6 +118,11 @@ const Dashboard: React.FC = () => {
                                 const columns = [t('hour', 'Heure'), t('monday', 'Lundi'), t('tuesday', 'Mardi'), t('wednesday', 'Mercredi'), t('thursday', 'Jeudi'), t('friday', 'Vendredi'), t('saturday', 'Samedi'), t('sunday', 'Dimanche')];
                                 const rows: any[] = [];
                                 const allSlots: any[] = [];
+                                if (stats.timetable_slots) {
+                                    try {
+                                        allSlots.push(...JSON.parse(stats.timetable_slots));
+                                    } catch(e) {}
+                                }
                                 if (stats.schedules) {
                                     stats.schedules.forEach((s: any) => {
                                         if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
@@ -134,20 +139,24 @@ const Dashboard: React.FC = () => {
                                 
                                 allSlots.forEach(slot => {
                                     const rowData = [slot.label];
-                                    [1, 2, 3, 4, 5, 6, 7].forEach(day => {
-                                        const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
-                                        if (sData) {
-                                            if (sData.type === 'PAUSE') {
-                                                rowData.push('PAUSE');
+                                    if (slot.isBreak) {
+                                        [1, 2, 3, 4, 5, 6, 7].forEach(() => rowData.push('PAUSE'));
+                                    } else {
+                                        [1, 2, 3, 4, 5, 6, 7].forEach(day => {
+                                            const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
+                                            if (sData) {
+                                                if (sData.type === 'PAUSE') {
+                                                    rowData.push('PAUSE');
+                                                } else {
+                                                    const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                    const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
+                                                    rowData.push(`${className}\n${subjectName}`);
+                                                }
                                             } else {
-                                                const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
-                                                const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
-                                                rowData.push(`${className}\n${subjectName}`);
+                                                rowData.push('-');
                                             }
-                                        } else {
-                                            rowData.push('-');
-                                        }
-                                    });
+                                        });
+                                    }
                                     rows.push(rowData);
                                 });
                                 
@@ -185,6 +194,11 @@ const Dashboard: React.FC = () => {
                                 {/* Rows */}
                                 {(() => {
                                     const allSlots: any[] = [];
+                                    if (stats.timetable_slots) {
+                                        try {
+                                            allSlots.push(...JSON.parse(stats.timetable_slots));
+                                        } catch(e) {}
+                                    }
                                     if (stats.schedules) {
                                         stats.schedules.forEach((s: any) => {
                                             if (s.start_time && !allSlots.some(slot => slot.start?.trim() === s.start_time?.trim())) {
@@ -210,56 +224,65 @@ const Dashboard: React.FC = () => {
 
                                     return allSlots.map((slot: any, index: number) => (
                                     <React.Fragment key={`${slot.label}-${index}`}>
-                                        <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex items-center justify-center border border-slate-800">
-                                            {slot.label}
+                                        <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex flex-col items-center justify-center border border-slate-800 gap-1">
+                                            {slot.label && slot.label !== 'Nouveau' && slot.label !== `${slot.start} - ${slot.end}` && (
+                                                <span className="text-amber-500/70">{slot.label}</span>
+                                            )}
+                                            <span>{slot.start} - {slot.end}</span>
                                         </div>
-                                        {[1, 2, 3, 4, 5, 6, 7].map(day => {
-                                            const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
-                                            
-                                            if (sData) {
-                                                const typeColor = sData.type === 'EVALUATION' 
-                                                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
-                                                    : sData.type === 'PAUSE'
-                                                        ? 'bg-slate-900/10 border-dashed border-slate-800 text-slate-600'
-                                                        : 'bg-amber-500/10 border-amber-500/20 text-amber-500';
-                                                
-                                                if (sData.type === 'PAUSE') {
+                                            {slot.isBreak ? (
+                                                <div className="col-span-7 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                </div>
+                                            ) : (
+                                                DAYS_OF_WEEK.map(day => {
+                                                    const sData = stats.schedules?.find((s: any) => s.day_of_week === day.key && s.start_time?.trim() === slot.start?.trim());
+                                                    
+                                                    if (sData) {
+                                                        const typeColor = sData.type === 'EVALUATION' 
+                                                            ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                                                            : sData.type === 'PAUSE'
+                                                                ? 'bg-slate-900/10 border-dashed border-slate-800 text-slate-600'
+                                                                : 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+                                                        
+                                                        if (sData.type === 'PAUSE') {
+                                                            return (
+                                                                <div key={day.key} className={`p-4 rounded-xl border text-center flex items-center justify-center ${typeColor}`}>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Pause (Perso)</span>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                        const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
+                                                        
+                                                        return (
+                                                            <div key={day.key} className={`p-2 rounded-xl border text-center flex flex-col justify-center ${typeColor} h-[70px] overflow-hidden`} title={`${className} - ${subjectName || sData.type}`}>
+                                                                <div className="w-full">
+                                                                    <div className="text-[10px] font-black uppercase text-amber-500 truncate px-1">
+                                                                        {className}
+                                                                    </div>
+                                                                    {subjectName && (
+                                                                        <div className="text-[9px] font-bold uppercase mt-1 text-slate-300 truncate px-1">
+                                                                            {subjectName}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[7px] font-black uppercase tracking-wider mt-1 opacity-50 truncate">
+                                                                    {sData.type || 'COURS'}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    
                                                     return (
-                                                        <div key={day} className={`p-4 rounded-xl border text-center flex items-center justify-center ${typeColor}`}>
-                                                            <span className="text-[10px] font-bold uppercase tracking-widest">Pause (Perso)</span>
+                                                        <div key={day.key} className="p-4 bg-slate-950/20 rounded-xl border border-white/5 hover:bg-slate-900/50 transition-all flex items-center justify-center">
+                                                            <span className="text-slate-700 text-xs">-</span>
                                                         </div>
                                                     );
-                                                }
-
-                                                const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
-                                                const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
-                                                
-                                                return (
-                                                    <div key={day} className={`p-2 rounded-xl border text-center flex flex-col justify-center ${typeColor} h-[70px] overflow-hidden`} title={`${className} - ${subjectName || sData.type}`}>
-                                                        <div className="w-full">
-                                                            <div className="text-[10px] font-black uppercase text-amber-500 truncate px-1">
-                                                                {className}
-                                                            </div>
-                                                            {subjectName && (
-                                                                <div className="text-[9px] font-bold uppercase mt-1 text-slate-300 truncate px-1">
-                                                                    {subjectName}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[7px] font-black uppercase tracking-wider mt-1 opacity-50 truncate">
-                                                            {sData.type || 'COURS'}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            
-                                            return (
-                                                <div key={day} className="p-4 bg-slate-950/20 rounded-xl border border-white/5 hover:bg-slate-900/50 transition-all flex items-center justify-center">
-                                                    <span className="text-slate-700 text-xs">-</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </React.Fragment>
+                                                })
+                                            )}
+                                        </React.Fragment>
                                     ));
                                 })()}
                             </div>

@@ -402,6 +402,52 @@ const ParentPortal: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Bilan des Absences */}
+                    <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
+                        <div className="flex items-center space-x-3 text-rose-500">
+                            <AlertTriangle className="w-6 h-6" />
+                            <h2 className="text-xl font-black uppercase text-white tracking-tight">Bilan des Absences</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
+                                        <th className="px-4 py-3">Date</th>
+                                        <th className="px-4 py-3">Heures Manquées</th>
+                                        <th className="px-4 py-3">Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {stats?.attendance && stats.attendance.length > 0 ? (
+                                        stats.attendance.map((abs: any) => (
+                                            <tr key={abs.id} className="hover:bg-white/5 transition-colors text-xs font-bold">
+                                                <td className="px-4 py-3 text-white">
+                                                    {new Date(abs.date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}
+                                                </td>
+                                                <td className="px-4 py-3 text-rose-400 font-black">{abs.hours_absent} Heure(s)</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest border ${
+                                                        abs.status === 'ABSENT' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 
+                                                        abs.status === 'JUSTIFIED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                        'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                                    }`}>
+                                                        {abs.status === 'ABSENT' ? 'Non Justifiée' : abs.status === 'JUSTIFIED' ? 'Justifiée' : 'Retard'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={3} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
+                                                Aucune absence enregistrée.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     {/* Financial tracking */}
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center space-x-3 text-amber-500">
@@ -595,9 +641,20 @@ const ParentPortal: React.FC = () => {
                             {(() => {
                                 const studentClass = classes.find(c => c.id === selectedChild.class_id);
                                 if (!studentClass) return null;
-                                const teachers = users.filter(u => u.id === studentClass.main_teacher_id || u.id === studentClass.assistant_teacher_id);
+                                const teachers = users.filter(u => {
+                                    if (u.id === studentClass.main_teacher_id || u.id === studentClass.assistant_teacher_id) return true;
+                                    if (u.role === 'TEACHER' && u.assignedClasses) {
+                                        try {
+                                            const classList = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : u.assignedClasses;
+                                            return Array.isArray(classList) && (classList.includes(studentClass.id) || classList.includes(String(studentClass.id)));
+                                        } catch(e) { return false; }
+                                    }
+                                    return false;
+                                });
                                 return teachers.map(t => (
-                                    <option key={t.id} value={t.id}>{t.full_name} ({t.id === studentClass.main_teacher_id ? 'Titulaire' : 'Suppléant'})</option>
+                                    <option key={t.id} value={t.id}>
+                                        {t.full_name} ({t.id === studentClass.main_teacher_id ? 'Titulaire' : t.id === studentClass.assistant_teacher_id ? 'Suppléant' : 'Professeur'})
+                                    </option>
                                 ));
                             })()}
                         </select>

@@ -1162,7 +1162,7 @@ const SystemAdmin: React.FC = () => {
       {/* Add School Modal */}
       {isAdding && (
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-2xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+              <div className="glass-card w-full max-w-2xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
                       <h2 className="text-2xl md:text-4xl font-black text-white tracking-tighter uppercase italic">{t('sys_deploy_school_title')}</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">{t('sys_deploy_school_desc')}</p>
@@ -1265,7 +1265,7 @@ const SystemAdmin: React.FC = () => {
       {/* Add Founder Modal */}
       {isAddingFounder && (
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
                       <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic">Créer le Fondateur</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Propriétaire principal pour {selectedSchool?.name}</p>
@@ -1300,7 +1300,7 @@ const SystemAdmin: React.FC = () => {
       {/* Add Subject Modal */}
       {isAddingSubject && (
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+              <div className="glass-card w-full max-w-xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
                       <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Ajouter une Matière Globale</h2>
                       <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Ajouter un nouveau module d'enseignement au registre général</p>
@@ -1344,7 +1344,7 @@ const SystemAdmin: React.FC = () => {
       {/* Password Confirmation Modal */}
       {confirmPasswordModal.isOpen && (
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[300] p-4 md:p-6 animate-in zoom-in-95 duration-300">
-              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-hidden">
+              <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-8 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
                       <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic text-rose-500">{confirmPasswordModal.title}</h2>
                       <p className="text-slate-400 text-xs font-bold mt-2 leading-relaxed">{confirmPasswordModal.description}</p>
