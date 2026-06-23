@@ -169,6 +169,12 @@ handlers['db:addSchool'] = async (school) => {
         const hash = bcrypt.hashSync('admin', 10);
         db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
           .run(`admin_${newSchoolId}`, hash, `Fondateur ${name}`, 'FOUNDER', newSchoolId);
+          
+        // Auto-enable all existing global subjects for this new school
+        db.prepare(`
+            INSERT INTO school_subjects (school_id, subject_id, is_active)
+            SELECT ?, id, 1 FROM subjects
+        `).run(newSchoolId);
     });
     transaction();
 
@@ -796,7 +802,13 @@ handlers['db:addGlobalSubject'] = async (subject) => {
   const result = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)')
     .run(name, domain, level, section);
   
-  if (activeUser && activeUser.schoolId && activeUser.role !== 'SUPERADMIN') {
+  if (activeUser && activeUser.role === 'SUPERADMIN') {
+    // If superadmin adds it, enable it for ALL schools automatically
+    db.prepare(`
+        INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active)
+        SELECT id, ?, 1 FROM schools
+    `).run(result.lastInsertRowid);
+  } else if (activeUser && activeUser.schoolId) {
     db.prepare('INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active) VALUES (?, ?, 1)')
       .run(activeUser.schoolId, result.lastInsertRowid);
   }
