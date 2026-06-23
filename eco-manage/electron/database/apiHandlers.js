@@ -259,7 +259,7 @@ const permanentlyDeleteSchool = (id) => {
                 'DELETE FROM bus_routes WHERE school_id = ?',
                 'DELETE FROM classes WHERE school_id = ?',
                 'DELETE FROM subjects WHERE school_id = ?',
-                'DELETE FROM users WHERE school_id = ? AND role != \\"SUPERADMIN\\"',
+                "DELETE FROM users WHERE school_id = ? AND role != 'SUPERADMIN'",
                 'DELETE FROM schools WHERE id = ?'
             ];
 
