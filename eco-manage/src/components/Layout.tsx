@@ -419,7 +419,7 @@ const Layout: React.FC = () => {
 
                       {isPending && (
                         <div className="space-y-3 border-t border-white/5 pt-3 mt-2">
-                          {n.request_type === 'GRADE_REACTIVATION' && (
+                          {(n.request_type === 'GRADE_REACTIVATION' || n.request_type === 'ATTENDANCE_REACTIVATION') && (
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-slate-400 font-bold">Durée de réactivation :</span>
                               <select 

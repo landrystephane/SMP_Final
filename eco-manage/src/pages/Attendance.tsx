@@ -49,7 +49,16 @@ const Attendance: React.FC = () => {
         
         const unlockKey = `attendance_unlock_${selectedClass}_${currentDate}`;
         const unlockSetting = await window.electronAPI.getSetting(unlockKey);
-        const unlocked = unlockSetting === 'true';
+        let unlocked = false;
+        if (unlockSetting === 'true') {
+            unlocked = true;
+        } else if (unlockSetting && unlockSetting !== 'false') {
+            const deadline = new Date(unlockSetting);
+            if (deadline > new Date()) {
+                unlocked = true;
+            }
+        }
+        
         setIsUnlockedByAdmin(unlocked);
         
         if (user?.role === 'TEACHER') {
