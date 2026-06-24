@@ -68,15 +68,16 @@ const generateClassCode = (name: string, existingClasses: any[]) => {
 
     // Check for duplicates
     let finalCode = targetCode;
-    let letterIndex = 1; // 1 = B, 2 = C, etc.
+    let letterIndex = 0; // 0 = A, 1 = B, etc.
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
     while (existingClasses.some(c => c.code === finalCode)) {
         if (letterIndex < alphabet.length) {
-            finalCode = baseCode + alphabet[letterIndex];
+            // Append letter BEFORE the year (e.g. SIL + A + 26 = SILA26)
+            finalCode = baseCode + alphabet[letterIndex] + currentYear;
             letterIndex++;
         } else {
-            finalCode = baseCode + Math.floor(Math.random() * 1000);
+            finalCode = baseCode + Math.floor(Math.random() * 1000) + currentYear;
             break; // Fallback if too many duplicates
         }
     }

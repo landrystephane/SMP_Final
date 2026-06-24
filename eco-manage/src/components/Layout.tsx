@@ -94,7 +94,7 @@ const Layout: React.FC = () => {
             notificationId: notifId,
             action,
             durationHours: duration,
-            resolvedBy: user?.fullName || user?.username || 'Admin'
+            resolvedBy: user?.id || 1
           });
           showNotification(
             action === 'APPROVED' ? "Demande approuvée avec succès !" : "Demande refusée.",

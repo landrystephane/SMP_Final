@@ -181,13 +181,15 @@ const Attendance: React.FC = () => {
       const message = `Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe ${className} du ${formattedDate}. Veuillez s'il vous plaît débloquer cette fiche.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`;
       
       try {
-          await window.electronAPI.sendTicket({
-              sender_id: user.id,
-              receiver_role: 'FOUNDER',
-              receiver_id: null,
-              subject,
-              message,
-              school_id: user.schoolId
+          await window.electronAPI.submitSystemRequest({
+              requestType: 'ATTENDANCE_REACTIVATION',
+              requestData: {
+                  teacherId: user.id,
+                  classId: selectedClass,
+                  className: classObj ? classObj.name : selectedClass,
+                  date: formattedDate,
+                  rawDate: currentDate
+              }
           });
           alert("Votre demande de déblocage a été envoyée avec succès à l'administration.");
       } catch (e: any) {

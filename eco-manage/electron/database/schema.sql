@@ -370,6 +370,8 @@ CREATE TABLE IF NOT EXISTS tickets (
     receiver_id INTEGER,
     subject TEXT NOT NULL,
     message TEXT NOT NULL,
+    request_type TEXT,
+    request_data TEXT,
     status TEXT DEFAULT 'OPEN',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (school_id) REFERENCES schools(id),

@@ -68,30 +68,41 @@ const Tickets: React.FC = () => {
   const handleSendTicket = async () => {
       if (!newTicketMessage.trim() || !window.electronAPI || !user) return;
       try {
-          await window.electronAPI.sendTicket({
-              sender_id: user.id,
-              receiver_role: receiverId ? null : receiverRole,
-              receiver_id: receiverId ? receiverId : null,
-              subject: newTicketSubject,
-              message: newTicketMessage,
-              school_id: user.schoolId,
-              request_type: requestType !== 'STANDARD' ? requestType : null,
-              request_data: requestType !== 'STANDARD' ? requestData : null
-          });
-          
-          if (receiverId) {
-             await window.electronAPI.createNotification({
-                 user_id: receiverId,
-                 message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
-                 type: 'INFO',
-                 school_id: user.schoolId
-             });
-          } else if (receiverRole) {
-             await window.electronAPI.createNotification({
-                 message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
-                 type: 'INFO',
-                 school_id: user.schoolId
-             });
+          if (requestType !== 'STANDARD') {
+              await window.electronAPI.submitSystemRequest({
+                  senderId: user.id,
+                  requestType: requestType,
+                  requestData: {
+                      ...requestData,
+                      message: newTicketMessage
+                  }
+              });
+              alert("Votre demande système a été soumise avec succès ! L'administration la traitera sous peu.");
+          } else {
+              await window.electronAPI.sendTicket({
+                  sender_id: user.id,
+                  receiver_role: receiverId ? null : receiverRole,
+                  receiver_id: receiverId ? receiverId : null,
+                  subject: newTicketSubject,
+                  message: newTicketMessage,
+                  school_id: user.schoolId
+              });
+              
+              if (receiverId) {
+                 await window.electronAPI.createNotification({
+                     user_id: receiverId,
+                     message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                     type: 'INFO',
+                     school_id: user.schoolId
+                 });
+              } else if (receiverRole) {
+                 await window.electronAPI.createNotification({
+                     message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                     type: 'INFO',
+                     school_id: user.schoolId
+                 });
+              }
+              alert("Message envoyé !");
           }
 
           setNewTicketMessage('');
@@ -101,7 +112,6 @@ const Tickets: React.FC = () => {
           setRequestType('STANDARD');
           setRequestData({});
           loadData();
-          alert("Message envoyé !");
       } catch (err: any) {
           alert(err.message);
       }

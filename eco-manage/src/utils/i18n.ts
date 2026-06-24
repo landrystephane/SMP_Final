@@ -179,7 +179,7 @@ i18n
           quick_collection_desc: 'Enregistrez un nouveau versement pour un élève déjà inscrit',
           new_payment: 'NOUVEAU VERSEMENT',
           search_student_payment: 'Rechercher un élève pour paiement...',
-          total_tuition: 'Scolarité Totale',
+          total_tuition: 'Total (Pension + Inscription)',
           already_paid: 'Déjà Payé',
           remaining_to_pay: 'Reste à Payer',
           state: 'État',

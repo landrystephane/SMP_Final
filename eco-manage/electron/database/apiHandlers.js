@@ -175,6 +175,15 @@ handlers['db:addSchool'] = async (school) => {
             INSERT INTO school_subjects (school_id, subject_id, is_active)
             SELECT ?, id, 1 FROM subjects
         `).run(newSchoolId);
+
+        // Auto-create a default grading scale (sur 20) with standard options
+        const scaleInfo = db.prepare('INSERT INTO grading_scales (school_id, name, is_numerical, min_value, max_value) VALUES (?, ?, 1, 0, 20)').run(newSchoolId, 'Notes sur 20');
+        const scaleId = scaleInfo.lastInsertRowid;
+        const insertOption = db.prepare('INSERT INTO grading_scale_options (scale_id, symbol, min_range, max_range, numeric_equivalent, description) VALUES (?, ?, ?, ?, ?, ?)');
+        insertOption.run(scaleId, 'N.A', 0, 9.99, 0, 'Non Acquis');
+        insertOption.run(scaleId, 'E.C.A', 10, 14.99, 10, "En Cours d'Acquisition");
+        insertOption.run(scaleId, 'A', 15, 17.99, 15, 'Acquis');
+        insertOption.run(scaleId, 'E', 18, 20, 20, 'Expert');
     });
     transaction();
 
@@ -353,7 +362,7 @@ handlers['db:addStudent'] = async (student) => {
   const transaction = db.transaction(() => {
     const cleanClassCode = classCode.replace(/\d+$/, '');
     const prefix = `${yearShort}${cleanClassCode}`;
-    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(CAST(SUBSTR(matricule, -4) AS INTEGER)), 0) as max_order FROM students WHERE matricule LIKE ?").get(`${prefix}%`);
+    const maxOrderRow = db.prepare("SELECT COALESCE(MAX(CAST(SUBSTR(matricule, -4) AS INTEGER)), 0) as max_order FROM students WHERE school_id = ? AND matricule LIKE ?").get(sid, `${prefix}%`);
     orderNumber = maxOrderRow.max_order + 1;
     matricule = `${prefix}${orderNumber.toString().padStart(4, '0')}`;
 
@@ -1896,8 +1905,15 @@ handlers['db:updateStudentStatus'] = async ({ id, status }) => {
 };
 
 handlers['db:deleteStudent'] = async (id) => {
-    // Soft delete to avoid breaking historical data (grades, attendance, etc.)
-    return db.prepare('UPDATE students SET status = ? WHERE id = ?').run('DELETED', id);
+    // Hard delete with cascade (deleting related records manually to avoid FK errors if ON DELETE CASCADE is missing)
+    const tx = db.transaction(() => {
+        db.prepare('DELETE FROM grades WHERE student_id = ?').run(id);
+        db.prepare('DELETE FROM attendance WHERE student_id = ?').run(id);
+        db.prepare('DELETE FROM payments WHERE student_id = ?').run(id);
+        db.prepare('DELETE FROM students WHERE id = ?').run(id);
+    });
+    tx();
+    return { success: true };
 };
 
 handlers['db:updateStudent'] = async (student) => {
@@ -1958,7 +1974,7 @@ handlers['db:getDashboardStats'] = async (params) => {
   const level = (params && params.level) ? params.level : null;
 
   let queryParams = [schoolId];
-  let studentFilters = [];
+  let studentFilters = ["s.status != 'DELETED'"];
   let classFilters = [];
 
   if (section) {
@@ -2006,7 +2022,10 @@ handlers['db:getDashboardStats'] = async (params) => {
   `).get(...queryParams).total || 0;
 
   const totalTuitionDue = db.prepare(`
-    SELECT SUM(t.total_fee) as total
+    SELECT SUM(
+      COALESCE(t.registration_fee, 0) + 
+      MAX(0, COALESCE(t.total_fee, 0) - COALESCE(s.scholarship_reduction, 0))
+    ) as total
     FROM tuition_fees t
     JOIN students s ON s.class_id = t.class_id
     JOIN classes c ON s.class_id = c.id
@@ -2059,7 +2078,7 @@ handlers['db:getBursarDashboardStats'] = async (params) => {
     FROM students s
     JOIN classes c ON s.class_id = c.id
     LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
-    WHERE s.school_id = ?
+    WHERE s.school_id = ? AND s.status != 'DELETED'
   `).all(schoolId);
 
   const tuitionFees = db.prepare(`
@@ -2606,22 +2625,60 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
     const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
     const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
     message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande la réactivation de la saisie des notes pour la classe ${cls?.name || 'Inconnue'} (${data.month}, Trimestre ${data.term}).`;
+  } else if (requestType === 'ATTENDANCE_REACTIVATION') {
+    const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
+    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande le déblocage des présences pour la classe ${data.className || 'Inconnue'} (Date: ${data.date}).`;
   } else if (requestType === 'ABSENCE_JUSTIFICATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
     const student = db.prepare('SELECT first_name, last_name FROM students WHERE id = ?').get(data.studentId);
     message = `Justification d'absence demandée pour l'élève ${student?.first_name || ''} ${student?.last_name || ''} le ${data.date}. Raison : ${data.reason}`;
+  } else if (requestType === 'GRADE_EXTENSION') {
+    const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
+    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
+    message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande une extension de délai pour la saisie des notes de la classe ${cls?.name || 'Inconnue'} (Séquence: ${data.sequence}, Trimestre: ${data.term}). Raison: ${data.message || ''}`;
+  } else if (requestType === 'CASH_WITHDRAWAL') {
+    const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
+    const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    message = `Demande de décaissement de ${data.amount} FCFA par ${user?.full_name || 'Inconnu'}. Motif: ${data.reason || data.message || ''}`;
+  } else if (requestType === 'PRINT_AUTHORIZATION') {
+    const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
+    const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
+    message = `Demande d'autorisation d'impression des bulletins pour la classe ${cls?.name || 'Inconnue'} (Séquence: ${data.sequence}, Trimestre: ${data.term}). Raison: ${data.message || ''}`;
   }
 
-  return db.prepare(`
-    INSERT INTO tickets (school_id, sender_id, receiver_role, subject, message, request_type, request_data)
-    VALUES (?, ?, 'DIRECTOR', 'Demande Système', ?, ?, ?)
-  `).run(sid, senderId, message, requestType, reqDataStr);
+  db.prepare(`
+    INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status)
+    VALUES (?, ?, ?, 'ACTION_REQUIRED', ?, ?, 'PENDING')
+  `).run(sid, senderId, `Demande Système: ${message}`, requestType, reqDataStr);
+  
+  return { success: true };
 };
 
 handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationHours, resolvedBy }) => {
   const notif = db.prepare('SELECT * FROM notifications WHERE id = ?').get(notificationId);
   if (!notif) throw new Error("Notification introuvable.");
   if (notif.action_status !== 'PENDING') throw new Error("Cette demande a déjà été résolue.");
+
+  let grantedById = parseInt(resolvedBy, 10);
+  if (isNaN(grantedById)) {
+    // Try to find the user by name
+    const u = db.prepare('SELECT id FROM users WHERE full_name = ? OR username = ?').get(resolvedBy, resolvedBy);
+    if (u) {
+      grantedById = u.id;
+    } else {
+      // Fallback to the founder of the school
+      const founder = db.prepare("SELECT id FROM users WHERE school_id = ? AND role = 'FOUNDER' LIMIT 1").get(notif.school_id);
+      if (founder) {
+        grantedById = founder.id;
+      } else {
+        // Absolute fallback to any valid user
+        const anyUser = db.prepare('SELECT id FROM users LIMIT 1').get();
+        grantedById = anyUser ? anyUser.id : 0;
+      }
+    }
+  }
 
   const tx = db.transaction(() => {
     if (action === 'APPROVED') {
@@ -2637,10 +2694,10 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
         
         if (existing) {
           db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?')
-            .run(deadlineStr, resolvedBy, existing.id);
+            .run(deadlineStr, grantedById, existing.id);
         } else {
           db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(data.teacherId, data.classId, data.term, data.month, deadlineStr, resolvedBy);
+            .run(data.teacherId, data.classId, data.term, data.month, deadlineStr, grantedById);
         }
 
         db.prepare(`
@@ -2648,9 +2705,51 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
           VALUES (?, ?, ?, 'SYSTEM')
         `).run(notif.school_id, data.teacherId, `Votre demande de réactivation pour la classe ${data.className || ''} a été approuvée pour une durée de ${hrs} heures.`);
 
+      } else if (notif.request_type === 'ATTENDANCE_REACTIVATION') {
+        const data = JSON.parse(notif.request_data);
+        const settingKey = `attendance_unlock_${data.classId}_${data.rawDate}`;
+        
+        // Add to settings table
+        db.prepare(`
+          INSERT INTO settings (school_id, key, value) 
+          VALUES (?, ?, 'true') 
+          ON CONFLICT(school_id, key) 
+          DO UPDATE SET value = 'true'
+        `).run(notif.school_id, settingKey);
+
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, data.teacherId, `Votre demande de déblocage des présences pour la classe ${data.className || ''} a été approuvée.`);
       } else if (notif.request_type === 'ABSENCE_JUSTIFICATION') {
         db.prepare("UPDATE attendance SET status = 'JUSTIFIED', remark = ? WHERE student_id = ? AND date = ?")
           .run(data.reason || 'Justifiée par la direction', data.studentId, data.date);
+      } else if (notif.request_type === 'GRADE_EXTENSION') {
+        const deadlineDate = new Date();
+        const hrs = parseInt(durationHours, 10) || 24;
+        deadlineDate.setHours(deadlineDate.getHours() + hrs);
+        const deadlineStr = deadlineDate.toISOString().replace('T', ' ').substring(0, 19);
+
+        const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?')
+          .get(notif.user_id, data.classId, data.term, data.sequence);
+        
+        if (existing) {
+          db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?')
+            .run(deadlineStr, grantedById, existing.id);
+        } else {
+          db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)')
+            .run(notif.user_id, data.classId, data.term, data.sequence, deadlineStr, grantedById);
+        }
+
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, notif.user_id, `Votre demande d'extension pour la classe a été approuvée pour une durée de ${hrs} heures.`);
+      } else if (notif.request_type === 'CASH_WITHDRAWAL' || notif.request_type === 'PRINT_AUTHORIZATION') {
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, notif.user_id, `Votre demande (${notif.request_type === 'CASH_WITHDRAWAL' ? 'Décaissement' : 'Impression'}) a été approuvée.`);
       }
       
       db.prepare("UPDATE notifications SET action_status = 'APPROVED' WHERE id = ?").run(notificationId);
@@ -2663,6 +2762,17 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
         `).run(notif.school_id, data.teacherId, `Votre demande de réactivation pour la classe ${data.className || ''} a été refusée.`);
+      } else if (notif.request_type === 'ATTENDANCE_REACTIVATION') {
+        const data = JSON.parse(notif.request_data);
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, data.teacherId, `Votre demande de déblocage des présences pour la classe ${data.className || ''} a été refusée.`);
+      } else if (['GRADE_EXTENSION', 'CASH_WITHDRAWAL', 'PRINT_AUTHORIZATION'].includes(notif.request_type)) {
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, notif.user_id, `Votre demande a été refusée par l'administration.`);
       }
     }
   });

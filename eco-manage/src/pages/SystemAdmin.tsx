@@ -899,6 +899,7 @@ const SystemAdmin: React.FC = () => {
                                 <PhoneInput
                                   international
                                   defaultCountry="CM"
+                                  limitMaxLength={true}
                                   className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
                                   value={editSchoolPhone}
                                   onChange={(val) => setEditSchoolPhone(val || '')}
@@ -1192,6 +1193,7 @@ const SystemAdmin: React.FC = () => {
                             <PhoneInput
                                 international
                                 defaultCountry="CM"
+                                limitMaxLength={true}
                                 className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
                                 value={newSchool.contact_phone}
                                 onChange={val => setNewSchool({...newSchool, contact_phone: val || ''})}

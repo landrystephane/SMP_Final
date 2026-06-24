@@ -256,6 +256,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 <PhoneInput
                   international
                   defaultCountry="CM"
+                  limitMaxLength={true}
                   value={formData.parentContact}
                   onChange={(val) => {
                       setFormData({...formData, parentContact: val || ''});
@@ -280,6 +281,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 <PhoneInput
                   international
                   defaultCountry="CM"
+                  limitMaxLength={true}
                   value={formData.emergencyContact}
                   onChange={(val) => {
                       setFormData({...formData, emergencyContact: val || ''});

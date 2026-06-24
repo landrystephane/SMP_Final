@@ -288,15 +288,23 @@ function initDb() {
         console.error(`[Migration] Payments depositor_name column migration failed:`, e.message);
     }
 
-    // 6.8. Tickets Table Migration: Add receiver_id if missing
+    // 6.8. Tickets Table Migration: Add receiver_id, request_type, request_data if missing
     try {
         const ticketCols = db.prepare(`PRAGMA table_info(tickets)`).all();
         if (!ticketCols.find(c => c.name === 'receiver_id')) {
             console.log(`[Migration] Adding receiver_id to tickets`);
             db.prepare(`ALTER TABLE tickets ADD COLUMN receiver_id INTEGER`).run();
         }
+        if (!ticketCols.find(c => c.name === 'request_type')) {
+            console.log(`[Migration] Adding request_type to tickets`);
+            db.prepare(`ALTER TABLE tickets ADD COLUMN request_type TEXT`).run();
+        }
+        if (!ticketCols.find(c => c.name === 'request_data')) {
+            console.log(`[Migration] Adding request_data to tickets`);
+            db.prepare(`ALTER TABLE tickets ADD COLUMN request_data TEXT`).run();
+        }
     } catch (e) {
-        console.error(`[Migration] Tickets receiver_id column migration failed:`, e.message);
+        console.error(`[Migration] Tickets column migration failed:`, e.message);
     }
 
     // 7. Archives Table Migration

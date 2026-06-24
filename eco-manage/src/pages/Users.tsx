@@ -26,6 +26,7 @@ const Users: React.FC = () => {
     classRole: 'MAIN'
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [editFormError, setEditFormError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editUserForm, setEditUserForm] = useState({
@@ -101,15 +102,17 @@ const Users: React.FC = () => {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setFormSuccess(null);
 
     // Name validation
-    const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
-    if (!nameRegex.test(newUser.fullName.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
+    const fullNameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
+    const usernameRegex = /^[A-Za-z0-9._-]+$/;
+    if (!fullNameRegex.test(newUser.fullName.trim())) {
+        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent contient des caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
         return;
     }
-    if (!nameRegex.test(newUser.username.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
+    if (!usernameRegex.test(newUser.username.trim())) {
+        setFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres, chiffres, points, tirets ou underscores sans espaces.");
         return;
     }
 
@@ -143,6 +146,8 @@ const Users: React.FC = () => {
           phone: '',
           classRole: 'MAIN'
       });
+      setFormSuccess("L'utilisateur a été créé avec succès !");
+      setTimeout(() => setFormSuccess(null), 5000);
       loadData();
     }
   };
@@ -152,13 +157,14 @@ const Users: React.FC = () => {
       setEditFormError(null);
       if (!editingUser) return;
 
-      const nameRegex = /^[A-Za-zÀ-ÿ\s\-]+$/;
-      if (!nameRegex.test(editUserForm.fullName.trim())) {
-          setEditFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent ne doit contenir que des lettres.");
+      const fullNameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
+      const usernameRegex = /^[A-Za-z0-9._-]+$/;
+      if (!fullNameRegex.test(editUserForm.fullName.trim())) {
+          setEditFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent contient des caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
           return;
       }
-      if (!nameRegex.test(editUserForm.username.trim())) {
-          setEditFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres.");
+      if (!usernameRegex.test(editUserForm.username.trim())) {
+          setEditFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres, chiffres, points, tirets ou underscores sans espaces.");
           return;
       }
 
@@ -268,6 +274,12 @@ const Users: React.FC = () => {
                             {formError}
                         </div>
                     )}
+                    {formSuccess && (
+                        <div className="p-3 bg-emerald-500/10 border-l-4 border-emerald-500 rounded-xl text-emerald-500 text-xs font-bold whitespace-pre-wrap flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            {formSuccess}
+                        </div>
+                    )}
                     <div className="grid grid-cols-3 gap-4">
                         <div className="col-span-1 space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{t('civility_label')}</label>
@@ -300,6 +312,7 @@ const Users: React.FC = () => {
                          <PhoneInput
                              international
                              defaultCountry="CM"
+                             limitMaxLength={true}
                              value={newUser.phone}
                              onChange={(val) => setNewUser({...newUser, phone: val || ''})}
                              className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
@@ -588,6 +601,7 @@ const Users: React.FC = () => {
                               <PhoneInput
                                   international
                                   defaultCountry="CM"
+                                  limitMaxLength={true}
                                   value={editUserForm.phone}
                                   onChange={(val) => setEditUserForm({...editUserForm, phone: val || ''})}
                                   className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
