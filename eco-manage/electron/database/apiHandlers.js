@@ -2616,18 +2616,20 @@ handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) =>
 };
 
 handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, requestData }) => {
-  const sid = getActiveSchoolId(schoolId);
+  const reqDataObj = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
+  const actualSenderId = senderId || reqDataObj.teacherId || reqDataObj.senderId;
+  const sid = getActiveSchoolId(schoolId || reqDataObj.schoolId || 1); // default fallback
   const reqDataStr = typeof requestData === 'string' ? requestData : JSON.stringify(requestData);
   
   let message = `Nouvelle demande de la part d'un utilisateur.`;
   if (requestType === 'GRADE_REACTIVATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
-    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
     const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
     message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande la réactivation de la saisie des notes pour la classe ${cls?.name || 'Inconnue'} (${data.month}, Trimestre ${data.term}).`;
   } else if (requestType === 'ATTENDANCE_REACTIVATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
-    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
     message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande le déblocage des présences pour la classe ${data.className || 'Inconnue'} (Date: ${data.date}).`;
   } else if (requestType === 'ABSENCE_JUSTIFICATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
@@ -2635,12 +2637,12 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
     message = `Justification d'absence demandée pour l'élève ${student?.first_name || ''} ${student?.last_name || ''} le ${data.date}. Raison : ${data.reason}`;
   } else if (requestType === 'GRADE_EXTENSION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
-    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
     const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
     message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande une extension de délai pour la saisie des notes de la classe ${cls?.name || 'Inconnue'} (Séquence: ${data.sequence}, Trimestre: ${data.term}). Raison: ${data.message || ''}`;
   } else if (requestType === 'CASH_WITHDRAWAL') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
-    const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+    const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
     message = `Demande de décaissement de ${data.amount} FCFA par ${user?.full_name || 'Inconnu'}. Motif: ${data.reason || data.message || ''}`;
   } else if (requestType === 'PRINT_AUTHORIZATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
@@ -2651,7 +2653,7 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
   db.prepare(`
     INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status)
     VALUES (?, ?, ?, 'ACTION_REQUIRED', ?, ?, 'PENDING')
-  `).run(sid, senderId, `Demande Système: ${message}`, requestType, reqDataStr);
+  `).run(sid, actualSenderId, `Demande Système: ${message}`, requestType, reqDataStr);
   
   return { success: true };
 };
@@ -2711,11 +2713,11 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
         
         // Add to settings table
         db.prepare(`
-          INSERT INTO settings (school_id, key, value) 
-          VALUES (?, ?, 'true') 
-          ON CONFLICT(school_id, key) 
+          INSERT INTO settings (key, value) 
+          VALUES (?, 'true') 
+          ON CONFLICT(key) 
           DO UPDATE SET value = 'true'
-        `).run(notif.school_id, settingKey);
+        `).run(settingKey);
 
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
