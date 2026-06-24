@@ -1,16 +1,17 @@
 const fs = require('fs');
+const path = require('path');
 const { db } = require('./db');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const session = require('./session');
 
-
+const logPath = path.join(__dirname, 'error.log');
 
 const getActiveSchoolId = (providedId = null) => {
-    if (providedId) return providedId;
     const user = session.getStore()?.user;
-    if (!user) return null;
-    return user.schoolId || user.school_id;
+    if (user && user.role === 'SUPERADMIN' && providedId) return providedId;
+    if (user) return user.schoolId || user.school_id;
+    return providedId || null;
 };
 
 const handlers = {};
@@ -151,6 +152,11 @@ handlers['auth:switchSchool'] = async (schoolId) => {
 };
 
 handlers['db:getSchools'] = async () => {
+    const user = session.getStore()?.user;
+    if (user && user.role !== 'SUPERADMIN') {
+        const sid = getActiveSchoolId();
+        return db.prepare('SELECT * FROM schools WHERE id = ? AND deleted_at IS NULL').all(sid);
+    }
     return db.prepare('SELECT * FROM schools WHERE deleted_at IS NULL').all();
 };
 
@@ -160,6 +166,7 @@ handlers['db:getDeletedSchools'] = async () => {
 };
 
 handlers['db:addSchool'] = async (school) => {
+    if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     const { name, address, contact_email, contact_phone, bp, motto } = school;
     const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto) VALUES (?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto);
     const newSchoolId = info.lastInsertRowid;
@@ -399,10 +406,6 @@ handlers['db:getParentsDirectory'] = async (schoolIdParam) => {
   `).all(schoolId);
 };
 
-handlers['db:deleteStudent'] = async (id) => {
-    return db.prepare('DELETE FROM students WHERE id = ?').run(id);
-};
-
 handlers['db:getAnnouncements'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
@@ -450,21 +453,30 @@ handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
 };
 
 handlers['db:getGrades'] = async ({ classId, term }) => {
-  return db.prepare('SELECT * FROM grades WHERE class_id = ? AND term = ?').all(classId, term);
+  const sid = getActiveSchoolId();
+  return db.prepare('SELECT g.* FROM grades g JOIN classes c ON g.class_id = c.id WHERE g.class_id = ? AND g.term = ? AND c.school_id = ?').all(classId, term, sid);
 };
 
 handlers['db:saveGrades'] = async (grades) => {
+  const sid = getActiveSchoolId();
+  if (grades && grades.length > 0) {
+    const classIds = [...new Set(grades.map(g => g.class_id))];
+    for (const cId of classIds) {
+      const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(cId, sid);
+      if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
+    }
+  }
   const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
   const upsert = db.prepare(`
     INSERT INTO grades (student_id, subject_id, class_id, term, month, score, letter_score, teacher_id, locked, validated)
-    VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @letter_score, @teacher_id, 0, 0)
-    ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
-    score = excluded.score,
-    letter_score = excluded.letter_score,
-    locked = 0,
-    validated = 0,
-    updated_at = CURRENT_TIMESTAMP
-    WHERE locked = 0
+      VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @letter_score, @teacher_id, 1, 0)
+      ON CONFLICT(student_id, subject_id, class_id, term, month) DO UPDATE SET
+      score = excluded.score,
+      letter_score = excluded.letter_score,
+      locked = 1,
+      validated = 0,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE locked = 0
   `);
 
   const transaction = db.transaction((gradesList) => {
@@ -477,7 +489,7 @@ handlers['db:saveGrades'] = async (grades) => {
         if (user && user.role === 'TEACHER') {
           const isAssigned = db.prepare('SELECT 1 FROM class_teacher_subjects WHERE class_id = ? AND subject_id = ? AND teacher_id = ?').get(g.class_id, g.subject_id, g.teacher_id);
           if (!isAssigned) {
-            throw new Error(`Vous n'êtes pas assigné à enseigner cette matière dans cette classe.`);
+            throw new Error(`Vous n'êtes pas assigné à enseigner cette matière (Class: ${g.class_id}, Subj: ${g.subject_id}, Teacher: ${g.teacher_id}) dans cette classe.`);
           }
 
           // 2. Validation du délai de saisie (verrouillage automatique)
@@ -550,6 +562,9 @@ handlers['db:saveGrades'] = async (grades) => {
 };
 
 handlers['db:unlockGrades'] = async ({ classId, term, month }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare('UPDATE grades SET locked = 0, validated = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
 };
 
@@ -591,11 +606,16 @@ handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month 
 handlers['db:validateClassGrades'] = async ({ classId, term, month }) => {
   const parsedClassId = parseInt(classId, 10);
   const parsedTerm = parseInt(term, 10);
-  return db.prepare(`
+  const result = db.prepare(`
     UPDATE grades
     SET validated = 1, locked = 1
     WHERE class_id = ? AND term = ? AND month = ?
   `).run(parsedClassId, parsedTerm, month);
+
+  const settingKey = `class_locked_${parsedClassId}_${parsedTerm}_${month}`;
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, 'true') ON CONFLICT(key) DO UPDATE SET value = 'true'").run(settingKey);
+
+  return result;
 };
 
 handlers['db:getPayments'] = async (schoolId) => {
@@ -611,6 +631,9 @@ handlers['db:getPayments'] = async (schoolId) => {
 
 handlers['db:addPayment'] = async (payment) => {
   const { studentId, amount, type, userId, installmentId, depositorName } = payment;
+  const sid = getActiveSchoolId();
+  const studentCheck = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
+  if (!studentCheck) throw new Error('Élève non autorisé pour cet établissement.');
   const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
   if (['Inscription', 'Transport', 'Examen'].includes(type)) {
@@ -646,7 +669,9 @@ handlers['db:addPayment'] = async (payment) => {
 };
 
 handlers['db:deletePayment'] = async (id) => {
-    const payment = db.prepare('SELECT student_id, payment_type FROM payments WHERE id = ?').get(id);
+    const sid = getActiveSchoolId();
+    const payment = db.prepare('SELECT p.student_id, p.payment_type FROM payments p JOIN students s ON p.student_id = s.id WHERE p.id = ? AND s.school_id = ?').get(id, sid);
+    if (!payment) throw new Error('Paiement introuvable ou non autorisé.');
     const result = db.prepare('DELETE FROM payments WHERE id = ?').run(id);
     if (result.changes > 0 && payment && payment.payment_type === 'Transport') {
         const otherPayments = db.prepare('SELECT COUNT(*) as count FROM payments WHERE student_id = ? AND payment_type = "Transport"').get(payment.student_id);
@@ -669,16 +694,25 @@ handlers['db:getTuitionFees'] = async (schoolId) => {
 };
 
 handlers['db:getInstallments'] = async () => {
+    const sid = getActiveSchoolId();
+    if (sid) {
+        return db.prepare('SELECT * FROM installments WHERE school_id = ? OR school_id = 1 ORDER BY display_order').all(sid);
+    }
     return db.prepare('SELECT * FROM installments ORDER BY display_order').all();
 };
 
 handlers['db:addInstallment'] = async (name) => {
-    const count = db.prepare('SELECT COUNT(*) as count FROM installments').get().count;
-    return db.prepare('INSERT INTO installments (name, display_order) VALUES (?, ?)').run(name, count + 1);
+    const sid = getActiveSchoolId() || 1;
+    const count = db.prepare('SELECT COUNT(*) as count FROM installments WHERE school_id = ?').get(sid).count;
+    return db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, ?)').run(name, count + 1, sid);
 };
 
 handlers['db:deleteInstallment'] = async (id) => {
+    const sid = getActiveSchoolId();
     db.prepare('DELETE FROM class_installment_fees WHERE installment_id = ?').run(id);
+    if (sid) {
+        return db.prepare('DELETE FROM installments WHERE id = ? AND school_id = ?').run(id, sid);
+    }
     return db.prepare('DELETE FROM installments WHERE id = ?').run(id);
 };
 
@@ -688,6 +722,9 @@ handlers['db:getClassInstallmentFees'] = async (schoolId) => {
 };
 
 handlers['db:updateTuitionFee'] = async ({ classId, totalFee, registrationFee, transportFee = 0, examFee = 0 }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare(`
     INSERT INTO tuition_fees (class_id, total_fee, registration_fee, transport_fee, exam_fee)
     VALUES (?, ?, ?, ?, ?)
@@ -696,6 +733,9 @@ handlers['db:updateTuitionFee'] = async ({ classId, totalFee, registrationFee, t
 };
 
 handlers['db:updateClassInstallmentFee'] = async ({ classId, installmentId, amount }) => {
+    const sid = getActiveSchoolId();
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     return db.prepare(`
         INSERT INTO class_installment_fees (class_id, installment_id, amount)
         VALUES (?, ?, ?)
@@ -900,6 +940,7 @@ handlers['db:getPendingSubjects'] = async (schoolId) => {
 };
 
 handlers['db:updateGlobalSubject'] = async (subject) => {
+  if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
   const { id, name, domain, level, section } = subject;
   const existing = db.prepare('SELECT id FROM subjects WHERE UPPER(name) = UPPER(?) AND id != ?').get(name, id);
   if (existing) {
@@ -911,6 +952,7 @@ handlers['db:updateGlobalSubject'] = async (subject) => {
 };
 
 handlers['db:deleteGlobalSubject'] = async (id) => {
+  if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
   db.transaction((subjectId) => {
     db.prepare('DELETE FROM grades WHERE subject_id = ?').run(subjectId);
     db.prepare('DELETE FROM class_subjects WHERE subject_id = ?').run(subjectId);
@@ -967,6 +1009,9 @@ handlers['db:getClassSubjects'] = async (classId) => {
 };
 
 handlers['db:assignSubjectToClass'] = async ({ classId, subjectId, coefficient, isOptional }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare(`
     INSERT INTO class_subjects (class_id, subject_id, coefficient, is_optional)
     VALUES (?, ?, ?, ?)
@@ -977,6 +1022,9 @@ handlers['db:assignSubjectToClass'] = async ({ classId, subjectId, coefficient, 
 };
 
 handlers['db:removeSubjectFromClass'] = async ({ classId, subjectId }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare('DELETE FROM class_subjects WHERE class_id = ? AND subject_id = ?')
     .run(classId, subjectId);
 };
@@ -1054,10 +1102,12 @@ handlers['db:addClass'] = async (classData) => {
 
 handlers['db:updateClass'] = async (classData) => {
     const { id, name, code, section, level, mainTeacherId, assistantTeacherId } = classData;
-    
+    const sid = getActiveSchoolId();
+
     db.transaction(() => {
         // Find previous teachers of this class
-        const prevClass = db.prepare('SELECT main_teacher_id, assistant_teacher_id FROM classes WHERE id = ?').get(id);
+        const prevClass = db.prepare('SELECT main_teacher_id, assistant_teacher_id FROM classes WHERE id = ? AND school_id = ?').get(id, sid);
+        if (!prevClass) throw new Error('Classe non autorisée pour cet établissement.');
         const prevTeacherId = prevClass ? prevClass.main_teacher_id : null;
         const prevAssistantId = prevClass ? prevClass.assistant_teacher_id : null;
 
@@ -1094,10 +1144,10 @@ handlers['db:updateClass'] = async (classData) => {
         }
 
         db.prepare(`
-            UPDATE classes 
+            UPDATE classes
             SET name = ?, code = ?, section = ?, level = ?, main_teacher_id = ?, assistant_teacher_id = ?
-            WHERE id = ?
-        `).run(name, code, section, level, mainTeacherId || null, assistantTeacherId || null, id);
+            WHERE id = ? AND school_id = ?
+        `).run(name, code, section, level, mainTeacherId || null, assistantTeacherId || null, id, sid);
     })();
     
     return { success: true };
@@ -1105,6 +1155,10 @@ handlers['db:updateClass'] = async (classData) => {
 };
 
 handlers['db:deleteClass'] = async (classId) => {
+    const sid = getActiveSchoolId();
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
+
     // Prevent deletion if students are assigned
     const studentCount = db.prepare('SELECT COUNT(*) as count FROM students WHERE class_id = ?').get(classId).count;
     if (studentCount > 0) {
@@ -1130,7 +1184,7 @@ handlers['db:deleteClass'] = async (classId) => {
             } catch(e) {}
         }
 
-        db.prepare('DELETE FROM classes WHERE id = ?').run(classId);
+        db.prepare('DELETE FROM classes WHERE id = ? AND school_id = ?').run(classId, sid);
     })();
 
     return { success: true };
@@ -1186,7 +1240,8 @@ handlers['db:updateSchedule'] = async (schedule) => {
 };
 
 handlers['db:deleteSchedule'] = async (id) => {
-    return db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
+    const sid = getActiveSchoolId();
+    return db.prepare('DELETE FROM schedules WHERE id = ? AND school_id = ?').run(id, sid);
 };
 
 handlers['db:getEvaluationSchedules'] = async (schoolId) => {
@@ -1202,7 +1257,8 @@ handlers['db:addEvaluationSchedule'] = async (schedule) => {
 };
 
 handlers['db:deleteEvaluationSchedule'] = async (id) => {
-    return db.prepare('DELETE FROM evaluation_schedules WHERE id = ?').run(id);
+    const sid = getActiveSchoolId();
+    return db.prepare('DELETE FROM evaluation_schedules WHERE id = ? AND school_id = ?').run(id, sid);
 };
 
 handlers['db:getBusRoutes'] = async (schoolId) => {
@@ -1283,7 +1339,8 @@ handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, rout
 };
 
 handlers['db:getParentStudents'] = async (parentPhone) => {
-    return db.prepare('SELECT * FROM students WHERE parent_contact = ?').all(parentPhone);
+    const sid = getActiveSchoolId();
+    return db.prepare('SELECT * FROM students WHERE parent_contact = ? AND school_id = ?').all(parentPhone, sid);
 };
 
 handlers['db:logTransport'] = async (log) => {
@@ -1358,14 +1415,76 @@ handlers['db:deleteMobileKey'] = async (keyId) => {
     return db.prepare('DELETE FROM mobile_access_keys WHERE id = ?').run(keyId);
 };
 
-handlers['db:getSetting'] = async (key) => {
-  const res = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  return res ? res.value : null;
+const GLOBAL_SETTINGS = ['initial_seeding_done'];
 
+const scopeSettingKey = (key) => {
+  if (GLOBAL_SETTINGS.includes(key)) return key;
+  const sid = getActiveSchoolId();
+  if (!sid) return key;
+  if (key.startsWith(`s${sid}_`)) return key;
+  return `s${sid}_${key}`;
+};
+
+handlers['db:getSetting'] = async (key) => {
+  const scopedKey = scopeSettingKey(key);
+  const res = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopedKey);
+  if (res) return res.value;
+  if (scopedKey !== key) {
+    const fallback = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    return fallback ? fallback.value : null;
+  }
+  return null;
 };
 
 handlers['db:setSetting'] = async ({ key, value }) => {
-  return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+  const scopedKey = scopeSettingKey(key);
+  return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(scopedKey, value);
+};
+
+handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, recordedBy, scheduleId }) => {
+  const sid = getActiveSchoolId();
+  return db.prepare(`
+    INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by, schedule_id, school_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(student_id, date, schedule_id) DO UPDATE SET
+      status = excluded.status,
+      hours_absent = excluded.hours_absent,
+      recorded_by = excluded.recorded_by
+  `).run(studentId, date, status, hoursAbsent || 0, recordedBy, scheduleId || 0, sid);
+};
+
+handlers['db:validatePayment'] = async (data) => {
+  const user = session.getStore()?.user;
+  if (!user || (user.role !== 'SUPERADMIN' && user.role !== 'FOUNDER')) throw new Error('Non autorisé');
+  const { schoolId, monthsGranted, amount } = data;
+  const tx = db.transaction(() => {
+    db.prepare("INSERT INTO saas_subscriptions (school_id, amount, payment_method, months_granted, start_date, end_date, status, validated_by) VALUES (?, ?, 'CASH', ?, date('now'), date('now', '+' || ? || ' months'), 'VALIDATED', ?)")
+      .run(schoolId, amount, monthsGranted, monthsGranted, user.id);
+    db.prepare("UPDATE schools SET subscription_status = 'ACTIVE', subscription_end_date = date(COALESCE(subscription_end_date, date('now')), '+' || ? || ' months'), is_active = 1 WHERE id = ?")
+      .run(monthsGranted, schoolId);
+  });
+  tx();
+  return { success: true };
+};
+
+handlers['db:cancelPendingSubject'] = async (id) => {
+  return db.prepare("UPDATE pending_subjects SET status = 'CANCELLED' WHERE id = ?").run(id);
+};
+
+handlers['db:getServerIp'] = async () => {
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return '127.0.0.1';
+};
+
+handlers['db:getSystemRequests'] = async ({ schoolId }) => {
+  const sid = getActiveSchoolId(schoolId);
+  return db.prepare("SELECT * FROM notifications WHERE school_id = ? AND type = 'ACTION_REQUIRED' ORDER BY created_at DESC").all(sid);
 };
 
 handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
@@ -1511,19 +1630,23 @@ handlers['db:addUser'] = async (user) => {
     
     if (role === 'TEACHER' && assignedClasses && assignedClasses.length > 0) {
         if (classRole === 'ASSISTANT') {
-            db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+            db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ') AND school_id = ?').run(result.lastInsertRowid, ...assignedClasses, sid);
         } else {
-            db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(result.lastInsertRowid, ...assignedClasses);
+            db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ') AND school_id = ?').run(result.lastInsertRowid, ...assignedClasses, sid);
         }
     }
   });
   transaction();
-  
+
   return { success: true, matricule };
 
 };
 
 handlers['db:deleteUser'] = async (id) => {
+  const user = session.getStore()?.user;
+  if (!user || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+  const sid = getActiveSchoolId();
+
   // Check if user is linked to grades
   const gradesCount = db.prepare('SELECT COUNT(*) as count FROM grades WHERE teacher_id = ?').get(id).count;
   if (gradesCount > 0) throw new Error('Impossible de supprimer cet utilisateur : des notes lui sont associées. Veuillez désactiver le compte.');
@@ -1546,18 +1669,20 @@ handlers['db:deleteUser'] = async (id) => {
   // Assistant teacher can be safely removed from their class
   db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ?').run(id);
 
-  return db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  return db.prepare('DELETE FROM users WHERE id = ? AND school_id = ?').run(id, sid);
 };
 
 handlers['db:toggleUserActive'] = async ({ id, isActive }) => {
-    return db.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, id);
+    const sid = getActiveSchoolId();
+    return db.prepare('UPDATE users SET is_active = ? WHERE id = ? AND school_id = ?').run(isActive ? 1 : 0, id, sid);
 };
 
 handlers['db:updateUser'] = async (userToUpdate) => {
   const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
+  const sid = getActiveSchoolId();
 
-  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM users WHERE id = ? AND school_id = ?').get(id, sid);
   if (!existing) throw new Error("Utilisateur introuvable");
 
   // Check username uniqueness if changed
@@ -1579,16 +1704,16 @@ handlers['db:updateUser'] = async (userToUpdate) => {
     if (password && password.trim()) {
         const hash = bcrypt.hashSync(password.trim(), 10);
         db.prepare(`
-          UPDATE users SET 
-            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ? 
-          WHERE id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id);
+          UPDATE users SET
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ?
+          WHERE id = ? AND school_id = ?
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id, sid);
     } else {
         db.prepare(`
-          UPDATE users SET 
-            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ? 
-          WHERE id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id);
+          UPDATE users SET
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?
+          WHERE id = ? AND school_id = ?
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id, sid);
     }
 
     if (finalRole === 'TEACHER') {
@@ -1609,15 +1734,31 @@ handlers['db:updateUser'] = async (userToUpdate) => {
 };
 
 handlers['db:changePassword'] = async ({ userId, newPassword }) => {
-  const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
+  const user = session.getStore()?.user;
+  if (!user) throw new Error('Non authentifié');
+  if (user.id !== userId && user.role !== 'FOUNDER' && user.role !== 'DIRECTOR' && user.role !== 'SUPERADMIN') {
+    throw new Error('Non autorisé');
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  const sid = getActiveSchoolId();
+  if (sid) {
+    return db.prepare('UPDATE users SET password = ? WHERE id = ? AND school_id = ?').run(hash, userId, sid);
+  }
   return db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, userId);
 };
 
 handlers['db:sendTicket'] = async (ticket) => {
   const { sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data } = ticket;
   const sid = getActiveSchoolId(school_id);
+  const safeReceiverId = receiver_id ? parseInt(receiver_id, 10) : null;
+  if (safeReceiverId) {
+    const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(safeReceiverId);
+    if (!exists) {
+      throw new Error('Le destinataire sélectionné est introuvable.');
+    }
+  }
   return db.prepare('INSERT INTO tickets (sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(sender_id, receiver_role, receiver_id, subject, message, sid, request_type || null, request_data ? JSON.stringify(request_data) : null);
+    .run(sender_id, receiver_role, safeReceiverId, subject, message, sid, request_type || null, request_data ? JSON.stringify(request_data) : null);
 };
 
 handlers['db:getTickets'] = async ({ userId, role, schoolId }) => {
@@ -1651,27 +1792,31 @@ handlers['db:getUnreadTicketsCount'] = async ({ userId, role, schoolId }) => {
 };
 
 handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actionData }) => {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    const sid = getActiveSchoolId();
+    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND school_id = ?').get(ticketId, sid);
     if (!ticket) throw new Error("Ticket introuvable");
     
     // Si c'est une demande d'extension de délai et qu'elle est approuvée avec un nombre d'heures
     if (status === 'RESOLVED' && (ticket.request_type === 'GRADE_EXTENSION' || ticket.request_type === 'GRADE_REACTIVATION') && actionData && actionData.hours) {
         let rData = {};
         try { rData = JSON.parse(ticket.request_data); } catch(e) {}
-        
+
         const classId = rData.classId || rData.class_id;
         const term = rData.term;
         const sequence = rData.sequence || rData.month;
 
+        const currentUser = session.getStore()?.user;
+        const grantedBy = currentUser?.id || ticket.receiver_id || 1;
+
         if (classId && term && sequence) {
             const deadline = new Date();
             deadline.setHours(deadline.getHours() + parseInt(actionData.hours));
-            
+
             const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(ticket.sender_id, classId, term, sequence);
             if (existing) {
-                db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?').run(deadline.toISOString(), ticket.receiver_id || ticket.receiver_role || 1, existing.id);
+                db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?').run(deadline.toISOString(), grantedBy, existing.id);
             } else {
-                db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(ticket.sender_id, classId, term, sequence, deadline.toISOString(), ticket.receiver_id || ticket.receiver_role || 1);
+                db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(ticket.sender_id, classId, term, sequence, deadline.toISOString(), grantedBy);
             }
         }
     }
@@ -1695,8 +1840,16 @@ handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actio
 handlers['db:createExpense'] = async (expense) => {
   const { amount, reason, requested_by, school_id } = expense;
   const sid = getActiveSchoolId(school_id);
-  return db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
+  const result = db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
     .run(amount, reason, requested_by, sid);
+
+  const user = db.prepare('SELECT full_name, role FROM users WHERE id = ?').get(requested_by);
+  const roleName = user?.role === 'BURSAR' ? "l'Économe" : (user?.full_name || 'un utilisateur');
+  const reqData = JSON.stringify({ expenseId: result.lastInsertRowid, amount, reason });
+  db.prepare("INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status) VALUES (?, NULL, ?, 'ACTION_REQUIRED', 'CASH_WITHDRAWAL', ?, 'PENDING')")
+    .run(sid, `Une demande de ${amount} FCFA a été soumise par ${roleName} pour: ${reason}. Veuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`, reqData);
+
+  return result;
 };
 
 handlers['db:getExpenses'] = async (schoolId) => {
@@ -1705,7 +1858,8 @@ handlers['db:getExpenses'] = async (schoolId) => {
 };
 
 handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) => {
-  return db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ?').run(status, validatedBy, expenseId);
+  const sid = getActiveSchoolId();
+  return db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ? AND school_id = ?').run(status, validatedBy, expenseId, sid);
 };
 
 handlers['db:createNotification'] = async (notification) => {
@@ -1833,7 +1987,7 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
       WHERE request_type = 'SUBJECT_ACTIVATION' OR (school_id = ? AND (user_id = ? OR user_id IS NULL))
       ORDER BY created_at DESC LIMIT 50
     `).all(sid, userId);
-  } else if (userRole === 'FOUNDER' || userRole === 'DIRECTOR' || userRole === 'SG') {
+  } else if (userRole === 'FOUNDER' || userRole === 'DIRECTOR' || userRole === 'SG' || userRole === 'ADVISOR') {
     return db.prepare(`
       SELECT * FROM notifications 
       WHERE school_id = ? AND (
@@ -1853,11 +2007,15 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
 };
 
 handlers['db:markNotificationRead'] = async (notificationId) => {
-  return db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ?').run(notificationId);
+  const user = session.getStore()?.user;
+  const userId = user?.id;
+  return db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND (user_id = ? OR user_id IS NULL)').run(notificationId, userId);
 };
 
 handlers['db:getStudentDetails'] = async (studentId) => {
-  const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ?').get(studentId);
+  const sid = getActiveSchoolId();
+  const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
+  if (!student) throw new Error('Élève introuvable ou non autorisé.');
   const payments = db.prepare('SELECT p.*, i.name as installmentName FROM payments p LEFT JOIN installments i ON p.installment_id = i.id WHERE p.student_id = ?').all(studentId);
   const attendance = db.prepare('SELECT * FROM attendance WHERE student_id = ?').all(studentId);
   const grades = db.prepare('SELECT g.*, s.name as subjectName, s.domain, COALESCE(cs.coefficient, 1) as coefficient FROM grades g JOIN subjects s ON g.subject_id = s.id LEFT JOIN class_subjects cs ON g.class_id = cs.class_id AND g.subject_id = cs.subject_id WHERE g.student_id = ?').all(studentId);
@@ -1901,16 +2059,23 @@ handlers['db:searchStudentsDetailed'] = async ({ name, schoolId, section, level,
 };
 
 handlers['db:updateStudentStatus'] = async ({ id, status }) => {
-    return db.prepare('UPDATE students SET status = ? WHERE id = ?').run(status, id);
+    const sid = getActiveSchoolId();
+    return db.prepare('UPDATE students SET status = ? WHERE id = ? AND school_id = ?').run(status, id, sid);
 };
 
 handlers['db:deleteStudent'] = async (id) => {
+    const user = session.getStore()?.user;
+    if (!user || !['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+    const sid = getActiveSchoolId();
+    const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(id, sid);
+    if (!student) throw new Error('Élève introuvable ou non autorisé.');
+
     // Hard delete with cascade (deleting related records manually to avoid FK errors if ON DELETE CASCADE is missing)
     const tx = db.transaction(() => {
         db.prepare('DELETE FROM grades WHERE student_id = ?').run(id);
         db.prepare('DELETE FROM attendance WHERE student_id = ?').run(id);
         db.prepare('DELETE FROM payments WHERE student_id = ?').run(id);
-        db.prepare('DELETE FROM students WHERE id = ?').run(id);
+        db.prepare('DELETE FROM students WHERE id = ? AND school_id = ?').run(id, sid);
     });
     tx();
     return { success: true };
@@ -1919,12 +2084,13 @@ handlers['db:deleteStudent'] = async (id) => {
 handlers['db:updateStudent'] = async (student) => {
   const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire, busRouteId } = student;
   const parsedClassId = parseInt(classId, 10);
-  
+  const sid = getActiveSchoolId();
+
   const runResult = db.prepare(`
-    UPDATE students 
+    UPDATE students
     SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, gender = ?, parent_name = ?, parent_contact = ?, emergency_contact = ?, medical_info = ?, address = ?, neighborhood = ?, section = ?, class_id = ?, scholarship_reduction = ?, has_moratoire = ?, bus_route_id = ?
-    WHERE id = ?
-  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, scholarshipReduction || 0, hasMoratoire ? 1 : 0, busRouteId ? parseInt(busRouteId, 10) : null, id);
+    WHERE id = ? AND school_id = ?
+  `).run(firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address || '', neighborhood || '', section, parsedClassId, scholarshipReduction || 0, hasMoratoire ? 1 : 0, busRouteId ? parseInt(busRouteId, 10) : null, id, sid);
 
   if (runResult.changes > 0 && parentContact && parentContact.trim()) {
       const studentInDb = db.prepare('SELECT parent_name, school_id FROM students WHERE id = ?').get(id);
@@ -2322,7 +2488,7 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
             FROM evaluation_schedules e
             LEFT JOIN classes c ON e.class_id = c.id
             LEFT JOIN subjects s ON e.subject_id = s.id
-            WHERE e.school_id = ? AND e.teacher_id = ?
+            WHERE e.school_id = ? AND e.teacher_id = ? AND e.status IN ('APPROVED', 'FORCED_APPROVED')
         `).all(sid, tId);
     }
 
@@ -2340,8 +2506,10 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
 };
 
 handlers['db:updateSchoolSettings'] = async (settings) => {
-    const { 
-        id, 
+    const user = session.getStore()?.user;
+    if (!user || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+    const {
+        id,
         name,
         motto,
         address,
@@ -2481,6 +2649,8 @@ handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) =
 };
 
 handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, deadline, grantedBy }) => {
+    const user = session.getStore()?.user;
+    if (!user || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
     const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
@@ -2489,17 +2659,30 @@ handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, dead
 
 handlers['db:getParentMessages'] = async ({ schoolId, userId }) => {
     const sid = getActiveSchoolId(schoolId);
-    // Fetch announcements meant for PARENTS or ALL
+    
+    // 1. Get classes of the parent's children
+    const parentRow = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+    const parentPhone = parentRow ? parentRow.username : '';
+    const children = db.prepare('SELECT class_id FROM students WHERE school_id = ? AND parent_contact = ?').all(sid, parentPhone);
+    const classIds = children.map(c => c.class_id).filter(Boolean);
+    const classTargets = classIds.map(id => `'CLASS_${id}'`).join(',');
+    
+    let targetCondition = `a.target IN ('PARENTS', 'ALL')`;
+    if (classTargets) {
+        targetCondition = `a.target IN ('PARENTS', 'ALL', ${classTargets})`;
+    }
+
+    // Fetch announcements meant for PARENTS, ALL, or specific classes
     const announcements = db.prepare(`
-        SELECT a.id, a.title, a.content, a.created_at, u.full_name as sender_name, u.role as sender_role 
+        SELECT a.id, a.title, a.content, a.created_at, u.full_name as sender_name, u.role as sender_role, a.sender_id, 'ANNOUNCEMENT' as message_type
         FROM announcements a 
         LEFT JOIN users u ON a.sender_id = u.id 
-        WHERE a.school_id = ? AND a.target IN ('PARENTS', 'ALL')
+        WHERE a.school_id = ? AND ${targetCondition}
     `).all(sid);
 
     // Fetch direct tickets to the parent
     const tickets = db.prepare(`
-        SELECT t.id, t.subject as title, t.message as content, t.created_at, u.full_name as sender_name, u.role as sender_role
+        SELECT t.id, t.subject as title, t.message as content, t.created_at, u.full_name as sender_name, u.role as sender_role, t.sender_id, 'TICKET' as message_type
         FROM tickets t
         LEFT JOIN users u ON t.sender_id = u.id
         WHERE t.school_id = ? AND t.receiver_id = ?
@@ -2510,6 +2693,10 @@ handlers['db:getParentMessages'] = async ({ schoolId, userId }) => {
     
     return allMessages;
 
+};
+
+handlers['db:sendParentTicket'] = async (ticket) => {
+    return handlers['db:sendTicket'](ticket);
 };
 
 handlers['db:getClassGradingScale'] = async (classId) => {
@@ -2567,10 +2754,11 @@ handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubje
 };
 
 handlers['db:deleteGradingScale'] = async (id) => {
+  const sid = getActiveSchoolId();
   const tx = db.transaction(() => {
-    db.prepare('UPDATE classes SET grading_scale_id = NULL WHERE grading_scale_id = ?').run(id);
+    db.prepare('UPDATE classes SET grading_scale_id = NULL WHERE grading_scale_id = ? AND school_id = ?').run(id, sid);
     db.prepare('DELETE FROM grading_scale_options WHERE scale_id = ?').run(id);
-    db.prepare('DELETE FROM grading_scales WHERE id = ?').run(id);
+    db.prepare('DELETE FROM grading_scales WHERE id = ? AND school_id = ?').run(id, sid);
   });
   tx();
   return { success: true };
@@ -2602,6 +2790,9 @@ handlers['db:getClassTeacherAssignments'] = async (classId) => {
 };
 
 handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM class_teacher_subjects WHERE class_id = ?').run(classId);
     if (assignments && Array.isArray(assignments)) {
@@ -2618,7 +2809,7 @@ handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) =>
 handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, requestData }) => {
   const reqDataObj = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
   const actualSenderId = senderId || reqDataObj.teacherId || reqDataObj.senderId;
-  const sid = getActiveSchoolId(schoolId || reqDataObj.schoolId || 1); // default fallback
+  const sid = getActiveSchoolId(schoolId || reqDataObj.schoolId);
   const reqDataStr = typeof requestData === 'string' ? requestData : JSON.stringify(requestData);
   
   let message = `Nouvelle demande de la part d'un utilisateur.`;
@@ -2652,8 +2843,8 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
 
   db.prepare(`
     INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status)
-    VALUES (?, ?, ?, 'ACTION_REQUIRED', ?, ?, 'PENDING')
-  `).run(sid, actualSenderId, `Demande Système: ${message}`, requestType, reqDataStr);
+    VALUES (?, NULL, ?, 'ACTION_REQUIRED', ?, ?, 'PENDING')
+  `).run(sid, `Demande Système: ${message}`, requestType, reqDataStr);
   
   return { success: true };
 };
@@ -2663,23 +2854,11 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
   if (!notif) throw new Error("Notification introuvable.");
   if (notif.action_status !== 'PENDING') throw new Error("Cette demande a déjà été résolue.");
 
-  let grantedById = parseInt(resolvedBy, 10);
-  if (isNaN(grantedById)) {
-    // Try to find the user by name
-    const u = db.prepare('SELECT id FROM users WHERE full_name = ? OR username = ?').get(resolvedBy, resolvedBy);
-    if (u) {
-      grantedById = u.id;
-    } else {
-      // Fallback to the founder of the school
-      const founder = db.prepare("SELECT id FROM users WHERE school_id = ? AND role = 'FOUNDER' LIMIT 1").get(notif.school_id);
-      if (founder) {
-        grantedById = founder.id;
-      } else {
-        // Absolute fallback to any valid user
-        const anyUser = db.prepare('SELECT id FROM users LIMIT 1').get();
-        grantedById = anyUser ? anyUser.id : 0;
-      }
-    }
+  const currentUser = session.getStore()?.user;
+  let grantedById = currentUser?.id || parseInt(resolvedBy, 10);
+  if (!grantedById || isNaN(grantedById)) {
+    const founder = db.prepare("SELECT id FROM users WHERE school_id = ? AND role = 'FOUNDER' LIMIT 1").get(notif.school_id);
+    grantedById = founder ? founder.id : 1;
   }
 
   const tx = db.transaction(() => {
@@ -2699,8 +2878,12 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
             .run(deadlineStr, grantedById, existing.id);
         } else {
           db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(data.teacherId, data.classId, data.term, data.month, deadlineStr, grantedById);
-        }
+              .run(data.teacherId, data.classId, data.term, data.month, deadlineStr, grantedById);
+          }
+          
+          // Also unlock the specific grades for this teacher
+          db.prepare('UPDATE grades SET locked = 0 WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?')
+            .run(data.teacherId, data.classId, data.term, data.month);
 
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
@@ -2711,13 +2894,18 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
         const data = JSON.parse(notif.request_data);
         const settingKey = `attendance_unlock_${data.classId}_${data.rawDate}`;
         
+        const deadlineDate = new Date();
+        const hrs = parseInt(durationHours, 10) || 24;
+        deadlineDate.setHours(deadlineDate.getHours() + hrs);
+        const deadlineStr = deadlineDate.toISOString();
+
         // Add to settings table
         db.prepare(`
           INSERT INTO settings (key, value) 
-          VALUES (?, 'true') 
+          VALUES (?, ?) 
           ON CONFLICT(key) 
-          DO UPDATE SET value = 'true'
-        `).run(settingKey);
+          DO UPDATE SET value = ?
+        `).run(settingKey, deadlineStr, deadlineStr);
 
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
@@ -2747,11 +2935,19 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
         `).run(notif.school_id, notif.user_id, `Votre demande d'extension pour la classe a été approuvée pour une durée de ${hrs} heures.`);
-      } else if (notif.request_type === 'CASH_WITHDRAWAL' || notif.request_type === 'PRINT_AUTHORIZATION') {
+      } else if (notif.request_type === 'CASH_WITHDRAWAL') {
+        if (data.expenseId) {
+          db.prepare("UPDATE expenses SET status = 'VALIDATED', validated_by = ? WHERE id = ?").run(grantedById, data.expenseId);
+        }
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
-        `).run(notif.school_id, notif.user_id, `Votre demande (${notif.request_type === 'CASH_WITHDRAWAL' ? 'Décaissement' : 'Impression'}) a été approuvée.`);
+        `).run(notif.school_id, notif.user_id || data.requested_by, `Votre demande de décaissement de ${data.amount || ''} FCFA a été approuvée.`);
+      } else if (notif.request_type === 'PRINT_AUTHORIZATION') {
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, notif.user_id, `Votre demande d'impression a été approuvée.`);
       }
       
       db.prepare("UPDATE notifications SET action_status = 'APPROVED' WHERE id = ?").run(notificationId);
@@ -2770,7 +2966,16 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
         `).run(notif.school_id, data.teacherId, `Votre demande de déblocage des présences pour la classe ${data.className || ''} a été refusée.`);
-      } else if (['GRADE_EXTENSION', 'CASH_WITHDRAWAL', 'PRINT_AUTHORIZATION'].includes(notif.request_type)) {
+      } else if (notif.request_type === 'CASH_WITHDRAWAL') {
+        const data = JSON.parse(notif.request_data);
+        if (data.expenseId) {
+          db.prepare("UPDATE expenses SET status = 'REJECTED', validated_by = ? WHERE id = ?").run(grantedById, data.expenseId);
+        }
+        db.prepare(`
+          INSERT INTO notifications (school_id, user_id, message, type)
+          VALUES (?, ?, ?, 'SYSTEM')
+        `).run(notif.school_id, notif.user_id || data.requested_by, `Votre demande de décaissement de ${data.amount || ''} FCFA a été refusée.`);
+      } else if (['GRADE_EXTENSION', 'PRINT_AUTHORIZATION'].includes(notif.request_type)) {
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
@@ -2791,20 +2996,56 @@ handlers['db:getTodayTransportAttendance'] = async ({ routeId, direction }) => {
   `).all(routeId, direction);
 };
 
-handlers['db:getTodayTransportAttendance'] = async ({ routeId, direction }) => {
-  return db.prepare(`
-    SELECT student_id, status 
-    FROM transport_attendance 
-    WHERE route_id = ? AND date = date('now') AND direction = ?
-  `).all(routeId, direction);
+handlers['db:getSettings'] = async () => {
+  const sid = getActiveSchoolId();
+  if (sid) {
+    const prefix = `s${sid}_`;
+    return db.prepare('SELECT key as setting_key, value as setting_value FROM settings WHERE key LIKE ? OR key IN (SELECT key FROM settings WHERE key NOT LIKE ?)')
+      .all(`${prefix}%`, 's%_%');
+  }
+  return db.prepare('SELECT key as setting_key, value as setting_value FROM settings').all();
 };
 
-handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubjectCode, allowFounderTermEdit }) => {
-  const tx = db.transaction(() => {
-    db.prepare('UPDATE schools SET requires_subject_code = ?, allow_founder_term_edit = ? WHERE id = ?')
-      .run(requiresSubjectCode, allowFounderTermEdit, schoolId);
-  });
-  tx();
+handlers['db:approveExpenseInline'] = async ({ expenseId, action, resolvedBy }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Unauthorized');
+  const sid = getActiveSchoolId();
+  const expense = db.prepare('SELECT * FROM expenses WHERE id = ? AND school_id = ?').get(expenseId, sid);
+  if (!expense) throw new Error("Décaissement introuvable.");
+  const newStatus = action === 'APPROVED' ? 'VALIDATED' : 'REJECTED';
+  db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ?').run(newStatus, resolvedBy, expenseId);
+  const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(expense.requested_by);
+  const msg = action === 'APPROVED'
+    ? `Votre demande de décaissement de ${expense.amount} FCFA a été approuvée.`
+    : `Votre demande de décaissement de ${expense.amount} FCFA a été refusée.`;
+  db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'SYSTEM')").run(expense.school_id, expense.requested_by, msg);
+  return { success: true };
+};
+
+handlers['db:reassignExamSurveillant'] = async ({ examId, newTeacherId, schoolId, notificationId }) => {
+  const user = session.getStore()?.user;
+  if (!user || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+  const sid = getActiveSchoolId(schoolId);
+  const exam = db.prepare('SELECT * FROM evaluation_schedules WHERE id = ? AND school_id = ?').get(examId, sid);
+  if (!exam) throw new Error("Évaluation introuvable.");
+
+  const oldTeacherId = exam.teacher_id;
+  db.prepare('UPDATE evaluation_schedules SET teacher_id = ?, status = ? WHERE id = ?').run(newTeacherId, 'PENDING_TEACHER', examId);
+
+  if (notificationId) {
+    db.prepare("UPDATE notifications SET action_status = 'APPROVED' WHERE id = ?").run(notificationId);
+  }
+
+  const newTeacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(newTeacherId);
+  const oldTeacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(oldTeacherId);
+  const subject = db.prepare('SELECT name FROM subjects WHERE id = ?').get(exam.subject_id);
+
+  db.prepare("INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data) VALUES (?, ?, ?, 'ACTION_REQUIRED', 'EXAM_SURVEILLANCE_REQUEST', ?)")
+    .run(sid, newTeacherId, `Vous êtes programmé(e) pour surveiller l'évaluation de ${subject?.name || ''} le ${exam.date} de ${exam.start_time} à ${exam.end_time}.`, JSON.stringify({ exam_id: examId }));
+
+  db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')")
+    .run(sid, oldTeacherId, `Votre refus de surveiller l'évaluation du ${exam.date} a été accepté. ${newTeacher?.full_name || 'Un autre enseignant'} vous remplace.`);
+
   return { success: true };
 };
 

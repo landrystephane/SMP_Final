@@ -42,19 +42,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.electronAPI.restoreSession(user)
         .then(() => {
           setIsRestoringSession(false);
-          // Update document title for alert boxes
           window.electronAPI.getSchools().then((schools: any) => {
               const currentSchool = schools.find((s: any) => Number(s.id) === Number(user.schoolId)) || schools[0];
-              if (currentSchool && currentSchool.name) {
-                  document.title = currentSchool.name;
-              } else {
-                  document.title = "Eco'Manage";
-              }
-          });
+              document.title = currentSchool?.name || "Eco'Manage";
+          }).catch(() => {});
         })
         .catch(err => {
-          console.error("Failed to restore main process session:", err);
+          console.error("Session restore failed:", err);
           setIsRestoringSession(false);
+          if (err?.message?.includes('401') || err?.message?.includes('expir') || err?.message?.includes('Authentification')) {
+            setUser(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('saas_token');
+          }
         });
     } else {
       setIsRestoringSession(false);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Ensure role is correctly handled from DB
                 const userObj: User = {
                     ...result,
-                    role: result.role || 'FOUNDER' // Fallback to avoid role_undefined
+                    role: result.role || 'TEACHER'
                 };
                 setUser(userObj);
                 localStorage.setItem('user', JSON.stringify(userObj));
@@ -116,11 +116,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    if (window.electronAPI) {
-        await window.electronAPI.logout();
+    try {
+        if (window.electronAPI) {
+            await window.electronAPI.logout();
+        }
+    } catch (e) {
+        // Ignore API errors during logout
     }
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('saas_token');
     localStorage.removeItem('impersonated_school_id');
   };
 

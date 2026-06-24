@@ -1,47 +1,75 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { initDb, db } = require('./electron/database/db');
 const jwt = require('jsonwebtoken');
 const session = require('./electron/database/session');
-const JWT_SECRET = process.env.JWT_SECRET || 'eco-manage-super-secret-key';
+
+if (!process.env.JWT_SECRET) {
+    console.warn('[⚠️  SÉCURITÉ] JWT_SECRET non défini ! Utilisation du secret par défaut. Définir JWT_SECRET en variable d\'environnement pour la production.');
+}
+const JWT_SECRET = process.env.JWT_SECRET || 'eco-manage-super-secret-key-' + crypto.randomBytes(16).toString('hex');
 const apiHandlers = require('./electron/database/apiHandlers');
 
 // Initialisation de la base de données
 initDb();
 
 const app = express();
-// Le Cloud (Railway/VPS) injecte process.env.PORT, sinon on utilise 3001
 const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(bodyParser.json());
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 200,
+    message: { error: 'Trop de requêtes. Veuillez patienter.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.use('/api', apiLimiter);
 
 app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    if (req.path === '/auth/login') return next();
-    
+    if (req.path === '/auth/login' || req.path === '/health') return next();
+
     const authHeader = req.headers.authorization;
     let user = null;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
         try {
             user = jwt.verify(token, JWT_SECRET);
-        } catch (e) {}
+        } catch (e) {
+            return res.status(401).json({ error: 'Token invalide ou expiré' });
+        }
     }
-    
+
+    if (!user) {
+        return res.status(401).json({ error: 'Authentification requise' });
+    }
+
     if (req.path.startsWith('/saas/') && req.path !== '/saas/schools') {
-        if (!user || user.role !== 'SUPERADMIN') {
+        if (user.role !== 'SUPERADMIN') {
             return res.status(403).json({ error: 'Accès réservé au Super Admin' });
         }
     }
-    
+
     session.run({ user }, () => {
         next();
     });
@@ -76,7 +104,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Migration de 'auth:login'
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', loginLimiter, (req, res) => {
     const { username, password } = req.body;
     
     try {

@@ -35,7 +35,7 @@ import { useTranslation } from 'react-i18next';
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isRestoringSession } = useAuth();
   const { t } = useTranslation();
-  
+
   if (isRestoringSession) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-white font-black text-sm italic uppercase tracking-[0.2em]">
@@ -46,8 +46,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       </div>
     );
   }
-  
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+const RoleGuard: React.FC<{ roles: string[]; children: React.ReactNode }> = ({ roles, children }) => {
+  const { user } = useAuth();
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
 };
 
 function App() {
@@ -67,28 +75,28 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
-              <Route path="students" element={<Students />} />
-              <Route path="subjects" element={<Subjects />} />
-              <Route path="grades" element={<Grades />} />
-              <Route path="finance" element={<Finance />} />
-              <Route path="tuition-config" element={<TuitionConfig />} />
-              <Route path="admin-workflow" element={<AdminWorkflow />} />
-              <Route path="attendance" element={<Attendance />} />
-              <Route path="tickets" element={<Tickets />} />
-              <Route path="transport" element={<Transport />} />
-              <Route path="users" element={<Users />} />
-              <Route path="parents" element={<Parents />} />
+              <Route path="students" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SECRETARY','SG','SUPERADMIN']}><Students /></RoleGuard>} />
+              <Route path="subjects" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','ADVISOR','SUPERADMIN']}><Subjects /></RoleGuard>} />
+              <Route path="grades" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','SUPERADMIN']}><Grades /></RoleGuard>} />
+              <Route path="finance" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']}><Finance /></RoleGuard>} />
+              <Route path="tuition-config" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']}><TuitionConfig /></RoleGuard>} />
+              <Route path="admin-workflow" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SECRETARY','SG','SUPERADMIN']}><AdminWorkflow /></RoleGuard>} />
+              <Route path="attendance" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SECRETARY','SG','ADVISOR','SUPERADMIN']}><Attendance /></RoleGuard>} />
+              <Route path="tickets" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SECRETARY','BURSAR','DRIVER','SG','SUPERADMIN']}><Tickets /></RoleGuard>} />
+              <Route path="transport" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Transport /></RoleGuard>} />
+              <Route path="users" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Users /></RoleGuard>} />
+              <Route path="parents" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SECRETARY','SG','SUPERADMIN']}><Parents /></RoleGuard>} />
               <Route path="profile" element={<Profile />} />
-              <Route path="mobile-access" element={<MobileAccess />} />
-              <Route path="sync" element={<SyncCenter />} />
-              <Route path="system-admin" element={<SystemAdmin />} />
-              <Route path="advisor" element={<AdvisorPortal />} />
-              <Route path="driver-portal" element={<DriverPortal />} />
-              <Route path="parent-portal" element={<ParentPortal />} />
-              <Route path="stats" element={<Statistics />} />
-              <Route path="customization" element={<CustomizationSettings />} />
-              <Route path="archives" element={<AnnualArchives />} />
-              <Route path="classes" element={<Classes />} />
+              <Route path="mobile-access" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SECRETARY','SG','SUPERADMIN']}><MobileAccess /></RoleGuard>} />
+              <Route path="sync" element={<RoleGuard roles={['TEACHER','DIRECTOR','SECRETARY','SUPERADMIN']}><SyncCenter /></RoleGuard>} />
+              <Route path="system-admin" element={<RoleGuard roles={['SUPERADMIN']}><SystemAdmin /></RoleGuard>} />
+              <Route path="advisor" element={<RoleGuard roles={['FOUNDER','SG','ADVISOR','SUPERADMIN']}><AdvisorPortal /></RoleGuard>} />
+              <Route path="driver-portal" element={<RoleGuard roles={['DRIVER','SUPERADMIN']}><DriverPortal /></RoleGuard>} />
+              <Route path="parent-portal" element={<RoleGuard roles={['PARENT','FOUNDER','SUPERADMIN']}><ParentPortal /></RoleGuard>} />
+              <Route path="stats" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']}><Statistics /></RoleGuard>} />
+              <Route path="customization" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']}><CustomizationSettings /></RoleGuard>} />
+              <Route path="archives" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']}><AnnualArchives /></RoleGuard>} />
+              <Route path="classes" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Classes /></RoleGuard>} />
             </Route>
           </Routes>
         </BrowserRouter>

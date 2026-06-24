@@ -65,42 +65,54 @@ function initDb() {
             console.log(`[Migration] Adding level to classes`);
             db.prepare(`ALTER TABLE classes ADD COLUMN level TEXT DEFAULT 'PRIMAIRE'`).run();
         }
-        // Harmonize class code CP1 to CP
-        db.prepare("UPDATE classes SET code = 'CP' WHERE code = 'CP1'").run();
-        console.log(`[Migration] Harmonized class code CP1 to CP`);
+        // One-shot: Harmonize class code CP1 to CP
+        const cpDone = db.prepare("SELECT value FROM settings WHERE key = 'migration_cp1_done'").get();
+        if (!cpDone) {
+            db.prepare("UPDATE classes SET code = 'CP' WHERE code = 'CP1'").run();
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_cp1_done', 'true')").run();
+            console.log(`[Migration] Harmonized class code CP1 to CP`);
+        }
 
-        // Ensure all class codes end with the current year (e.g. 26) as requested
+        // One-shot: Ensure all class codes end with the current year
         const currentYear = new Date().getFullYear().toString().slice(-2);
-        const classes = db.prepare('SELECT id, code FROM classes').all();
-        db.transaction(() => {
-            for (const c of classes) {
-                if (!c.code.endsWith(currentYear)) {
-                    // Remove any trailing numbers (like old years) before appending
-                    const baseCode = c.code.replace(/\d+$/, '');
-                    db.prepare('UPDATE classes SET code = ? WHERE id = ?').run(baseCode + currentYear, c.id);
+        const yearKey = `migration_year_codes_${currentYear}`;
+        const yearDone = db.prepare("SELECT value FROM settings WHERE key = ?").get(yearKey);
+        if (!yearDone) {
+            const classes = db.prepare('SELECT id, code FROM classes').all();
+            db.transaction(() => {
+                for (const c of classes) {
+                    if (!c.code.endsWith(currentYear)) {
+                        const baseCode = c.code.replace(/\d+$/, '');
+                        db.prepare('UPDATE classes SET code = ? WHERE id = ?').run(baseCode + currentYear, c.id);
+                    }
                 }
-            }
-        })();
-        console.log(`[Migration] Appended year ${currentYear} to class codes`);
+            })();
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, 'true')").run(yearKey);
+            console.log(`[Migration] Appended year ${currentYear} to class codes`);
+        }
     } catch (e) {
         console.error(`[Migration] Classes table migration failed:`, e.message);
     }
 
-    // 3.5.5 Fix student matricules with duplicated years (e.g. 26SIL260001 -> 26SIL0001)
+    // 3.5.5 One-shot: Fix student matricules with duplicated years
     try {
-        const students = db.prepare('SELECT id, matricule FROM students').all();
-        db.transaction(() => {
-            for (const s of students) {
-                if (s.matricule) {
-                    const match = s.matricule.match(/^(\d{2})([A-Z]+)(\d{2})(\d{4})$/);
-                    if (match && match[1] === match[3]) {
-                        const newMatricule = `${match[1]}${match[2]}${match[4]}`;
-                        db.prepare('UPDATE students SET matricule = ? WHERE id = ?').run(newMatricule, s.id);
+        const matDone = db.prepare("SELECT value FROM settings WHERE key = 'migration_matricule_fix_done'").get();
+        if (!matDone) {
+            const students = db.prepare('SELECT id, matricule FROM students').all();
+            db.transaction(() => {
+                for (const s of students) {
+                    if (s.matricule) {
+                        const match = s.matricule.match(/^(\d{2})([A-Z]+)(\d{2})(\d{4})$/);
+                        if (match && match[1] === match[3]) {
+                            const newMatricule = `${match[1]}${match[2]}${match[4]}`;
+                            db.prepare('UPDATE students SET matricule = ? WHERE id = ?').run(newMatricule, s.id);
+                        }
                     }
                 }
-            }
-        })();
-        console.log(`[Migration] Fixed duplicated years in student matricules`);
+            })();
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_matricule_fix_done', 'true')").run();
+            console.log(`[Migration] Fixed duplicated years in student matricules`);
+        }
     } catch (e) {
         console.error(`[Migration] Student matricules migration failed:`, e.message);
     }
@@ -569,6 +581,46 @@ function initDb() {
         console.log(`[Migration] New evolution tables verified/created successfully`);
     } catch (e) {
         console.error(`[Migration] New school evolutions migration failed:`, e.message);
+    }
+
+    // 10. Add school_id to installments table
+    try {
+        const instCols = db.prepare(`PRAGMA table_info(installments)`).all();
+        if (!instCols.find(c => c.name === 'school_id')) {
+            console.log(`[Migration] Adding school_id to installments`);
+            db.prepare(`ALTER TABLE installments ADD COLUMN school_id INTEGER DEFAULT 1`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Installments school_id failed:`, e.message);
+    }
+
+    // 11. Create unique index on (school_id, username) for users
+    try {
+        const idxDone = db.prepare("SELECT value FROM settings WHERE key = 'migration_unique_username_done'").get();
+        if (!idxDone) {
+            const dupes = db.prepare(`
+                SELECT school_id, username, COUNT(*) as cnt
+                FROM users GROUP BY school_id, username HAVING cnt > 1
+            `).all();
+            if (dupes.length > 0) {
+                console.log(`[Migration] Found ${dupes.length} duplicate username(s), appending suffix...`);
+                for (const d of dupes) {
+                    const rows = db.prepare('SELECT id FROM users WHERE school_id = ? AND username = ? ORDER BY id').all(d.school_id, d.username);
+                    for (let i = 1; i < rows.length; i++) {
+                        db.prepare('UPDATE users SET username = ? WHERE id = ?').run(`${d.username}_${i}`, rows[i].id);
+                    }
+                }
+            }
+            try {
+                db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_school_username ON users(school_id, username)').run();
+                console.log(`[Migration] Created UNIQUE index on users(school_id, username)`);
+            } catch (e2) {
+                console.error(`[Migration] Unique index creation failed:`, e2.message);
+            }
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_unique_username_done', 'true')").run();
+        }
+    } catch (e) {
+        console.error(`[Migration] Unique username migration failed:`, e.message);
     }
 
     console.log('Database initialized and migrated at:', dbPath);

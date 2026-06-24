@@ -35,6 +35,12 @@ export const initSaaSBridge = () => {
             const response = await fetch(finalUrl, config);
             const data = await response.json();
             
+            if (response.status === 401) {
+                localStorage.removeItem('saas_token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+                throw new Error('Session expirée');
+            }
             if (!response.ok) {
                 throw new Error(data.error || 'Erreur réseau API');
             }

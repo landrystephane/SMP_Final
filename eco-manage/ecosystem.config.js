@@ -10,8 +10,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 8080,
-        // Dossier où la base de données SQLite sera stockée sur le serveur
-        DATA_DIR: "/var/opt/eco-hub-data" 
+        DATA_DIR: "/var/opt/eco-hub-data",
+        JWT_SECRET: "CHANGEZ-MOI-avec-une-vraie-cle-secrete-en-production-" + Date.now()
       }
     }
   ]

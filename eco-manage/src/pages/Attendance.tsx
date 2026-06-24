@@ -62,7 +62,7 @@ const Attendance: React.FC = () => {
         setIsUnlockedByAdmin(unlocked);
         
         if (user?.role === 'TEACHER') {
-            if (!selectedSchedule) {
+            if (!unlocked && !selectedSchedule && availableSchedules.length > 0) {
                 setIsLocked(true);
                 setNotProgrammedMsg("Veuillez sélectionner un créneau horaire pour faire l'appel.");
                 setMaxAllowedHours(0);
@@ -78,13 +78,37 @@ const Attendance: React.FC = () => {
                 const [startH, startM] = schedule.start_time.split(':').map(Number);
                 const [endH, endM] = schedule.end_time.split(':').map(Number);
                 const diffMins = (endH * 60 + endM) - (startH * 60 + startM);
-                const maxH = Math.max(0, Math.ceil(diffMins / 60));
-                setMaxAllowedHours(maxH);
-                setNotProgrammedMsg('');
-            } else {
+                  const maxH = Math.max(0, Math.ceil(diffMins / 60));
+                  setMaxAllowedHours(maxH);
+                  
+                  const now = new Date();
+                  const selectedDateObj = new Date(currentDate);
+                  const isToday = now.toISOString().split('T')[0] === currentDate;
+                  
+                  const currentH = now.getHours();
+                  const currentM = now.getMinutes();
+                  
+                  const isPast = (selectedDateObj < new Date(now.toISOString().split('T')[0])) || (isToday && (currentH > endH || (currentH === endH && currentM > endM)));
+
+                  if (isPast && !unlocked && hasRecords) {
+                      setIsLocked(true);
+                      setNotProgrammedMsg("Le cours est terminé. Délai de saisie dépassé.");
+                  } else if (isPast && !unlocked && !hasRecords) {
+                      setIsLocked(true);
+                      setNotProgrammedMsg("Le cours est terminé. Vous n'avez pas enregistré l'appel à temps.");
+                  } else {
+                      setNotProgrammedMsg('');
+                  }
+            } else if (!unlocked) {
                 setMaxAllowedHours(0);
                 setIsLocked(true);
-                setNotProgrammedMsg("Créneau invalide ou introuvable.");
+                if (availableSchedules.length > 0) {
+                    setNotProgrammedMsg("Créneau invalide ou introuvable.");
+                }
+            } else {
+                // Admin unlocked it, allow default max hours
+                setMaxAllowedHours(8);
+                setNotProgrammedMsg('');
             }
         } else {
             setIsLocked(false);
@@ -132,6 +156,25 @@ const Attendance: React.FC = () => {
                   
                   // Sort by start_time
                   teacherSchedules.sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+                  // Check if unlocked by admin
+                  const unlockKey = `attendance_unlock_${selectedClass}_${currentDate}`;
+                  const unlockSetting = await window.electronAPI.getSetting(unlockKey);
+                  let isUnlocked = false;
+                  if (unlockSetting === 'true') {
+                      isUnlocked = true;
+                  } else if (unlockSetting && unlockSetting !== 'false') {
+                      const deadline = new Date(unlockSetting);
+                      if (deadline > new Date()) {
+                          isUnlocked = true;
+                      }
+                  }
+
+                  if (teacherSchedules.length === 0 && !isUnlocked) {
+                      setIsLocked(true);
+                      setNotProgrammedMsg("Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui.");
+                      setMaxAllowedHours(0);
+                  }
                   setAvailableSchedules(teacherSchedules);
                   setSelectedSchedule(''); // Reset selection when date/class changes
               } catch (e) {
@@ -494,10 +537,10 @@ const Attendance: React.FC = () => {
                     <div className="flex items-center space-x-3">
                         <AlertCircle className="w-6 h-6 flex-shrink-0" />
                         <div>
-                            <p className="font-bold text-sm">{notProgrammedMsg ? "Absence d'horaire" : "Fiche de présence verrouillée"}</p>
+                            <p className="font-bold text-sm">{notProgrammedMsg ? "Fiche de présence bloquée" : "Fiche de présence verrouillée"}</p>
                             <p className="text-xs text-slate-400">
                                 {notProgrammedMsg 
-                                    ? "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans l'emploi du temps pour cette classe aujourd'hui."
+                                    ? notProgrammedMsg
                                     : "Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage."}
                             </p>
                         </div>

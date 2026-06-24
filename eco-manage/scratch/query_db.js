@@ -1,26 +1,28 @@
 const { Client } = require('ssh2');
+const fs = require('fs');
+
+const VPS_HOST = process.env.VPS_HOST || '2.24.15.119';
+const VPS_USER = process.env.VPS_USER || 'root';
+const VPS_PASSWORD = process.env.VPS_PASSWORD;
+const VPS_KEY_PATH = process.env.VPS_KEY_PATH;
+
+if (!VPS_PASSWORD && !VPS_KEY_PATH) {
+  console.error('Erreur: Définir VPS_PASSWORD ou VPS_KEY_PATH.');
+  process.exit(1);
+}
+
+const connConfig = { host: VPS_HOST, port: 22, username: VPS_USER };
+if (VPS_KEY_PATH) connConfig.privateKey = fs.readFileSync(VPS_KEY_PATH);
+else connConfig.password = VPS_PASSWORD;
+
+const query = process.argv[2] || 'SELECT COUNT(*) FROM schools;';
 
 const conn = new Client();
 conn.on('ready', () => {
-  const cmd = `node -e "
-    const Database = require('/var/www/saas/node_modules/better-sqlite3');
-    const db = new Database('/var/opt/eco-hub-data/school.db');
-    const classes = db.prepare('SELECT id, name, code FROM classes').all();
-    console.log(classes);
-  "`;
-  conn.exec(cmd, (err, stream) => {
+  conn.exec(`sqlite3 /var/opt/eco-hub-data/school.db "${query}"`, (err, stream) => {
     if (err) throw err;
-    stream.on('close', (code, signal) => {
-      conn.end();
-    }).on('data', (data) => {
-      console.log('STDOUT: ' + data.toString());
-    }).stderr.on('data', (data) => {
-      console.log('STDERR: ' + data.toString());
-    });
+    stream.on('close', () => conn.end())
+          .on('data', data => console.log('OUT:', data.toString()))
+          .stderr.on('data', data => console.log('ERR:', data.toString()));
   });
-}).connect({
-  host: '2.24.15.119',
-  port: 22,
-  username: 'root',
-  password: 'Eco-Manage12'
-});
+}).connect(connConfig);

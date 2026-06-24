@@ -150,7 +150,7 @@ const Parents: React.FC = () => {
           </div>
                <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
               <button 
-                  onClick={() => { setTargetStudentId(null); setShowAnnouncementModal(true); }}
+                  onClick={() => { setTargetParent(null); setShowAnnouncementModal(true); }}
                   disabled={filteredParents.length === 0}
                   className="btn-secondary h-[46px] px-6 disabled:opacity-50 flex items-center justify-center flex-1 md:flex-none whitespace-nowrap"
               >

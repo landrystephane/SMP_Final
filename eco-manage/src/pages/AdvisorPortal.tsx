@@ -44,6 +44,8 @@ const AdvisorPortal: React.FC = () => {
     const [classSubjects, setClassSubjects] = useState<any[]>([]);
     const [teacherAssignments, setTeacherAssignments] = useState<Record<number, number>>({});
 
+    const [replacementTeacher, setReplacementTeacher] = useState<Record<number, string>>({});
+
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<any>(null);
     const [schedDay, setSchedDay] = useState<number>(1);
@@ -305,6 +307,23 @@ const AdvisorPortal: React.FC = () => {
             } catch (err: any) {
                 showNotification("Erreur lors de la suppression : " + err.message, "error");
             }
+        }
+    };
+
+    const handleReassignSurveillant = async (examId: number) => {
+        const newTeacherId = replacementTeacher[examId];
+        if (!newTeacherId || !window.electronAPI) return;
+        try {
+            await (window.electronAPI as any).reassignExamSurveillant({
+                examId,
+                newTeacherId: parseInt(newTeacherId),
+                schoolId: user?.schoolId
+            });
+            showNotification("Surveillant remplacé avec succès. Une notification a été envoyée au nouvel enseignant.", "success");
+            setReplacementTeacher(prev => { const copy = {...prev}; delete copy[examId]; return copy; });
+            loadSchedules();
+        } catch (err: any) {
+            showNotification("Erreur : " + err.message, "error");
         }
     };
 
@@ -943,17 +962,55 @@ const AdvisorPortal: React.FC = () => {
                                                 <th className="px-6 py-4">Horaires</th>
                                                 <th className="px-6 py-4">Matière</th>
                                                 <th className="px-6 py-4">Surveillant</th>
+                                                <th className="px-6 py-4">Statut</th>
                                                 <th className="px-6 py-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5 bg-slate-900/30">
-                                            {examSchedules.filter(exam => selectedCalendarMonth === 'ALL' || exam.date.split('-')[1] === selectedCalendarMonth).map(exam => (
-                                                <tr key={exam.id} className="hover:bg-white/5 transition-colors">
+                                            {examSchedules.filter(exam => selectedCalendarMonth === 'ALL' || exam.date.split('-')[1] === selectedCalendarMonth).map(exam => {
+                                                const statusLabels: Record<string, {label: string, color: string}> = {
+                                                    'PENDING_TEACHER': { label: 'En attente', color: 'bg-amber-500/20 text-amber-400' },
+                                                    'APPROVED': { label: 'Accepté', color: 'bg-emerald-500/20 text-emerald-400' },
+                                                    'FORCED_APPROVED': { label: 'Forcé', color: 'bg-blue-500/20 text-blue-400' },
+                                                    'PENDING_ADMIN': { label: 'Refusé (en attente)', color: 'bg-rose-500/20 text-rose-400' },
+                                                    'REJECTED': { label: 'Refusé', color: 'bg-rose-500/20 text-rose-400' },
+                                                };
+                                                const st = statusLabels[exam.status] || { label: exam.status || 'En attente', color: 'bg-slate-500/20 text-slate-400' };
+                                                const isRefused = exam.status === 'PENDING_ADMIN' || exam.status === 'REJECTED';
+
+                                                return (
+                                                <tr key={exam.id} className={`hover:bg-white/5 transition-colors ${isRefused ? 'bg-rose-500/5' : ''}`}>
                                                     <td className="px-6 py-4 text-white font-black text-sm">{exam.date}</td>
                                                     <td className="px-6 py-4 text-slate-400 text-sm font-bold">{exam.start_time} - {exam.end_time}</td>
                                                     <td className="px-6 py-4 text-amber-500 font-bold uppercase text-xs">{getSubjectName(exam.subject_id)}</td>
                                                     <td className="px-6 py-4 text-slate-300 text-xs">{getTeacherName(exam.teacher_id)}</td>
-                                                    <td className="px-6 py-4 text-right">
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${st.color}`}>{st.label}</span>
+                                                        {exam.rejection_reason && <p className="text-[10px] text-rose-400 mt-1 italic">Motif : {exam.rejection_reason}</p>}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right space-y-2">
+                                                        {isRefused && (
+                                                            <div className="flex items-center gap-2 justify-end">
+                                                                <select
+                                                                    title="Choisir un remplaçant"
+                                                                    value={replacementTeacher[exam.id] || ''}
+                                                                    onChange={(e) => setReplacementTeacher(prev => ({...prev, [exam.id]: e.target.value}))}
+                                                                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-amber-500 max-w-[140px]"
+                                                                >
+                                                                    <option value="">Remplaçant...</option>
+                                                                    {teachers.filter(t => t.id !== exam.teacher_id).map(t => (
+                                                                        <option key={t.id} value={t.id}>{t.full_name || t.fullName}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <button
+                                                                    onClick={() => handleReassignSurveillant(exam.id)}
+                                                                    disabled={!replacementTeacher[exam.id]}
+                                                                    className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                >
+                                                                    Remplacer
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                         <button
                                                             onClick={() => handleDeleteExam(exam.id)}
                                                             className="p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
@@ -962,7 +1019,8 @@ const AdvisorPortal: React.FC = () => {
                                                         </button>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>

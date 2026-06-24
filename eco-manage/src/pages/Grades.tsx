@@ -33,6 +33,7 @@ const Grades: React.FC = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
   const [bulletinsValidated, setBulletinsValidated] = useState(false);
+    const [isSgActing, setIsSgActing] = useState(false);
 
   const loadData = async () => {
       if (window.electronAPI) {
@@ -54,7 +55,9 @@ const Grades: React.FC = () => {
             setClasses(c);
         }
         
-        const bv = await window.electronAPI.getSetting('bulletins_validated');
+        const sgStatus = await window.electronAPI.getSetting('sg_acting_director');
+          setIsSgActing(sgStatus === 'true');
+          const bv = await window.electronAPI.getSetting('bulletins_validated');
         setBulletinsValidated(bv === 'true');
 
         const activeTerm = await window.electronAPI.getSetting('active_term');
@@ -134,7 +137,16 @@ const Grades: React.FC = () => {
                   ? (g.letter_score || '')
                   : (g.score !== null && g.score !== undefined ? g.score.toString() : '');
                 gradeMap[`${g.student_id}-${g.subject_id}`] = val;
-                if (g.locked) locked = true;
+                if (g.locked) {
+                    if (user?.role === 'TEACHER') {
+                        // Only lock if a grade belonging to the teacher's subjects is locked
+                        if (subjects.some(s => s.id === g.subject_id)) {
+                            locked = true;
+                        }
+                    } else {
+                        locked = true;
+                    }
+                }
             }
         });
         setGrades(gradeMap);
@@ -194,12 +206,41 @@ const Grades: React.FC = () => {
     }
   }, [selectedClass, selectedMonth, selectedTerm]);
 
+  const handleRequestUnlock = async () => {
+      if (!window.electronAPI || !user || !selectedClass || !selectedTerm || !selectedMonth) return;
+      const classObj = classes.find(c => c.id.toString() === selectedClass);
+      const className = classObj ? `${classObj.name} (${classObj.code})` : selectedClass;
+      const subject = `Demande de déblocage : Notes ${className}`;
+      const message = `Bonjour,\n\nJe souhaite modifier les notes de la classe ${className} pour la période ${selectedMonth} (Trimestre ${selectedTerm}). Veuillez s'il vous plaît débloquer ces notes.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`;
+      
+      try {
+          await window.electronAPI.submitSystemRequest({
+              requestType: 'GRADE_REACTIVATION',
+              requestData: {
+                  teacherId: user.id,
+                  classId: selectedClass,
+                  className: classObj ? classObj.name : selectedClass,
+                  term: selectedTerm,
+                  month: selectedMonth
+              }
+          });
+          showNotification("Votre demande de déblocage a été envoyée avec succès à l'administration.", "success");
+      } catch (e: any) {
+          showNotification("Erreur lors de l'envoi de la demande: " + e.message, "error");
+      }
+  };
+
   const handleSave = async () => {
     if (isLocked || isPastDeadline) {
         showNotification("La saisie est bloquée (période fermée ou délai dépassé).", "error");
         return;
     }
-    const formattedGrades = Object.entries(grades).map(([key, scoreOrLetter]) => {
+    const formattedGrades = Object.entries(grades)
+        .filter(([key]) => {
+            const [, subjectId] = key.split('-');
+            return subjects.some(s => s.id === parseInt(subjectId));
+        })
+        .map(([key, scoreOrLetter]) => {
         const [studentId, subjectId] = key.split('-');
         const isNumerical = !scaleConfig || scaleConfig.scale.is_numerical === 1;
         
@@ -398,7 +439,7 @@ const Grades: React.FC = () => {
             const allStudents = await window.electronAPI.getStudents(user?.schoolId);
             const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
 
-            const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+            const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER' || (user?.role === 'SG' && isSgActing);
             // Calculate averages for all students in the class based on validated grades (or all grades for DIRECTOR)
             const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
                 const details = await window.electronAPI.getStudentDetails(s.id);
@@ -544,6 +585,14 @@ const Grades: React.FC = () => {
                         )}
                       </div>
                     )}
+                    {user?.role === 'TEACHER' && (isLocked || isPastDeadline) && (
+                        <button
+                            onClick={handleRequestUnlock}
+                            className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
+                        >
+                            Demander Déblocage
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center space-x-4">
                     {hasRole(['DIRECTOR', 'FOUNDER', 'ADVISOR']) && (
@@ -555,7 +604,7 @@ const Grades: React.FC = () => {
                             DÉROGATION
                         </button>
                     )}
-                    {hasRole(['DIRECTOR', 'FOUNDER']) && !isLocked && (
+                    {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && !isLocked && (
                         <button
                             onClick={handleValidateClass}
                             className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all inline-flex items-center shadow-lg shadow-emerald-600/20"
@@ -727,8 +776,8 @@ const Grades: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}
-                            disabled={!bulletinsValidated && user?.role === 'SECRETARY'}
-                            title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'est pas encore autorisée par la direction." : ""}
+                            disabled={(!bulletinsValidated && user?.role === 'SECRETARY') || !isLocked}
+                            title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'est pas encore autorisée par la direction." : (!isLocked ? "Les notes de la classe ne sont pas encore validées et verrouillées." : "")}
                             className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                               <FileText className="w-5 h-5" />

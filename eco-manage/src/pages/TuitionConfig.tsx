@@ -210,7 +210,7 @@ const TuitionConfig: React.FC = () => {
                                   type="date" 
                                   value={deadlineRecord?.deadline_date || ''}
                                   onChange={(e) => handleUpdateDeadline(inst.id, e.target.value)}
-                                  onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                                  onBlur={() => {}}
                                   className="w-full bg-slate-900 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-slate-300 outline-none focus:border-amber-500"
                               />
                           </div>
@@ -254,7 +254,7 @@ const TuitionConfig: React.FC = () => {
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, registrationFee: val } : item);
                                 setFees(newFees);
                             }}
-                            onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                            onBlur={() => {}}
                         />
                     </td>
                     <td className="px-10 py-6">
@@ -268,7 +268,7 @@ const TuitionConfig: React.FC = () => {
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, transportFee: val } : item);
                                 setFees(newFees);
                             }}
-                            onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                            onBlur={() => {}}
                         />
                     </td>
                     <td className="px-10 py-6">
@@ -283,7 +283,7 @@ const TuitionConfig: React.FC = () => {
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, examFee: val } : item);
                                 setFees(newFees);
                             }}
-                            onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                            onBlur={() => {}}
                         />
                     </td>
                     <td className="px-10 py-6">
@@ -297,7 +297,7 @@ const TuitionConfig: React.FC = () => {
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, totalFee: val } : item);
                                 setFees(newFees);
                             }}
-                            onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                            onBlur={() => {}}
                         />
                     </td>
                     {installments.map(inst => {
@@ -315,7 +315,7 @@ const TuitionConfig: React.FC = () => {
                                         const updatedCif = [...classInstallmentFees.filter(c => !(c.class_id === f.classId && c.installment_id === inst.id)), { class_id: f.classId, installment_id: inst.id, amount }];
                                         setClassInstallmentFees(updatedCif);
                                     }}
-                                    onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                                    onBlur={() => {}}
                                 />
                             </td>
                         );
@@ -383,7 +383,7 @@ const TuitionConfig: React.FC = () => {
                       type="number"
                       value={transportFeeAmount}
                       onChange={(e) => setTransportFeeAmount(parseFloat(e.target.value) || 0)}
-                      onBlur={() => showNotification(t('amount_saved', 'Montant enregistré avec succès'), 'success')}
+                      onBlur={() => {}}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                   />
               </div>

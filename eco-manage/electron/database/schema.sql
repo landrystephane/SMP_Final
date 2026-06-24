@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS schools (
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER,
-    username TEXT UNIQUE NOT NULL,
+    username TEXT NOT NULL,
     password TEXT NOT NULL,
     full_name TEXT NOT NULL,
     role TEXT NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS class_subjects (
 CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER,
-    matricule TEXT UNIQUE NOT NULL,
+    matricule TEXT NOT NULL,
     registration_year INTEGER NOT NULL,
     order_number INTEGER NOT NULL,
     first_name TEXT NOT NULL,
@@ -456,6 +456,26 @@ CREATE TABLE IF NOT EXISTS grading_scales (
     max_value REAL,
     FOREIGN KEY (school_id) REFERENCES schools(id)
 );
+
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_users_school ON users(school_id);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_students_school ON students(school_id);
+CREATE INDEX IF NOT EXISTS idx_students_class ON students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_parent ON students(parent_contact);
+CREATE INDEX IF NOT EXISTS idx_grades_student ON grades(student_id);
+CREATE INDEX IF NOT EXISTS idx_grades_class_term ON grades(class_id, term);
+CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance(student_id, date);
+CREATE INDEX IF NOT EXISTS idx_attendance_school_date ON attendance(school_id, date);
+CREATE INDEX IF NOT EXISTS idx_schedules_school ON schedules(school_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_class ON schedules(class_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_school ON notifications(school_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_school ON tickets(school_id);
+CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_school ON expenses(school_id);
+CREATE INDEX IF NOT EXISTS idx_bus_routes_school ON bus_routes(school_id);
 
 -- Grading options and range mappings
 CREATE TABLE IF NOT EXISTS grading_scale_options (

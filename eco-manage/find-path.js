@@ -26,5 +26,5 @@ conn.on('ready', () => {
   host: '2.24.15.119',
   port: 22,
   username: 'root',
-  password: 'Eco-Manage12'
+  password: process.env.VPS_PASSWORD
 });

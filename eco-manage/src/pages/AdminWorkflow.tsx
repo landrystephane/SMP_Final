@@ -15,7 +15,8 @@ const AdminWorkflow: React.FC = () => {
   const [bulletinsValidated, setBulletinsValidated] = useState(false);
   const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
 
-  const [period, setPeriod] = useState({
+  const [lockedClasses, setLockedClasses] = useState<string[]>([]);
+    const [period, setPeriod] = useState({
     activeId: '1',
     start: '2026-04-20',
     end: '2026-05-15',
@@ -45,7 +46,10 @@ const AdminWorkflow: React.FC = () => {
 
   const loadPeriodSettings = async () => {
     if (window.electronAPI) {
-        const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';
+        const allSet = await window.electronAPI.getSettings();
+          const locks = allSet.filter((s: any) => s.setting_key.startsWith('class_locked_') && s.setting_value === 'true').map((s: any) => s.setting_key);
+          setLockedClasses(locks);
+          const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';
         const end = await window.electronAPI.getSetting('period_end') || '2026-05-15';
         const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
         const activeTerm = await window.electronAPI.getSetting('active_term') || '1';
@@ -145,6 +149,12 @@ const AdminWorkflow: React.FC = () => {
     }
   };
 
+  const getActiveTerm = () => period.activeId.toString().split('_')[0];
+  const getActiveSequence = () => {
+      const parts = period.activeId.toString().split('_');
+      return parts.length > 1 ? parts[1] : '';
+  };
+
   const handlePrintClassReportCards = async (classId: number) => {
     if (!window.electronAPI || !school) return;
     setPrintingClassId(classId);
@@ -172,12 +182,12 @@ const AdminWorkflow: React.FC = () => {
             });
         }
 
-        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER' || (user?.role === 'SG' && isSgActing);
 
         // Calculate averages for rank calculation
         const studentsWithAverages = studentsData.map(sData => {
             const validatedGrades = sData.grades.filter((g: any) => 
-                g.term?.toString() === period.term?.toString() && 
+                g.term?.toString() === getActiveTerm()?.toString() && 
                 (g.validated === 1 || isDirector)
             );
             if (validatedGrades.length === 0) {
@@ -197,7 +207,7 @@ const AdminWorkflow: React.FC = () => {
             .sort((a, b) => (b.average || 0) - (a.average || 0));
 
         const finalStudentsData = studentsWithAverages.map(sData => {
-            const termGrades = sData.grades.filter((g: any) => g.term?.toString() === period.term?.toString());
+            const termGrades = sData.grades.filter((g: any) => g.term?.toString() === getActiveTerm()?.toString());
             if (sData.average === null) {
                 return {
                     student: sData.student,
@@ -226,7 +236,7 @@ const AdminWorkflow: React.FC = () => {
         generateClassReportCards({
             classObj,
             school,
-            term: period.term,
+            term: getActiveTerm(),
             studentsData: finalStudentsData,
             ignoreValidation: isDirector
         });
@@ -265,7 +275,7 @@ const AdminWorkflow: React.FC = () => {
             });
         }
 
-        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER';
+        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER' || (user?.role === 'SG' && isSgActing);
 
         // Get all unique terms present in the grades for this class to determine N
         let allTerms = new Set<number>();
@@ -368,7 +378,7 @@ const AdminWorkflow: React.FC = () => {
         <p className="text-slate-400 mt-1">{t('admin_control_desc')}</p>
       </div>
 
-      <div className="grid grid-cols-1 grid-cols-1 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Evaluation Period Control */}
         <div className="glass-card p-6 space-y-4">
           <div className="flex items-center space-x-3 text-slate-gold-gold">
@@ -525,9 +535,9 @@ const AdminWorkflow: React.FC = () => {
                     <div className="flex gap-2">
                         <button
                         onClick={() => handlePrintClassReportCards(c.id)}
-                        disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
+                        disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY') || !lockedClasses.some(k => k.startsWith(`s`) && k.includes(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`)}
                         className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : "Bulletin du trimestre actuel"}
+                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : (!lockedClasses.some(k => k.startsWith(`s`) && k.includes(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`) ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin du trimestre actuel")}
                         >
                         <Printer className="w-4 h-4" />
                         {printingClassId === c.id ? "Impression..." : t('start_printing')}
@@ -535,9 +545,9 @@ const AdminWorkflow: React.FC = () => {
                         
                         <button
                         onClick={() => handlePrintAnnualReportCards(c.id)}
-                        disabled={printingAnnualClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY')}
+                        disabled={printingAnnualClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY') || !lockedClasses.some(k => k.startsWith(`s`) && k.includes(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`)}
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : "Bulletin Annuel (Moyenne des trimestres)"}
+                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : (!lockedClasses.some(k => k.startsWith(`s`) && k.includes(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`) ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin Annuel (Moyenne des trimestres)")}
                         >
                         <Printer className="w-4 h-4" />
                         {printingAnnualClassId === c.id ? "Impression..." : "B. Annuel"}

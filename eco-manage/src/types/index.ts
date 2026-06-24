@@ -1,4 +1,4 @@
-export type Role = 'FOUNDER' | 'DIRECTOR' | 'SECRETARY' | 'BURSAR' | 'TEACHER' | 'ADVISOR' | 'DRIVER' | 'MAINTENANCE' | 'SUPERADMIN';
+export type Role = 'FOUNDER' | 'DIRECTOR' | 'SG' | 'SECRETARY' | 'BURSAR' | 'TEACHER' | 'ADVISOR' | 'DRIVER' | 'PARENT' | 'MAINTENANCE' | 'SUPERADMIN';
 
 export interface User {
   id: number;

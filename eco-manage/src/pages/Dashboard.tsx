@@ -6,6 +6,17 @@ import { useAuth } from '../context/AuthContext';
 import SystemAdmin from './SystemAdmin';
 import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
 
+
+const DAYS_OF_WEEK = [
+    { key: 1, label: 'Lundi' },
+    { key: 2, label: 'Mardi' },
+    { key: 3, label: 'Mercredi' },
+    { key: 4, label: 'Jeudi' },
+    { key: 5, label: 'Vendredi' },
+    { key: 6, label: 'Samedi' },
+    { key: 7, label: 'Dimanche' }
+];
+
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -17,7 +28,9 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let isMounted = true;
     const loadStats = async () => {
+      if (!isMounted) return;
       const isImpersonating = localStorage.getItem('impersonated_school_id') !== null;
       if (user?.role === 'SUPERADMIN' && !isImpersonating) {
         return;
@@ -72,6 +85,16 @@ const Dashboard: React.FC = () => {
       }
     };
     loadStats();
+    
+    // Auto-refresh stats every 10 seconds for real-time updates
+    const interval = setInterval(() => {
+        if (isMounted) loadStats();
+    }, 10000);
+    
+    return () => {
+        isMounted = false;
+        clearInterval(interval);
+    };
   }, [selectedSection, selectedCycle, user]);
 
   useEffect(() => {
@@ -143,7 +166,7 @@ const Dashboard: React.FC = () => {
                                         [1, 2, 3, 4, 5, 6, 7].forEach(() => rowData.push('PAUSE'));
                                     } else {
                                         [1, 2, 3, 4, 5, 6, 7].forEach(day => {
-                                            const sData = stats.schedules?.find((s: any) => s.day_of_week === day && s.start_time?.trim() === slot.start?.trim());
+                                            const sData = stats.schedules?.find((s: any) => s.day_of_week == day && s.start_time?.trim() === slot.start?.trim());
                                             if (sData) {
                                                 if (sData.type === 'PAUSE') {
                                                     rowData.push('PAUSE');
@@ -236,7 +259,7 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 DAYS_OF_WEEK.map(day => {
-                                                    const sData = stats.schedules?.find((s: any) => s.day_of_week === day.key && s.start_time?.trim() === slot.start?.trim());
+                                                    const sData = stats.schedules?.find((s: any) => s.day_of_week == day.key && s.start_time?.trim() === slot.start?.trim());
                                                     
                                                     if (sData) {
                                                         const typeColor = sData.type === 'EVALUATION' 

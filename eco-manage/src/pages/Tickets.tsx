@@ -12,6 +12,8 @@ const Tickets: React.FC = () => {
   const [tickets, setTickets] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState('');
+  const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [newTicketSubject, setNewTicketSubject] = useState(t('internal_message_default', 'Message interne'));
   const [receiverRole, setReceiverRole] = useState('DIRECTOR');
@@ -26,9 +28,9 @@ const Tickets: React.FC = () => {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [newAnnTitle, setNewAnnTitle] = useState('');
   const [newAnnContent, setNewAnnContent] = useState('');
-  const [newAnnTarget, setNewAnnTarget] = useState<'ALL' | 'STAFF' | 'PARENTS'>('ALL');
+  const [newAnnTarget, setNewAnnTarget] = useState<string>('ALL');
 
-  const canPublish = ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'SECRETARY'].includes(user?.role || '');
+  const canPublish = ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'SECRETARY', 'TEACHER'].includes(user?.role || '');
 
   const loadData = async () => {
     if (window.electronAPI && user) {
@@ -55,6 +57,9 @@ const Tickets: React.FC = () => {
             
             const classData = await window.electronAPI.getClasses(user.schoolId);
             setClasses(classData || []);
+
+            const studentsData = await window.electronAPI.getStudents(user.schoolId);
+            setStudentsList(studentsData || []);
         } catch (err) {
             console.error('Failed to load data', err);
         }
@@ -277,11 +282,15 @@ const Tickets: React.FC = () => {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('target_audience_label', 'Audience Cible')}</label>
                   <select
                     value={newAnnTarget}
-                    onChange={(e) => setNewAnnTarget(e.target.value as any)}
+                    onChange={(e) => setNewAnnTarget(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                   >
                     <option value="ALL">{t('target_all_option', 'Tout le monde (Personnels)')}</option>
                     <option value="STAFF">{t('target_staff_option', 'Personnels de l\'école uniquement')}</option>
+                    <option value="PARENTS">Tous les parents</option>
+                    {user?.role === 'TEACHER' && classes.filter(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id).map(c => (
+                        <option key={`CLASS_${c.id}`} value={`CLASS_${c.id}`}>Aux parents de la classe : {c.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -515,7 +524,7 @@ const Tickets: React.FC = () => {
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cible (Rôle)</label>
                     <select
                         value={receiverRole}
-                        onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); }}
+                        onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); setStudentSearchTerm(''); }}
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                     >
                         <option value="FOUNDER">Le Fondateur</option>
@@ -523,6 +532,7 @@ const Tickets: React.FC = () => {
                         <option value="SG">Secrétariat Général</option>
                         <option value="BURSAR">Économat</option>
                         <option value="ADVISOR">Conseiller Pédagogique</option>
+                        <option value="PARENT">Parent d'un élève (Privé)</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -547,6 +557,48 @@ const Tickets: React.FC = () => {
                     </select>
                   </div>
               </div>
+              
+              {receiverRole === 'PARENT' && (
+                  <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Rechercher l'élève (Destinataire: Parent)</label>
+                      <input
+                          type="text"
+                          placeholder="Tapez le nom de l'élève..."
+                          value={studentSearchTerm}
+                          onChange={(e) => setStudentSearchTerm(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                      />
+                      {studentSearchTerm && (
+                          <div className="mt-1 bg-slate-800 border border-slate-700 rounded-lg max-h-40 overflow-y-auto">
+                              {(() => {
+                                  const filtered = studentsList.filter(s => { const safeFirst = (s.first_name || '').trim(); const safeLast = (s.last_name || '').trim(); const fullName = `${safeFirst} ${safeLast}`.replace(/\s+/g, ' ').toLowerCase(); const revName = `${safeLast} ${safeFirst}`.replace(/\s+/g, ' ').toLowerCase(); const search = studentSearchTerm.replace(/\s+/g, ' ').toLowerCase().trim(); return fullName.includes(search) || revName.includes(search) || safeFirst.toLowerCase().includes(search) || safeLast.toLowerCase().includes(search); }).slice(0, 10);
+                                  if (filtered.length === 0) {
+                                      return <div className="p-2 text-xs text-slate-400 text-center italic">Aucun élève trouvé contenant "{studentSearchTerm}" (Parmi {studentsList.length} élèves)</div>;
+                                  }
+                                  return filtered.map(s => (
+                                      <div 
+                                          key={s.id} 
+                                          onClick={() => {
+                                              setStudentSearchTerm(`${s.first_name} ${s.last_name}`);
+                                              const parentUser = usersList.find(u => u.role === 'PARENT' && u.username === s.parent_contact);
+                                              if (parentUser) {
+                                                  setReceiverId(parentUser.id);
+                                              } else {
+                                                  alert("Cet élève n'a pas de compte parent configuré (numéro de parent non trouvé).");
+                                                  setReceiverId('');
+                                              }
+                                          }}
+                                          className="p-2 text-xs text-white cursor-pointer hover:bg-slate-700 border-b border-slate-700/50 flex justify-between items-center"
+                                      >
+                                          <span><span className="font-bold text-amber-500">{s.first_name} {s.last_name}</span> (Classe: {classes?.find(c => c.id === s.class_id)?.name || 'N/A'})</span>
+                                          <span className="text-[10px] text-slate-400">Parent: {s.parent_name || 'Inconnu'}</span>
+                                      </div>
+                                  ));
+                              })()}
+                          </div>
+                      )}
+                  </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('message_for_direction', 'Message pour la direction')}</label>

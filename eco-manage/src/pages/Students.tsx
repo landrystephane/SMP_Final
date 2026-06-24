@@ -35,7 +35,7 @@ const Students: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user?.schoolId]);
 
   const handleDeleteStudent = async (id: number) => {
       if (!window.confirm(t('confirm_delete_student', "Êtes-vous sûr de vouloir supprimer cet élève ?"))) return;

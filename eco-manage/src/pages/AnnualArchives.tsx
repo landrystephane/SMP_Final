@@ -20,7 +20,8 @@ const AnnualArchives: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         if (window.electronAPI && user) {
-            const sid = user.schoolId || 1;
+            const sid = user.schoolId;
+            if (!sid) { setLoading(false); return; }
             const arch = await window.electronAPI.getSchoolArchives(sid);
             const p = await window.electronAPI.getPayments(sid);
             const s = await window.electronAPI.getStudents(sid);

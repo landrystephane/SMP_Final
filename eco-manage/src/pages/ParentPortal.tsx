@@ -182,7 +182,7 @@ const ParentPortal: React.FC = () => {
             if (window.electronAPI) {
                 const allSchools = schools.length > 0 ? schools : await window.electronAPI.getSchools();
                 const school = allSchools.find((s: any) => s.id === selectedChild.school_id) || allSchools[0];
-                const allClasses = classes.length > 0 ? classes : await window.electronAPI.getClasses();
+                const allClasses = classes.length > 0 ? classes : await window.electronAPI.getClasses(user?.schoolId);
                 const classObj = allClasses.find(c => c.id === selectedChild.class_id);
 
                 // Fetch all students in this class
@@ -601,30 +601,42 @@ const ParentPortal: React.FC = () => {
             {/* School communication feed */}
             <div className="space-y-4">
                 <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
-                    <Info className="w-6 h-6 text-amber-500" /> Messages de la Direction
+                    <Info className="w-6 h-6 text-amber-500" /> Messages et Communiqués
                 </h2>
                 {announcements.length > 0 ? (
                     announcements.map((ann) => (
-                        <div key={ann.id} className="glass-card p-6 border-l-4 border-l-amber-500 bg-amber-500/5 rounded-2xl flex items-start space-x-4">
-                            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-1" />
-                            <div>
+                        <div key={ann.id} className={`glass-card p-6 border-l-4 rounded-2xl flex items-start space-x-4 ${ann.message_type === 'TICKET' ? 'border-l-blue-500 bg-blue-500/5' : 'border-l-amber-500 bg-amber-500/5'}`}>
+                            <Info className={`w-5 h-5 shrink-0 mt-1 ${ann.message_type === 'TICKET' ? 'text-blue-500' : 'text-amber-500'}`} />
+                            <div className="flex-1">
                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
                                     {new Date(ann.created_at).toLocaleDateString()} - De : {ann.sender_name}
                                 </span>
                                 <h4 className="text-sm font-black text-white mt-1 uppercase">{ann.title}</h4>
                                 <p className="text-xs text-slate-300 font-bold mt-1 whitespace-pre-wrap">{ann.content}</p>
+                                {ann.message_type === 'TICKET' && ann.sender_id && (
+                                    <button 
+                                        onClick={() => {
+                                            setTicketReceiver(ann.sender_id.toString());
+                                            setTicketSubject(`RE: ${ann.title}`);
+                                            document.getElementById('ticketForm')?.scrollIntoView({ behavior: 'smooth' });
+                                        }}
+                                        className="mt-3 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-xs font-black text-white uppercase tracking-widest rounded-lg transition-colors"
+                                    >
+                                        Répondre
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))
                 ) : (
                     <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Aucun communiqué de la direction</p>
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Aucun message de l'école</p>
                     </div>
                 )}
             </div>
 
             {/* Ticket to teacher */}
-            <div className="glass-card p-8 bg-slate-900 border border-white/5 rounded-[32px] space-y-6">
+            <div id="ticketForm" className="glass-card p-8 bg-slate-900 border border-white/5 rounded-[32px] space-y-6">
                 <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
                     Contacter l'enseignant
                 </h2>
@@ -746,17 +758,9 @@ const ParentPortal: React.FC = () => {
                         </div>
 
                         {/* Driver & vehicle card */}
-                        <div className="mt-6 grid grid-cols-1 gap-4">
-                            <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                                <span className="text-[9px] text-slate-500 font-black uppercase block">Conducteur principal</span>
-                                <span className="text-white font-black text-sm mt-0.5 block">M. Landry Stephane</span>
-                                <span className="text-slate-400 text-xs mt-0.5 block">+237 677 88 99 00</span>
-                            </div>
-                            <div className="p-4 bg-white/5 border border-white/5 rounded-2xl">
-                                <span className="text-[9px] text-slate-500 font-black uppercase block">Véhicule assigné</span>
-                                <span className="text-white font-black text-sm mt-0.5 block">Toyota Coaster</span>
-                                <span className="text-slate-400 text-xs mt-0.5 block">N° Immat: CE 432-BD</span>
-                            </div>
+                        <div className="mt-6 p-4 bg-white/5 border border-white/5 rounded-2xl text-center">
+                            <span className="text-[9px] text-slate-500 font-black uppercase block">Informations du transport</span>
+                            <span className="text-slate-400 text-xs mt-2 block">Contactez l'école pour les détails du chauffeur et du véhicule.</span>
                         </div>
                     </div>
                 </div>

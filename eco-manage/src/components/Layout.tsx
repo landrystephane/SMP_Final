@@ -25,23 +25,30 @@ const Layout: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [durations, setDurations] = useState<Record<number, number>>({});
   const [unreadTicketsCount, setUnreadTicketsCount] = useState(0);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [selectedReplacementTeacher, setSelectedReplacementTeacher] = useState<Record<number, string>>({});
 
   const loadNotifications = async () => {
     if (window.electronAPI && user) {
       try {
-        const notifs = await window.electronAPI.getNotifications({ 
-          userId: user.id, 
+        const notifs = await window.electronAPI.getNotifications({
+          userId: user.id,
           schoolId: user.schoolId,
-          role: user.role 
+          role: user.role
         });
         setNotifications(notifs || []);
-        
+
         const count = await window.electronAPI.getUnreadTicketsCount({
           userId: user.id,
           role: user.role,
           schoolId: user.schoolId
         });
         setUnreadTicketsCount(count || 0);
+
+        if (['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR'].includes(user.role)) {
+          const allUsers = await window.electronAPI.getUsers(user.schoolId);
+          setTeachers((allUsers || []).filter((u: any) => u.role === 'TEACHER'));
+        }
       } catch (e) {
         console.error("Failed to load notifications", e);
       }
@@ -81,13 +88,47 @@ const Layout: React.FC = () => {
           }
       } else if (n.request_type === 'EXAM_SURVEILLANCE_REFUSAL') {
           const reqData = JSON.parse(n.request_data || '{}');
-          await (window.electronAPI as any).adminResolveExamRefusal({
+          if (action === 'APPROVED') {
+              const newTeacherId = selectedReplacementTeacher[notifId];
+              if (!newTeacherId) {
+                  showNotification("Veuillez sélectionner un enseignant remplaçant avant d'accepter le refus.", "warning");
+                  return;
+              }
+              await (window.electronAPI as any).reassignExamSurveillant({
+                  examId: reqData.exam_id,
+                  newTeacherId: parseInt(newTeacherId),
+                  schoolId: user?.schoolId,
+                  notificationId: notifId
+              });
+              setSelectedReplacementTeacher(prev => { const copy = {...prev}; delete copy[notifId]; return copy; });
+              showNotification("Refus accepté et surveillant remplacé avec succès.", "success");
+          } else {
+              await (window.electronAPI as any).adminResolveExamRefusal({
+                  notificationId: notifId,
+                  examId: reqData.exam_id,
+                  adminAction: 'FORCE_ASSIGNMENT',
+                  schoolId: user?.schoolId
+              });
+              showNotification("Surveillance maintenue de force.", "info");
+          }
+      } else if (n.request_type === 'CASH_WITHDRAWAL') {
+          const reqData = JSON.parse(n.request_data || '{}');
+          if (reqData.expenseId) {
+              await (window.electronAPI as any).approveExpenseInline({
+                  expenseId: reqData.expenseId,
+                  action,
+                  resolvedBy: user?.id
+              });
+          }
+          await (window.electronAPI as any).resolveSystemRequest({
               notificationId: notifId,
-              examId: reqData.exam_id,
-              adminAction: action === 'APPROVED' ? 'ACCEPT_REFUSAL' : 'FORCE_ASSIGNMENT',
-              schoolId: user?.schoolId
+              action,
+              resolvedBy: user?.id || 1
           });
-          showNotification("Décision enregistrée avec succès.", "success");
+          showNotification(
+              action === 'APPROVED' ? "Décaissement approuvé !" : "Décaissement refusé.",
+              action === 'APPROVED' ? "success" : "info"
+          );
       } else {
           const duration = durations[notifId] || 24;
           await (window.electronAPI as any).resolveSystemRequest({
@@ -445,18 +486,49 @@ const Layout: React.FC = () => {
                                 Marquer comme traité
                               </button>
                             ) : n.request_type === 'EXAM_SURVEILLANCE_REFUSAL' ? (
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Enseignant remplaçant</label>
+                                  <select
+                                    title="Choisir un remplaçant"
+                                    value={selectedReplacementTeacher[n.id] || ''}
+                                    onChange={(e) => setSelectedReplacementTeacher(prev => ({...prev, [n.id]: e.target.value}))}
+                                    className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-500"
+                                  >
+                                    <option value="">-- Sélectionner --</option>
+                                    {teachers.map(t => (
+                                      <option key={t.id} value={t.id}>{t.full_name || t.fullName}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
+                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                                  >
+                                    Accepter & Remplacer
+                                  </button>
+                                  <button
+                                    onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
+                                    className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
+                                  >
+                                    Forcer (Maintenir)
+                                  </button>
+                                </div>
+                              </div>
+                            ) : n.request_type === 'CASH_WITHDRAWAL' ? (
                               <>
                                 <button
                                   onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                   className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                                 >
-                                  Accepter le refus (Remplacer)
+                                  Approuver le décaissement
                                 </button>
                                 <button
                                   onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
-                                  className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
+                                  className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
                                 >
-                                  Forcer (Maintenir)
+                                  Refuser
                                 </button>
                               </>
                             ) : (

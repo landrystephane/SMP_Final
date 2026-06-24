@@ -353,7 +353,8 @@ const Users: React.FC = () => {
                                 <option value="FOUNDER">{t('role_FOUNDER')}</option>
                             )}
                             <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
-                            <option value="SECRETARY">{t('role_SG')}</option>
+                            <option value="SG">{t('role_SG', 'Secrétaire Général')}</option>
+                            <option value="SECRETARY">{t('role_SECRETARY', 'Secrétaire')}</option>
                             <option value="BURSAR">{t('role_BURSAR')}</option>
                             <option value="TEACHER">{t('role_TEACHER')}</option>
                             <option value="ADVISOR">{t('role_ADVISOR')}</option>
@@ -620,7 +621,8 @@ const Users: React.FC = () => {
                                         <option value="FOUNDER">{t('role_FOUNDER')}</option>
                                     )}
                                     <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
-                                    <option value="SECRETARY">{t('role_SG')}</option>
+                                    <option value="SG">{t('role_SG', 'Secrétaire Général')}</option>
+                                    <option value="SECRETARY">{t('role_SECRETARY', 'Secrétaire')}</option>
                                     <option value="BURSAR">{t('role_BURSAR')}</option>
                                     <option value="TEACHER">{t('role_TEACHER')}</option>
                                     <option value="ADVISOR">{t('role_ADVISOR')}</option>
