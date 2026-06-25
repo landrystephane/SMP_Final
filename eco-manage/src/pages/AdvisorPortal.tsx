@@ -903,7 +903,7 @@ const AdvisorPortal: React.FC = () => {
                                                 return;
                                             }
                                             const classObj = classes.find(c => c.id.toString() === selectedClass);
-                                            const columns = ['Date', 'Horaires', 'Matière', 'Enseignant/Surveillant'];
+                                            const columns = [t('date', 'Date'), t('schedule_time', 'Horaires'), t('subject_primary_header', 'Matière'), t('teacher_supervisor', 'Enseignant/Surveillant')];
                                             const filteredForPdf = examSchedules.filter(exam => {
                                                 if (selectedCalendarMonth === 'ALL') return true;
                                                 return exam.date.split('-')[1] === selectedCalendarMonth;
@@ -1098,7 +1098,7 @@ const AdvisorPortal: React.FC = () => {
                                     {editingSchedule ? "Modifier le Cours" : "Programmer un Cours"}
                                 </h3>
                                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">
-                                    {editingSchedule ? "Modifier la programmation horaire" : "Ajouter un nouveau cours à l'emploi du temps"}
+                                    {editingSchedule ? t('edit_schedule_subtitle', "Modifier la programmation horaire") : t('add_schedule_subtitle', "Ajouter un nouveau cours à l'emploi du temps")}
                                 </p>
                             </div>
                             <button

@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Clock, Users, Phone, Bell, CheckCircle2, AlertCircle, Play, Square, Map as MapIcon } from 'lucide-react';
+import { MapPin, Navigation, Clock, Users, Phone, Bell, CheckCircle2, AlertCircle, Play, Square, Map as MapIcon, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Geolocation } from '@capacitor/geolocation';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({ iconUrl: markerIcon, shadowUrl: markerShadow });
+
+// Component to recenter map when position changes
+const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center[0], center[1]]);
+  return null;
+};
 const DriverPortal: React.FC = () => {
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -20,12 +37,13 @@ const DriverPortal: React.FC = () => {
   const [filterLevel, setFilterLevel] = useState('ALL');
   const [filterClass, setFilterClass] = useState('ALL');
   const [classes, setClasses] = useState<any[]>([]);
+  const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
 
   const loadRouteData = async () => {
     if (window.electronAPI) {
       const routes = await window.electronAPI.getBusRoutes(user?.schoolId);
-      const myRoute = routes.find((r: any) => r.driver_id === user?.id) || routes[0];
-      setActiveRoute(myRoute);
+      const myRoute = routes.find((r: any) => r.driver_id === user?.id);
+      setActiveRoute(myRoute || null);
 
       if (myRoute) {
         const routeStudents = await window.electronAPI.getRouteStudents(myRoute.id);
@@ -85,13 +103,16 @@ const DriverPortal: React.FC = () => {
           watchId = await Geolocation.watchPosition(
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
             async (position, err) => {
-              if (position && window.electronAPI) {
-                await window.electronAPI.logTransport({
-                  route_id: activeRoute.id,
-                  event_type: 'GPS_UPDATE',
-                  latitude: position.coords.latitude,
-                  longitude: position.coords.longitude
-                });
+              if (position) {
+                setCurrentPosition([position.coords.latitude, position.coords.longitude]);
+                if (window.electronAPI) {
+                  await window.electronAPI.logTransport({
+                    route_id: activeRoute.id,
+                    event_type: 'GPS_UPDATE',
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                  });
+                }
               }
             }
           );
@@ -126,7 +147,7 @@ const DriverPortal: React.FC = () => {
       } catch (err) {
           console.warn("GPS failed or denied:", err);
           // Fallback to 0,0 but alert driver
-          alert("Impossible d'obtenir la position GPS exacte. L'arrêt sera créé sans coordonnées précises.");
+          alert(t('gps_position_failed', "Impossible d'obtenir la position GPS exacte. L'arrêt sera créé sans coordonnées précises."));
       }
 
       if (window.electronAPI) {
@@ -211,6 +232,13 @@ const DriverPortal: React.FC = () => {
       }
   };
 
+  const handleUnassignStudent = async (studentId: number) => {
+      if (window.electronAPI && window.confirm(t('confirm_remove_student_from_route', 'Retirer cet élève de la ligne de transport ?'))) {
+          await window.electronAPI.unassignStudentFromTransport(studentId);
+          loadRouteData();
+      }
+  };
+
   const filteredEligible = eligibleStudents.filter(s => {
       if (filterSection !== 'ALL' && s.section !== filterSection) return false;
       if (filterLevel !== 'ALL' && s.level !== filterLevel) return false;
@@ -227,23 +255,39 @@ const DriverPortal: React.FC = () => {
             {activeRoute?.name || t('no_assigned_route', 'Aucune ligne assignée')} • {activeRoute?.bus_number}
           </p>
         </div>
-        <button
-            onClick={toggleActivity}
-            className={`px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center shadow-2xl ${
-                isDriving
-                ? 'bg-rose-500 text-white shadow-rose-500/20'
-                : 'bg-emerald-500 text-slate-950 shadow-emerald-500/20 hover:scale-105'
-            }`}
-        >
-            {isDriving ? (
-                <><Square className="w-5 h-5 mr-3" /> {t('stop_tour', 'ARRÊTER LA TOURNÉE')}</>
-            ) : (
-                <><Play className="w-5 h-5 mr-3" /> {t('start_tour', 'DÉMARRER LA TOURNÉE')}</>
-            )}
-        </button>
+        {activeRoute && (
+          <button
+              onClick={toggleActivity}
+              className={`px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center shadow-2xl ${
+                  isDriving
+                  ? 'bg-rose-500 text-white shadow-rose-500/20'
+                  : 'bg-emerald-500 text-slate-950 shadow-emerald-500/20 hover:scale-105'
+              }`}
+          >
+              {isDriving ? (
+                  <><Square className="w-5 h-5 mr-3" /> {t('stop_tour', 'ARRÊTER LA TOURNÉE')}</>
+              ) : (
+                  <><Play className="w-5 h-5 mr-3" /> {t('start_tour', 'DÉMARRER LA TOURNÉE')}</>
+              )}
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {!activeRoute && (
+        <div className="glass-card p-16 text-center border-none bg-slate-900/40">
+          <div className="p-6 bg-amber-500/10 rounded-full inline-block mb-6">
+            <AlertCircle className="w-16 h-16 text-amber-500" />
+          </div>
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight italic mb-3">
+            {t('no_route_assigned', 'Aucune Ligne Assignée')}
+          </h2>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest max-w-md mx-auto">
+            {t('no_route_assigned_desc', 'Vous n\'êtes assigné à aucune ligne de bus. Contactez l\'administration pour être affecté à une ligne.')}
+          </p>
+        </div>
+      )}
+
+      {activeRoute && <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Navigation & Points */}
         <div className="glass-card p-8 space-y-8 bg-slate-900/40 border-none">
             <div className="flex justify-between items-center border-b border-white/5 pb-4">
@@ -251,7 +295,7 @@ const DriverPortal: React.FC = () => {
                     <MapIcon className="w-4 h-4 mr-3 text-amber-500" /> {t('itinerary', 'Itinéraire')}
                 </h2>
                 <button onClick={() => setShowAddPoint(true)} className="p-2 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 text-xs font-black transition-all">
-                    + Ajouter Arrêt
+                    + {t('add_stop', 'Ajouter Arrêt')}
                 </button>
             </div>
             <div className="relative space-y-10 pl-10">
@@ -307,7 +351,7 @@ const DriverPortal: React.FC = () => {
                                 {t('assign_students', 'Assignation des Élèves')}
                             </h2>
                             <p className="text-[10px] text-indigo-300/70 font-black uppercase mt-1 tracking-widest">
-                                Élèves ayant souscrit au transport
+                                {t('students_subscribed_transport', 'Élèves ayant souscrit au transport')}
                             </p>
                         </div>
                         <div className="flex gap-4">
@@ -316,25 +360,25 @@ const DriverPortal: React.FC = () => {
                                 value={filterSection}
                                 onChange={e => setFilterSection(e.target.value)}
                             >
-                                <option value="ALL">Toutes Sections</option>
-                                <option value="FRANCOPHONE">Francophone</option>
-                                <option value="ANGLOPHONE">Anglophone</option>
+                                <option value="ALL">{t('all_sections', 'Toutes Sections')}</option>
+                                <option value="FRANCOPHONE">{t('francophone', 'Francophone')}</option>
+                                <option value="ANGLOPHONE">{t('anglophone', 'Anglophone')}</option>
                             </select>
                             <select 
                                 className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
                                 value={filterLevel}
                                 onChange={e => { setFilterLevel(e.target.value); setFilterClass('ALL'); }}
                             >
-                                <option value="ALL">Tous Cycles</option>
-                                <option value="PRIMAIRE">Primaire</option>
-                                <option value="MATERNELLE">Maternelle</option>
+                                <option value="ALL">{t('all_levels', 'Tous Cycles')}</option>
+                                <option value="PRIMAIRE">{t('primary', 'Primaire')}</option>
+                                <option value="MATERNELLE">{t('nursery', 'Maternelle')}</option>
                             </select>
                             <select 
                                 className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs font-black text-white uppercase outline-none"
                                 value={filterClass}
                                 onChange={e => setFilterClass(e.target.value)}
                             >
-                                <option value="ALL">Toutes Salles</option>
+                                <option value="ALL">{t('all_classrooms', 'Toutes Salles')}</option>
                                 {classes
                                     .filter(c => (filterSection === 'ALL' || c.section === filterSection) && (filterLevel === 'ALL' || c.level === filterLevel))
                                     .map(c => (
@@ -364,7 +408,7 @@ const DriverPortal: React.FC = () => {
                                         onChange={(e) => handleAssignStudent(s.id, parseInt(e.target.value))}
                                         value=""
                                     >
-                                        <option value="" disabled>Assigner à un arrêt...</option>
+                                        <option value="" disabled>{t('assign_to_stop', 'Assigner à un arrêt...')}</option>
                                         {points.map(p => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
@@ -374,7 +418,7 @@ const DriverPortal: React.FC = () => {
                         ))}
                         {filteredEligible.length === 0 && (
                             <div className="py-10 text-center text-slate-500 font-black uppercase text-xs tracking-widest">
-                                Aucun élève pour ces filtres
+                                {t('no_students_for_filters', 'Aucun élève pour ces filtres')}
                             </div>
                         )}
                     </div>
@@ -427,6 +471,13 @@ const DriverPortal: React.FC = () => {
                                 >
                                     <CheckCircle2 className={`w-7 h-7 ${attendance[s.id] ? 'animate-in zoom-in duration-300' : ''}`} />
                                 </button>
+                                <button
+                                    onClick={() => handleUnassignStudent(s.id)}
+                                    title={t('remove_from_route', 'Retirer de la ligne')}
+                                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-slate-900 text-slate-600 border border-slate-800 hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-500 transition-all"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -437,6 +488,58 @@ const DriverPortal: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* GPS Map */}
+            {(() => {
+                const validStops = points.filter(p => p.latitude && p.longitude && !(p.latitude === 0 && p.longitude === 0));
+                if (validStops.length === 0) return null;
+                const mapCenter: [number, number] = currentPosition && isDriving
+                    ? currentPosition
+                    : [validStops[0].latitude, validStops[0].longitude];
+                const polylinePositions: [number, number][] = validStops.map(p => [p.latitude, p.longitude]);
+                return (
+                    <div className="glass-card p-4 border-none shadow-xl bg-slate-900/40 overflow-hidden rounded-3xl">
+                        <div className="flex items-center gap-3 mb-3 px-2">
+                            <Navigation className="w-4 h-4 text-amber-500" />
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('live_map', 'Carte GPS en Direct')}</h3>
+                        </div>
+                        <div style={{ height: '300px', width: '100%', borderRadius: '16px', overflow: 'hidden' }}>
+                            <MapContainer
+                                center={mapCenter}
+                                zoom={14}
+                                style={{ height: '100%', width: '100%' }}
+                                scrollWheelZoom={true}
+                            >
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                />
+                                {currentPosition && isDriving && <MapRecenter center={currentPosition} />}
+                                {isDriving && polylinePositions.length > 1 && (
+                                    <Polyline positions={polylinePositions} pathOptions={{ color: '#f59e0b', weight: 4, opacity: 0.8 }} />
+                                )}
+                                {validStops.map((p, idx) => (
+                                    <Marker key={p.id} position={[p.latitude, p.longitude]}>
+                                        <Popup>
+                                            <strong>{p.name}</strong>
+                                            {idx === currentPointIndex && isDriving && <><br /><em style={{ color: '#f59e0b' }}>{t('current_stop', 'Arret actuel')}</em></>}
+                                        </Popup>
+                                    </Marker>
+                                ))}
+                                {currentPosition && isDriving && (
+                                    <CircleMarker
+                                        center={currentPosition}
+                                        radius={10}
+                                        pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.9, weight: 3 }}
+                                    >
+                                        <Popup>{t('bus_position', 'Position du bus')}</Popup>
+                                    </CircleMarker>
+                                )}
+                            </MapContainer>
+                        </div>
+                    </div>
+                );
+            })()}
 
             <div className="grid grid-cols-1 grid-cols-1 gap-8">
                 <div className="glass-card p-8 bg-rose-500/5 border-none shadow-xl">
@@ -455,27 +558,39 @@ const DriverPortal: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-white font-black text-sm uppercase tracking-widest">{t('next_point_estimation', 'Estimation Prochain Point')}</p>
-                        <p className="text-slate-500 text-[10px] font-black uppercase mt-2 tracking-widest italic">{t('estimated_time', '± 8 minutes (Trafic Fluide)')}</p>
+                        {(() => {
+                            const remainingStops = Math.max(0, points.length - 1 - currentPointIndex);
+                            const etaMinutes = remainingStops * 3;
+                            return (
+                                <p className="text-slate-500 text-[10px] font-black uppercase mt-2 tracking-widest italic">
+                                    {isDriving && remainingStops > 0
+                                        ? `${etaMinutes} min (${remainingStops} ${t('remaining_stops', 'arrets restants')})`
+                                        : isDriving
+                                        ? t('arrived_terminus', 'Arrive au terminus')
+                                        : t('tour_not_started', 'Tournee non demarree')}
+                                </p>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
         </div>
-      </div>
+      </div>}
 
       {/* Add Point Modal */}
       {showAddPoint && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl">
-                  <h3 className="text-xl font-black text-white italic tracking-tight mb-6">NOUVEAU POINT DE RAMASSAGE</h3>
+                  <h3 className="text-xl font-black text-white italic tracking-tight mb-6">{t('new_pickup_point', 'NOUVEAU POINT DE RAMASSAGE')}</h3>
                   <div className="space-y-4">
                       <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nom de l'arrêt</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('stop_name', "Nom de l'arrêt")}</label>
                           <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Carrefour Mvog-Mbi" />
                       </div>
                       <div className="flex gap-3 pt-4">
-                          <button onClick={() => setShowAddPoint(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-xs font-black text-white uppercase" disabled={isAdding}>Annuler</button>
+                          <button onClick={() => setShowAddPoint(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-xs font-black text-white uppercase" disabled={isAdding}>{t('cancel', 'Annuler')}</button>
                           <button onClick={handleAddPoint} disabled={isAdding} className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase disabled:opacity-50 flex justify-center items-center">
-                              {isAdding ? <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" /> : 'Ajouter'}
+                              {isAdding ? <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" /> : t('add', 'Ajouter')}
                           </button>
                       </div>
                   </div>

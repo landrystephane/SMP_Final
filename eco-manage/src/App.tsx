@@ -52,7 +52,21 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const RoleGuard: React.FC<{ roles: string[]; children: React.ReactNode }> = ({ roles, children }) => {
   const { user } = useAuth();
-  if (!user || !roles.includes(user.role)) {
+  const needsSgCheck = user?.role === 'SG' && !roles.includes('SG') && roles.includes('DIRECTOR');
+  const [sgActing, setSgActing] = React.useState(false);
+  const [loading, setLoading] = React.useState(needsSgCheck);
+
+  React.useEffect(() => {
+    if (needsSgCheck && window.electronAPI) {
+      window.electronAPI.getSetting('sg_acting_director').then((status: any) => {
+        setSgActing(status === 'true');
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    }
+  }, [needsSgCheck]);
+
+  if (loading) return null;
+  if (!user || (!roles.includes(user.role) && !(user.role === 'SG' && sgActing))) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;

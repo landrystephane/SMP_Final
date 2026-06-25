@@ -462,7 +462,7 @@ const Users: React.FC = () => {
                         </div>
                         <div>
                             <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
-                                {u.civility ? `${u.civility} ` : ''}{u.fullName || 'Utilisateur'}
+                                {u.civility ? `${u.civility} ` : ''}{u.fullName || t('user_default', 'Utilisateur')}
                             </div>
                              <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                  <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>

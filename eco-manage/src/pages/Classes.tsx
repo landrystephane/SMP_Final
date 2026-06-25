@@ -192,25 +192,25 @@ const Classes: React.FC = () => {
                 });
             }
 
-            showNotification(formData.id ? "Classe mise à jour avec succès !" : "Classe créée avec succès !", "success");
+            showNotification(formData.id ? t('class_updated_success', "Classe mise à jour avec succès !") : t('class_created_success', "Classe créée avec succès !"), "success");
             await loadData();
             setIsModalOpen(false);
         } catch (err: any) {
-            showNotification("Erreur : " + err.message, "error");
+            showNotification(t('error_prefix', "Erreur : ") + err.message, "error");
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette classe ? Toute sa configuration sera perdue.")) return;
+        if (!window.confirm(t('confirm_delete_class', "Êtes-vous sûr de vouloir supprimer cette classe ? Toute sa configuration sera perdue."))) return;
         if (!window.electronAPI) return;
 
         try {
             const res = await (window.electronAPI as any).deleteClass(id);
             if (res.error) throw new Error(res.error);
-            showNotification("Classe supprimée avec succès !", "success");
+            showNotification(t('class_deleted_success', "Classe supprimée avec succès !"), "success");
             await loadData();
         } catch (err: any) {
-            showNotification("Erreur : " + err.message, "error");
+            showNotification(t('error_prefix', "Erreur : ") + err.message, "error");
         }
     };
 
@@ -231,7 +231,7 @@ const Classes: React.FC = () => {
             setAssignments(initialAssignments);
             setIsAssignModalOpen(true);
         } catch (e: any) {
-            showNotification("Erreur lors du chargement des affectations : " + e.message, "error");
+            showNotification(t('error_loading_assignments', "Erreur lors du chargement des affectations : ") + e.message, "error");
         }
     };
 
@@ -248,11 +248,11 @@ const Classes: React.FC = () => {
                 assignments: assignmentArray
             });
             if (res.error) throw new Error(res.error);
-            showNotification("Affectations de la classe enregistrées avec succès !", "success");
+            showNotification(t('assignments_saved_success', "Affectations de la classe enregistrées avec succès !"), "success");
             setIsAssignModalOpen(false);
             loadData();
         } catch (e: any) {
-            showNotification("Erreur lors de la sauvegarde : " + e.message, "error");
+            showNotification(t('error_saving', "Erreur lors de la sauvegarde : ") + e.message, "error");
         }
     };
 
@@ -262,8 +262,8 @@ const Classes: React.FC = () => {
     );
 
     const getTeacherName = (id: number) => {
-        const t = teachers.find(teach => teach.id === id);
-        return t ? t.fullName : 'Non assigné';
+        const teacher = teachers.find(teach => teach.id === id);
+        return teacher ? teacher.fullName : t('not_assigned', 'Non assigné');
     };
 
     return (
@@ -272,16 +272,16 @@ const Classes: React.FC = () => {
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                         <Building2 className="w-8 h-8 text-amber-500" />
-                        Salles de classe
+                        {t('classrooms', 'Salles de classe')}
                     </h1>
-                    <p className="text-slate-400 mt-1">Gestion des classes et de leurs configurations.</p>
+                    <p className="text-slate-400 mt-1">{t('class_management_desc', 'Gestion des classes et de leurs configurations.')}</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
                     className="px-4 py-2 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 transition-colors flex items-center gap-2"
                 >
                     <Plus className="w-5 h-5" />
-                    Nouvelle Classe
+                    {t('new_class', 'Nouvelle Classe')}
                 </button>
             </div>
 
@@ -290,7 +290,7 @@ const Classes: React.FC = () => {
                     <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                         type="text"
-                        placeholder="Rechercher une classe..."
+                        placeholder={t('search_class', 'Rechercher une classe...')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
@@ -301,11 +301,11 @@ const Classes: React.FC = () => {
                     <table className="w-full text-left">
                         <thead className="text-slate-500 text-xs uppercase bg-slate-900/50">
                             <tr>
-                                <th className="p-4 rounded-tl-xl">Classe</th>
-                                <th className="p-4">Code</th>
-                                <th className="p-4">Section / Niveau</th>
-                                <th className="p-4">Titulaire</th>
-                                <th className="p-4 rounded-tr-xl">Actions</th>
+                                <th className="p-4 rounded-tl-xl">{t('class', 'Classe')}</th>
+                                <th className="p-4">{t('code', 'Code')}</th>
+                                <th className="p-4">{t('section_level', 'Section / Niveau')}</th>
+                                <th className="p-4">{t('class_teacher', 'Titulaire')}</th>
+                                <th className="p-4 rounded-tr-xl">{t('actions', 'Actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="text-slate-300">
@@ -328,14 +328,14 @@ const Classes: React.FC = () => {
                                             <button 
                                                 onClick={() => handleOpenAssignModal(c)} 
                                                 className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
-                                                title="Affecter Enseignants aux Matières"
+                                                title={t('assign_teachers_to_subjects', 'Affecter Enseignants aux Matières')}
                                             >
                                                 <Users className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => handleOpenModal(c)} className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Modifier">
+                                            <button onClick={() => handleOpenModal(c)} className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title={t('edit', 'Modifier')}>
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => handleDelete(c.id)} className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Supprimer">
+                                            <button onClick={() => handleDelete(c.id)} className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title={t('delete', 'Supprimer')}>
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -345,7 +345,7 @@ const Classes: React.FC = () => {
                             {filteredClasses.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="p-8 text-center text-slate-500">
-                                        Aucune classe trouvée.
+                                        {t('no_class_found', 'Aucune classe trouvée.')}
                                     </td>
                                 </tr>
                             )}
@@ -359,7 +359,7 @@ const Classes: React.FC = () => {
                     <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto custom-scrollbar max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-slate-800/50">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                {formData.id ? 'Modifier la classe' : 'Nouvelle classe'}
+                                {formData.id ? t('edit_class', 'Modifier la classe') : t('new_class', 'Nouvelle classe')}
                             </h2>
                             <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
                                 <X className="w-5 h-5" />
@@ -481,7 +481,7 @@ const Classes: React.FC = () => {
                                     <option value="">-- Notation standard (Saisie sur 20 brute) --</option>
                                     {gradingScales.map(scale => (
                                         <option key={scale.id} value={scale.id}>
-                                            {scale.name} ({scale.is_numerical ? 'Conversion numérique' : 'Saisie littérale'})
+                                            {scale.name} ({scale.is_numerical ? t('numerical_conversion', 'Conversion numérique') : t('literal_entry', 'Saisie littérale')})
                                         </option>
                                     ))}
                                 </select>

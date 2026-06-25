@@ -501,7 +501,7 @@ const Subjects: React.FC = () => {
                                 className="btn-primary flex-1 flex items-center justify-center"
                             >
                                 <Save className="w-4 h-4 mr-2" />
-                                {editingSubject ? 'Mettre à jour' : (requiresCode ? 'Demander un code' : 'Ajouter')}
+                                {editingSubject ? t('update', 'Mettre à jour') : (requiresCode ? t('request_code', 'Demander un code') : t('add', 'Ajouter'))}
                             </button>
                         </div>
                     </form>

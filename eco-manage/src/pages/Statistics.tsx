@@ -198,12 +198,6 @@ const Statistics: React.FC = () => {
                           <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
                           <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest">Meilleurs élèves (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
                       </div>
-                      <button 
-                          onClick={() => window.print()}
-                          className="px-4 py-2 bg-slate-950 text-amber-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all border border-slate-950 hover:border-amber-500 shadow-xl"
-                      >
-                          Imprimer
-                      </button>
                   </div>
 
                   <div id="honor-roll-section" className="space-y-6 relative z-10 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">

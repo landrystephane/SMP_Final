@@ -48,23 +48,23 @@ const Attendance: React.FC = () => {
         const hasRecords = records.length > 0;
         
         const unlockKey = `attendance_unlock_${selectedClass}_${currentDate}`;
+        const unlockKeyTeacher = user?.role === 'TEACHER' ? `attendance_unlock_${selectedClass}_${currentDate}_${user.id}` : null;
         const unlockSetting = await window.electronAPI.getSetting(unlockKey);
+        const unlockSettingT = unlockKeyTeacher ? await window.electronAPI.getSetting(unlockKeyTeacher) : null;
         let unlocked = false;
-        if (unlockSetting === 'true') {
-            unlocked = true;
-        } else if (unlockSetting && unlockSetting !== 'false') {
-            const deadline = new Date(unlockSetting);
-            if (deadline > new Date()) {
-                unlocked = true;
-            }
-        }
+        const checkUnlock = (val: any) => {
+            if (val === 'true') return true;
+            if (val && val !== 'false') { return new Date(val) > new Date(); }
+            return false;
+        };
+        unlocked = checkUnlock(unlockSetting) || checkUnlock(unlockSettingT);
         
         setIsUnlockedByAdmin(unlocked);
         
         if (user?.role === 'TEACHER') {
             if (!unlocked && !selectedSchedule && availableSchedules.length > 0) {
                 setIsLocked(true);
-                setNotProgrammedMsg("Veuillez sélectionner un créneau horaire pour faire l'appel.");
+                setNotProgrammedMsg(t('select_slot_for_attendance', "Veuillez sélectionner un créneau horaire pour faire l'appel."));
                 setMaxAllowedHours(0);
                 setAbsences({});
                 return;
@@ -92,10 +92,10 @@ const Attendance: React.FC = () => {
 
                   if (isPast && !unlocked && hasRecords) {
                       setIsLocked(true);
-                      setNotProgrammedMsg("Le cours est terminé. Délai de saisie dépassé.");
+                      setNotProgrammedMsg(t('course_ended_deadline_passed', "Le cours est terminé. Délai de saisie dépassé."));
                   } else if (isPast && !unlocked && !hasRecords) {
                       setIsLocked(true);
-                      setNotProgrammedMsg("Le cours est terminé. Vous n'avez pas enregistré l'appel à temps.");
+                      setNotProgrammedMsg(t('course_ended_not_recorded', "Le cours est terminé. Vous n'avez pas enregistré l'appel à temps."));
                   } else {
                       setNotProgrammedMsg('');
                   }
@@ -103,7 +103,7 @@ const Attendance: React.FC = () => {
                 setMaxAllowedHours(0);
                 setIsLocked(true);
                 if (availableSchedules.length > 0) {
-                    setNotProgrammedMsg("Créneau invalide ou introuvable.");
+                    setNotProgrammedMsg(t('invalid_slot', "Créneau invalide ou introuvable."));
                 }
             } else {
                 // Admin unlocked it, allow default max hours
@@ -157,22 +157,21 @@ const Attendance: React.FC = () => {
                   // Sort by start_time
                   teacherSchedules.sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''));
 
-                  // Check if unlocked by admin
-                  const unlockKey = `attendance_unlock_${selectedClass}_${currentDate}`;
-                  const unlockSetting = await window.electronAPI.getSetting(unlockKey);
-                  let isUnlocked = false;
-                  if (unlockSetting === 'true') {
-                      isUnlocked = true;
-                  } else if (unlockSetting && unlockSetting !== 'false') {
-                      const deadline = new Date(unlockSetting);
-                      if (deadline > new Date()) {
-                          isUnlocked = true;
-                      }
-                  }
+                  // Check if unlocked by admin (class-wide or per-teacher)
+                  const unlockKey2 = `attendance_unlock_${selectedClass}_${currentDate}`;
+                  const unlockKeyT2 = `attendance_unlock_${selectedClass}_${currentDate}_${user?.id}`;
+                  const unlockS2 = await window.electronAPI.getSetting(unlockKey2);
+                  const unlockST2 = await window.electronAPI.getSetting(unlockKeyT2);
+                  const chk = (val: any) => {
+                      if (val === 'true') return true;
+                      if (val && val !== 'false') return new Date(val) > new Date();
+                      return false;
+                  };
+                  let isUnlocked = chk(unlockS2) || chk(unlockST2);
 
                   if (teacherSchedules.length === 0 && !isUnlocked) {
                       setIsLocked(true);
-                      setNotProgrammedMsg("Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui.");
+                      setNotProgrammedMsg(t('no_scheduled_class_today', "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui."));
                       setMaxAllowedHours(0);
                   }
                   setAvailableSchedules(teacherSchedules);
@@ -229,8 +228,8 @@ const Attendance: React.FC = () => {
       const classObj = classes.find(c => c.id.toString() === selectedClass);
       const className = classObj ? `${classObj.name} (${classObj.code})` : selectedClass;
       const formattedDate = new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR');
-      const subject = `Demande de déblocage : Présences ${className}`;
-      const message = `Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe ${className} du ${formattedDate}. Veuillez s'il vous plaît débloquer cette fiche.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`;
+      const subject = t('unlock_request_subject', `Demande de déblocage : Présences ${className}`);
+      const message = t('unlock_request_message', `Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe ${className} du ${formattedDate}. Veuillez s'il vous plaît débloquer cette fiche.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`);
       
       try {
           await window.electronAPI.submitSystemRequest({
@@ -243,9 +242,9 @@ const Attendance: React.FC = () => {
                   rawDate: currentDate
               }
           });
-          alert("Votre demande de déblocage a été envoyée avec succès à l'administration.");
+          alert(t('unlock_request_sent', "Votre demande de déblocage a été envoyée avec succès à l'administration."));
       } catch (e: any) {
-          alert("Erreur lors de l'envoi de la demande: " + e.message);
+          alert(t('error_sending_request', "Erreur lors de l'envoi de la demande: ") + e.message);
       }
   };
 
@@ -258,10 +257,10 @@ const Attendance: React.FC = () => {
               value: newValue ? 'true' : 'false'
           });
           setIsUnlockedByAdmin(newValue);
-          alert(newValue ? "La fiche a été déverrouillée pour l'enseignant." : "La fiche a été verrouillée à nouveau.");
+          alert(newValue ? t('sheet_unlocked', "La fiche a été déverrouillée pour l'enseignant.") : t('sheet_relocked', "La fiche a été verrouillée à nouveau."));
           await loadExistingAttendance();
       } catch (e: any) {
-          alert("Erreur lors du changement de verrouillage: " + e.message);
+          alert(t('error_lock_change', "Erreur lors du changement de verrouillage: ") + e.message);
       }
   };
 
@@ -279,7 +278,7 @@ const Attendance: React.FC = () => {
               try {
                   const res = await window.electronAPI.saveAttendanceBulk({ records, userId: user.id });
                   if (res && res.error) {
-                      alert(`Erreur: ${res.error}`);
+                      alert(`${t('error_label', 'Erreur')}: ${res.error}`);
                       return;
                   }
                   if (res && res.exceeders && res.exceeders.length > 0) {
@@ -310,7 +309,7 @@ const Attendance: React.FC = () => {
           }));
           const key = `pending_attendance_${Date.now()}`;
           localStorage.setItem(key, JSON.stringify(records));
-          alert("✅ Absences sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC.");
+          alert(t('absences_saved_locally', "Absences sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC."));
       }
   };
 
@@ -338,19 +337,19 @@ const Attendance: React.FC = () => {
           if (reportPeriod === 'DAY') {
               startDateStr = reportDate;
               endDateStr = reportDate;
-              periodText = isEn ? `DATE: ${reportDate}` : `JOURNÉE DU: ${reportDate}`;
+              periodText = isEn ? `DATE: ${reportDate}` : t('day_of', `JOURNÉE DU: ${reportDate}`);
           } else if (reportPeriod === 'WEEK') {
-              if (!reportWeek) throw new Error(isEn ? 'Select a week' : 'Sélectionnez une semaine');
+              if (!reportWeek) throw new Error(t('select_a_week', 'Sélectionnez une semaine'));
               const { start, end } = getWeekDateRange(reportWeek);
               startDateStr = start.toISOString().split('T')[0];
               endDateStr = end.toISOString().split('T')[0];
-              periodText = isEn ? `WEEK: ${reportWeek}` : `SEMAINE: ${reportWeek}`;
+              periodText = isEn ? `WEEK: ${reportWeek}` : t('week_of', `SEMAINE: ${reportWeek}`);
           } else if (reportPeriod === 'MONTH') {
               startDateStr = `${reportMonth}-01`;
               const [y, m] = reportMonth.split('-');
               const endOfMonth = new Date(parseInt(y), parseInt(m), 0);
               endDateStr = endOfMonth.toISOString().split('T')[0];
-              periodText = isEn ? `MONTH: ${reportMonth}` : `MOIS: ${reportMonth}`;
+              periodText = isEn ? `MONTH: ${reportMonth}` : t('month_of', `MOIS: ${reportMonth}`);
           }
 
           const records = await window.electronAPI.getAttendanceReport({
@@ -370,7 +369,7 @@ const Attendance: React.FC = () => {
           }
 
           if (finalRecords.length === 0) {
-              alert(isEn ? 'No records found for this period' : 'Aucune présence enregistrée pour cette période');
+              alert(t('no_records_for_period', 'Aucune présence enregistrée pour cette période'));
               setIsGenerating(false);
               return;
           }
@@ -452,15 +451,15 @@ const Attendance: React.FC = () => {
         
         {user?.role === 'TEACHER' && selectedClass && activeTab === 'INPUT' && (
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sélectionner le cours (Créneau)</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('select_course_slot', 'Sélectionner le cours (Créneau)')}</label>
               <select
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all disabled:opacity-30"
                 value={selectedSchedule}
                 onChange={(e) => setSelectedSchedule(e.target.value)}
               >
-                <option value="">-- Choisir un créneau --</option>
+                <option value="">{t('choose_slot', '-- Choisir un créneau --')}</option>
                 {availableSchedules.length === 0 ? (
-                    <option value="" disabled>Aucun cours programmé ce jour</option>
+                    <option value="" disabled>{t('no_course_scheduled_today', 'Aucun cours programmé ce jour')}</option>
                 ) : (
                     availableSchedules.map(s => {
                         const today = new Date().toISOString().split('T')[0];
@@ -478,7 +477,7 @@ const Attendance: React.FC = () => {
                         
                         return (
                             <option key={s.id} value={s.id} disabled={isFuture}>
-                                {s.start_time} - {s.end_time} : {subjectsMap[s.subject_id] || 'Matière inconnue'} {isFuture ? '(Pas encore commencé)' : ''}
+                                {s.start_time} - {s.end_time} : {subjectsMap[s.subject_id] || t('unknown_subject', 'Matière inconnue')} {isFuture ? t('not_started_yet', '(Pas encore commencé)') : ''}
                             </option>
                         );
                     })
@@ -504,7 +503,7 @@ const Attendance: React.FC = () => {
                     <div>
                         <h2 className="text-lg font-bold">{t('daily_call')} : {classes.find(c => c.id.toString() === selectedClass)?.name}</h2>
                         <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">
-                            {isLocked && notProgrammedMsg ? notProgrammedMsg : isLocked ? "Fiche de présence verrouillée" : `Maximum : ${maxAllowedHours}h d'absence`}
+                            {isLocked && notProgrammedMsg ? notProgrammedMsg : isLocked ? t('attendance_sheet_locked', "Fiche de présence verrouillée") : `Maximum : ${maxAllowedHours}h ${t('of_absence', "d'absence")}`}
                         </p>
                     </div>
                 </div>
@@ -518,7 +517,7 @@ const Attendance: React.FC = () => {
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                             }`}
                         >
-                            {isUnlockedByAdmin ? "Re-verrouiller" : "Débloquer"}
+                            {isUnlockedByAdmin ? t('relock', "Re-verrouiller") : t('unlock_btn', "Débloquer")}
                         </button>
                     )}
                     {!isLocked && (
@@ -537,7 +536,7 @@ const Attendance: React.FC = () => {
                     <div className="flex items-center space-x-3">
                         <AlertCircle className="w-6 h-6 flex-shrink-0" />
                         <div>
-                            <p className="font-bold text-sm">{notProgrammedMsg ? "Fiche de présence bloquée" : "Fiche de présence verrouillée"}</p>
+                            <p className="font-bold text-sm">{notProgrammedMsg ? t('attendance_sheet_blocked', "Fiche de présence bloquée") : t('attendance_sheet_locked', "Fiche de présence verrouillée")}</p>
                             <p className="text-xs text-slate-400">
                                 {notProgrammedMsg 
                                     ? notProgrammedMsg

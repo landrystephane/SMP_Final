@@ -270,8 +270,8 @@ export const generateReportCard = (data: any) => {
     // --- Summary & Performance ---
     let finalY = (doc as any).lastAutoTable.finalY + 5;
     
-    // Check if we need to add a new page for the footer section to fit
-    if (finalY > 230) {
+    const overflowThreshold = template?.footer_image ? 200 : 230;
+    if (finalY > overflowThreshold) {
         doc.addPage();
         addWatermark();
         finalY = 20;
@@ -357,9 +357,19 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.setFont('helvetica', 'bold');
         doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 10);
         doc.text('Paix - Travail - Patrie', 20, 14);
-        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 18);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+
         doc.text('REPUBLIC OF CAMEROON', 190, 10, { align: 'right' });
         doc.text('Peace - Work - Fatherland', 190, 14, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 190, 18, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
 
         // Center Logo/School Info
         doc.setFontSize(12);
@@ -539,7 +549,7 @@ export const generateAnnualAuditReport = (data: any) => {
     doc.text(isEn ? "GENERAL AVERAGE" : "MOYENNE GÉNÉRALE", 145, 40);
     doc.setFontSize(14);
     doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text("14.50 / 20", 145, 50);
+    doc.text(data.generalAverage ? `${data.generalAverage} / 20` : "N/A", 145, 50);
 
     // Class performance table
     doc.setFontSize(11);
@@ -554,8 +564,8 @@ export const generateAnnualAuditReport = (data: any) => {
         return [
             c.name,
             count.toString(),
-            "14.50",
-            "92.5 %"
+            data.classAverages?.[c.id] ?? "N/A",
+            data.classSuccessRates?.[c.id] ? `${data.classSuccessRates[c.id]} %` : "N/A"
         ];
     });
 
@@ -624,8 +634,8 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text(school?.header_french || "RÉPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie", 50, 23, { align: 'center' });
-    doc.text(school?.header_english || "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland", 247, 23, { align: 'center' });
+    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 50, 23, { align: 'center' });
+    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 247, 23, { align: 'center' });
 
     // School Name and Info
     doc.setFontSize(22);
@@ -685,14 +695,14 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(100, 100, 100);
     const certificateDate = new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-    doc.text(isEn ? `Done at Yaoundé, on ${certificateDate}` : `Fait à Yaoundé, le ${certificateDate}`, 148, 160, { align: 'center' });
+    doc.text(isEn ? `Done at ${school?.address || 'Yaoundé'}, on ${certificateDate}` : `Fait à ${school?.address || 'Yaoundé'}, le ${certificateDate}`, 148, 160, { align: 'center' });
 
     // Signatures
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(isEn ? "Main Teacher" : "L'Enseignant principal", 40, 180);
-    doc.text(isEn ? "School Principal" : "Le Directeur de l'Établissement", 195, 180);
+    doc.text(school?.bulletin_sig_left || (isEn ? "Main Teacher" : "L'Enseignant principal"), 40, 180);
+    doc.text(school?.bulletin_sig_right || (isEn ? "School Principal" : "Le Directeur de l'Établissement"), 195, 180);
 
     doc.save(isEn ? `Certificate_${studentName.replace(/[\s]+/g, '_')}.pdf` : `Certificat_${studentName.replace(/[\s]+/g, '_')}.pdf`);
 };
@@ -704,13 +714,26 @@ export const generateClassReportCards = (data: {
     studentsData: any[];
     ignoreValidation?: boolean;
     isAnnual?: boolean;
+    template?: any;
 }) => {
-    const { classObj, school, term, studentsData, ignoreValidation, isAnnual } = data;
+    const { classObj, school, term, studentsData, ignoreValidation, isAnnual, template } = data;
     const doc = new jsPDF();
     const isNursery = classObj.level === 'MATERNELLE';
     const isEn = i18n.language?.startsWith('en') ?? false;
-    const primary = school.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
-    const secondary = school.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
+    const primaryColor = template?.primary_color || school.primary_color;
+    const secondaryColor = template?.secondary_color || school.secondary_color;
+    const primary = primaryColor ? hexToRgb(primaryColor) : [30, 41, 59];
+    const secondary = secondaryColor ? hexToRgb(secondaryColor) : [245, 158, 11];
+
+    const addWatermarkBulk = () => {
+        if (template?.watermark_image) {
+            try {
+                doc.setGState(new (doc as any).GState({opacity: 0.15}));
+                doc.addImage(template.watermark_image, 'PNG', 35, 70, 140, 140, undefined, 'FAST');
+                doc.setGState(new (doc as any).GState({opacity: 1}));
+            } catch (e) {}
+        }
+    };
 
     studentsData.forEach((sData, index) => {
         const { student, grades, attendance, rank, totalStudents, validGrades, termAverages, termsArray, average: annualAvg } = sData;
@@ -769,6 +792,7 @@ export const generateClassReportCards = (data: {
         if (index > 0) {
             doc.addPage();
         }
+        addWatermarkBulk();
 
         // Custom template
         if (school.bulletin_pdf_use_custom === 1 && school.bulletin_pdf_template) {
@@ -892,6 +916,15 @@ export const generateClassReportCards = (data: {
             });
         } else {
             // Standard layout
+            let bulkStartY = 20;
+            if (template?.header_image) {
+                try {
+                    doc.addImage(template.header_image, 'JPEG', 0, 0, 210, 45, undefined, 'FAST');
+                    bulkStartY = 50;
+                } catch(e) {}
+            }
+
+            if (!template?.header_image) {
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(0, 0, 0);
@@ -915,6 +948,7 @@ export const generateClassReportCards = (data: {
 
             doc.setDrawColor(200, 200, 200);
             doc.line(20, 48, 190, 48);
+            }
 
             doc.setFontSize(16);
             doc.setFont('helvetica', 'bold');
@@ -1014,6 +1048,7 @@ export const generateClassReportCards = (data: {
                 theme: 'grid',
                 headStyles: { fillColor: primary, textColor: 255, fontSize: 8, fontStyle: 'bold' },
                 bodyStyles: { fontSize: 8 },
+                margin: { bottom: template?.footer_image ? 55 : 40 },
                 columnStyles: {
                     0: { cellWidth: 70 },
                     1: { halign: 'center' },
@@ -1023,7 +1058,13 @@ export const generateClassReportCards = (data: {
                 }
             });
 
-            const finalY = (doc as any).lastAutoTable.finalY + 10;
+            let finalY = (doc as any).lastAutoTable.finalY + 10;
+            const bulkOverflow = template?.footer_image ? 200 : 230;
+            if (finalY > bulkOverflow) {
+                doc.addPage();
+                addWatermarkBulk();
+                finalY = 20;
+            }
             doc.setDrawColor(primary[0], primary[1], primary[2]);
             doc.rect(20, finalY, 170, 40);
 
@@ -1069,6 +1110,9 @@ export const generateClassReportCards = (data: {
                 doc.text(isEn ? `DECISION: PENDING VALIDATION` : `DÉCISION: EN ATTENTE DE VALIDATION`, 120, finalY + 30);
             }
 
+            if (template?.footer_image) {
+                try { doc.addImage(template.footer_image, 'JPEG', 0, 255, 210, 42, undefined, 'FAST'); } catch(e) {}
+            } else {
             const sigY = finalY + 55;
             doc.setFontSize(9);
             doc.setFont('helvetica', 'bold');
@@ -1079,6 +1123,7 @@ export const generateClassReportCards = (data: {
             doc.text(sigLeftStr, 25, sigY);
             doc.text(sigMiddleStr, 85, sigY);
             doc.text(sigRightStr, 140, sigY);
+            }
 
             doc.setFontSize(7);
             doc.setTextColor(120, 120, 120);
@@ -1176,8 +1221,8 @@ export const generateAttendanceReport = (data: { records: any[], className: stri
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
     
-    doc.text(isEn ? 'The Teacher' : "L'Enseignant(e)", 30, finalY + 20);
-    doc.text(isEn ? 'Administration' : 'L\'Administration', 150, finalY + 20);
+    doc.text(school?.bulletin_sig_left || (isEn ? 'The Teacher' : "L'Enseignant(e)"), 30, finalY + 20);
+    doc.text(school?.bulletin_sig_right || (isEn ? 'Administration' : "L'Administration"), 150, finalY + 20);
 
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
@@ -1189,7 +1234,7 @@ export const generateAttendanceReport = (data: { records: any[], className: stri
 export const generateParentsListReport = async (parents: any[], schoolInfo: any, title: string) => {
     const doc = new jsPDF('p', 'pt', 'a4');
     let yPos = 40;
-    const BRAND_COLOR: [number, number, number] = [245, 158, 11];
+    const BRAND_COLOR: [number, number, number] = schoolInfo?.primary_color ? hexToRgb(schoolInfo.primary_color) : [245, 158, 11];
     const TEXT_COLOR: [number, number, number] = [51, 65, 85];
     const LIGHT_BG: [number, number, number] = [248, 250, 252];
 
@@ -1208,7 +1253,7 @@ export const generateParentsListReport = async (parents: any[], schoolInfo: any,
         yPos += 15;
     }
     if (schoolInfo?.phone) {
-        doc.text("T�l: ", 40, yPos);
+        doc.text("Tel: " + schoolInfo.phone, 40, yPos);
     }
 
     yPos += 40;
@@ -1281,13 +1326,15 @@ export const generateSchedulePdf = (data: any) => {
         yPos += 5;
     }
 
+    const schedulePrimary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+
     (doc as any).autoTable({
         head: [columns],
         body: rows,
         startY: yPos,
         theme: 'grid',
         headStyles: {
-            fillColor: [30, 41, 59],
+            fillColor: schedulePrimary,
             textColor: [255, 255, 255],
             fontStyle: 'bold',
             halign: 'center'
@@ -1315,7 +1362,8 @@ export const generateSchedulePdf = (data: any) => {
 export const generateExamSchedulePdf = (data: any) => {
     const { school, title, columns, rows } = data;
     const doc = new jsPDF();
-    
+    const examPrimary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+
     let yPos = 20;
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -1331,7 +1379,7 @@ export const generateExamSchedulePdf = (data: any) => {
         startY: yPos,
         theme: 'grid',
         headStyles: {
-            fillColor: [30, 41, 59],
+            fillColor: examPrimary,
             textColor: [255, 255, 255],
             fontStyle: 'bold'
         },

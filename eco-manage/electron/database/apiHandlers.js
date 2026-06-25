@@ -1279,11 +1279,28 @@ handlers['db:addBusRoute'] = async ({ name, bus_number, driver_id, schoolId }) =
     return db.prepare('INSERT INTO bus_routes (name, bus_number, driver_id, school_id) VALUES (?, ?, ?, ?)').run(name, bus_number, driver_id, sid);
 };
 
+handlers['db:updateBusRoute'] = async ({ id, name, bus_number, driver_id }) => {
+    return db.prepare('UPDATE bus_routes SET name = ?, bus_number = ?, driver_id = ? WHERE id = ?').run(name, bus_number, driver_id, id);
+};
+
+handlers['db:deleteBusRoute'] = async (routeId) => {
+    db.prepare('UPDATE students SET transport_point_id = NULL WHERE transport_point_id IN (SELECT id FROM transport_points WHERE route_id = ?)').run(routeId);
+    db.prepare('DELETE FROM transport_points WHERE route_id = ?').run(routeId);
+    db.prepare('DELETE FROM transport_attendance WHERE route_id = ?').run(routeId);
+    db.prepare('DELETE FROM transport_logs WHERE route_id = ?').run(routeId);
+    return db.prepare('DELETE FROM bus_routes WHERE id = ?').run(routeId);
+};
+
+handlers['db:unassignStudentFromTransport'] = async (studentId) => {
+    return db.prepare('UPDATE students SET transport_point_id = NULL WHERE id = ?').run(studentId);
+};
+
 handlers['db:addTransportPoint'] = async ({ routeId, name, latitude, longitude, estimatedTime }) => {
     return db.prepare('INSERT INTO transport_points (route_id, name, latitude, longitude, estimated_time_from_start) VALUES (?, ?, ?, ?, ?)').run(routeId, name, latitude, longitude, estimatedTime);
 };
 
 handlers['db:deleteTransportPoint'] = async (pointId) => {
+    db.prepare('UPDATE students SET transport_point_id = NULL WHERE transport_point_id = ?').run(pointId);
     return db.prepare('DELETE FROM transport_points WHERE id = ?').run(pointId);
 };
 
@@ -1377,16 +1394,55 @@ handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, 
     }
 
     if (status === 'PRESENT') {
-        const student = db.prepare('SELECT first_name, school_id FROM students WHERE id = ?').get(studentId);
-        if (student) {
-            const msg = `🚌 Votre enfant ${student.first_name} est bien à bord du bus scolaire.`;
-            db.prepare(`
-                INSERT INTO announcements (school_id, sender_id, target, title, content) 
-                VALUES (?, ?, 'PARENTS', 'Appel Bus Scolaire', ?)
-            `).run(student.school_id, recordedBy, msg);
+        const student = db.prepare('SELECT first_name, last_name, parent_contact, school_id FROM students WHERE id = ?').get(studentId);
+        if (student && student.parent_contact) {
+            const parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND role = 'PARENT'").get(student.parent_contact);
+            if (parentUser) {
+                db.prepare(`
+                    INSERT INTO notifications (school_id, user_id, message, type)
+                    VALUES (?, ?, ?, 'INFO')
+                `).run(student.school_id, parentUser.id, `Votre enfant ${student.first_name} ${student.last_name} est bien à bord du bus scolaire.`);
+            }
         }
     }
     return res;
+};
+
+handlers['db:getTransportHistory'] = async ({ routeId, date }) => {
+    const sid = getActiveSchoolId();
+    let query = `
+        SELECT ta.*, s.first_name, s.last_name, s.parent_contact,
+               tp.name as stop_name
+        FROM transport_attendance ta
+        JOIN students s ON ta.student_id = s.id
+        LEFT JOIN transport_points tp ON s.transport_point_id = tp.id
+        WHERE ta.route_id = ?
+    `;
+    const params = [routeId];
+    if (date) {
+        query += ' AND ta.date = ?';
+        params.push(date);
+    }
+    query += ' ORDER BY ta.date DESC, s.last_name ASC';
+    return db.prepare(query).all(...params);
+};
+
+handlers['db:getTransportLogs'] = async ({ routeId }) => {
+    return db.prepare(`
+        SELECT * FROM transport_logs
+        WHERE route_id = ?
+        ORDER BY created_at DESC LIMIT 50
+    `).all(routeId);
+};
+
+handlers['db:getLatestBusPosition'] = async ({ routeId }) => {
+    const log = db.prepare(`
+        SELECT latitude, longitude, created_at
+        FROM transport_logs
+        WHERE route_id = ? AND event_type = 'GPS_UPDATE'
+        ORDER BY created_at DESC LIMIT 1
+    `).get(routeId);
+    return log || null;
 };
 
 handlers['db:notifyTransportProximity'] = async ({ pointId, driverId }) => {
@@ -1853,7 +1909,7 @@ handlers['db:createExpense'] = async (expense) => {
 
   const user = db.prepare('SELECT full_name, role FROM users WHERE id = ?').get(requested_by);
   const roleName = user?.role === 'BURSAR' ? "l'Économe" : (user?.full_name || 'un utilisateur');
-  const reqData = JSON.stringify({ expenseId: result.lastInsertRowid, amount, reason });
+  const reqData = JSON.stringify({ expenseId: result.lastInsertRowid, amount, reason, requested_by });
   db.prepare("INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status) VALUES (?, NULL, ?, 'ACTION_REQUIRED', 'CASH_WITHDRAWAL', ?, 'PENDING')")
     .run(sid, `Une demande de ${amount} FCFA a été soumise par ${roleName} pour: ${reason}. Veuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`, reqData);
 
@@ -2025,7 +2081,16 @@ handlers['db:getStudentDetails'] = async (studentId) => {
   const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
   if (!student) throw new Error('Élève introuvable ou non autorisé.');
   const payments = db.prepare('SELECT p.*, i.name as installmentName FROM payments p LEFT JOIN installments i ON p.installment_id = i.id WHERE p.student_id = ?').all(studentId);
-  const attendance = db.prepare('SELECT * FROM attendance WHERE student_id = ?').all(studentId);
+  const attendance = db.prepare(`
+    SELECT a.*,
+           sch.start_time, sch.end_time, sch.day_of_week,
+           sub.name as subject_name
+    FROM attendance a
+    LEFT JOIN schedules sch ON a.schedule_id = sch.id
+    LEFT JOIN subjects sub ON sch.subject_id = sub.id
+    WHERE a.student_id = ?
+    ORDER BY a.date DESC
+  `).all(studentId);
   const grades = db.prepare('SELECT g.*, s.name as subjectName, s.domain, COALESCE(cs.coefficient, 1) as coefficient FROM grades g JOIN subjects s ON g.subject_id = s.id LEFT JOIN class_subjects cs ON g.class_id = cs.class_id AND g.subject_id = cs.subject_id WHERE g.student_id = ?').all(studentId);
 
   return { student, payments, attendance, grades };
@@ -2230,15 +2295,67 @@ handlers['db:getDashboardStats'] = async (params) => {
     ORDER BY c.level ASC, c.section ASC, c.name ASC, avg DESC
   `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : []), honorThreshold] : [schoolId, honorThreshold]));
 
+  const totalExpenses = db.prepare(`
+    SELECT SUM(amount) as total FROM expenses WHERE status = 'VALIDATED' AND school_id = ?
+  `).get(schoolId).total || 0;
+
+  const allClasses = db.prepare('SELECT id FROM classes WHERE school_id = ?').all(schoolId);
+  const allSettingsForLocks = db.prepare("SELECT key FROM settings WHERE key LIKE 'class_locked_%' AND value = 'true'").all();
+  const sPrefix = `s${schoolId}_`;
+  const allSettingsPrefixed = db.prepare("SELECT key FROM settings WHERE key LIKE ? AND value = 'true'").all(`${sPrefix}class_locked_%`);
+  const lockKeys = [...allSettingsForLocks.map(s => s.key), ...allSettingsPrefixed.map(s => s.key.replace(sPrefix, ''))];
+  let completedClasses = 0;
+  for (const cls of allClasses) {
+    if (lockKeys.some(k => k.startsWith(`class_locked_${cls.id}_`))) completedClasses++;
+  }
+
+  // Financial Alerts (thresholds configured per school)
+  const financialAlerts = [];
+  try {
+    const getSchoolSetting = (key) => {
+      const prefixed = db.prepare('SELECT value FROM settings WHERE key = ?').get(`s${schoolId}_${key}`);
+      if (prefixed) return prefixed.value;
+      const raw = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+      return raw ? raw.value : null;
+    };
+    const unpaidThreshold = parseInt(getSchoolSetting('alert_unpaid_threshold')) || 50;
+    const expenseRatio = parseInt(getSchoolSetting('alert_expense_ratio')) || 50;
+
+    const classesForAlerts = db.prepare('SELECT id, name, level, section FROM classes WHERE school_id = ?').all(schoolId);
+    for (const cls of classesForAlerts) {
+      const fee = db.prepare('SELECT total_fee, registration_fee FROM tuition_fees WHERE class_id = ?').get(cls.id);
+      if (!fee) continue;
+      const totalDuePerStudent = (fee.total_fee || 0) + (fee.registration_fee || 0);
+      if (totalDuePerStudent <= 0) continue;
+      const studentsInClass = db.prepare("SELECT id, scholarship_reduction FROM students WHERE class_id = ? AND school_id = ? AND status != 'DELETED'").all(cls.id, schoolId);
+      let unpaidCount = 0;
+      for (const st of studentsInClass) {
+        const paid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE student_id = ?').get(st.id).total || 0;
+        const due = totalDuePerStudent - (st.scholarship_reduction || 0);
+        if (paid < due * (unpaidThreshold / 100)) unpaidCount++;
+      }
+      if (unpaidCount > 0) {
+        financialAlerts.push({ class: cls.name, unpaidCount, label: `${unpaidCount} élève(s) ont payé moins de ${unpaidThreshold}% de leur pension` });
+      }
+    }
+    if (totalExpenses > 0 && totalRevenue > 0 && totalExpenses > totalRevenue * (expenseRatio / 100)) {
+      financialAlerts.push({ class: 'FINANCES', unpaidCount: 0, label: `Les décaissements (${totalExpenses} FCFA) dépassent ${expenseRatio}% des recettes` });
+    }
+  } catch (e) {
+    console.error('Financial alerts error:', e);
+  }
+
   return {
     totalStudents,
     genderDist: { boys, girls },
     totalRevenue,
+    totalExpenses,
     totalTuitionDue,
+    completedClasses,
     classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
     honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, level: h.class_level, section: h.class_section, avg: h.avg || 0 })),
     honorRollThreshold: honorThreshold,
-    financialAlerts: []
+    financialAlerts
   };
 
 };
@@ -2825,8 +2942,8 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
   const reqDataObj = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
   const actualSenderId = senderId || reqDataObj.teacherId || reqDataObj.senderId;
   const sid = getActiveSchoolId(schoolId || reqDataObj.schoolId);
-  const reqDataStr = typeof requestData === 'string' ? requestData : JSON.stringify(requestData);
-  
+  let reqDataStr = typeof requestData === 'string' ? requestData : JSON.stringify(requestData);
+
   let message = `Nouvelle demande de la part d'un utilisateur.`;
   if (requestType === 'GRADE_REACTIVATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
@@ -2849,6 +2966,13 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
   } else if (requestType === 'CASH_WITHDRAWAL') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
     const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
+
+    const expResult = db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
+        .run(parseFloat(data.amount) || 0, data.reason || data.message || '', actualSenderId, sid);
+    data.expenseId = expResult.lastInsertRowid;
+    data.requested_by = actualSenderId;
+    reqDataStr = JSON.stringify(data);
+
     message = `Demande de décaissement de ${data.amount} FCFA par ${user?.full_name || 'Inconnu'}. Motif: ${data.reason || data.message || ''}`;
   } else if (requestType === 'PRINT_AUTHORIZATION') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
@@ -2907,7 +3031,7 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
 
       } else if (notif.request_type === 'ATTENDANCE_REACTIVATION') {
         const data = JSON.parse(notif.request_data);
-        const settingKey = `attendance_unlock_${data.classId}_${data.rawDate}`;
+        const settingKey = `attendance_unlock_${data.classId}_${data.rawDate}_${data.teacherId || notif.user_id || ''}`;
         
         const deadlineDate = new Date();
         const hrs = parseInt(durationHours, 10) || 24;
@@ -2951,13 +3075,19 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
           VALUES (?, ?, ?, 'SYSTEM')
         `).run(notif.school_id, notif.user_id, `Votre demande d'extension pour la classe a été approuvée pour une durée de ${hrs} heures.`);
       } else if (notif.request_type === 'CASH_WITHDRAWAL') {
+        let bursarUserId = null;
         if (data.expenseId) {
           db.prepare("UPDATE expenses SET status = 'VALIDATED', validated_by = ? WHERE id = ?").run(grantedById, data.expenseId);
+          const exp = db.prepare('SELECT requested_by FROM expenses WHERE id = ?').get(data.expenseId);
+          bursarUserId = exp?.requested_by;
         }
-        db.prepare(`
-          INSERT INTO notifications (school_id, user_id, message, type)
-          VALUES (?, ?, ?, 'SYSTEM')
-        `).run(notif.school_id, notif.user_id || data.requested_by, `Votre demande de décaissement de ${data.amount || ''} FCFA a été approuvée.`);
+        if (!bursarUserId) bursarUserId = data.requested_by || notif.user_id;
+        if (bursarUserId && bursarUserId !== grantedById) {
+          db.prepare(`
+            INSERT INTO notifications (school_id, user_id, message, type)
+            VALUES (?, ?, ?, 'SYSTEM')
+          `).run(notif.school_id, bursarUserId, `Votre demande de décaissement de ${data.amount || ''} FCFA a été approuvée par la direction.`);
+        }
       } else if (notif.request_type === 'PRINT_AUTHORIZATION') {
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
@@ -2983,13 +3113,19 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
         `).run(notif.school_id, data.teacherId, `Votre demande de déblocage des présences pour la classe ${data.className || ''} a été refusée.`);
       } else if (notif.request_type === 'CASH_WITHDRAWAL') {
         const data = JSON.parse(notif.request_data);
+        let bursarUserId = null;
         if (data.expenseId) {
           db.prepare("UPDATE expenses SET status = 'REJECTED', validated_by = ? WHERE id = ?").run(grantedById, data.expenseId);
+          const exp = db.prepare('SELECT requested_by FROM expenses WHERE id = ?').get(data.expenseId);
+          bursarUserId = exp?.requested_by;
         }
-        db.prepare(`
-          INSERT INTO notifications (school_id, user_id, message, type)
-          VALUES (?, ?, ?, 'SYSTEM')
-        `).run(notif.school_id, notif.user_id || data.requested_by, `Votre demande de décaissement de ${data.amount || ''} FCFA a été refusée.`);
+        if (!bursarUserId) bursarUserId = data.requested_by || notif.user_id;
+        if (bursarUserId && bursarUserId !== grantedById) {
+          db.prepare(`
+            INSERT INTO notifications (school_id, user_id, message, type)
+            VALUES (?, ?, ?, 'SYSTEM')
+          `).run(notif.school_id, bursarUserId, `Votre demande de décaissement de ${data.amount || ''} FCFA a été refusée par la direction.`);
+        }
       } else if (['GRADE_EXTENSION', 'PRINT_AUTHORIZATION'].includes(notif.request_type)) {
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)

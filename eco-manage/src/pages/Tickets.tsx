@@ -21,6 +21,7 @@ const Tickets: React.FC = () => {
   
   const [requestType, setRequestType] = useState('STANDARD');
   const [requestData, setRequestData] = useState<any>({});
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [classes, setClasses] = useState<any[]>([]);
   const [termStructure, setTermStructure] = useState<any[]>([]);
 
@@ -84,28 +85,118 @@ const Tickets: React.FC = () => {
               });
               alert("Votre demande système a été soumise avec succès ! L'administration la traitera sous peu.");
           } else {
-              await window.electronAPI.sendTicket({
-                  sender_id: user.id,
-                  receiver_role: receiverId ? null : receiverRole,
-                  receiver_id: receiverId ? receiverId : null,
-                  subject: newTicketSubject,
-                  message: newTicketMessage,
-                  school_id: user.schoolId
-              });
-              
-              if (receiverId) {
-                 await window.electronAPI.createNotification({
-                     user_id: receiverId,
-                     message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
-                     type: 'INFO',
-                     school_id: user.schoolId
-                 });
-              } else if (receiverRole) {
-                 await window.electronAPI.createNotification({
-                     message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
-                     type: 'INFO',
-                     school_id: user.schoolId
-                 });
+              if (receiverRole === 'ALL_PARENTS') {
+                  await window.electronAPI.sendTicket({
+                      sender_id: user.id,
+                      receiver_role: 'PARENT',
+                      receiver_id: null,
+                      subject: newTicketSubject,
+                      message: newTicketMessage,
+                      school_id: user.schoolId
+                  });
+                  await window.electronAPI.createNotification({
+                      role: 'PARENT',
+                      message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                      type: 'INFO',
+                      school_id: user.schoolId
+                  });
+              } else if (receiverRole === 'TITULAIRE') {
+                  if (!receiverId) {
+                      alert("Veuillez sélectionner l'enfant et son enseignant.");
+                      return;
+                  }
+                  await window.electronAPI.sendTicket({
+                      sender_id: user.id,
+                      receiver_id: receiverId,
+                      receiver_role: null,
+                      subject: newTicketSubject,
+                      message: newTicketMessage,
+                      school_id: user.schoolId
+                  });
+                  await window.electronAPI.createNotification({
+                      user_id: receiverId,
+                      message: `Message d'un parent (${user.fullName || user.username}) : ${newTicketSubject}`,
+                      type: 'INFO',
+                      school_id: user.schoolId
+                  });
+              } else if (receiverRole === 'CLASS_TEACHERS') {
+                  if (!selectedClassId) {
+                      alert("Veuillez sélectionner une classe.");
+                      return;
+                  }
+                  const cls = classes.find(c => c.id?.toString() === selectedClassId);
+                  const teacherIds = new Set<number>();
+                  usersList.filter(u => u.role === 'TEACHER').forEach(u => {
+                      try {
+                          const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
+                          if (assigned.includes(parseInt(selectedClassId)) || assigned.includes(selectedClassId)) teacherIds.add(u.id);
+                      } catch(e) {}
+                  });
+                  if (cls?.main_teacher_id) teacherIds.add(cls.main_teacher_id);
+                  if (cls?.assistant_teacher_id) teacherIds.add(cls.assistant_teacher_id);
+                  teacherIds.delete(user.id);
+                  if (teacherIds.size === 0) {
+                      alert("Aucun autre enseignant trouvé pour cette classe.");
+                      return;
+                  }
+                  for (const tid of teacherIds) {
+                      await window.electronAPI.sendTicket({
+                          sender_id: user.id,
+                          receiver_id: tid,
+                          receiver_role: null,
+                          subject: newTicketSubject,
+                          message: newTicketMessage,
+                          school_id: user.schoolId
+                      });
+                  }
+              } else if (receiverRole === 'CLASS_PARENTS') {
+                  if (!selectedClassId) {
+                      alert("Veuillez sélectionner une classe.");
+                      return;
+                  }
+                  const classStudents = studentsList.filter(s => s.class_id?.toString() === selectedClassId?.toString());
+                  const parentIds = new Set<number>();
+                  for (const s of classStudents) {
+                      const parentUser = usersList.find(u => u.role === 'PARENT' && u.username === s.parent_contact);
+                      if (parentUser) parentIds.add(parentUser.id);
+                  }
+                  if (parentIds.size === 0) {
+                      alert("Aucun parent trouvé pour cette classe.");
+                      return;
+                  }
+                  for (const pid of parentIds) {
+                      await window.electronAPI.sendTicket({
+                          sender_id: user.id,
+                          receiver_id: pid,
+                          receiver_role: null,
+                          subject: newTicketSubject,
+                          message: newTicketMessage,
+                          school_id: user.schoolId
+                      });
+                  }
+              } else {
+                  await window.electronAPI.sendTicket({
+                      sender_id: user.id,
+                      receiver_role: receiverId ? null : receiverRole,
+                      receiver_id: receiverId ? receiverId : null,
+                      subject: newTicketSubject,
+                      message: newTicketMessage,
+                      school_id: user.schoolId
+                  });
+                  if (receiverId) {
+                     await window.electronAPI.createNotification({
+                         user_id: receiverId,
+                         message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                         type: 'INFO',
+                         school_id: user.schoolId
+                     });
+                  } else if (receiverRole) {
+                     await window.electronAPI.createNotification({
+                         message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                         type: 'INFO',
+                         school_id: user.schoolId
+                     });
+                  }
               }
               alert("Message envoyé !");
           }
@@ -114,6 +205,7 @@ const Tickets: React.FC = () => {
           setNewTicketSubject('Message interne');
           setReceiverId('');
           setReceiverRole('DIRECTOR');
+          setSelectedClassId('');
           setRequestType('STANDARD');
           setRequestData({});
           loadData();
@@ -341,7 +433,7 @@ const Tickets: React.FC = () => {
                 {tickets.map((ticket) => {
                   let senderIdentity = ticket.sender_name || t('administration');
                   if (ticket.sender_civility) {
-                      const civ = ticket.sender_civility === 'M.' ? 'Monsieur' : (ticket.sender_civility === 'Mme' ? 'Madame' : ticket.sender_civility);
+                      const civ = ticket.sender_civility === 'M.' ? t('mr', 'Monsieur') : (ticket.sender_civility === 'Mme' ? t('mrs', 'Madame') : ticket.sender_civility);
                       senderIdentity = `${civ} ${senderIdentity}`;
                   } else if (ticket.sender_name && ticket.sender_role !== 'SUPERADMIN') {
                       senderIdentity = `Monsieur/Madame ${senderIdentity}`;
@@ -409,7 +501,7 @@ const Tickets: React.FC = () => {
                                         onClick={() => handleResolveTicket(ticket.id, 'RESOLVED', ticket.request_type)}
                                         className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all shadow-lg"
                                     >
-                                        {ticket.request_type === 'GRADE_EXTENSION' ? 'Valider Extension' : 'Approuver'}
+                                        {ticket.request_type === 'GRADE_EXTENSION' ? t('validate_extension', 'Valider Extension') : t('approve', 'Approuver')}
                                     </button>
                                     <button 
                                         onClick={() => handleResolveTicket(ticket.id, 'REJECTED', ticket.request_type)}
@@ -524,15 +616,40 @@ const Tickets: React.FC = () => {
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cible (Rôle)</label>
                     <select
                         value={receiverRole}
-                        onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); setStudentSearchTerm(''); }}
+                        onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); setStudentSearchTerm(''); setSelectedClassId(''); }}
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                     >
-                        <option value="FOUNDER">Le Fondateur</option>
-                        <option value="DIRECTOR">La Direction</option>
-                        <option value="SG">Secrétariat Général</option>
-                        <option value="BURSAR">Économat</option>
-                        <option value="ADVISOR">Conseiller Pédagogique</option>
-                        <option value="PARENT">Parent d'un élève (Privé)</option>
+                        {user?.role === 'PARENT' ? (
+                            <>
+                                <option value="TITULAIRE">Enseignant Titulaire de mon enfant</option>
+                                <option value="DIRECTOR">La Direction</option>
+                                <option value="FOUNDER">Le Fondateur</option>
+                            </>
+                        ) : (
+                            <>
+                                <option value="FOUNDER">Le Fondateur</option>
+                                <option value="DIRECTOR">La Direction</option>
+                                <option value="SG">Secrétariat Général</option>
+                                <option value="BURSAR">Économat</option>
+                                <option value="ADVISOR">Conseiller Pédagogique</option>
+                                {user?.role === 'TEACHER' && classes.some(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id) && (
+                                    <option value="PARENT">Parent d'un élève (Privé)</option>
+                                )}
+                                {user?.role === 'TEACHER' && classes.some(c => c.main_teacher_id === user?.id) && (
+                                    <option value="CLASS_TEACHERS">Enseignants de ma classe</option>
+                                )}
+                                {user?.role !== 'TEACHER' && user?.role !== 'PARENT' && (
+                                    <option value="PARENT">Parent d'un élève (Privé)</option>
+                                )}
+                                {user?.role === 'SECRETARY' && (
+                                    <>
+                                        <option value="ALL_PARENTS">Tous les Parents (Diffusion)</option>
+                                        <option value="CLASS_PARENTS">Parents d'une classe spécifique</option>
+                                        <option value="TEACHER">Un Enseignant</option>
+                                    </>
+                                )}
+                            </>
+                        )}
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -557,7 +674,59 @@ const Tickets: React.FC = () => {
                     </select>
                   </div>
               </div>
-              
+
+              {receiverRole === 'CLASS_PARENTS' && (
+                  <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe ciblée</label>
+                      <select
+                          value={selectedClassId}
+                          onChange={(e) => setSelectedClassId(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                      >
+                          <option value="">-- Sélectionner une classe --</option>
+                          {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level} - {c.section})</option>)}
+                      </select>
+                  </div>
+              )}
+
+              {receiverRole === 'TITULAIRE' && user?.role === 'PARENT' && (
+                  <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Choisir l'enfant</label>
+                      <select
+                          value={receiverId}
+                          onChange={(e) => setReceiverId(e.target.value ? Number(e.target.value) : '')}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                      >
+                          <option value="">-- Sélectionner --</option>
+                          {studentsList.filter(s => s.parent_contact === user?.username).map(s => {
+                              const cls = classes.find(c => c.id === s.class_id);
+                              const titulaire = cls ? usersList.find(u => u.id === cls.main_teacher_id) : null;
+                              const suppleant = cls ? usersList.find(u => u.id === cls.assistant_teacher_id) : null;
+                              return [
+                                  titulaire && <option key={`tit-${s.id}`} value={titulaire.id}>{s.first_name} {s.last_name} - Titulaire: {titulaire.fullName || titulaire.full_name} ({cls?.name})</option>,
+                                  suppleant && <option key={`sup-${s.id}`} value={suppleant.id}>{s.first_name} {s.last_name} - Suppléant: {suppleant.fullName || suppleant.full_name} ({cls?.name})</option>
+                              ];
+                          })}
+                      </select>
+                  </div>
+              )}
+
+              {receiverRole === 'CLASS_TEACHERS' && user?.role === 'TEACHER' && (
+                  <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe concernée</label>
+                      <select
+                          value={selectedClassId}
+                          onChange={(e) => setSelectedClassId(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                      >
+                          <option value="">-- Sélectionner --</option>
+                          {classes.filter(c => c.main_teacher_id === user?.id).map(c => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.level} - {c.section})</option>
+                          ))}
+                      </select>
+                  </div>
+              )}
+
               {receiverRole === 'PARENT' && (
                   <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Rechercher l'élève (Destinataire: Parent)</label>
@@ -571,7 +740,8 @@ const Tickets: React.FC = () => {
                       {studentSearchTerm && (
                           <div className="mt-1 bg-slate-800 border border-slate-700 rounded-lg max-h-40 overflow-y-auto">
                               {(() => {
-                                  const filtered = studentsList.filter(s => { const safeFirst = (s.first_name || '').trim(); const safeLast = (s.last_name || '').trim(); const fullName = `${safeFirst} ${safeLast}`.replace(/\s+/g, ' ').toLowerCase(); const revName = `${safeLast} ${safeFirst}`.replace(/\s+/g, ' ').toLowerCase(); const search = studentSearchTerm.replace(/\s+/g, ' ').toLowerCase().trim(); return fullName.includes(search) || revName.includes(search) || safeFirst.toLowerCase().includes(search) || safeLast.toLowerCase().includes(search); }).slice(0, 10);
+                                  const teacherClassIds = user?.role === 'TEACHER' ? classes.filter(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id).map(c => c.id) : null;
+                                  const filtered = studentsList.filter(s => { if (teacherClassIds && !teacherClassIds.includes(s.class_id)) return false; const safeFirst = (s.first_name || '').trim(); const safeLast = (s.last_name || '').trim(); const fullName = `${safeFirst} ${safeLast}`.replace(/\s+/g, ' ').toLowerCase(); const revName = `${safeLast} ${safeFirst}`.replace(/\s+/g, ' ').toLowerCase(); const search = studentSearchTerm.replace(/\s+/g, ' ').toLowerCase().trim(); return fullName.includes(search) || revName.includes(search) || safeFirst.toLowerCase().includes(search) || safeLast.toLowerCase().includes(search); }).slice(0, 10);
                                   if (filtered.length === 0) {
                                       return <div className="p-2 text-xs text-slate-400 text-center italic">Aucun élève trouvé contenant "{studentSearchTerm}" (Parmi {studentsList.length} élèves)</div>;
                                   }

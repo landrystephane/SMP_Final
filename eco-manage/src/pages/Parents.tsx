@@ -163,7 +163,7 @@ const Parents: React.FC = () => {
                   className="btn-primary h-[46px] px-6 disabled:opacity-50 flex items-center justify-center flex-1 md:flex-none whitespace-nowrap"
               >
                   <Printer className="w-4 h-4 mr-2" />
-                  {isPrinting ? "Génération..." : "Imprimer"}
+                  {isPrinting ? t('generating', "Génération...") : t('print', "Imprimer")}
               </button>
           </div>
       </div>
@@ -207,7 +207,7 @@ const Parents: React.FC = () => {
                         </div>
                         <div>
                             <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
-                                {p.parent_name || 'Non renseigné'}
+                                {p.parent_name || t('not_specified', 'Non renseigné')}
                             </div>
                         </div>
                       </div>
@@ -285,7 +285,7 @@ const Parents: React.FC = () => {
                           disabled={isSending || !announcementSubject || !announcementMessage}
                           className="btn-primary px-8 py-2 disabled:opacity-50 flex items-center"
                       >
-                          {isSending ? "Envoi..." : "Envoyer"}
+                          {isSending ? t('sending', "Envoi...") : t('send', "Envoyer")}
                       </button>
                   </div>
               </div>

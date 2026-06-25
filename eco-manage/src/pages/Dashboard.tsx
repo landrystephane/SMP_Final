@@ -7,14 +7,14 @@ import SystemAdmin from './SystemAdmin';
 import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
 
 
-const DAYS_OF_WEEK = [
-    { key: 1, label: 'Lundi' },
-    { key: 2, label: 'Mardi' },
-    { key: 3, label: 'Mercredi' },
-    { key: 4, label: 'Jeudi' },
-    { key: 5, label: 'Vendredi' },
-    { key: 6, label: 'Samedi' },
-    { key: 7, label: 'Dimanche' }
+const DAYS_OF_WEEK_KEYS = [
+    { key: 1, labelKey: 'monday', labelFallback: 'Lundi' },
+    { key: 2, labelKey: 'tuesday', labelFallback: 'Mardi' },
+    { key: 3, labelKey: 'wednesday', labelFallback: 'Mercredi' },
+    { key: 4, labelKey: 'thursday', labelFallback: 'Jeudi' },
+    { key: 5, labelKey: 'friday', labelFallback: 'Vendredi' },
+    { key: 6, labelKey: 'saturday', labelFallback: 'Samedi' },
+    { key: 7, labelKey: 'sunday', labelFallback: 'Dimanche' }
 ];
 
 const Dashboard: React.FC = () => {
@@ -120,12 +120,12 @@ const Dashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
-                    <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu de vos classes</p>
+                    <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('class_overview', 'Aperçu de vos classes')}</p>
                 </div>
                 <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
-                    <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mes Classes</button>
-                    <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mon Emploi du Temps</button>
-                    <button onClick={() => setTeacherTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>Programme Évaluations</button>
+                    <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_classes', 'Mes Classes')}</button>
+                    <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_timetable', 'Mon Emploi du Temps')}</button>
+                    <button onClick={() => setTeacherTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('exams_program', 'Programme Évaluations')}</button>
                 </div>
             </div>
 
@@ -134,7 +134,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <LayoutGrid className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Mon Emploi du Temps Hebdomadaire</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('my_weekly_timetable', 'Mon Emploi du Temps Hebdomadaire')}</h2>
                         </div>
                         <button 
                             onClick={() => {
@@ -193,10 +193,10 @@ const Dashboard: React.FC = () => {
                             className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center"
                         >
                             <Download className="w-3 h-3 mr-2" />
-                            Télécharger PDF
+                            {t('download_pdf', 'Télécharger PDF')}
                         </button>
                     </div>
-                    
+
                     <div className="overflow-x-auto pb-4">
                         <div className="min-w-[800px]">
                             <div className="grid grid-cols-8 gap-3">
@@ -239,8 +239,8 @@ const Dashboard: React.FC = () => {
                                     if (allSlots.length === 0) {
                                         return (
                                             <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                                                <p className="text-slate-400 font-bold mb-4">Aucun cours programmé pour vous.</p>
-                                                <p className="text-xs text-slate-500">Votre emploi du temps s'affichera ici dès qu'on vous aura attribué des cours.</p>
+                                                <p className="text-slate-400 font-bold mb-4">{t('no_courses_scheduled', 'Aucun cours programmé pour vous.')}</p>
+                                                <p className="text-xs text-slate-500">{t('timetable_will_appear', "Votre emploi du temps s'affichera ici dès qu'on vous aura attribué des cours.")}</p>
                                             </div>
                                         );
                                     }
@@ -258,7 +258,7 @@ const Dashboard: React.FC = () => {
                                                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
                                                 </div>
                                             ) : (
-                                                DAYS_OF_WEEK.map(day => {
+                                                DAYS_OF_WEEK_KEYS.map(day => {
                                                     const sData = stats.schedules?.find((s: any) => s.day_of_week == day.key && s.start_time?.trim() === slot.start?.trim());
                                                     
                                                     if (sData) {
@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
                                                         if (sData.type === 'PAUSE') {
                                                             return (
                                                                 <div key={day.key} className={`p-4 rounded-xl border text-center flex items-center justify-center ${typeColor}`}>
-                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Pause (Perso)</span>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">{t('personal_break', 'Pause (Perso)')}</span>
                                                                 </div>
                                                             );
                                                         }
@@ -317,12 +317,12 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <BookOpen className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">Mes Surveillances d'Évaluations</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('my_exam_supervisions', "Mes Surveillances d'Évaluations")}</h2>
                         </div>
                         {stats.examSchedules && stats.examSchedules.length > 0 && (
                             <button 
                                 onClick={() => {
-                                    const columns = ['Date', 'Horaires', 'Classe', 'Matière'];
+                                    const columns = [t('date', 'Date'), t('schedule', 'Horaires'), t('class', 'Classe'), t('subject', 'Matière')];
                                     const rows = stats.examSchedules.map((exam: any) => {
                                         return [exam.date, `${exam.start_time} - ${exam.end_time}`, exam.class_name, exam.subject_name];
                                     });
@@ -336,24 +336,24 @@ const Dashboard: React.FC = () => {
                                 className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center"
                             >
                                 <Download className="w-3 h-3 mr-2" />
-                                Télécharger PDF
+                                {t('download_pdf', 'Télécharger PDF')}
                             </button>
                         )}
                     </div>
-                    
+
                     {(!stats.examSchedules || stats.examSchedules.length === 0) ? (
                         <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                            <p className="text-slate-400 font-bold mb-4">Aucune surveillance d'évaluation programmée.</p>
+                            <p className="text-slate-400 font-bold mb-4">{t('no_exam_supervision_scheduled', "Aucune surveillance d'évaluation programmée.")}</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto pb-4">
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4">Horaires</th>
-                                        <th className="px-6 py-4">Classe</th>
-                                        <th className="px-6 py-4">Matière</th>
+                                        <th className="px-6 py-4">{t('date', 'Date')}</th>
+                                        <th className="px-6 py-4">{t('schedule', 'Horaires')}</th>
+                                        <th className="px-6 py-4">{t('class', 'Classe')}</th>
+                                        <th className="px-6 py-4">{t('subject', 'Matière')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5 bg-slate-900/30">
@@ -390,7 +390,7 @@ const Dashboard: React.FC = () => {
                         <UsersIcon className="text-blue-500 group-hover:text-slate-950 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Garçons</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('boys', 'Garçons')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.boys || 0}</p>
                 </div>
                 {/* Girls */}
@@ -400,7 +400,7 @@ const Dashboard: React.FC = () => {
                         <UsersIcon className="text-pink-500 group-hover:text-slate-950 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Filles</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('girls', 'Filles')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.girls || 0}</p>
                 </div>
             </div>
@@ -408,7 +408,7 @@ const Dashboard: React.FC = () => {
             {/* List of students by merit */}
             <div className="glass-card p-6 border-none shadow-xl">
                 <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
-                    Liste des élèves par ordre de mérite
+                    {t('students_by_merit', 'Liste des élèves par ordre de mérite')}
                 </h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -734,7 +734,10 @@ const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{t('tuition')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_recovery')}</p>
-          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          {(stats?.totalExpenses || 0) > 0 && (
+            <p className="text-[10px] text-rose-400 font-bold mt-1">Décaissements: -{(stats?.totalExpenses || 0).toLocaleString()} FCFA</p>
+          )}
           <div className="w-full h-1.5 bg-slate-700 rounded-full mt-4 overflow-hidden p-[1px]">
              <div
                 className="h-full bg-rose-500 rounded-full shadow-lg shadow-rose-500/50"
@@ -756,6 +759,40 @@ const Dashboard: React.FC = () => {
           <p className="text-[10px] text-purple-400 font-bold mt-2 uppercase tracking-tight italic">100% {t('active_staff')}</p>
         </div>
       </div>
+
+      {/* Financial Overview for Founder/Director */}
+      {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR') && (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl"><CreditCard className="text-emerald-500 w-6 h-6" /></div>
+          </div>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+        </div>
+        <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-rose-500/10 rounded-2xl"><Wallet className="text-rose-500 w-6 h-6" /></div>
+          </div>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+        </div>
+        <div className="glass-card p-6 border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-amber-500/20 rounded-2xl"><Activity className="text-amber-500 w-6 h-6" /></div>
+          </div>
+          <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
+          <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">FCFA</span></p>
+        </div>
+        <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-blue-500/10 rounded-2xl"><AlertTriangle className="text-blue-500 w-6 h-6" /></div>
+          </div>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Arriérés</p>
+          <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+        </div>
+      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
@@ -854,10 +891,10 @@ const Dashboard: React.FC = () => {
                     <div className="space-y-3">
                         <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest">
                             <span>{t('completed_classes')}</span>
-                            <span className="text-white">0 / {stats?.classStats?.length || 0}</span>
+                            <span className="text-white">{stats?.completedClasses || 0} / {stats?.classStats?.length || 0}</span>
                         </div>
                         <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden p-[1px] border border-slate-700">
-                            <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/20" style={{ width: '0%' }} />
+                            <div className="h-full bg-amber-500 shadow-lg shadow-amber-500/20" style={{ width: `${stats?.classStats?.length ? ((stats?.completedClasses || 0) / stats.classStats.length * 100) : 0}%` }} />
                         </div>
                     </div>
                     <div className="pt-2">

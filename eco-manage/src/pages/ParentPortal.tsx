@@ -413,32 +413,43 @@ const ParentPortal: React.FC = () => {
                                 <thead>
                                     <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
                                         <th className="px-4 py-3">Date</th>
-                                        <th className="px-4 py-3">Heures Manquées</th>
+                                        <th className="px-4 py-3">Cours</th>
+                                        <th className="px-4 py-3">Horaire</th>
+                                        <th className="px-4 py-3">Heures</th>
                                         <th className="px-4 py-3">Statut</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {stats?.attendance && stats.attendance.length > 0 ? (
-                                        stats.attendance.map((abs: any) => (
+                                        <>
+                                        {stats.attendance.map((abs: any) => (
                                             <tr key={abs.id} className="hover:bg-white/5 transition-colors text-xs font-bold">
                                                 <td className="px-4 py-3 text-white">
                                                     {new Date(abs.date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}
                                                 </td>
-                                                <td className="px-4 py-3 text-rose-400 font-black">{abs.hours_absent} Heure(s)</td>
+                                                <td className="px-4 py-3 text-amber-400">{abs.subject_name || '-'}</td>
+                                                <td className="px-4 py-3 text-slate-400">{abs.start_time && abs.end_time ? `${abs.start_time} - ${abs.end_time}` : '-'}</td>
+                                                <td className="px-4 py-3 text-rose-400 font-black">{abs.hours_absent}h</td>
                                                 <td className="px-4 py-3">
                                                     <span className={`text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest border ${
-                                                        abs.status === 'ABSENT' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 
+                                                        abs.status === 'ABSENT' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
                                                         abs.status === 'JUSTIFIED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
                                                         'bg-amber-500/10 text-amber-500 border-amber-500/20'
                                                     }`}>
-                                                        {abs.status === 'ABSENT' ? 'Non Justifiée' : abs.status === 'JUSTIFIED' ? 'Justifiée' : 'Retard'}
+                                                        {abs.status === 'ABSENT' ? t('not_justified', 'Non Justifiée') : abs.status === 'JUSTIFIED' ? t('justified', 'Justifiée') : t('late', 'Retard')}
                                                     </span>
                                                 </td>
                                             </tr>
-                                        ))
+                                        ))}
+                                        <tr className="bg-slate-950/50">
+                                            <td colSpan={3} className="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Cumul Total</td>
+                                            <td className="px-4 py-3 text-rose-500 font-black text-sm">{stats.attendance.reduce((acc: number, a: any) => acc + (a.hours_absent || 0), 0)}h</td>
+                                            <td></td>
+                                        </tr>
+                                        </>
                                     ) : (
                                         <tr>
-                                            <td colSpan={3} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
+                                            <td colSpan={5} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
                                                 Aucune absence enregistrée.
                                             </td>
                                         </tr>
@@ -489,7 +500,7 @@ const ParentPortal: React.FC = () => {
                                         <div key={idx} className="flex justify-between items-center text-xs font-bold">
                                             <span className="text-slate-400 uppercase tracking-wider">{inst.name}</span>
                                             <span className={inst.paid >= inst.amountDue ? "text-emerald-500" : inst.paid > 0 ? "text-amber-500" : "text-slate-600"}>
-                                                {inst.paid >= inst.amountDue ? "Payée" : inst.paid > 0 ? `Partiel (${inst.paid.toLocaleString()} F)` : "Non payée"}
+                                                {inst.paid >= inst.amountDue ? t('paid', "Payée") : inst.paid > 0 ? `${t('partial', 'Partiel')} (${inst.paid.toLocaleString()} F)` : t('not_paid', "Non payée")}
                                             </span>
                                         </div>
                                     ))}
@@ -663,9 +674,9 @@ const ParentPortal: React.FC = () => {
                                     }
                                     return false;
                                 });
-                                return teachers.map(t => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.full_name} ({t.id === studentClass.main_teacher_id ? 'Titulaire' : t.id === studentClass.assistant_teacher_id ? 'Suppléant' : 'Professeur'})
+                                return teachers.map(tchr => (
+                                    <option key={tchr.id} value={tchr.id}>
+                                        {tchr.full_name} ({tchr.id === studentClass.main_teacher_id ? t('main_teacher', 'Titulaire') : tchr.id === studentClass.assistant_teacher_id ? t('assistant_teacher', 'Suppléant') : t('subject_teacher', 'Professeur')})
                                     </option>
                                 ));
                             })()}

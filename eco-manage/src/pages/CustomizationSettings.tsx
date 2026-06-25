@@ -45,6 +45,27 @@ const CustomizationSettings: React.FC = () => {
     const [installments, setInstallments] = useState<any[]>([]);
     const [installmentDeadlines, setInstallmentDeadlines] = useState<any[]>([]);
 
+    // Financial alert thresholds
+    const [alertUnpaidThreshold, setAlertUnpaidThreshold] = useState(50);
+    const [alertExpenseRatio, setAlertExpenseRatio] = useState(50);
+
+    // Full custom bulletin template
+    const [bulletinUseCustom, setBulletinUseCustom] = useState(0);
+    const [bulletinTemplate, setBulletinTemplate] = useState('');
+    const [bulletinMapping, setBulletinMapping] = useState<any>({
+        studentName: { x: 80, y: 80 },
+        matricule: { x: 80, y: 87 },
+        class: { x: 80, y: 94 },
+        year: { x: 175, y: 80 },
+        section: { x: 175, y: 87 },
+        absences: { x: 25, y: 195 },
+        conduct: { x: 25, y: 202 },
+        average: { x: 120, y: 195 },
+        rank: { x: 120, y: 202 },
+        decision: { x: 120, y: 209 },
+        table: { x: 20, y: 115, width: 170 }
+    });
+
     // Custom PDF template fields
     const [headerImage, setHeaderImage] = useState('');
     const [watermarkImage, setWatermarkImage] = useState('');
@@ -128,6 +149,19 @@ const CustomizationSettings: React.FC = () => {
                         console.error('Failed to load grading scales', e);
                         setGradingScales([]);
                     }
+
+                    setBulletinUseCustom(mySchool.bulletin_pdf_use_custom || 0);
+                    setBulletinTemplate(mySchool.bulletin_pdf_template || '');
+                    try {
+                        if (mySchool.bulletin_pdf_mapping) {
+                            setBulletinMapping(typeof mySchool.bulletin_pdf_mapping === 'string' ? JSON.parse(mySchool.bulletin_pdf_mapping) : mySchool.bulletin_pdf_mapping);
+                        }
+                    } catch(e) {}
+
+                    const aut = await window.electronAPI.getSetting('alert_unpaid_threshold');
+                    if (aut) setAlertUnpaidThreshold(parseInt(aut));
+                    const aer = await window.electronAPI.getSetting('alert_expense_ratio');
+                    if (aer) setAlertExpenseRatio(parseInt(aer));
                 }
             }
         } catch (e: any) {
@@ -238,7 +272,10 @@ const CustomizationSettings: React.FC = () => {
                 honor_roll_threshold: honorRollThreshold,
                 timetable_slots: JSON.stringify(timetableSlots),
                 evaluation_periods: JSON.stringify(evaluationPeriods),
-                term_structure: JSON.stringify(termStructure)
+                term_structure: JSON.stringify(termStructure),
+                bulletin_pdf_use_custom: bulletinUseCustom,
+                bulletin_pdf_template: bulletinTemplate || null,
+                bulletin_pdf_mapping: JSON.stringify(bulletinMapping)
             });
 
             await window.electronAPI.saveReportTemplate({
@@ -256,6 +293,9 @@ const CustomizationSettings: React.FC = () => {
             if (window.electronAPI.saveInstallmentDeadlines) {
                 await window.electronAPI.saveInstallmentDeadlines(activeSchool.id, installmentDeadlines);
             }
+
+            await window.electronAPI.setSetting({ key: 'alert_unpaid_threshold', value: alertUnpaidThreshold.toString() });
+            await window.electronAPI.setSetting({ key: 'alert_expense_ratio', value: alertExpenseRatio.toString() });
 
             setSuccess(true);
             showNotification("Paramètres enregistrés avec succès !", "success");
@@ -729,7 +769,7 @@ const CustomizationSettings: React.FC = () => {
                                             >
                                                 <h4 className="text-sm font-black text-white">{scale.name}</h4>
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                    Type : {scale.is_numerical ? 'Conversion de note' : 'Cote littérale directe'}
+                                                    Type : {scale.is_numerical ? t('grade_conversion', 'Conversion de note') : t('literal_grade', 'Cote littérale directe')}
                                                 </p>
                                                 {scale.is_numerical ? (
                                                     <p className="text-[10px] text-amber-500 font-black mt-1">
@@ -1081,6 +1121,140 @@ const CustomizationSettings: React.FC = () => {
                                 </div>
                             </div>
 
+                        </div>
+                    </div>
+
+                    {/* Custom Bulletin Template */}
+                    <div className="glass-card p-6 space-y-6 border-slate-800">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 text-blue-400">
+                                <FileText className="w-6 h-6" />
+                                <h3 className="text-lg font-black uppercase tracking-tight">Modèle de Bulletin Personnalisé</h3>
+                            </div>
+                            <div
+                                onClick={() => setBulletinUseCustom(bulletinUseCustom === 1 ? 0 : 1)}
+                                className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${bulletinUseCustom === 1 ? 'bg-blue-500' : 'bg-slate-700'}`}
+                            >
+                                <div className={`w-5 h-5 bg-white rounded-full transition-transform ${bulletinUseCustom === 1 ? 'translate-x-7' : ''}`} />
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500">Activez cette option si votre école a son propre modèle de bulletin (image A4 complète). Le système placera les données de chaque élève aux coordonnées que vous définissez.</p>
+
+                        {bulletinUseCustom === 1 && (
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Image du bulletin vierge (A4, format portrait)</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleImageUpload(e, setBulletinTemplate)}
+                                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-500/20 file:text-blue-400 file:font-bold file:text-xs file:cursor-pointer"
+                                    />
+                                    {bulletinTemplate && (
+                                        <div className="mt-2 border border-slate-800 rounded-xl overflow-hidden max-h-[300px]">
+                                            <img src={bulletinTemplate} alt="Aperçu bulletin" className="w-full object-contain" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4">Coordonnées des champs (X, Y en mm)</h4>
+                                    <p className="text-[10px] text-slate-500 mb-4">X = position horizontale (0=gauche, 210=droite). Y = position verticale (0=haut, 297=bas). Ajustez pour que les données tombent dans les bonnes cases de votre modèle.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {[
+                                            { key: 'studentName', label: t('field_student_name', 'Nom de l\'élève') },
+                                            { key: 'matricule', label: t('field_matricule', 'Matricule') },
+                                            { key: 'class', label: t('field_class', 'Classe') },
+                                            { key: 'year', label: t('field_year', 'Année scolaire') },
+                                            { key: 'section', label: t('field_section', 'Section') },
+                                            { key: 'absences', label: t('field_absences', 'Absences') },
+                                            { key: 'conduct', label: t('field_conduct', 'Conduite') },
+                                            { key: 'average', label: t('field_average', 'Moyenne') },
+                                            { key: 'rank', label: t('field_rank', 'Rang') },
+                                            { key: 'decision', label: t('field_decision', 'Décision') },
+                                        ].map(field => (
+                                            <div key={field.key} className="bg-slate-900/50 p-3 rounded-xl border border-slate-800 space-y-2">
+                                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{field.label}</label>
+                                                <div className="flex gap-2">
+                                                    <div className="flex-1">
+                                                        <span className="text-[9px] text-slate-600 font-bold">X</span>
+                                                        <input type="number" value={bulletinMapping[field.key]?.x || 0}
+                                                            onChange={(e) => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), x: parseInt(e.target.value) || 0}})}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <span className="text-[9px] text-slate-600 font-bold">Y</span>
+                                                        <input type="number" value={bulletinMapping[field.key]?.y || 0}
+                                                            onChange={(e) => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), y: parseInt(e.target.value) || 0}})}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="bg-slate-900/50 p-3 rounded-xl border border-blue-500/20 space-y-2 md:col-span-2 lg:col-span-3">
+                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Tableau des notes (position + largeur)</label>
+                                            <div className="flex gap-4">
+                                                <div className="flex-1">
+                                                    <span className="text-[9px] text-slate-600 font-bold">X</span>
+                                                    <input type="number" value={bulletinMapping.table?.x || 20}
+                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), x: parseInt(e.target.value) || 20}})}
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <span className="text-[9px] text-slate-600 font-bold">Y</span>
+                                                    <input type="number" value={bulletinMapping.table?.y || 115}
+                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), y: parseInt(e.target.value) || 115}})}
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <span className="text-[9px] text-slate-600 font-bold">Largeur (mm)</span>
+                                                    <input type="number" value={bulletinMapping.table?.width || 170}
+                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), width: parseInt(e.target.value) || 170}})}
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Financial Alerts Configuration */}
+                    <div className="glass-card p-6 space-y-6 border-slate-800">
+                        <div className="flex items-center space-x-3 text-rose-400">
+                            <ShieldAlert className="w-6 h-6" />
+                            <h3 className="text-lg font-black uppercase tracking-tight">Configuration des Alertes Financières</h3>
+                        </div>
+                        <p className="text-xs text-slate-500">Définissez les seuils qui déclencheront des alertes sur le tableau de bord.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Seuil Impayés (%)</label>
+                                <p className="text-[10px] text-slate-600 italic">Alerte si un élève a payé moins de ce % de sa pension</p>
+                                <input
+                                    type="number" min="10" max="100" step="5"
+                                    value={alertUnpaidThreshold}
+                                    onChange={(e) => setAlertUnpaidThreshold(parseInt(e.target.value) || 50)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte si élève a payé moins de {alertUnpaidThreshold}%</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Seuil Décaissements (%)</label>
+                                <p className="text-[10px] text-slate-600 italic">Alerte si les dépenses dépassent ce % des recettes</p>
+                                <input
+                                    type="number" min="10" max="100" step="5"
+                                    value={alertExpenseRatio}
+                                    onChange={(e) => setAlertExpenseRatio(parseInt(e.target.value) || 50)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte si décaissements dépassent {alertExpenseRatio}% des recettes</p>
+                            </div>
                         </div>
                     </div>
 

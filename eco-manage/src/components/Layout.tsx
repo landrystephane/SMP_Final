@@ -112,14 +112,6 @@ const Layout: React.FC = () => {
               showNotification("Surveillance maintenue de force.", "info");
           }
       } else if (n.request_type === 'CASH_WITHDRAWAL') {
-          const reqData = JSON.parse(n.request_data || '{}');
-          if (reqData.expenseId) {
-              await (window.electronAPI as any).approveExpenseInline({
-                  expenseId: reqData.expenseId,
-                  action,
-                  resolvedBy: user?.id
-              });
-          }
           await (window.electronAPI as any).resolveSystemRequest({
               notificationId: notifId,
               action,
@@ -231,18 +223,18 @@ const Layout: React.FC = () => {
     { key: 'subjects', path: '/subjects', icon: BookOpen, roles: ['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'classes', path: '/classes', icon: Building2, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'pedagogy_advisor', path: '/advisor', icon: Award, roles: ['FOUNDER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'pedagogy_advisor', path: '/advisor', icon: Award, roles: ['FOUNDER', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'finance', path: '/finance', icon: CreditCard, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
     { key: 'tuition_config', path: '/tuition-config', icon: Settings, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
     { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
-    { key: 'stats', path: '/stats', icon: TrendingUp, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'stats', path: '/stats', icon: TrendingUp, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'users', path: '/users', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'parents', path: '/parents', icon: HeartHandshake, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'mobile_access', path: '/mobile-access', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport', path: '/transport', icon: Bus, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'customization', path: '/customization', icon: Palette, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'customization', path: '/customization', icon: Palette, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'archives', path: '/archives', icon: Archive, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
     { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
@@ -449,7 +441,7 @@ const Layout: React.FC = () => {
                             ? 'bg-amber-500/20 text-amber-400' 
                             : 'bg-white/10 text-slate-300'
                         }`}>
-                          {n.type === 'ACTION_REQUIRED' ? 'Action Requise' : 'Message'}
+                          {n.type === 'ACTION_REQUIRED' ? t('action_required', 'Action Requise') : t('message_type', 'Message')}
                         </span>
                         <span className="text-[9px] text-slate-500 font-bold">
                           {new Date(n.created_at).toLocaleString()}
