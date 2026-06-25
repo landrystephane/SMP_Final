@@ -220,7 +220,33 @@ app.get(/.*/, (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// Job périodique : auto-désactiver la saisie des notes quand la deadline est passée
+const checkDeadlines = () => {
+    try {
+        const schools = db.prepare('SELECT id FROM schools WHERE deleted_at IS NULL').all();
+        const now = new Date();
+        now.setHours(23, 59, 59, 999);
+        for (const school of schools) {
+            const prefix = `s${school.id}_`;
+            const endSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(`${prefix}period_end`);
+            const allowedSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(`${prefix}period_editing_allowed`);
+            if (endSetting && allowedSetting && allowedSetting.value === 'true') {
+                const endDate = new Date(endSetting.value);
+                endDate.setHours(23, 59, 59, 999);
+                if (now > endDate) {
+                    db.prepare("INSERT INTO settings (key, value) VALUES (?, 'false') ON CONFLICT(key) DO UPDATE SET value = 'false'").run(`${prefix}period_editing_allowed`);
+                    console.log(`[Auto] Saisie des notes désactivée pour l'école ${school.id} (deadline ${endSetting.value} dépassée)`);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Auto] Erreur vérification deadlines:', e.message);
+    }
+};
+
 // Démarrage
 app.listen(port, '0.0.0.0', () => {
     console.log(`[🚀 SaaS Cloud] Serveur démarré et accessible sur le port ${port}`);
+    checkDeadlines();
+    setInterval(checkDeadlines, 60 * 60 * 1000);
 });

@@ -778,34 +778,42 @@ handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, sender
         return { success: false, error: 'Échéance non configurée pour cette tranche.' };
     }
 
-    // 2. Find students who haven't fully paid this installment
-    // Note: payments table has installment_id OR payment_type = 'Scolarité'.
-    // In our current schema, we check total paid for "Scolarité" vs required per class.
-    // However, to be simple, we can check payments specifically linked to this installment_id.
+    const deadlineStr = deadlineRecord?.deadline_date || 'non définie';
+
     const lateStudents = db.prepare(`
-        SELECT s.id, s.first_name, s.parent_contact, cif.amount as required_amount,
-               COALESCE((SELECT SUM(amount) FROM payments p WHERE p.student_id = s.id AND p.installment_id = ? AND p.payment_type = 'Scolarité'), 0) as paid_amount
+        SELECT s.id, s.first_name, s.last_name, s.parent_contact, c.name as class_name,
+               COALESCE(cif.amount, 0) as required_amount,
+               COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id = s.id AND (p.installment_id = ? OR (p.payment_type = 'Scolarité' AND p.installment_id IS NULL))), 0) as total_paid
         FROM students s
-        JOIN class_installment_fees cif ON s.class_id = cif.class_id AND cif.installment_id = ?
-        WHERE s.school_id = ?
+        JOIN classes c ON s.class_id = c.id
+        LEFT JOIN class_installment_fees cif ON s.class_id = cif.class_id AND cif.installment_id = ?
+        WHERE s.school_id = ? AND s.status = 'ACTIVE'
     `).all(installmentId, installmentId, sid);
 
     let notifiedCount = 0;
-    const notifyStmt = db.prepare(`
-        INSERT INTO announcements (school_id, sender_id, target, title, content) 
-        VALUES (?, ?, 'PARENTS', 'Alerte Échéance Scolarité', ?)
-    `);
+    const notifStmt = db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'WARNING')");
+    const ticketStmt = db.prepare("INSERT INTO tickets (sender_id, receiver_id, subject, message, school_id) VALUES (?, ?, ?, ?, ?)");
 
-    for (const student of lateStudents) {
-        if (student.paid_amount < student.required_amount) {
-            const msg = `⚠️ Rappel Important : Le délai pour le paiement de la ${installment.name} approche (${deadlineRecord.deadline_date}). Le montant attendu est de ${student.required_amount} FCFA, dont ${student.paid_amount} FCFA ont été versés. Veuillez régulariser la situation de votre enfant ${student.first_name} dans les plus brefs délais.`;
-            notifyStmt.run(sid, senderId, msg);
-            notifiedCount++;
+    const tx = db.transaction(() => {
+        for (const student of lateStudents) {
+            if (student.required_amount > 0 && student.total_paid < student.required_amount) {
+                const remaining = student.required_amount - student.total_paid;
+                const msg = `Rappel : Le paiement de la ${installment.name} pour ${student.first_name} ${student.last_name} (${student.class_name}) n'est pas encore complet. Reste à payer : ${remaining} FCFA. Échéance : ${deadlineStr}.`;
+
+                if (student.parent_contact) {
+                    const parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND school_id = ?").get(student.parent_contact, sid);
+                    if (parentUser) {
+                        notifStmt.run(sid, parentUser.id, msg);
+                        ticketStmt.run(senderId, parentUser.id, `Rappel ${installment.name}`, msg, sid);
+                        notifiedCount++;
+                    }
+                }
+            }
         }
-    }
+    });
+    tx();
 
-    return { success: true, notifiedCount };
-
+    return { success: true, notifiedCount, message: `${notifiedCount} parent(s) notifié(s) pour la ${installment.name}.` };
 };
 
 handlers['db:getGlobalSubjects'] = async () => {
@@ -2623,7 +2631,14 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
     `).get(sid);
     const averageGrade = avgObj && avgObj.avg ? avgObj.avg : 14.5;
 
-    const backupsDir = path.join(app.getAppPath(), 'backups');
+    let backupsDir;
+    if (process.versions && process.versions.electron) {
+        const { app } = require('electron');
+        backupsDir = path.join(app.getAppPath(), 'backups');
+    } else {
+        const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+        backupsDir = path.join(dataDir, 'backups');
+    }
     if (!fs.existsSync(backupsDir)) {
         fs.mkdirSync(backupsDir, { recursive: true });
     }
