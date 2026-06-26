@@ -623,6 +623,27 @@ function initDb() {
         console.error(`[Migration] Unique username migration failed:`, e.message);
     }
 
+    // Performance indexes
+    try {
+        db.exec(`
+            CREATE INDEX IF NOT EXISTS idx_students_school ON students(school_id);
+            CREATE INDEX IF NOT EXISTS idx_students_class ON students(class_id);
+            CREATE INDEX IF NOT EXISTS idx_grades_student ON grades(student_id);
+            CREATE INDEX IF NOT EXISTS idx_grades_class ON grades(class_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
+            CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id);
+            CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+            CREATE INDEX IF NOT EXISTS idx_classes_school ON classes(school_id);
+            CREATE INDEX IF NOT EXISTS idx_users_school ON users(school_id);
+            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+            CREATE INDEX IF NOT EXISTS idx_notifications_school ON notifications(school_id);
+            CREATE INDEX IF NOT EXISTS idx_expenses_school ON expenses(school_id);
+            CREATE INDEX IF NOT EXISTS idx_bus_routes_school ON bus_routes(school_id);
+            CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+        `);
+        console.log('[Migration] Performance indexes created/verified');
+    } catch(e) { console.error('Index creation error:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

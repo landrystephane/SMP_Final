@@ -575,6 +575,8 @@ handlers['db:saveGrades'] = async (grades) => {
 };
 
 handlers['db:unlockGrades'] = async ({ classId, term, month }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER','DIRECTOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -609,6 +611,8 @@ handlers['db:getClassSubjectsValidationStatus'] = async ({ classId, term, month 
 };
 
 handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER','DIRECTOR','ADVISOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -623,6 +627,8 @@ handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month 
 };
 
 handlers['db:validateClassGrades'] = async ({ classId, term, month }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER','DIRECTOR','ADVISOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -653,6 +659,7 @@ handlers['db:getPayments'] = async (schoolId) => {
 
 handlers['db:addPayment'] = async (payment) => {
   const { studentId, amount, type, userId, installmentId, depositorName } = payment;
+  if (!amount || parseFloat(amount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
   const sid = getActiveSchoolId();
   const studentCheck = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
   if (!studentCheck) throw new Error('Élève non autorisé pour cet établissement.');
@@ -691,6 +698,7 @@ handlers['db:addPayment'] = async (payment) => {
 };
 
 handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositorName, includeTransport, includeExam }) => {
+    if (!totalAmount || parseFloat(totalAmount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
     const sid = getActiveSchoolId();
     const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
     if (!student) throw new Error('Élève non autorisé.');
@@ -719,73 +727,78 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     let remaining = parseFloat(totalAmount);
     const receipts = [];
 
-    const createReceipt = (amount, type, installmentId = null) => {
-        const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-        db.prepare('INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name) VALUES (?, ?, ?, ?, ?, ?, ?)').run(studentId, amount, type, userId, receiptNumber, installmentId, depositorName || '');
-        if (type === 'Transport') db.prepare('UPDATE students SET has_transport = 1 WHERE id = ?').run(studentId);
-        receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null });
-    };
+    const tx = db.transaction(() => {
+        const createReceipt = (amount, type, installmentId = null) => {
+            const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+            db.prepare('INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name) VALUES (?, ?, ?, ?, ?, ?, ?)').run(studentId, amount, type, userId, receiptNumber, installmentId, depositorName || '');
+            if (type === 'Transport') db.prepare('UPDATE students SET has_transport = 1 WHERE id = ?').run(studentId);
+            receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null });
+        };
 
-    // 1. Inscription (montant exact obligatoire, pas d'avance)
-    const regFee = feeConfig.registration_fee || 0;
-    const regPaid = paidByType('Inscription');
-    const regDue = Math.max(0, regFee - regPaid);
-    if (regDue > 0) {
-        if (remaining < regDue) {
-            throw new Error(`Le montant est insuffisant pour couvrir l'inscription (${regDue} FCFA requis). L'inscription doit être payée intégralement.`);
+        // 1. Inscription (montant exact obligatoire, pas d'avance)
+        const regFee = feeConfig.registration_fee || 0;
+        const regPaid = paidByType('Inscription');
+        const regDue = Math.max(0, regFee - regPaid);
+        if (regDue > 0) {
+            if (remaining < regDue) {
+                throw new Error(`Le montant est insuffisant pour couvrir l'inscription (${regDue} FCFA requis). L'inscription doit être payée intégralement.`);
+            }
+            createReceipt(regDue, 'Inscription');
+            remaining -= regDue;
         }
-        createReceipt(regDue, 'Inscription');
-        remaining -= regDue;
-    }
 
-    // 2. Transport (si demandé)
-    if (includeTransport && remaining > 0) {
-        const transFee = feeConfig.transport_fee || 0;
-        const transPaid = paidByType('Transport');
-        const transDue = Math.max(0, transFee - transPaid);
-        if (transDue > 0) {
-            const pay = Math.min(remaining, transDue);
-            createReceipt(pay, 'Transport');
-            remaining -= pay;
+        // 2. Transport (si demandé)
+        if (includeTransport && remaining > 0) {
+            const transFee = feeConfig.transport_fee || 0;
+            const transPaid = paidByType('Transport');
+            const transDue = Math.max(0, transFee - transPaid);
+            if (transDue > 0) {
+                const pay = Math.min(remaining, transDue);
+                createReceipt(pay, 'Transport');
+                remaining -= pay;
+            }
         }
-    }
 
-    // 3. Examen (si demandé)
-    if (includeExam && remaining > 0) {
-        const examFee = feeConfig.exam_fee || 0;
-        const examPaid = paidByType('Examen');
-        const examDue = Math.max(0, examFee - examPaid);
-        if (examDue > 0) {
-            const pay = Math.min(remaining, examDue);
-            createReceipt(pay, 'Examen');
-            remaining -= pay;
+        // 3. Examen (si demandé)
+        if (includeExam && remaining > 0) {
+            const examFee = feeConfig.exam_fee || 0;
+            const examPaid = paidByType('Examen');
+            const examDue = Math.max(0, examFee - examPaid);
+            if (examDue > 0) {
+                const pay = Math.min(remaining, examDue);
+                createReceipt(pay, 'Examen');
+                remaining -= pay;
+            }
         }
-    }
 
-    // 4. Tranches de pension dans l'ordre
-    for (const inst of installments) {
-        if (remaining <= 0) break;
-        const instAmount = inst.configured_amount || 0;
-        if (instAmount <= 0) continue;
-        const instPaid = paidByInstallment(inst.id);
-        const instDue = Math.max(0, instAmount - instPaid);
-        if (instDue > 0) {
-            const pay = Math.min(remaining, instDue);
-            createReceipt(pay, 'Scolarité', inst.id);
-            remaining -= pay;
+        // 4. Tranches de pension dans l'ordre
+        for (const inst of installments) {
+            if (remaining <= 0) break;
+            const instAmount = inst.configured_amount || 0;
+            if (instAmount <= 0) continue;
+            const instPaid = paidByInstallment(inst.id);
+            const instDue = Math.max(0, instAmount - instPaid);
+            if (instDue > 0) {
+                const pay = Math.min(remaining, instDue);
+                createReceipt(pay, 'Scolarité', inst.id);
+                remaining -= pay;
+            }
         }
-    }
 
-    // 5. Si reste encore de l'argent (excédent), enregistrer comme pension générale
-    if (remaining > 0) {
-        createReceipt(remaining, 'Scolarité');
-        remaining = 0;
-    }
+        // 5. Si reste encore de l'argent (excédent), enregistrer comme pension générale
+        if (remaining > 0) {
+            createReceipt(remaining, 'Scolarité');
+            remaining = 0;
+        }
+    });
+    tx();
 
     return { success: true, receipts, studentName: `${student.last_name} ${student.first_name}`, className: student.className };
 };
 
 handlers['db:deletePayment'] = async (id) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER','DIRECTOR','BURSAR','SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé');
     const sid = getActiveSchoolId();
     const payment = db.prepare('SELECT p.student_id, p.payment_type FROM payments p JOIN students s ON p.student_id = s.id WHERE p.id = ? AND s.school_id = ?').get(id, sid);
     if (!payment) throw new Error('Paiement introuvable ou non autorisé.');
@@ -1418,10 +1431,14 @@ handlers['db:deleteBusRoute'] = async (routeId) => {
 };
 
 handlers['db:unassignStudentFromTransport'] = async (studentId) => {
-    return db.prepare('UPDATE students SET transport_point_id = NULL WHERE id = ?').run(studentId);
+    const sid = getActiveSchoolId();
+    return db.prepare('UPDATE students SET transport_point_id = NULL WHERE id = ? AND school_id = ?').run(studentId, sid);
 };
 
 handlers['db:addTransportPoint'] = async ({ routeId, name, latitude, longitude, estimatedTime }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée.');
     return db.prepare('INSERT INTO transport_points (route_id, name, latitude, longitude, estimated_time_from_start) VALUES (?, ?, ?, ?, ?)').run(routeId, name, latitude, longitude, estimatedTime);
 };
 
@@ -1502,6 +1519,9 @@ handlers['db:getParentStudents'] = async (parentPhone) => {
 
 handlers['db:logTransport'] = async (log) => {
     const { route_id, event_type, latitude, longitude } = log;
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(route_id, sid);
+    if (!route) throw new Error('Route non autorisée.');
     return db.prepare(`INSERT INTO transport_logs (route_id, event_type, latitude, longitude) VALUES (?, ?, ?, ?)`).run(route_id, event_type, latitude, longitude);
 };
 
@@ -1561,6 +1581,9 @@ handlers['db:getTransportHistory'] = async ({ routeId, date }) => {
 };
 
 handlers['db:getTransportLogs'] = async ({ routeId }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée.');
     return db.prepare(`
         SELECT * FROM transport_logs
         WHERE route_id = ?
@@ -1569,6 +1592,9 @@ handlers['db:getTransportLogs'] = async ({ routeId }) => {
 };
 
 handlers['db:getLatestBusPosition'] = async ({ routeId }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée.');
     const log = db.prepare(`
         SELECT latitude, longitude, created_at
         FROM transport_logs
@@ -1581,7 +1607,10 @@ handlers['db:getLatestBusPosition'] = async ({ routeId }) => {
 handlers['db:notifyTransportProximity'] = async ({ pointId, driverId }) => {
     const point = db.prepare('SELECT name, route_id FROM transport_points WHERE id = ?').get(pointId);
     if (!point) return false;
-    
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(point.route_id, sid);
+    if (!route) throw new Error('Route non autorisée.');
+
     // Find all students assigned to this point
     const students = db.prepare('SELECT first_name, school_id FROM students WHERE transport_point_id = ?').all(pointId);
     
@@ -1604,12 +1633,18 @@ handlers['db:getMobileKeys'] = async () => {
 };
 
 handlers['db:generateMobileKey'] = async ({ name, userId }) => {
+    const sid = getActiveSchoolId();
+    const user = db.prepare('SELECT id FROM users WHERE id = ? AND school_id = ?').get(userId, sid);
+    if (!user) throw new Error('Utilisateur non autorisé pour cet établissement.');
     const key = `KEY-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     return db.prepare('INSERT INTO mobile_access_keys (access_key, assigned_to_name, assigned_to_user_id) VALUES (?, ?, ?)')
         .run(key, name, userId);
 };
 
 handlers['db:deleteMobileKey'] = async (keyId) => {
+    const sid = getActiveSchoolId();
+    const key = db.prepare('SELECT mk.id FROM mobile_access_keys mk JOIN users u ON mk.assigned_to_user_id = u.id WHERE mk.id = ? AND u.school_id = ?').get(keyId, sid);
+    if (!key) throw new Error('Clé non autorisée pour cet établissement.');
     return db.prepare('DELETE FROM mobile_access_keys WHERE id = ?').run(keyId);
 };
 
@@ -1662,6 +1697,9 @@ handlers['db:validatePayment'] = async (data) => {
 };
 
 handlers['db:cancelPendingSubject'] = async (id) => {
+  const sid = getActiveSchoolId();
+  const pending = db.prepare('SELECT id FROM pending_subjects WHERE id = ? AND school_id = ?').get(id, sid);
+  if (!pending) throw new Error('Demande non autorisée pour cet établissement.');
   return db.prepare("UPDATE pending_subjects SET status = 'CANCELLED' WHERE id = ?").run(id);
 };
 
@@ -2054,6 +2092,7 @@ handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actio
 
 handlers['db:createExpense'] = async (expense) => {
   const { amount, reason, requested_by, school_id } = expense;
+  if (!amount || parseFloat(amount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
   const sid = getActiveSchoolId(school_id);
   const result = db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
     .run(amount, reason, requested_by, sid);
@@ -2515,7 +2554,7 @@ handlers['db:getDashboardStats'] = async (params) => {
     // Installment deadline alerts (configurable days)
     const deadlineAlertDays = parseInt(getSchoolSetting('alert_deadline_days')) || 7;
     try {
-      const deadlines = db.prepare('SELECT id.*, i.name as installment_name FROM installment_deadlines id JOIN installments i ON id.installment_id = i.id WHERE id.school_id = ?').all(schoolId);
+      const deadlines = db.prepare('SELECT dl.*, i.name as installment_name FROM school_installment_deadlines dl JOIN installments i ON dl.installment_id = i.id WHERE dl.school_id = ?').all(schoolId);
       const today = new Date();
       for (const dl of deadlines) {
         if (dl.deadline_date) {
@@ -2778,17 +2817,17 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
     let studentsAverages = [];
     
     if (classIds.length > 0) {
-        classes = db.prepare(`SELECT * FROM classes WHERE id IN (${classIds.join(',')}) AND school_id = ?`).all(sid);
+        classes = db.prepare(`SELECT * FROM classes WHERE id IN (${classIds.map(() => '?').join(',')}) AND school_id = ?`).all(...classIds, sid);
         if (classes.length > 0) {
-            const activeClassIds = classes.map(c => c.id).join(',');
+            const activeClassIds = classes.map(c => c.id);
             const studentStats = db.prepare(`
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN gender = 'M' THEN 1 ELSE 0 END) as boys,
                     SUM(CASE WHEN gender = 'F' THEN 1 ELSE 0 END) as girls
                 FROM students s
-                WHERE s.class_id IN (${activeClassIds}) AND s.school_id = ?
-            `).get(sid);
+                WHERE s.class_id IN (${activeClassIds.map(() => '?').join(',')}) AND s.school_id = ?
+            `).get(...activeClassIds, sid);
             totalStudents = studentStats.total || 0;
             boys = studentStats.boys || 0;
             girls = studentStats.girls || 0;
@@ -2799,21 +2838,21 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
                 FROM students s
                 JOIN classes c ON s.class_id = c.id
                 LEFT JOIN grades g ON g.student_id = s.id
-                WHERE s.class_id IN (${activeClassIds})
+                WHERE s.class_id IN (${activeClassIds.map(() => '?').join(',')})
                 GROUP BY s.id
                 ORDER BY average DESC NULLS LAST
-            `).all();
+            `).all(...activeClassIds);
         }
     }
 
     const schoolConfig = db.prepare('SELECT timetable_slots FROM schools WHERE id = ?').get(sid);
     const subjects = db.prepare('SELECT id, name FROM subjects').all();
-    
+
     let schedules = [];
     let examSchedules = [];
     if (tId) {
         if (classIds.length > 0) {
-            schedules = db.prepare(`SELECT * FROM schedules WHERE school_id = ? AND (teacher_id = ? OR (type = 'PAUSE' AND class_id IN (${classIds.join(',')})))`).all(sid, tId);
+            schedules = db.prepare(`SELECT * FROM schedules WHERE school_id = ? AND (teacher_id = ? OR (type = 'PAUSE' AND class_id IN (${classIds.map(() => '?').join(',')})))`).all(sid, tId, ...classIds);
         } else {
             schedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND teacher_id = ?').all(sid, tId);
         }
@@ -2956,7 +2995,7 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
         JOIN students s ON g.student_id = s.id
         WHERE s.school_id = ?
     `).get(sid);
-    const averageGrade = avgObj && avgObj.avg ? avgObj.avg : 14.5;
+    const averageGrade = avgObj && avgObj.avg ? avgObj.avg : 0;
 
     let backupsDir;
     if (process.versions && process.versions.electron) {
@@ -3248,6 +3287,8 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
 };
 
 handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationHours, resolvedBy }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER','DIRECTOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const notif = db.prepare('SELECT * FROM notifications WHERE id = ?').get(notificationId);
   if (!notif) throw new Error("Notification introuvable.");
   if (notif.action_status !== 'PENDING') throw new Error("Cette demande a déjà été résolue.");
