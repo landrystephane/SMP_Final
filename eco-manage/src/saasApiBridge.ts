@@ -81,7 +81,22 @@ export const initSaaSBridge = () => {
             
             // Déterminer le channel IPC
             let channel = `db:${prop}`;
-            if (prop === 'logout' || prop === 'switchSchool' || prop === 'restoreSession') {
+            if (prop === 'switchSchool') {
+                return async (schoolId: number) => {
+                    try {
+                        const token = localStorage.getItem('saas_token');
+                        const res = await fetch(`${API_BASE.replace('/api', '')}/api/auth/switchSchool`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+                            body: JSON.stringify({ schoolId })
+                        });
+                        const data = await res.json();
+                        if (data.token) localStorage.setItem('saas_token', data.token);
+                        return true;
+                    } catch (e) { return false; }
+                };
+            }
+            if (prop === 'logout' || prop === 'restoreSession') {
                 channel = `auth:${prop}`;
                 if (prop === 'logout') {
                     localStorage.removeItem('saas_token');

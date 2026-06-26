@@ -240,6 +240,7 @@ const Students: React.FC = () => {
                     <span className={s.gender === 'M' ? 'text-blue-400' : 'text-pink-400'}>{s.gender}</span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
+                    {s.has_paid_registration === 1 && (
                     <button
                         onClick={() => generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name }, schoolInfo)}
                         className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-500/20 rounded-md transition-all"
@@ -247,6 +248,7 @@ const Students: React.FC = () => {
                     >
                         <FileText className="w-4 h-4" />
                     </button>
+                    )}
                     <button onClick={() => setEditingStudent(s)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>

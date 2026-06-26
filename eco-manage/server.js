@@ -155,6 +155,24 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
     }
 });
 
+app.post('/api/auth/switchSchool', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token' });
+    try {
+        const token = authHeader.substring(7);
+        const user = jwt.verify(token, JWT_SECRET);
+        if (user.role !== 'SUPERADMIN') return res.status(403).json({ error: 'Unauthorized' });
+        const { schoolId } = req.body;
+        const updatedUser = { ...user, schoolId: schoolId || null };
+        delete updatedUser.iat;
+        delete updatedUser.exp;
+        const newToken = jwt.sign(updatedUser, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ success: true, token: newToken });
+    } catch (e) {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+});
+
 // ==========================================
 // ROUTES SUPER ADMIN (Gestion SaaS)
 // ==========================================
