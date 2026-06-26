@@ -692,14 +692,16 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
         receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null });
     };
 
-    // 1. Inscription
+    // 1. Inscription (montant exact obligatoire, pas d'avance)
     const regFee = feeConfig.registration_fee || 0;
     const regPaid = paidByType('Inscription');
     const regDue = Math.max(0, regFee - regPaid);
-    if (regDue > 0 && remaining > 0) {
-        const pay = Math.min(remaining, regDue);
-        createReceipt(pay, 'Inscription');
-        remaining -= pay;
+    if (regDue > 0) {
+        if (remaining < regDue) {
+            throw new Error(`Le montant est insuffisant pour couvrir l'inscription (${regDue} FCFA requis). L'inscription doit être payée intégralement.`);
+        }
+        createReceipt(regDue, 'Inscription');
+        remaining -= regDue;
     }
 
     // 2. Transport (si demandé)
