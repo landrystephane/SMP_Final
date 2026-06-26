@@ -552,6 +552,13 @@ const SystemAdmin: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                     <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
                   </div>
+                  {s.access_code && (
+                  <div className="flex items-center gap-3 text-xs font-bold">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span className="text-slate-500">Code d'accès :</span>
+                    <span className="text-amber-500 font-black tracking-widest bg-amber-500/10 px-3 py-1 rounded-lg">{s.access_code}</span>
+                  </div>
+                  )}
                   <div className="pt-4 grid grid-cols-1 gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}

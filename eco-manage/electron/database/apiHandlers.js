@@ -168,7 +168,8 @@ handlers['db:getDeletedSchools'] = async () => {
 handlers['db:addSchool'] = async (school) => {
     if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     const { name, address, contact_email, contact_phone, bp, motto } = school;
-    const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto) VALUES (?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto);
+    const accessCode = name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X') + Date.now().toString().slice(-4);
+    const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto, access_code) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto, accessCode);
     const newSchoolId = info.lastInsertRowid;
 
     const transaction = db.transaction(() => {

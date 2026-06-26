@@ -644,6 +644,21 @@ function initDb() {
         console.log('[Migration] Performance indexes created/verified');
     } catch(e) { console.error('Index creation error:', e.message); }
 
+    // School access code
+    try {
+        const schoolCols = db.prepare("PRAGMA table_info(schools)").all();
+        if (!schoolCols.find(c => c.name === 'access_code')) {
+            db.prepare("ALTER TABLE schools ADD COLUMN access_code TEXT").run();
+            // Generate codes for existing schools
+            const schools = db.prepare("SELECT id, name FROM schools").all();
+            for (const s of schools) {
+                const code = s.name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X') + s.id.toString().padStart(3, '0');
+                db.prepare("UPDATE schools SET access_code = ? WHERE id = ?").run(code, s.id);
+            }
+            console.log('[Migration] School access codes generated');
+        }
+    } catch(e) { console.error('Access code migration error:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

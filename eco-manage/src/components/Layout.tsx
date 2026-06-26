@@ -349,7 +349,19 @@ const Layout: React.FC = () => {
           ))}
         </nav>
 
-        <div className="p-6 border-t border-white/5 bg-slate-900/20">
+        <div className="p-6 border-t border-white/5 bg-slate-900/20 space-y-2">
+          {(window as any).__pwaInstallPrompt && (
+            <button
+              onClick={async () => {
+                const prompt = (window as any).__pwaInstallPrompt;
+                if (prompt) { prompt.prompt(); const r = await prompt.userChoice; if (r.outcome === 'accepted') (window as any).__pwaInstallPrompt = null; }
+              }}
+              className="flex items-center w-full px-5 py-4 text-emerald-500 hover:bg-emerald-500/10 rounded-2xl transition-all text-xs font-black uppercase tracking-widest"
+            >
+              <TabletSmartphone className="w-5 h-5 mr-4" />
+              {t('install_app', 'Installer l\'App')}
+            </button>
+          )}
           <button
             onClick={() => { setIsSidebarOpen(false); handleLogout(); }}
             className="flex items-center w-full px-5 py-4 text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 rounded-2xl transition-all text-xs font-black uppercase tracking-widest"

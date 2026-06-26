@@ -103,13 +103,19 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'SaaS Web API is running perfectly!' });
 });
 
-// Public route: list active schools (name + address only, no sensitive data)
-app.get('/api/schools-list', (req, res) => {
+// Public route: verify school access code (no school list exposed)
+app.post('/api/verify-school-code', (req, res) => {
     try {
-        const schools = db.prepare("SELECT id, name, address FROM schools WHERE is_active = 1 AND deleted_at IS NULL ORDER BY name ASC").all();
-        res.json({ schools });
+        const { code } = req.body;
+        if (!code || code.trim().length < 3) return res.json({ found: false });
+        const school = db.prepare("SELECT id, name, address FROM schools WHERE access_code = ? AND is_active = 1 AND deleted_at IS NULL").get(code.trim().toUpperCase());
+        if (school) {
+            res.json({ found: true, school: { id: school.id, name: school.name, address: school.address } });
+        } else {
+            res.json({ found: false });
+        }
     } catch(e) {
-        res.json({ schools: [] });
+        res.json({ found: false });
     }
 });
 
