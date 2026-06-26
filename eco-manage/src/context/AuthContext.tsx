@@ -3,7 +3,7 @@ import type { User, Role } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, schoolId?: number | null) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   isRestoringSession: boolean;
@@ -62,10 +62,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, schoolId?: number | null) => {
     if (window.electronAPI) {
         try {
-            const result = await window.electronAPI.login({ username, password });
+            const result = await window.electronAPI.login({ username, password, schoolId });
 
             if (result && result.error) {
                 throw new Error(result.error);

@@ -121,7 +121,7 @@ app.post('/api/verify-school-code', (req, res) => {
 
 // Migration de 'auth:login'
 app.post('/api/auth/login', loginLimiter, (req, res) => {
-    let { username, password } = req.body;
+    let { username, password, schoolId } = req.body;
 
     try {
         // Normalize phone number for parent login
@@ -129,8 +129,15 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
         if (normalizedUsername.startsWith('+237')) normalizedUsername = normalizedUsername.slice(4);
         if (normalizedUsername.startsWith('237') && normalizedUsername.length > 9) normalizedUsername = normalizedUsername.slice(3);
 
-        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender, is_active as isActive FROM users WHERE username = ? OR username = ? OR matricule = ?').get(username, normalizedUsername, username);
-        
+        let user;
+        if (schoolId) {
+            // School-scoped login (from access code flow)
+            user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender, is_active as isActive FROM users WHERE (username = ? OR username = ? OR matricule = ?) AND school_id = ?').get(username, normalizedUsername, username, schoolId);
+        } else {
+            // SuperAdmin login (no school context)
+            user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender, is_active as isActive FROM users WHERE (username = ? OR username = ? OR matricule = ?) AND (role = \'SUPERADMIN\' OR school_id IS NULL)').get(username, normalizedUsername, username);
+        }
+
         if (!user) return res.status(401).json({ error: 'Utilisateur ou mot de passe incorrect' });
 
         // Block login if user is deactivated

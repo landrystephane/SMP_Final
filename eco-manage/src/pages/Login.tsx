@@ -61,7 +61,7 @@ const Login: React.FC = () => {
     setError('');
     setIsLoading(true);
     try {
-      await login(username, password);
+      await login(username, password, selectedSchool?.id || null);
       setIsLoading(false);
     } catch (err: any) {
       setError(t('invalid_credentials_error'));
