@@ -193,6 +193,7 @@ const Finance: React.FC = () => {
                 });
             }
 
+            showNotification(status === 'VALIDATED' ? "Décaissement approuvé" : "Décaissement rejeté", "success");
             loadData();
         } catch (err: any) {
             console.error(err);

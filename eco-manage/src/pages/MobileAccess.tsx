@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Copy, ShieldCheck, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 
 const MobileAccess: React.FC = () => {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const { t } = useTranslation();
   const [keys, setKeys] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -40,33 +42,43 @@ const MobileAccess: React.FC = () => {
 
     const foundUser = users.find(u => u.matricule === enteredMatricule);
     if (!foundUser) {
-      alert(t('matricule_not_found', 'Erreur : Le matricule "{{matricule}}" n\'existe pas parmi le personnel de cet établissement.', { matricule: enteredMatricule }));
+      showNotification(t('matricule_not_found', 'Erreur : Le matricule "{{matricule}}" n\'existe pas parmi le personnel de cet établissement.', { matricule: enteredMatricule }), "error");
       return;
     }
 
     if (window.electronAPI) {
       setIsLoading(true);
       try {
-        await window.electronAPI.generateMobileKey({ 
-          name: `[${foundUser.matricule}] ${foundUser.fullName}`, 
-          userId: foundUser.id 
+        await window.electronAPI.generateMobileKey({
+          name: `[${foundUser.matricule}] ${foundUser.fullName}`,
+          userId: foundUser.id
         });
         setEnteredMatricule('');
         setIsModalOpen(false);
         await loadData();
+        showNotification("Clé mobile générée avec succès", "success");
+      } catch (err) {
+        console.error(err);
+        showNotification("Erreur lors de la génération de la clé mobile", "error");
       } finally {
         setIsLoading(false);
       }
     } else {
-      alert(t('feature_limited_desktop', "Fonctionnalité limitée au mode Desktop (Electron)"));
+      showNotification(t('feature_limited_desktop', "Fonctionnalité limitée au mode Desktop (Electron)"), "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm(t('confirm_delete_key', "Voulez-vous vraiment supprimer cette clé ?"))) return;
     if (window.electronAPI) {
-      await window.electronAPI.deleteMobileKey(id);
-      await loadData();
+      try {
+        await window.electronAPI.deleteMobileKey(id);
+        await loadData();
+        showNotification("Clé supprimée", "success");
+      } catch (err) {
+        console.error(err);
+        showNotification("Erreur lors de la suppression de la clé", "error");
+      }
     }
   };
 
@@ -115,7 +127,7 @@ const MobileAccess: React.FC = () => {
                               </td>
                               <td className="px-8 py-5 text-right space-x-4">
                                   <button
-                                      onClick={() => { navigator.clipboard.writeText(k.access_key); alert(t('key_copied', 'Clé copiée !')); }}
+                                      onClick={() => { navigator.clipboard.writeText(k.access_key); showNotification(t('key_copied', 'Clé copiée !'), "success"); }}
                                       className="text-slate-500 hover:text-white transition-colors"
                                       title={t('copy_key', "Copier la clé")}
                                   ><Copy className="w-5 h-5" /></button>

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f update.zip)",
+      "Bash(zip -r update.zip dist/ server.js electron/database/apiHandlers.js electron/database/db.js electron/database/schema.sql electron/database/session.js electron/main.js electron/preload.js package.json package-lock.json -x \"*.sqlite\" \"*.db\")",
+      "Bash(tar -cf - dist/ server.js electron/database/apiHandlers.js electron/database/db.js electron/database/schema.sql electron/database/session.js electron/main.js electron/preload.js package.json package-lock.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(tar -czf update.tar.gz dist/ server.js electron/database/apiHandlers.js electron/database/db.js electron/database/schema.sql electron/database/session.js electron/main.js electron/preload.js electron/api-server.js package.json package-lock.json)",
+      "Bash(grep -v \"//\")",
+      "Bash(grep -rn \">[A-ZÉÈÊÀÙÇ][a-zéèêàùçôîûäï ]\\\\{4,\\\\}<\\\\|'[A-ZÉÈÊÀÙÇ][a-zéèêàùçôîûäï ]\\\\{4,\\\\}'\\\\|\\\\\"[A-ZÉÈÊÀÙÇ][a-zéèêàùçôîûäï ]\\\\{4,\\\\}\\\\\"\" pages/ components/ --include=\"*.tsx\")",
+      "Bash(grep -v \"console\\\\|import\\\\|className\\\\|error\\\\|catch\\\\|//\\\\|key=\\\\|value=\\\\|type=\\\\|align\\\\|style\\\\|\\\\.log\\\\|\\\\.error\\\\|\\\\.warn\\\\|electronAPI\\\\|fallback\\\\|labelF\\\\|JSON\\\\|parse\\\\|label:\")"
+    ]
+  }
+}

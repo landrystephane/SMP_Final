@@ -66,6 +66,7 @@ const Subjects: React.FC = () => {
     if (window.electronAPI) {
       try {
         await (window.electronAPI as any).cancelPendingSubject(id);
+        showNotification("Demande annulée avec succès", "success");
         loadPendingSubjects();
       } catch (err: any) {
         showNotification(err.message, "error");
@@ -136,15 +137,21 @@ const Subjects: React.FC = () => {
     if (!selectedClassId || !window.electronAPI) return;
 
     const existing = classSubjects.find(s => s.id === subjectId);
-    if (existing) {
-      await window.electronAPI.removeSubjectFromClass({ classId: selectedClassId, subjectId });
-    } else {
-      await window.electronAPI.assignSubjectToClass({
-        classId: selectedClassId,
-        subjectId,
-        coefficient: 1,
-        isOptional: false
-      });
+    try {
+      if (existing) {
+        await window.electronAPI.removeSubjectFromClass({ classId: selectedClassId, subjectId });
+        showNotification("Matière retirée de la classe", "success");
+      } else {
+        await window.electronAPI.assignSubjectToClass({
+          classId: selectedClassId,
+          subjectId,
+          coefficient: 1,
+          isOptional: false
+        });
+        showNotification("Matière assignée à la classe", "success");
+      }
+    } catch (err: any) {
+      showNotification("Erreur: " + err.message, "error");
     }
     loadClassSubjects(selectedClassId);
   };
@@ -152,24 +159,34 @@ const Subjects: React.FC = () => {
   const updateCoefficient = async (subjectId: number, coef: number) => {
     if (!selectedClassId || !window.electronAPI) return;
     const s = classSubjects.find(s => s.id === subjectId);
-    await window.electronAPI.assignSubjectToClass({
-        classId: selectedClassId,
-        subjectId,
-        coefficient: coef,
-        isOptional: s?.is_optional || false
-    });
+    try {
+      await window.electronAPI.assignSubjectToClass({
+          classId: selectedClassId,
+          subjectId,
+          coefficient: coef,
+          isOptional: s?.is_optional || false
+      });
+      showNotification("Coefficient mis à jour", "success");
+    } catch (err: any) {
+      showNotification("Erreur: " + err.message, "error");
+    }
     loadClassSubjects(selectedClassId);
   };
 
   const toggleOptional = async (subjectId: number) => {
     if (!selectedClassId || !window.electronAPI) return;
     const s = classSubjects.find(s => s.id === subjectId);
-    await window.electronAPI.assignSubjectToClass({
-        classId: selectedClassId,
-        subjectId,
-        coefficient: s?.coefficient || 1,
-        isOptional: !s?.is_optional
-    });
+    try {
+      await window.electronAPI.assignSubjectToClass({
+          classId: selectedClassId,
+          subjectId,
+          coefficient: s?.coefficient || 1,
+          isOptional: !s?.is_optional
+      });
+      showNotification(s?.is_optional ? "Matière définie comme obligatoire" : "Matière définie comme optionnelle", "success");
+    } catch (err: any) {
+      showNotification("Erreur: " + err.message, "error");
+    }
     loadClassSubjects(selectedClassId);
   };
 
@@ -264,10 +281,11 @@ const Subjects: React.FC = () => {
                             <div className="flex items-center space-x-2">
                                 <span className="text-[10px] font-black text-slate-500 uppercase">{t('coef', 'Coef:')}</span>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
                                     className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-xs text-amber-500 font-black"
-                                    value={classSub?.coefficient || 1}
-                                    onChange={(e) => updateCoefficient(s.id, parseInt(e.target.value))}
+                                    value={classSub?.coefficient ?? ''}
+                                    onChange={(e) => { const v = e.target.value; if (v === '' || /^\d+$/.test(v)) updateCoefficient(s.id, v === '' ? 1 : parseInt(v)); }}
                                 />
                             </div>
                             <button

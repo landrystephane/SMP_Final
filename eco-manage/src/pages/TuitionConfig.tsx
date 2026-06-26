@@ -56,13 +56,23 @@ const TuitionConfig: React.FC = () => {
 
   const handleUpdateBase = async (classId: number, fee: number, reg: number, trans: number, exam: number) => {
     if (window.electronAPI) {
-      await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
+      try {
+        await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
+        showNotification("Frais de scolarité mis à jour", "success");
+      } catch (err: any) {
+        showNotification("Erreur: " + err.message, "error");
+      }
     }
   };
 
   const handleUpdateInstallmentFee = async (classId: number, installmentId: number, amount: number) => {
       if (window.electronAPI) {
-          await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
+          try {
+              await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
+              showNotification("Tranche mise à jour", "success");
+          } catch (err: any) {
+              showNotification("Erreur: " + err.message, "error");
+          }
       }
   };
 
@@ -77,10 +87,15 @@ const TuitionConfig: React.FC = () => {
       setDeadlines(updated);
       
       if (window.electronAPI && user) {
-          await window.electronAPI.saveInstallmentDeadlines({
-              schoolId: user.schoolId,
-              deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
-          });
+          try {
+              await window.electronAPI.saveInstallmentDeadlines({
+                  schoolId: user.schoolId,
+                  deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
+              });
+              showNotification("Échéance mise à jour", "success");
+          } catch (err: any) {
+              showNotification("Erreur: " + err.message, "error");
+          }
       }
   };
 
@@ -106,12 +121,12 @@ const TuitionConfig: React.FC = () => {
               const newFees = fees.map(f => ({ ...f, transportFee: transportFeeAmount }));
               setFees(newFees);
               
-              alert(t('settings_updated', 'Paramètres mis à jour avec succès.'));
+              showNotification(t('settings_updated', 'Paramètres mis à jour avec succès.'), "success");
           } catch (e: any) {
-              alert(`Erreur: ${e.message}`);
+              showNotification(`Erreur: ${e.message}`, "error");
           }
       } else {
-          alert("Erreur: Les paramètres de l'école n'ont pas pu être chargés.");
+          showNotification("Erreur: Les paramètres de l'école n'ont pas pu être chargés.", "error");
       }
   };
 
@@ -126,13 +141,14 @@ const TuitionConfig: React.FC = () => {
           try {
               const res = await window.electronAPI.addInstallment(newInstallmentName.trim().toUpperCase());
               if (res && res.error) {
-                  alert('Erreur: ' + res.error);
+                  showNotification('Erreur: ' + res.error, "error");
                   return;
               }
               setShowAddModal(false);
+              showNotification("Tranche ajoutée avec succès", "success");
               loadData();
           } catch (err: any) {
-              alert('Erreur: ' + err.message);
+              showNotification('Erreur: ' + err.message, "error");
           }
       }
   };
@@ -140,8 +156,13 @@ const TuitionConfig: React.FC = () => {
   const handleDeleteInstallment = async (id: number, name: string) => {
       if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la tranche : ${name} ? Cela supprimera également les configurations de paiement associées.`)) return;
       if (window.electronAPI) {
-          await window.electronAPI.deleteInstallment(id);
-          loadData();
+          try {
+              await window.electronAPI.deleteInstallment(id);
+              showNotification("Tranche supprimée", "success");
+              loadData();
+          } catch (err: any) {
+              showNotification("Erreur: " + err.message, "error");
+          }
       }
   };
 
@@ -245,8 +266,8 @@ const TuitionConfig: React.FC = () => {
                     </td>
                     <td className="px-10 py-6">
                         <input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-emerald-500 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner"
                             value={f.registrationFee === 0 ? '' : f.registrationFee}
                             onChange={(e) => {
@@ -259,8 +280,8 @@ const TuitionConfig: React.FC = () => {
                     </td>
                     <td className="px-10 py-6">
                         <input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-indigo-500 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
                             value={f.transportFee === 0 ? '' : f.transportFee}
                             onChange={(e) => {
@@ -273,8 +294,8 @@ const TuitionConfig: React.FC = () => {
                     </td>
                     <td className="px-10 py-6">
                         <input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             disabled={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6')}
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-rose-500 outline-none focus:ring-2 focus:ring-rose-500/20 transition-all shadow-inner disabled:opacity-30 disabled:cursor-not-allowed"
                             value={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
@@ -288,8 +309,8 @@ const TuitionConfig: React.FC = () => {
                     </td>
                     <td className="px-10 py-6">
                         <input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             className="w-full max-w-[160px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:ring-2 focus:ring-amber-500/20 transition-all shadow-inner"
                             value={f.totalFee === 0 ? '' : f.totalFee}
                             onChange={(e) => {

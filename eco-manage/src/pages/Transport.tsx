@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Clock, Users, Shield, Radio, Activity, Pencil, Trash2, X, History, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -13,6 +14,7 @@ L.Icon.Default.mergeOptions({ iconUrl: markerIcon, shadowUrl: markerShadow });
 
 const Transport: React.FC = () => {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const { t } = useTranslation();
   const [routes, setRoutes] = useState<any[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
@@ -135,38 +137,56 @@ const Transport: React.FC = () => {
   const handleAddRoute = async () => {
       if (!newRoute.name || !newRoute.bus_number) return;
       if (window.electronAPI) {
-          await window.electronAPI.addBusRoute({
-              name: newRoute.name,
-              bus_number: newRoute.bus_number,
-              driver_id: newRoute.driver_id ? parseInt(newRoute.driver_id, 10) : null,
-              schoolId: user?.schoolId
-          });
-          setShowAddRoute(false);
-          setNewRoute({ name: '', bus_number: '', driver_id: '' });
-          loadData();
+          try {
+              await window.electronAPI.addBusRoute({
+                  name: newRoute.name,
+                  bus_number: newRoute.bus_number,
+                  driver_id: newRoute.driver_id ? parseInt(newRoute.driver_id, 10) : null,
+                  schoolId: user?.schoolId
+              });
+              setShowAddRoute(false);
+              setNewRoute({ name: '', bus_number: '', driver_id: '' });
+              loadData();
+              showNotification("Ligne de bus créée avec succès", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de la création de la ligne de bus", "error");
+          }
       }
   };
 
   const handleAddPoint = async () => {
       if (!selectedRoute || !newPoint.name) return;
       if (window.electronAPI) {
-          await window.electronAPI.addTransportPoint({
-              routeId: selectedRoute.id,
-              name: newPoint.name,
-              latitude: 0,
-              longitude: 0,
-              estimatedTime: 0
-          });
-          setShowAddPoint(false);
-          setNewPoint({ name: '' });
-          loadPoints();
+          try {
+              await window.electronAPI.addTransportPoint({
+                  routeId: selectedRoute.id,
+                  name: newPoint.name,
+                  latitude: 0,
+                  longitude: 0,
+                  estimatedTime: 0
+              });
+              setShowAddPoint(false);
+              setNewPoint({ name: '' });
+              loadPoints();
+              showNotification("Point d'arrêt ajouté", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de l'ajout du point d'arrêt", "error");
+          }
       }
   };
 
   const handleDeletePoint = async (id: number) => {
       if (window.electronAPI && window.confirm(t('confirm_delete_point', "Supprimer ce point ?"))) {
-          await window.electronAPI.deleteTransportPoint(id);
-          loadPoints();
+          try {
+              await window.electronAPI.deleteTransportPoint(id);
+              loadPoints();
+              showNotification("Point d'arrêt supprimé", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de la suppression du point d'arrêt", "error");
+          }
       }
   };
 
@@ -183,41 +203,59 @@ const Transport: React.FC = () => {
   const handleUpdateRoute = async () => {
       if (!editRoute.name || !editRoute.bus_number) return;
       if (window.electronAPI) {
-          await window.electronAPI.updateBusRoute({
-              id: editRoute.id,
-              name: editRoute.name,
-              bus_number: editRoute.bus_number,
-              driver_id: editRoute.driver_id ? parseInt(editRoute.driver_id, 10) : null
-          });
-          setShowEditRoute(false);
-          const wasSelected = selectedRoute?.id === editRoute.id;
-          setSelectedRoute(null);
-          await loadData();
-          if (wasSelected) {
-              const r = await window.electronAPI.getBusRoutes(user?.schoolId);
-              const updated = (r || []).find((rt: any) => rt.id === editRoute.id);
-              if (updated) setSelectedRoute(updated);
+          try {
+              await window.electronAPI.updateBusRoute({
+                  id: editRoute.id,
+                  name: editRoute.name,
+                  bus_number: editRoute.bus_number,
+                  driver_id: editRoute.driver_id ? parseInt(editRoute.driver_id, 10) : null
+              });
+              setShowEditRoute(false);
+              const wasSelected = selectedRoute?.id === editRoute.id;
+              setSelectedRoute(null);
+              await loadData();
+              if (wasSelected) {
+                  const r = await window.electronAPI.getBusRoutes(user?.schoolId);
+                  const updated = (r || []).find((rt: any) => rt.id === editRoute.id);
+                  if (updated) setSelectedRoute(updated);
+              }
+              showNotification("Ligne mise à jour", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de la mise à jour de la ligne", "error");
           }
       }
   };
 
   const handleDeleteRoute = async (routeId: number) => {
       if (window.electronAPI && window.confirm(t('confirm_delete_route', 'Supprimer cette ligne de bus et tous ses points ? Cette action est irreversible.'))) {
-          await window.electronAPI.deleteBusRoute(routeId);
-          if (selectedRoute?.id === routeId) {
-              setSelectedRoute(null);
-              setPoints([]);
-              setRouteStudents([]);
-              setTransportHistory([]);
+          try {
+              await window.electronAPI.deleteBusRoute(routeId);
+              if (selectedRoute?.id === routeId) {
+                  setSelectedRoute(null);
+                  setPoints([]);
+                  setRouteStudents([]);
+                  setTransportHistory([]);
+              }
+              loadData();
+              showNotification("Ligne de bus supprimée", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de la suppression de la ligne de bus", "error");
           }
-          loadData();
       }
   };
 
   const handleUnassignStudent = async (studentId: number) => {
       if (window.electronAPI && window.confirm(t('confirm_unassign_student', 'Retirer cet eleve de la ligne de transport ?'))) {
-          await window.electronAPI.unassignStudentFromTransport(studentId);
-          loadPoints();
+          try {
+              await window.electronAPI.unassignStudentFromTransport(studentId);
+              loadPoints();
+              showNotification("Élève désassigné", "success");
+          } catch (err) {
+              console.error(err);
+              showNotification("Erreur lors de la désassignation de l'élève", "error");
+          }
       }
   };
 

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Shield, Search, Users as UsersIcon, Filter, Printer } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { generateParentsListReport } from '../utils/reports';
 
 const Parents: React.FC = () => {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
+  const { showNotification } = useNotification();
   const [parents, setParents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [school, setSchool] = useState<any>(null);
@@ -70,7 +72,7 @@ const Parents: React.FC = () => {
   const handleSendAnnouncement = async () => {
       if (!window.electronAPI || !currentUser) return;
       if (!announcementSubject.trim() || !announcementMessage.trim()) {
-          alert("Veuillez remplir le sujet et le message.");
+          showNotification("Veuillez remplir le sujet et le message.", "error");
           return;
       }
       setIsSending(true);
@@ -88,20 +90,20 @@ const Parents: React.FC = () => {
           
           if (res && res.success) {
               if (targetParent) {
-                  alert(`Communiqué envoyé avec succès au parent ${targetParent.parent_name || targetParent.parent_contact || ''} (Élève: ${targetParent.first_name} ${targetParent.last_name}).`);
+                  showNotification(`Communiqué envoyé avec succès au parent ${targetParent.parent_name || targetParent.parent_contact || ''} (Élève: ${targetParent.first_name} ${targetParent.last_name}).`, "success");
               } else {
-                  alert(`Communiqué envoyé avec succès à ${res.count} parent(s).`);
+                  showNotification(`Communiqué envoyé avec succès à ${res.count} parent(s).`, "success");
               }
               setShowAnnouncementModal(false);
               setAnnouncementSubject('');
               setAnnouncementMessage('');
               setTargetParent(null);
           } else {
-              alert("Erreur lors de l'envoi du communiqué.");
+              showNotification("Erreur lors de l'envoi du communiqué.", "error");
           }
       } catch (err) {
           console.error(err);
-          alert("Une erreur s'est produite.");
+          showNotification("Une erreur s'est produite.", "error");
       } finally {
           setIsSending(false);
       }

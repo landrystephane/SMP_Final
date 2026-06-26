@@ -241,7 +241,7 @@ const Students: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button
-                        onClick={() => generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name })}
+                        onClick={() => generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name }, schoolInfo)}
                         className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-500/20 rounded-md transition-all"
                         title={t('registration_sheet_title')}
                     >

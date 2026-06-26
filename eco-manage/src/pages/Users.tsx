@@ -3,11 +3,13 @@ import { UserPlus, Shield, Trash2, CheckCircle, Lock, Search, Edit, X } from 'lu
 import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
 const Users: React.FC = () => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -194,6 +196,7 @@ const Users: React.FC = () => {
                   return;
               }
 
+              showNotification("Agent mis à jour avec succès !", "success");
               setEditingUser(null);
               loadData();
           } catch (err: any) {
@@ -208,12 +211,13 @@ const Users: React.FC = () => {
           try {
               const res = await window.electronAPI.deleteUser(id);
               if (res && res.error) {
-                  alert(res.error);
+                  showNotification(res.error, "error");
               } else {
+                  showNotification("Compte supprimé", "success");
                   loadData();
               }
           } catch (err: any) {
-              alert(err.message);
+              showNotification(err.message, "error");
           }
       }
   };
@@ -224,12 +228,13 @@ const Users: React.FC = () => {
           try {
               const res = await window.electronAPI.toggleUserActive({ id, isActive: !currentStatus });
               if (res && res.error) {
-                  alert(res.error);
+                  showNotification(res.error, "error");
               } else {
+                  showNotification(currentStatus ? "Compte désactivé" : "Compte réactivé", "success");
                   loadData();
               }
           } catch (err: any) {
-              alert(err.message);
+              showNotification(err.message, "error");
           }
       }
   };

@@ -1,30 +1,36 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { Lock, Save, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const { t } = useTranslation();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState('');
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setMessage(t('passwords_do_not_match', 'Les mots de passe ne correspondent pas'));
+      showNotification(t('passwords_do_not_match', 'Les mots de passe ne correspondent pas'), "error");
       return;
     }
 
     if (window.electronAPI && user) {
-      await window.electronAPI.changePassword({
-        userId: user.id,
-        newPassword
-      });
-      setMessage(t('password_updated', 'Mot de passe mis à jour avec succès !'));
-      setNewPassword('');
-      setConfirmPassword('');
+      try {
+        await window.electronAPI.changePassword({
+          userId: user.id,
+          newPassword
+        });
+        showNotification(t('password_updated', 'Mot de passe mis à jour avec succès !'), "success");
+        setNewPassword('');
+        setConfirmPassword('');
+      } catch (err) {
+        console.error(err);
+        showNotification("Erreur lors de la mise à jour du mot de passe", "error");
+      }
     }
   };
 
@@ -79,12 +85,6 @@ const Profile: React.FC = () => {
                         />
                     </div>
                 </div>
-
-                {message && (
-                    <p className={`text-sm font-bold ${message.includes('succès') ? 'text-green-500' : 'text-red-500'}`}>
-                        {message}
-                    </p>
-                )}
 
                 <button
                     type="submit"
