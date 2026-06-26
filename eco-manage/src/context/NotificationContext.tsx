@@ -25,7 +25,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const showNotification = useCallback((message: string, type: NotificationType = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     setNotifications((prev) => [...prev, { id, message, type }]);
-    // Notifications must now be manually dismissed by clicking the cross
+    setTimeout(() => removeNotification(id), type === 'error' ? 6000 : 4000);
   }, [removeNotification]);
 
   useEffect(() => {

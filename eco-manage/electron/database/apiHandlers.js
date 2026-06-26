@@ -1742,11 +1742,17 @@ handlers['db:toggleUserActive'] = async ({ id, isActive }) => {
 };
 
 handlers['db:updateUser'] = async (userToUpdate) => {
-  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole } = userToUpdate;
+  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole, schoolId } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
-  const sid = getActiveSchoolId();
+  const sid = getActiveSchoolId(schoolId);
+  const currentUser = session.getStore()?.user;
 
-  const existing = db.prepare('SELECT * FROM users WHERE id = ? AND school_id = ?').get(id, sid);
+  let existing;
+  if (currentUser?.role === 'SUPERADMIN') {
+    existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  } else {
+    existing = db.prepare('SELECT * FROM users WHERE id = ? AND school_id = ?').get(id, sid);
+  }
   if (!existing) throw new Error("Utilisateur introuvable");
 
   // Check username uniqueness if changed

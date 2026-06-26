@@ -734,10 +734,7 @@ const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{t('tuition')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_recovery')}</p>
-          <p className="text-2xl font-black text-white mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
-          {(stats?.totalExpenses || 0) > 0 && (
-            <p className="text-[10px] text-rose-400 font-bold mt-1">Décaissements: -{(stats?.totalExpenses || 0).toLocaleString()} FCFA</p>
-          )}
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span> <span className="text-slate-600 text-sm">/</span> <span className="text-sm text-slate-400">{(stats?.totalTuitionDue || 0).toLocaleString()} FCFA</span></p>
           <div className="w-full h-1.5 bg-slate-700 rounded-full mt-4 overflow-hidden p-[1px]">
              <div
                 className="h-full bg-rose-500 rounded-full shadow-lg shadow-rose-500/50"
