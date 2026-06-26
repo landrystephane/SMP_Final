@@ -2512,7 +2512,8 @@ handlers['db:getDashboardStats'] = async (params) => {
       financialAlerts.push({ class: 'FINANCES', unpaidCount: 0, label: `Les décaissements (${totalExpenses} FCFA) dépassent ${expenseRatio}% des recettes` });
     }
 
-    // Installment deadline alerts
+    // Installment deadline alerts (configurable days)
+    const deadlineAlertDays = parseInt(getSchoolSetting('alert_deadline_days')) || 7;
     try {
       const deadlines = db.prepare('SELECT id.*, i.name as installment_name FROM installment_deadlines id JOIN installments i ON id.installment_id = i.id WHERE id.school_id = ?').all(schoolId);
       const today = new Date();
@@ -2520,7 +2521,7 @@ handlers['db:getDashboardStats'] = async (params) => {
         if (dl.deadline_date) {
           const deadline = new Date(dl.deadline_date);
           const daysLeft = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysLeft >= 0 && daysLeft <= 7) {
+          if (daysLeft >= 0 && daysLeft <= deadlineAlertDays) {
             financialAlerts.push({ class: dl.installment_name, unpaidCount: daysLeft, label: `Échéance ${dl.installment_name} dans ${daysLeft} jour(s)` });
           } else if (daysLeft < 0) {
             financialAlerts.push({ class: dl.installment_name, unpaidCount: 0, label: `Échéance ${dl.installment_name} dépassée depuis ${Math.abs(daysLeft)} jour(s)` });
@@ -2529,14 +2530,15 @@ handlers['db:getDashboardStats'] = async (params) => {
       }
     } catch(e) {}
 
-    // Grade entry deadline alert
+    // Grade entry deadline alert (configurable days)
+    const gradeDeadlineAlertDays = parseInt(getSchoolSetting('alert_grade_deadline_days')) || 3;
     try {
       const periodEnd = getSchoolSetting('period_end');
       if (periodEnd) {
         const endDate = new Date(periodEnd);
         const today2 = new Date();
         const daysLeft2 = Math.ceil((endDate.getTime() - today2.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysLeft2 >= 0 && daysLeft2 <= 3) {
+        if (daysLeft2 >= 0 && daysLeft2 <= gradeDeadlineAlertDays) {
           financialAlerts.push({ class: 'NOTES', unpaidCount: daysLeft2, label: `Fin de saisie des notes dans ${daysLeft2} jour(s)` });
         } else if (daysLeft2 < 0) {
           financialAlerts.push({ class: 'NOTES', unpaidCount: 0, label: `Période de saisie des notes terminée` });

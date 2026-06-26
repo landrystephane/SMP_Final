@@ -48,6 +48,8 @@ const CustomizationSettings: React.FC = () => {
     // Financial alert thresholds
     const [alertUnpaidThreshold, setAlertUnpaidThreshold] = useState(50);
     const [alertExpenseRatio, setAlertExpenseRatio] = useState(50);
+    const [alertDeadlineDays, setAlertDeadlineDays] = useState(7);
+    const [alertGradeDeadlineDays, setAlertGradeDeadlineDays] = useState(3);
 
     // Full custom bulletin template
     const [bulletinUseCustom, setBulletinUseCustom] = useState(0);
@@ -162,6 +164,10 @@ const CustomizationSettings: React.FC = () => {
                     if (aut) setAlertUnpaidThreshold(parseInt(aut));
                     const aer = await window.electronAPI.getSetting('alert_expense_ratio');
                     if (aer) setAlertExpenseRatio(parseInt(aer));
+                    const add = await window.electronAPI.getSetting('alert_deadline_days');
+                    if (add) setAlertDeadlineDays(parseInt(add));
+                    const agd = await window.electronAPI.getSetting('alert_grade_deadline_days');
+                    if (agd) setAlertGradeDeadlineDays(parseInt(agd));
                 }
             }
         } catch (e: any) {
@@ -296,6 +302,8 @@ const CustomizationSettings: React.FC = () => {
 
             await window.electronAPI.setSetting({ key: 'alert_unpaid_threshold', value: alertUnpaidThreshold.toString() });
             await window.electronAPI.setSetting({ key: 'alert_expense_ratio', value: alertExpenseRatio.toString() });
+            await window.electronAPI.setSetting({ key: 'alert_deadline_days', value: alertDeadlineDays.toString() });
+            await window.electronAPI.setSetting({ key: 'alert_grade_deadline_days', value: alertGradeDeadlineDays.toString() });
 
             setSuccess(true);
             showNotification("Paramètres enregistrés avec succès !", "success");
@@ -1254,6 +1262,22 @@ const CustomizationSettings: React.FC = () => {
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
                                 />
                                 <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte si décaissements dépassent {alertExpenseRatio}% des recettes</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('deadline_alert_days', 'Alerte Échéance Tranches (jours avant)')}</label>
+                                <p className="text-[10px] text-slate-600 italic">Nombre de jours avant l'échéance d'une tranche pour alerter</p>
+                                <input type="number" min="1" max="30" value={alertDeadlineDays}
+                                    onChange={(e) => setAlertDeadlineDays(parseInt(e.target.value) || 7)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
+                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte {alertDeadlineDays} jours avant l'échéance</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('grade_deadline_alert_days', 'Alerte Fin Saisie Notes (jours avant)')}</label>
+                                <p className="text-[10px] text-slate-600 italic">Nombre de jours avant la fin de la période de saisie pour alerter</p>
+                                <input type="number" min="1" max="15" value={alertGradeDeadlineDays}
+                                    onChange={(e) => setAlertGradeDeadlineDays(parseInt(e.target.value) || 3)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
+                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte {alertGradeDeadlineDays} jours avant la fin de saisie</p>
                             </div>
                         </div>
                     </div>
