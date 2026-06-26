@@ -516,10 +516,10 @@ const AdvisorPortal: React.FC = () => {
                         </div>
                     )}
 
-                    {(activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
+                    {(activeTab === 'PLANNING' || activeTab === 'EVALUATIONS' || activeTab === 'EXAMS_PROGRAM') && (
                         <>
                             <div>
-                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('evaluation_month', 'Séquence')}</label>
+                                <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('sequence_label', 'Séquence')}</label>
                                 <select
                                     value={selectedSequence}
                                     onChange={(e) => setSelectedSequence(e.target.value)}
@@ -535,9 +535,9 @@ const AdvisorPortal: React.FC = () => {
                                 </select>
                             </div>
 
-                            {activeTab === 'EXAMS_PROGRAM' && (
+                            {(activeTab === 'EXAMS_PROGRAM' || activeTab === 'PLANNING') && (
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">Mois</label>
+                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1">{t('month_label', 'Mois')}</label>
                                     <select
                                         value={selectedCalendarMonth}
                                         onChange={(e) => setSelectedCalendarMonth(e.target.value)}
@@ -560,14 +560,14 @@ const AdvisorPortal: React.FC = () => {
                                 </div>
                             )}
                             
-                            {user?.role !== 'ADVISOR' && (
+                            {user?.role !== 'ADVISOR' && activeTab === 'EVALUATIONS' && (
                                 <div className="flex flex-col justify-end h-full">
                                     <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">Action</label>
                                     <button
                                         onClick={handleLaunchGradeEntry}
                                         className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase tracking-wider"
                                     >
-                                        Lancer la Saisie
+                                        {t('launch_grade_entry', 'Lancer la Saisie')}
                                     </button>
                                 </div>
                             )}

@@ -469,6 +469,14 @@ handlers['db:saveGrades'] = async (grades) => {
       if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     }
   }
+  // Check for blocked students
+  if (grades && grades.length > 0) {
+    const studentIds = [...new Set(grades.map(g => g.student_id))];
+    for (const sId of studentIds) {
+      const st = db.prepare('SELECT status FROM students WHERE id = ?').get(sId);
+      if (st && st.status === 'BLOCKED') throw new Error(`L'élève est bloqué. Impossible d'enregistrer ses notes.`);
+    }
+  }
   const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
   const upsert = db.prepare(`
     INSERT INTO grades (student_id, subject_id, class_id, term, month, score, letter_score, teacher_id, locked, validated)
@@ -686,6 +694,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     const sid = getActiveSchoolId();
     const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
     if (!student) throw new Error('Élève non autorisé.');
+    if (student.status === 'BLOCKED') throw new Error('Cet élève est bloqué. Aucun versement ne peut être effectué.');
 
     const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(student.class_id);
     if (!feeConfig) throw new Error('Aucun barème de frais configuré pour cette classe.');
@@ -2501,6 +2510,39 @@ handlers['db:getDashboardStats'] = async (params) => {
     }
     if (totalExpenses > 0 && totalRevenue > 0 && totalExpenses > totalRevenue * (expenseRatio / 100)) {
       financialAlerts.push({ class: 'FINANCES', unpaidCount: 0, label: `Les décaissements (${totalExpenses} FCFA) dépassent ${expenseRatio}% des recettes` });
+    }
+
+    // Installment deadline alerts
+    try {
+      const deadlines = db.prepare('SELECT id.*, i.name as installment_name FROM installment_deadlines id JOIN installments i ON id.installment_id = i.id WHERE id.school_id = ?').all(schoolId);
+      const today = new Date();
+      for (const dl of deadlines) {
+        if (dl.deadline_date) {
+          const deadline = new Date(dl.deadline_date);
+          const daysLeft = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysLeft >= 0 && daysLeft <= 7) {
+            financialAlerts.push({ class: dl.installment_name, unpaidCount: daysLeft, label: `Échéance ${dl.installment_name} dans ${daysLeft} jour(s)` });
+          } else if (daysLeft < 0) {
+            financialAlerts.push({ class: dl.installment_name, unpaidCount: 0, label: `Échéance ${dl.installment_name} dépassée depuis ${Math.abs(daysLeft)} jour(s)` });
+          }
+        }
+      }
+    } catch(e) {}
+
+    // Grade entry deadline alert
+    try {
+      const periodEnd = getSchoolSetting('period_end');
+      if (periodEnd) {
+        const endDate = new Date(periodEnd);
+        const today2 = new Date();
+        const daysLeft2 = Math.ceil((endDate.getTime() - today2.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysLeft2 >= 0 && daysLeft2 <= 3) {
+          financialAlerts.push({ class: 'NOTES', unpaidCount: daysLeft2, label: `Fin de saisie des notes dans ${daysLeft2} jour(s)` });
+        } else if (daysLeft2 < 0) {
+          financialAlerts.push({ class: 'NOTES', unpaidCount: 0, label: `Période de saisie des notes terminée` });
+        }
+      }
+    } catch(e) {}
     }
   } catch (e) {
     console.error('Financial alerts error:', e);
