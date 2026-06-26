@@ -583,35 +583,39 @@ export const generateAnnualAuditReport = (data: any) => {
     doc.text(isEn ? "1. GLOBAL SCHOOL YEAR SUMMARY" : "1. BILAN GLOBAL DE L'ANNÉE SCOLAIRE", 20, 25);
 
     // Summary Cards
-    doc.setDrawColor(220, 220, 220);
-    doc.setFillColor(248, 250, 252);
-    
+    const fmtNum = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
     // Total Students Card
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(248, 250, 252);
     doc.roundedRect(20, 32, 50, 25, 2, 2, 'FD');
     doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
     doc.text(isEn ? "TOTAL STUDENTS" : "TOTAL ÉLÈVES", 25, 40);
-    doc.setFontSize(14);
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(`${stats.totalStudents || students.length}`, 25, 50);
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${stats.totalStudents || students.length}`, 25, 52);
 
     // Total Revenue Card
-    doc.roundedRect(80, 32, 50, 25, 2, 2, 'FD');
+    doc.setFillColor(secondary[0], secondary[1], secondary[2]);
+    doc.roundedRect(80, 32, 55, 25, 2, 2, 'F');
     doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
     doc.text(isEn ? "TOTAL REVENUE" : "RECETTES TOTALES", 85, 40);
     doc.setFontSize(12);
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(`${(stats.totalRevenue || 0).toLocaleString()} FCFA`, 85, 50);
+    doc.text(`${fmtNum(stats.totalRevenue || 0)} FCFA`, 85, 52);
 
     // Academic Success Card
-    doc.roundedRect(140, 32, 50, 25, 2, 2, 'FD');
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.roundedRect(145, 32, 45, 25, 2, 2, 'F');
     doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(isEn ? "GENERAL AVERAGE" : "MOYENNE GÉNÉRALE", 145, 40);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(isEn ? "GENERAL AVG" : "MOYENNE GÉN.", 150, 40);
     doc.setFontSize(14);
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(data.generalAverage ? `${data.generalAverage} / 20` : "N/A", 145, 50);
+    doc.text(data.generalAverage ? `${data.generalAverage} / 20` : "N/A", 150, 52);
 
     // Class performance table
     doc.setFontSize(11);

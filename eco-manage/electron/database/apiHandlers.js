@@ -508,7 +508,9 @@ handlers['db:saveGrades'] = async (grades) => {
                 }
               }
               if (!hasValidOverride) {
-                throw new Error(`Le délai de saisie pour cette période est dépassé (${periodEndSetting.value}).`);
+                const endParts = periodEndSetting.value.split('-');
+                const formattedEnd = endParts.length === 3 ? `${endParts[2]}/${endParts[1]}/${endParts[0]}` : periodEndSetting.value;
+                throw new Error(`Le délai de saisie pour cette période est dépassé (${formattedEnd}).`);
               }
             }
           }
@@ -1587,10 +1589,6 @@ handlers['db:getSetting'] = async (key) => {
   const scopedKey = scopeSettingKey(key);
   const res = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopedKey);
   if (res) return res.value;
-  if (scopedKey !== key) {
-    const fallback = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-    return fallback ? fallback.value : null;
-  }
   return null;
 };
 
@@ -3054,8 +3052,21 @@ handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) =>
     db.prepare('DELETE FROM class_teacher_subjects WHERE class_id = ?').run(classId);
     if (assignments && Array.isArray(assignments)) {
       const insert = db.prepare('INSERT INTO class_teacher_subjects (class_id, subject_id, teacher_id) VALUES (?, ?, ?)');
+      const teacherIds = new Set();
       for (const a of assignments) {
         insert.run(classId, a.subject_id, a.teacher_id);
+        teacherIds.add(a.teacher_id);
+      }
+      for (const tid of teacherIds) {
+        const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ?').get(tid);
+        if (teacher) {
+          let classes = [];
+          try { classes = JSON.parse(teacher.assigned_classes || '[]'); } catch(e) { classes = []; }
+          if (!classes.includes(classId) && !classes.includes(classId.toString())) {
+            classes.push(classId);
+            db.prepare('UPDATE users SET assigned_classes = ? WHERE id = ?').run(JSON.stringify(classes), tid);
+          }
+        }
       }
     }
   });
