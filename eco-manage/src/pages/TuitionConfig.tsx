@@ -58,7 +58,6 @@ const TuitionConfig: React.FC = () => {
     if (window.electronAPI) {
       try {
         await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
-        showNotification("Frais de scolarité mis à jour", "success");
       } catch (err: any) {
         showNotification("Erreur: " + err.message, "error");
       }
@@ -69,7 +68,6 @@ const TuitionConfig: React.FC = () => {
       if (window.electronAPI) {
           try {
               await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
-              showNotification("Tranche mise à jour", "success");
           } catch (err: any) {
               showNotification("Erreur: " + err.message, "error");
           }
@@ -92,7 +90,6 @@ const TuitionConfig: React.FC = () => {
                   schoolId: user.schoolId,
                   deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
               });
-              showNotification("Échéance mise à jour", "success");
           } catch (err: any) {
               showNotification("Erreur: " + err.message, "error");
           }

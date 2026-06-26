@@ -2139,8 +2139,16 @@ handlers['db:searchStudentsDetailed'] = async ({ name, schoolId, section, level,
 };
 
 handlers['db:updateStudentStatus'] = async ({ id, status }) => {
-    const sid = getActiveSchoolId();
-    return db.prepare('UPDATE students SET status = ? WHERE id = ? AND school_id = ?').run(status, id, sid);
+    const currentUser = session.getStore()?.user;
+    let result;
+    if (currentUser?.role === 'SUPERADMIN') {
+        result = db.prepare('UPDATE students SET status = ? WHERE id = ?').run(status, id);
+    } else {
+        const sid = getActiveSchoolId();
+        result = db.prepare('UPDATE students SET status = ? WHERE id = ? AND school_id = ?').run(status, id, sid);
+    }
+    if (result.changes === 0) throw new Error("Impossible de modifier le statut de cet élève.");
+    return { success: true };
 };
 
 handlers['db:deleteStudent'] = async (id) => {
