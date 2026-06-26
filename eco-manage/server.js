@@ -47,7 +47,7 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    if (req.path === '/auth/login' || req.path === '/health') return next();
+    if (req.path === '/auth/login' || req.path === '/health' || req.path === '/verify-school-code' || req.path === '/auth/switchSchool') return next();
 
     const authHeader = req.headers.authorization;
     let user = null;
