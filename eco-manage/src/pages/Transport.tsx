@@ -280,12 +280,12 @@ const Transport: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">{t('transport_management', 'Gestion du Transport')}</h1>
           <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">{t('transport_supervision', 'Supervision de la flotte scolaire')}</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap space-x-2">
             <span className="flex items-center px-4 py-2 bg-emerald-500/10 text-emerald-500 rounded-2xl text-[10px] font-black uppercase border border-emerald-500/20">
                 <Radio className="w-3 h-3 mr-2 animate-pulse" />
                 {t('gps_server_connected', 'Serveur GPS Connecte')}

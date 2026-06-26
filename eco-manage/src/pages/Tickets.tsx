@@ -277,7 +277,7 @@ const Tickets: React.FC = () => {
       </div>
 
       {/* Navigation Onglets */}
-      <div className="flex border-b border-white/5 space-x-4">
+      <div className="flex flex-wrap border-b border-white/5 space-x-4">
         <button
           onClick={() => setActiveTab('announcements')}
           className={`flex items-center pb-4 px-2 text-sm font-black uppercase tracking-widest border-b-2 transition-all gap-2 ${

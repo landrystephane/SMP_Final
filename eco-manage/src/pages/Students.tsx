@@ -125,7 +125,7 @@ const Students: React.FC = () => {
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
             <select
                 className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-bold uppercase"
                 value={selectedSection}
@@ -177,7 +177,7 @@ const Students: React.FC = () => {
       </div>
 
       {/* Statistiques Rapides */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div className="glass-card p-4 text-center">
               <div className="text-sm text-slate-400 font-bold uppercase tracking-wider">{t('total_students', 'Effectif Total')}</div>
               <div className="text-2xl font-black text-white mt-1">{stats.total}</div>

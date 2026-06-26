@@ -26,6 +26,7 @@ const Dashboard: React.FC = () => {
   const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
   const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE' | 'EXAMS_PROGRAM'>('OVERVIEW');
+  const [currency, setCurrency] = useState('FCFA');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -92,11 +93,20 @@ const Dashboard: React.FC = () => {
     };
     loadStats();
     
+    // Load currency setting
+    const loadCurrency = async () => {
+        if (window.electronAPI) {
+            const curr = await window.electronAPI.getSetting('currency');
+            if (curr) setCurrency(curr);
+        }
+    };
+    loadCurrency();
+
     // Auto-refresh stats every 10 seconds for real-time updates
     const interval = setInterval(() => {
         if (isMounted) loadStats();
     }, 10000);
-    
+
     return () => {
         isMounted = false;
         clearInterval(interval);
@@ -128,7 +138,7 @@ const Dashboard: React.FC = () => {
                     <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
                     <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('class_overview', 'Aperçu de vos classes')}</p>
                 </div>
-                <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
+                <div className="flex flex-wrap bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_classes', 'Mes Classes')}</button>
                     <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_timetable', 'Mon Emploi du Temps')}</button>
                     <button onClick={() => setTeacherTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('exams_program', 'Programme Évaluations')}</button>
@@ -460,7 +470,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Financier</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Recouvrements (Recettes) */}
                 <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
                   <div className="flex items-center justify-between mb-4">
@@ -469,7 +479,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
-                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
                 </div>
 
                 {/* Total Décaissements (Dépenses) */}
@@ -480,7 +490,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
-                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                  <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
                 </div>
 
                 {/* Solde Actuel (Recettes - Dépenses) */}
@@ -491,9 +501,9 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
-                  <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">FCFA</span></p>
+                  <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">{currency}</span></p>
                 </div>
-                
+
                 {/* Reste à Percevoir (Arriérés) */}
                 <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
                   <div className="flex items-center justify-between mb-4">
@@ -502,7 +512,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('arrears', 'Reste à Percevoir')}</p>
-                  <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+                  <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
                 </div>
             </div>
 
@@ -699,7 +709,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className={`grid grid-cols-1 grid-cols-1 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
         <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
@@ -740,7 +750,7 @@ const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{t('tuition')}</span>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_recovery')}</p>
-          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span> <span className="text-slate-600 text-sm">/</span> <span className="text-sm text-slate-400">{(stats?.totalTuitionDue || 0).toLocaleString()} FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span> <span className="text-slate-600 text-sm">/</span> <span className="text-sm text-slate-400">{(stats?.totalTuitionDue || 0).toLocaleString()} {currency}</span></p>
           <div className="w-full h-1.5 bg-slate-700 rounded-full mt-4 overflow-hidden p-[1px]">
              <div
                 className="h-full bg-rose-500 rounded-full shadow-lg shadow-rose-500/50"
@@ -771,28 +781,28 @@ const Dashboard: React.FC = () => {
             <div className="p-3 bg-emerald-500/10 rounded-2xl"><CreditCard className="text-emerald-500 w-6 h-6" /></div>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
-          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-rose-500/10 rounded-2xl"><Wallet className="text-rose-500 w-6 h-6" /></div>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
-          <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/20 rounded-2xl"><Activity className="text-amber-500 w-6 h-6" /></div>
           </div>
           <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
-          <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">FCFA</span></p>
+          <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-blue-500/10 rounded-2xl"><AlertTriangle className="text-blue-500 w-6 h-6" /></div>
           </div>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Arriérés</p>
-          <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span></p>
+          <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
       </div>
       )}
@@ -816,7 +826,7 @@ const Dashboard: React.FC = () => {
                 </select>
             </div>
 
-            <div className="grid grid-cols-1 grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredClassStats && filteredClassStats.length > 0 ? (
                 filteredClassStats.map((item: any) => (
                     <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all border-l-4 border-l-amber-500 bg-slate-900/60 group hover:bg-slate-900/80">

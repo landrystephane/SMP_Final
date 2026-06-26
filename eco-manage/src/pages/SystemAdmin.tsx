@@ -523,7 +523,7 @@ const SystemAdmin: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {schools.map(s => (
               <div key={s.id} className="glass-card group hover:border-amber-500/50 transition-all p-0 overflow-hidden bg-slate-900/50">
                 <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
@@ -611,6 +611,7 @@ const SystemAdmin: React.FC = () => {
           </div>
 
           <div className="glass-card p-0 overflow-hidden border-none shadow-2xl">
+            <div className="overflow-x-auto">
               <table className="w-full text-left">
                   <thead>
                       <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
@@ -645,6 +646,7 @@ const SystemAdmin: React.FC = () => {
                       ))}
                   </tbody>
               </table>
+            </div>
           </div>
         </div>
       )}
@@ -733,7 +735,7 @@ const SystemAdmin: React.FC = () => {
               <p className="font-black uppercase text-xs tracking-widest">{t('sys_trash_empty')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-1 space-y-4 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {deletedSchools.map(s => {
                   const deletedDate = s.deleted_at ? new Date(s.deleted_at) : new Date();
                   const expireDate = new Date(deletedDate.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -1126,7 +1128,7 @@ const SystemAdmin: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 grid-cols-1 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {globalSubjects.map(subj => {
                                 const isActive = schoolSubjects.includes(subj.id);
                                 return (
@@ -1175,7 +1177,7 @@ const SystemAdmin: React.FC = () => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_school_full_name')}</label>
                           <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Ex: Collège Bilingue Adonaï" />
                       </div>
-                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_city_neighborhood')}</label>
                             <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Ex: Yaoundé, Quartier Mvan" />
@@ -1185,7 +1187,7 @@ const SystemAdmin: React.FC = () => {
                             <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="Ex: BP 1234" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_email_contact')}</label>
                             <input type="email" className="input-field w-full" value={newSchool.contact_email} onChange={e => setNewSchool({...newSchool, contact_email: e.target.value})} />
@@ -1205,7 +1207,7 @@ const SystemAdmin: React.FC = () => {
 
                       <div className="pt-4 border-t border-white/10 space-y-4">
                         <h3 className="text-sm font-black text-white uppercase tracking-widest">Configuration Avancée</h3>
-                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Structure Académique</label>
                               <select 
@@ -1314,7 +1316,7 @@ const SystemAdmin: React.FC = () => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la Matière</label>
                           <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
                       </div>
-                      <div className="grid grid-cols-1 grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
                             <input required className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})} placeholder="Ex: Sciences et Technologie" />

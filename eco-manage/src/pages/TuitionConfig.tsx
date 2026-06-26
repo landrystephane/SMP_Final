@@ -390,7 +390,7 @@ const TuitionConfig: React.FC = () => {
                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Configuration globale des frais de transport scolaire</p>
               </div>
           </div>
-          <div className="grid grid-cols-1 grid-cols-1 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Modèle de Facturation</label>
                   <select 

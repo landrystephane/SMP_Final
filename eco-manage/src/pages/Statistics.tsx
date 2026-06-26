@@ -20,6 +20,7 @@ const Statistics: React.FC = () => {
   const [activeCycle, setActiveCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [school, setSchool] = useState<any>(null);
   const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('FCFA');
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -37,6 +38,8 @@ const Statistics: React.FC = () => {
         const schoolsList = await window.electronAPI.getSchools();
         const curSchool = schoolsList.find((s: any) => s.id?.toString() === user.schoolId?.toString());
         setSchool(curSchool);
+        const curr = await window.electronAPI.getSetting('currency');
+        if (curr) setCurrency(curr);
       }
     };
     loadSchool();
@@ -241,7 +244,7 @@ const Statistics: React.FC = () => {
 
                           return (
                               <>
-                                  <div className="grid grid-cols-3 gap-2 mb-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
                                       <select 
                                           value={honorCycle}
                                           onChange={(e) => { setHonorCycle(e.target.value); setHonorClass('ALL'); }}
@@ -321,7 +324,7 @@ const Statistics: React.FC = () => {
                   <div className="space-y-6">
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                           <span>{t('recovery_objective', 'Objectif de Recouvrement')}</span>
-                          <span className="text-white">{stats.totalTuitionDue.toLocaleString()} FCFA</span>
+                          <span className="text-white">{stats.totalTuitionDue.toLocaleString()} {currency}</span>
                       </div>
                       <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
                           <div
@@ -331,7 +334,7 @@ const Statistics: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                           <span>{t('total_recovered', 'Total Recouvré')}</span>
-                          <span className="text-emerald-500">{stats.totalRevenue.toLocaleString()} FCFA</span>
+                          <span className="text-emerald-500">{stats.totalRevenue.toLocaleString()} {currency}</span>
                       </div>
                   </div>
               </div>

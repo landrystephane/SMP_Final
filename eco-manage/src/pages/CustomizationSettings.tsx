@@ -19,6 +19,7 @@ const CustomizationSettings: React.FC = () => {
     const [schoolMotto, setSchoolMotto] = useState('');
     const [schoolAddress, setSchoolAddress] = useState('');
     const [schoolBp, setSchoolBp] = useState('');
+    const [currency, setCurrency] = useState('FCFA');
     const [primaryColor, setPrimaryColor] = useState('#1e293b');
     const [secondaryColor, setSecondaryColor] = useState('#f59e0b');
     const [receiptSigTitle, setReceiptSigTitle] = useState("Signature de l'Économe");
@@ -168,6 +169,9 @@ const CustomizationSettings: React.FC = () => {
                     if (add) setAlertDeadlineDays(parseInt(add));
                     const agd = await window.electronAPI.getSetting('alert_grade_deadline_days');
                     if (agd) setAlertGradeDeadlineDays(parseInt(agd));
+
+                    const currencySetting = await window.electronAPI.getSetting('currency');
+                    if (currencySetting) setCurrency(currencySetting);
                 }
             }
         } catch (e: any) {
@@ -304,6 +308,7 @@ const CustomizationSettings: React.FC = () => {
             await window.electronAPI.setSetting({ key: 'alert_expense_ratio', value: alertExpenseRatio.toString() });
             await window.electronAPI.setSetting({ key: 'alert_deadline_days', value: alertDeadlineDays.toString() });
             await window.electronAPI.setSetting({ key: 'alert_grade_deadline_days', value: alertGradeDeadlineDays.toString() });
+            await window.electronAPI.setSetting({ key: 'currency', value: currency });
 
             setSuccess(true);
             showNotification("Paramètres enregistrés avec succès !", "success");
@@ -368,7 +373,7 @@ const CustomizationSettings: React.FC = () => {
                             <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_school_identity', 'Identité de l\'Établissement')}</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_name', 'Nom de l\'École')}</label>
                                 <input
@@ -412,6 +417,17 @@ const CustomizationSettings: React.FC = () => {
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
                             </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Devise Monétaire (Currency)</label>
+                                <input
+                                    type="text"
+                                    value={currency}
+                                    onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                                    placeholder="Ex: FCFA, USD, EUR"
+                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -422,7 +438,7 @@ const CustomizationSettings: React.FC = () => {
                             <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_color_palette', 'Palette Graphique de l\'École')}</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 grid-cols-1 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Primary color */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_primary_color', 'Couleur Primaire (Cadres et En-têtes)')}</label>
@@ -765,7 +781,7 @@ const CustomizationSettings: React.FC = () => {
                                 {gradingScales.length === 0 ? (
                                     <p className="text-center text-slate-500 text-xs font-bold py-6 italic">Aucun barème personnalisé créé. Les classes utilisent par défaut la notation sur 20 brute.</p>
                                 ) : (
-                                    <div className="grid grid-cols-1 grid-cols-1 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {gradingScales.map((scale: any) => (
                                             <div 
                                                 key={scale.id} 
