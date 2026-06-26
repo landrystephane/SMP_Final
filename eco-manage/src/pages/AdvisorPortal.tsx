@@ -641,7 +641,7 @@ const AdvisorPortal: React.FC = () => {
                                             const saturday = new Date(curr.setDate(firstDay + 5)).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
                                             generateSchedulePdf({
-                                                school: { name: user?.schoolName || 'ECO-MANAGE' }, 
+                                                school: { name: user?.schoolName || '' },
                                                 title: `Programme des cours du Lundi ${monday} au Samedi ${saturday}`,
                                                 subtitle: `Emploi du Temps - Classe : ${classObj?.name}`,
                                                 columns,
@@ -914,7 +914,7 @@ const AdvisorPortal: React.FC = () => {
                                                 return [exam.date, `${exam.start_time} - ${exam.end_time}`, subjectName, teacherName];
                                             });
                                             generateExamSchedulePdf({
-                                                school: { name: user?.schoolName || 'ECO-MANAGE' },
+                                                school: { name: user?.schoolName || '' },
                                                 title: `Programme des Évaluations - ${classObj?.name}`,
                                                 columns,
                                                 rows

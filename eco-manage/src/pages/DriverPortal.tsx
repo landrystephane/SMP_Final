@@ -55,7 +55,7 @@ const DriverPortal: React.FC = () => {
         } else {
             // Fallback points for simulation if none defined
             setPoints([
-                { id: 'p1', name: 'Campus Eco-Manage', estimated_time_from_start: 0, latitude: 3.848, longitude: 11.502 },
+                { id: 'p1', name: 'Campus', estimated_time_from_start: 0, latitude: 3.848, longitude: 11.502 },
                 { id: 'p2', name: 'Carrefour Bastos', estimated_time_from_start: 15, latitude: 3.868, longitude: 11.512 },
                 { id: 'p3', name: 'Rond-point Nlongkak', estimated_time_from_start: 25, latitude: 3.878, longitude: 11.522 },
                 { id: 'p4', name: 'Carrefour Warda', estimated_time_from_start: 40, latitude: 3.858, longitude: 11.532 }

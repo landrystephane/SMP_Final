@@ -1306,7 +1306,7 @@ const CustomizationSettings: React.FC = () => {
                             {/* School Title dynamic color */}
                             <div className="text-center py-1">
                                 <h3 className="text-xs font-black uppercase tracking-tight" style={{ color: primaryColor }}>
-                                    {schoolName || 'ECO-MANAGE ACADEMY'}
+                                    {schoolName || ''}
                                 </h3>
                                 <p className="text-[5px] text-slate-400 font-bold italic mt-0.5">{schoolMotto || 'Education for Excellence'}</p>
                             </div>

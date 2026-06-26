@@ -168,7 +168,7 @@ const ParentPortal: React.FC = () => {
     const handlePrintReceipt = async (payment: any) => {
         try {
             const financials = getStudentFinancials(selectedChild);
-            const activeSchool = schools.find(sch => sch.id === user?.schoolId) || schools[0] || { name: 'Eco-Manage' };
+            const activeSchool = schools.find(sch => sch.id === user?.schoolId) || schools[0] || { name: '' };
             const { generatePaymentReceipt } = await import('../utils/reports');
             generatePaymentReceipt(payment, selectedChild, financials, activeSchool);
         } catch (e: any) {

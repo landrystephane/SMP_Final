@@ -184,7 +184,7 @@ const Dashboard: React.FC = () => {
                                 });
                                 
                                 generateSchedulePdf({
-                                    school: { name: user?.schoolName || 'ECO-MANAGE' }, 
+                                    school: { name: user?.schoolName || '' },
                                     title: `Emploi du Temps - ${user?.fullName}`,
                                     columns,
                                     rows
@@ -327,7 +327,7 @@ const Dashboard: React.FC = () => {
                                         return [exam.date, `${exam.start_time} - ${exam.end_time}`, exam.class_name, exam.subject_name];
                                     });
                                     generateExamSchedulePdf({
-                                        school: { name: user?.schoolName || 'ECO-MANAGE' },
+                                        school: { name: user?.schoolName || '' },
                                         title: `Programme des Évaluations - ${user?.fullName}`,
                                         columns,
                                         rows

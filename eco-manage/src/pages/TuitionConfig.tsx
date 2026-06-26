@@ -366,7 +366,7 @@ const TuitionConfig: React.FC = () => {
           </div>
           <div className="text-[11px] text-slate-400 space-y-3 leading-relaxed relative z-10">
               <p className="font-black text-white uppercase tracking-widest text-sm italic">{t('chronological_engine', 'Moteur de Calcul Chronologique :')}</p>
-              <p className="font-medium">{t('chronological_engine_desc', 'Le système Eco-Manage utilise une règle d\'imputation chronologique stricte pour garantir la transparence financière.')}</p>
+              <p className="font-medium">{t('chronological_engine_desc', 'Le système utilise une règle d\'imputation chronologique stricte pour garantir la transparence financière.')}</p>
               <div className="flex items-center gap-4 py-2">
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5 font-black text-emerald-500 uppercase">1. {t('registration', 'Inscription')}</div>
                   <ChevronRight className="w-4 h-4 text-slate-700" />

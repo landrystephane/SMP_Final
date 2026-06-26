@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsRestoringSession(false);
           window.electronAPI.getSchools().then((schools: any) => {
               const currentSchool = schools.find((s: any) => Number(s.id) === Number(user.schoolId)) || schools[0];
-              document.title = currentSchool?.name || "Eco'Manage";
+              document.title = currentSchool?.name || "Gestion Scolaire";
           }).catch(() => {});
         })
         .catch(err => {
@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     } else {
       setIsRestoringSession(false);
-      document.title = "Eco'Manage";
+      document.title = "Gestion Scolaire";
     }
   }, [user]);
 

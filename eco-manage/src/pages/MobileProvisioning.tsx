@@ -76,7 +76,7 @@ const MobileProvisioning: React.FC = () => {
         </form>
 
         <p className="text-center text-[10px] text-slate-600 uppercase tracking-widest">
-            Sécurité Renforcée • Eco-Manage System
+            Sécurité Renforcée • System
         </p>
       </div>
     </div>

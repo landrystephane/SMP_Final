@@ -16,7 +16,7 @@ const Layout: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const [schoolName, setSchoolName] = useState('Eco-Manage');
+  const [schoolName, setSchoolName] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSgActing, setIsSgActing] = useState(false);
 
@@ -177,13 +177,13 @@ const Layout: React.FC = () => {
               handleLogout();
               return;
             }
-            setSchoolName('Eco-Manage');
+            setSchoolName('');
           }
         } catch (e) {
           console.error("Failed to load school name in layout", e);
         }
       } else {
-        setSchoolName('Eco-Manage');
+        setSchoolName('');
       }
 
       if (window.electronAPI) {

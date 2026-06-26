@@ -448,7 +448,7 @@ const Transport: React.FC = () => {
                                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 border-4 border-slate-950">
                                         <Shield className="w-5 h-5 text-white" />
                                     </div>
-                                    <span className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('campus', 'Campus Eco-Manage')}</span>
+                                    <span className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('campus', 'Campus')}</span>
                                 </div>
 
                                 {/* Bus Icon */}
