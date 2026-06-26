@@ -471,7 +471,26 @@ const Finance: React.FC = () => {
                             value={filterDate}
                             onChange={(e) => setFilterDate(e.target.value)}
                         />
-                        <button className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || JSON.parse(localStorage.getItem('user') || '{}')?.schoolId)?.toString()) || schools[0];
+                                    const reportsModule = await import('../utils/reports');
+                                    const filteredPayments = filterDate ? payments.filter(p => p.created_at?.startsWith(filterDate)) : payments;
+                                    reportsModule.generateAnnualAuditReport({
+                                        school: activeSchool,
+                                        yearName: `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`,
+                                        stats: { totalStudents: students.length, totalRevenue: filteredPayments.reduce((s: number, p: any) => s + p.amount, 0) },
+                                        payments: filteredPayments,
+                                        students,
+                                        classes
+                                    });
+                                    showNotification("Rapport financier exporté avec succès", "success");
+                                } catch (err: any) {
+                                    showNotification("Erreur: " + err.message, "error");
+                                }
+                            }}
+                            className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
                             <Download className="w-4 h-4 mr-2" /> {t('export_report')}
                         </button>
                     </div>

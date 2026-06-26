@@ -2369,16 +2369,27 @@ handlers['db:getDashboardStats'] = async (params) => {
     WHERE s.school_id = ? ${studentWhereStr}
   `).get(...queryParams).total || 0;
 
-  const totalTuitionDue = db.prepare(`
-    SELECT SUM(
-      COALESCE(t.registration_fee, 0) + 
-      MAX(0, COALESCE(t.total_fee, 0) - COALESCE(s.scholarship_reduction, 0))
-    ) as total
-    FROM tuition_fees t
-    JOIN students s ON s.class_id = t.class_id
+  const allStudentsForDue = db.prepare(`
+    SELECT s.id, s.class_id, s.scholarship_reduction, s.has_transport,
+           c.name as class_name, c.level as class_level,
+           COALESCE(t.registration_fee, 0) as reg_fee,
+           COALESCE(t.total_fee, 0) as total_fee,
+           COALESCE(t.transport_fee, 0) as transport_fee,
+           COALESCE(t.exam_fee, 0) as exam_fee
+    FROM students s
     JOIN classes c ON s.class_id = c.id
-    WHERE s.school_id = ? ${studentWhereStr}
-  `).get(...queryParams).total || 0;
+    LEFT JOIN tuition_fees t ON s.class_id = t.class_id
+    WHERE s.school_id = ? AND s.status != 'DELETED' ${studentWhereStr}
+  `).all(...queryParams);
+
+  let totalTuitionDue = 0;
+  for (const st of allStudentsForDue) {
+    let due = (st.reg_fee || 0) + Math.max(0, (st.total_fee || 0) - (st.scholarship_reduction || 0));
+    if (st.has_transport === 1 && st.transport_fee > 0) due += st.transport_fee;
+    const isExamClass = (st.class_name || '').toUpperCase().replace(/\s+/g, '').includes('CM2') || (st.class_name || '').toUpperCase().replace(/\s+/g, '').includes('CLASS6');
+    if (isExamClass && st.exam_fee > 0) due += st.exam_fee;
+    totalTuitionDue += due;
+  }
 
   const classStats = db.prepare(`
     SELECT c.name as level, c.section, AVG(g.score) as avg,
@@ -2519,9 +2530,14 @@ handlers['db:getBursarDashboardStats'] = async (params) => {
     const classFeeConfig = tuitionFees.find(f => f.class_id === s.class_id);
     const totalReg = classFeeConfig ? classFeeConfig.registration_fee : 0;
     const totalPension = classFeeConfig ? classFeeConfig.total_fee : 0;
-    
+    const transportFee = classFeeConfig ? (classFeeConfig.transport_fee || 0) : 0;
+    const examFee = classFeeConfig ? (classFeeConfig.exam_fee || 0) : 0;
+
     const scholarship = s.scholarship_reduction || 0;
-    const due = totalReg + Math.max(0, totalPension - scholarship);
+    let due = totalReg + Math.max(0, totalPension - scholarship);
+    if (s.has_transport === 1 && transportFee > 0) due += transportFee;
+    const isExamClass = (s.class_name || '').toUpperCase().replace(/\s+/g, '').includes('CM2') || (s.class_name || '').toUpperCase().replace(/\s+/g, '').includes('CLASS6');
+    if (isExamClass && examFee > 0) due += examFee;
     const paid = paymentMap[s.id] || 0;
 
     totalTuitionDue += due;
