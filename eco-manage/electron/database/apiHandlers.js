@@ -2584,7 +2584,6 @@ handlers['db:getDashboardStats'] = async (params) => {
         }
       }
     } catch(e) {}
-    }
   } catch (e) {
     console.error('Financial alerts error:', e);
   }
@@ -3293,7 +3292,6 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
   if (!notif) throw new Error("Notification introuvable.");
   if (notif.action_status !== 'PENDING') throw new Error("Cette demande a déjà été résolue.");
 
-  const currentUser = session.getStore()?.user;
   let grantedById = currentUser?.id || parseInt(resolvedBy, 10);
   if (!grantedById || isNaN(grantedById)) {
     const founder = db.prepare("SELECT id FROM users WHERE school_id = ? AND role = 'FOUNDER' LIMIT 1").get(notif.school_id);
