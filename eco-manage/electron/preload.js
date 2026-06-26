@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Finance
   getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
+  smartPayment: (data) => ipcRenderer.invoke('db:smartPayment', data),
   deletePayment: (id) => ipcRenderer.invoke('db:deletePayment', id),
   getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),
@@ -83,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Finance
   getPayments: (schoolId) => ipcRenderer.invoke('db:getPayments', schoolId),
   addPayment: (payment) => ipcRenderer.invoke('db:addPayment', payment),
+  smartPayment: (data) => ipcRenderer.invoke('db:smartPayment', data),
   deletePayment: (id) => ipcRenderer.invoke('db:deletePayment', id),
   getTuitionFees: (schoolId) => ipcRenderer.invoke('db:getTuitionFees', schoolId),
   updateTuitionFee: (data) => ipcRenderer.invoke('db:updateTuitionFee', data),

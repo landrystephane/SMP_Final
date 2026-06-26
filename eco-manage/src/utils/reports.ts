@@ -1367,21 +1367,37 @@ export const generateParentsListReport = async (parents: any[], schoolInfo: any,
 export const generateSchedulePdf = (data: any) => {
     const { school, title, subtitle, columns, rows } = data;
     const doc = new jsPDF('landscape');
-    
-    let yPos = 20;
-    doc.setFontSize(16);
+    const isEn = i18n.language.startsWith('en');
+    const primary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+
+    // School header
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.rect(0, 0, 297, 30, 'F');
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text(school?.name?.toUpperCase() || '', 148, yPos, { align: 'center' });
-    yPos += 10;
+    doc.setTextColor(255, 255, 255);
+    doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 8);
+    doc.text('Paix - Travail - Patrie', 20, 12);
+    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 16);
+    doc.text('REPUBLIC OF CAMEROON', 277, 8, { align: 'right' });
+    doc.text('Peace - Work - Fatherland', 277, 12, { align: 'right' });
+    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 277, 16, { align: 'right' });
     doc.setFontSize(12);
+    doc.text((school?.name || '').toUpperCase(), 148, 24, { align: 'center' });
+
+    let yPos = 38;
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
     doc.text(title.toUpperCase(), 148, yPos, { align: 'center' });
-    yPos += 10;
-    
+    yPos += 8;
+
     if (subtitle) {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
         doc.text(subtitle.toUpperCase(), 148, yPos, { align: 'center' });
-        yPos += 10;
+        yPos += 8;
     } else {
         yPos += 5;
     }
@@ -1424,14 +1440,28 @@ export const generateExamSchedulePdf = (data: any) => {
     const doc = new jsPDF();
     const examPrimary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
 
-    let yPos = 20;
-    doc.setFontSize(16);
+    doc.setFillColor(examPrimary[0], examPrimary[1], examPrimary[2]);
+    doc.rect(0, 0, 210, 35, 'F');
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text(school?.name?.toUpperCase() || '', 105, yPos, { align: 'center' });
-    yPos += 10;
+    doc.setTextColor(255, 255, 255);
+    doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 8);
+    doc.text('Paix - Travail - Patrie', 20, 12);
+    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 16);
+    doc.text('REPUBLIC OF CAMEROON', 190, 8, { align: 'right' });
+    doc.text('Peace - Work - Fatherland', 190, 12, { align: 'right' });
+    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 190, 16, { align: 'right' });
     doc.setFontSize(12);
+    doc.text((school?.name || '').toUpperCase(), 105, 26, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(school?.address || '', 105, 32, { align: 'center' });
+
+    let yPos = 42;
+    doc.setTextColor(examPrimary[0], examPrimary[1], examPrimary[2]);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
     doc.text(title.toUpperCase(), 105, yPos, { align: 'center' });
-    yPos += 15;
+    yPos += 12;
 
     (doc as any).autoTable({
         head: [columns],

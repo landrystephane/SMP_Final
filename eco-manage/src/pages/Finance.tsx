@@ -16,7 +16,7 @@ const Finance: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'PAYMENTS' | 'EXPENSES' | 'SPECIAL_FEES'>('MANAGEMENT');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
+  const [newPayment, setNewPayment] = useState({ studentId: '', amount: '', depositorName: '', includeTransport: false, includeExam: false });
   const [newExpense, setNewExpense] = useState({ amount: '', reason: '' });
   const [filterDate, setFilterDate] = useState('');
 
@@ -59,77 +59,115 @@ const Finance: React.FC = () => {
   const totalValidatedExpenses = expenses.filter(e => e.status === 'VALIDATED').reduce((acc, e) => acc + e.amount, 0);
   const totalReceived = totalCollected - totalValidatedExpenses;
 
+  const handleAddPaymentLegacy = async (paymentData: { studentId: string; amount: string; type: string; installmentId: string; depositorName: string }) => {
+    if (window.electronAPI) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await window.electronAPI.addPayment({
+                ...paymentData,
+                studentId: parseInt(paymentData.studentId),
+                amount: parseFloat(paymentData.amount.toString().replace(/\s+/g, '')),
+                userId: parseInt(user.id),
+                installmentId: paymentData.installmentId ? parseInt(paymentData.installmentId) : null
+            });
+            if (res && res.error) {
+                showNotification(`Erreur de paiement: ${res.error}`, "error");
+                return;
+            }
+            if (res.receiptNumber) {
+                const s = students.find(stud => stud.id.toString() === paymentData.studentId);
+                const financials = getStudentFinancials(s, paymentData.type);
+                const amountPaid = parseFloat(paymentData.amount) || 0;
+                financials.totalPaid += amountPaid;
+                financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
+                const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
+                const pd = { ...paymentData, receipt_number: res.receiptNumber, payment_date: new Date().toISOString(), amount: amountPaid, payment_type: paymentData.type, depositor_name: paymentData.depositorName };
+                // @ts-ignore
+                import('../utils/reports').then(m => m.generatePaymentReceipt(pd, s, financials, activeSchool));
+            }
+            showNotification("Paiement enregistré avec succès !", "success");
+            loadData();
+        } catch (err: any) {
+            console.error(err);
+            showNotification("Erreur: " + err.message, "error");
+        }
+    }
+  };
+
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPayment.depositorName.trim()) {
         showNotification("Le nom de celui qui fait le versement est obligatoire.", "warning");
         return;
     }
-
-    if (newPayment.type !== 'Inscription') {
-        const studentObj = students.find(s => s.id.toString() === newPayment.studentId);
-        const classConfig = tuitionFees.find(f => f.classId === studentObj?.class_id);
-        const totalRegRequired = classConfig?.registrationFee || 0;
-        const studentPayments = payments.filter(p => p.student_id.toString() === newPayment.studentId && p.payment_type === 'Inscription');
-        const totalRegPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
-
-        if (totalRegRequired > 0 && totalRegPaid < totalRegRequired) {
-            showNotification(`Le premier versement d'un élève doit obligatoirement être l'Inscription. Reste à payer pour l'inscription : ${totalRegRequired - totalRegPaid} FCFA.`, "warning");
-            return;
-        }
+    if (!newPayment.studentId) {
+        showNotification("Veuillez sélectionner un élève.", "warning");
+        return;
+    }
+    const parsedAmount = parseFloat(newPayment.amount.toString().replace(/\s+/g, ''));
+    if (!parsedAmount || parsedAmount <= 0) {
+        showNotification("Veuillez saisir un montant valide.", "warning");
+        return;
     }
 
     if (window.electronAPI) {
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const res = await window.electronAPI.addPayment({
-                ...newPayment,
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await window.electronAPI.smartPayment({
                 studentId: parseInt(newPayment.studentId),
-                amount: parseFloat(newPayment.amount.toString().replace(/\s+/g, '')),
-                userId: parseInt(user.id),
-                installmentId: newPayment.installmentId ? parseInt(newPayment.installmentId) : null
+                totalAmount: parsedAmount,
+                userId: currentUser.id,
+                depositorName: newPayment.depositorName,
+                includeTransport: newPayment.includeTransport || false,
+                includeExam: newPayment.includeExam || false
             });
-            
+
             if (res && res.error) {
                 showNotification(`Erreur de paiement: ${res.error}`, "error");
                 setIsAddingPayment(false);
                 return;
             }
 
-            // Generate receipt automatically
-            if (res.receiptNumber) {
+            // Generate a PDF receipt for EACH ventilated receipt
+            if (res.receipts && res.receipts.length > 0) {
                 const s = students.find(stud => stud.id.toString() === newPayment.studentId);
-                const financials = getStudentFinancials(s, newPayment.type);
-                
-                // Intégrer le montant payé actuel dans les calculs financiers pour le reçu
-                const amountPaid = parseFloat(newPayment.amount) || 0;
-                financials.totalPaid += amountPaid;
-                financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
+                const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || currentUser?.schoolId)?.toString()) || schools[0];
 
-                const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
-                const paymentData = {
-                    ...newPayment,
-                    receipt_number: res.receiptNumber,
-                    payment_date: new Date().toISOString(),
-                    amount: amountPaid,
-                    payment_type: newPayment.type,
-                    depositor_name: newPayment.depositorName
-                };
                 // @ts-ignore
-                import('../utils/reports').then(m => m.generatePaymentReceipt(paymentData, s, financials, activeSchool));
+                const reportsModule = await import('../utils/reports');
+                for (const receipt of res.receipts) {
+                    const financials = getStudentFinancials(s, receipt.type);
+                    financials.totalPaid += receipt.amount;
+                    financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
+
+                    const paymentData = {
+                        receipt_number: receipt.receiptNumber,
+                        payment_date: new Date().toISOString(),
+                        amount: receipt.amount,
+                        payment_type: receipt.type,
+                        depositor_name: newPayment.depositorName,
+                        student_id: parseInt(newPayment.studentId)
+                    };
+                    reportsModule.generatePaymentReceipt(paymentData, s, financials, activeSchool);
+                }
+
+                // Build ventilation summary
+                const summary = res.receipts.map((r: any) => `${r.installmentName || r.type} ${r.amount.toLocaleString()} FCFA`).join(', ');
+                showNotification(`Paiement ventilé: ${summary}`, "success");
+            } else {
+                showNotification("Paiement enregistré avec succès !", "success");
             }
 
             setIsAddingPayment(false);
-            setNewPayment({ studentId: '', amount: '', type: 'Scolarité', installmentId: '', depositorName: '' });
-            showNotification("Paiement enregistré et reçu généré avec succès !", "success");
-            
+            setNewPayment({ studentId: '', amount: '', depositorName: '', includeTransport: false, includeExam: false });
+
             // Notify system
             const studentInfo = students.find(s => s.id.toString() === newPayment.studentId);
             try {
                 await window.electronAPI.createNotification({
-                    school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
-                    role: user?.role || 'ALL', 
-                    message: `Un paiement de ${newPayment.amount} FCFA a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (${newPayment.type}).`,
+                    school_id: localStorage.getItem('impersonated_school_id') || currentUser?.schoolId,
+                    role: currentUser?.role || 'ALL',
+                    message: `Un paiement de ${parsedAmount.toLocaleString()} FCFA a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (ventilation automatique).`,
                     type: 'FINANCE'
                 });
             } catch(e) { console.error("Notification failed", e); }
@@ -782,16 +820,7 @@ const Finance: React.FC = () => {
                                           key={s.id} 
                                           className="p-3 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
                                           onClick={() => {
-                                              let amt = newPayment.amount;
-                                              if (['Inscription', 'Transport', 'Examen'].includes(newPayment.type)) {
-                                                  const classConfig = tuitionFees.find(f => f.classId === s.class_id);
-                                                  if (classConfig) {
-                                                      if (newPayment.type === 'Inscription') amt = classConfig.registrationFee || 0;
-                                                      if (newPayment.type === 'Transport') amt = classConfig.transportFee || 0;
-                                                      if (newPayment.type === 'Examen') amt = classConfig.examFee || 0;
-                                                  }
-                                              }
-                                              setNewPayment({...newPayment, studentId: s.id.toString(), amount: amt.toString()});
+                                              setNewPayment({...newPayment, studentId: s.id.toString()});
                                               setPaymentSearchQuery('');
                                           }}
                                       >
@@ -805,73 +834,85 @@ const Finance: React.FC = () => {
                           )}
                       </div>
 
-                      {newPayment.studentId && (
+                      {newPayment.studentId && (() => {
+                          const selectedStudent = students.find(s => s.id.toString() === newPayment.studentId);
+                          const finScol = getStudentFinancials(selectedStudent, 'Scolarité');
+                          const classConfig = tuitionFees.find(f => f.classId === selectedStudent?.class_id);
+                          const hasTransportFee = (classConfig?.transportFee || 0) > 0;
+                          const hasExamFee = (classConfig?.examFee || 0) > 0;
+                          return (
                           <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl animate-in fade-in duration-300 relative">
-                              <button 
-                                  type="button" 
+                              <button
+                                  type="button"
                                   onClick={() => setNewPayment({...newPayment, studentId: ''})}
                                   className="absolute top-2 right-2 p-1.5 bg-slate-900 rounded-lg text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                               >
                                   <Plus className="w-4 h-4 rotate-45" />
                               </button>
                               <div className="flex justify-between items-center mb-2 pr-8">
-                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte ({newPayment.type})</span>
-                                  <span className="text-sm font-black text-white">{getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).balance.toLocaleString()} FCFA Restant</span>
+                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte (Scolarité)</span>
+                                  <span className="text-sm font-black text-white">{finScol.balance.toLocaleString()} FCFA Restant</span>
                               </div>
                               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-amber-500"
-                                    style={{ width: `${getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalDue > 0 ? (getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalPaid / getStudentFinancials(students.find(s => s.id.toString() === newPayment.studentId), newPayment.type).totalDue) * 100 : 0}%` }}
+                                    style={{ width: `${finScol.totalDue > 0 ? (finScol.totalPaid / finScol.totalDue) * 100 : 0}%` }}
                                   />
                               </div>
+                              {(hasTransportFee || hasExamFee) && (
+                                  <div className="mt-4 pt-3 border-t border-white/5 space-y-3">
+                                      {hasTransportFee && (
+                                          <label className="flex items-center gap-3 cursor-pointer group/cb">
+                                              <input
+                                                  type="checkbox"
+                                                  checked={newPayment.includeTransport}
+                                                  onChange={(e) => setNewPayment({...newPayment, includeTransport: e.target.checked})}
+                                                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
+                                              />
+                                              <div>
+                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">Inclure Transport</span>
+                                                  <span className="text-[10px] text-slate-500 ml-2">({classConfig?.transportFee?.toLocaleString()} FCFA)</span>
+                                              </div>
+                                          </label>
+                                      )}
+                                      {hasExamFee && (
+                                          <label className="flex items-center gap-3 cursor-pointer group/cb">
+                                              <input
+                                                  type="checkbox"
+                                                  checked={newPayment.includeExam}
+                                                  onChange={(e) => setNewPayment({...newPayment, includeExam: e.target.checked})}
+                                                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
+                                              />
+                                              <div>
+                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">Inclure Examen</span>
+                                                  <span className="text-[10px] text-slate-500 ml-2">({classConfig?.examFee?.toLocaleString()} FCFA)</span>
+                                              </div>
+                                          </label>
+                                      )}
+                                  </div>
+                              )}
                           </div>
-                      )}
+                          );
+                      })()}
 
-                      <div className="grid grid-cols-1 grid-cols-1 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                                <Wallet className="w-3 h-3 mr-2" /> {t('amount_to_pay')}
-                            </label>
-                            <div className="relative">
-                                <input
-                                    required
-                                    type="number"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 pl-6 pr-20 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    value={newPayment.amount}
-                                    onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
-                                    placeholder="0"
-                                />
-                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600 uppercase tracking-widest">FCFA</span>
-                            </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
+                            <Wallet className="w-3 h-3 mr-2" /> {t('amount_to_pay')}
+                        </label>
+                        <div className="relative">
+                            <input
+                                required
+                                type="number"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 pl-6 pr-20 text-white font-black text-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                value={newPayment.amount}
+                                onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
+                                placeholder="0"
+                            />
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600 uppercase tracking-widest">FCFA</span>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                                <Filter className="w-3 h-3 mr-2" /> {t('fee_type')}
-                            </label>
-                            <select
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
-                                value={newPayment.type}
-                                onChange={(e) => {
-                                    const t = e.target.value;
-                                    let amt = newPayment.amount;
-                                    if (newPayment.studentId && ['Inscription', 'Transport', 'Examen'].includes(t)) {
-                                        const s = students.find(st => st.id.toString() === newPayment.studentId);
-                                        const classConfig = tuitionFees.find(f => f.classId === s?.class_id);
-                                        if (classConfig) {
-                                            if (t === 'Inscription') amt = classConfig.registrationFee || 0;
-                                            if (t === 'Transport') amt = classConfig.transportFee || 0;
-                                            if (t === 'Examen') amt = classConfig.examFee || 0;
-                                        }
-                                    }
-                                    setNewPayment({...newPayment, type: t, amount: amt.toString()});
-                                }}
-                            >
-                                <option value="Scolarité">{t('tuition_fees_pension')}</option>
-                                <option value="Inscription">{t('registration_fees')}</option>
-                                <option value="Transport">{t('transport_fees')}</option>
-                                <option value="Examen">{t('exam_fees')}</option>
-                            </select>
-                        </div>
+                        <p className="text-[10px] text-slate-600 font-bold mt-1 leading-relaxed">
+                            Le montant sera ventilé automatiquement : Inscription &rarr; Transport &rarr; Examen &rarr; Tranches de pension
+                        </p>
                       </div>
 
                       <div className="space-y-2 pt-2">
@@ -888,23 +929,6 @@ const Finance: React.FC = () => {
                           />
                       </div>
 
-                      {newPayment.type === 'Scolarité' && (
-                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                                <Clock className="w-3 h-3 mr-2" /> {t('installment_assignment')}
-                            </label>
-                            <select
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
-                                value={newPayment.installmentId}
-                                onChange={(e) => setNewPayment({...newPayment, installmentId: e.target.value})}
-                            >
-                                <option value="">Imputation Automatique</option>
-                                {installments.map(inst => (
-                                    <option key={inst.id} value={inst.id}>{inst.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                      )}
 
                       <div className="pt-6 flex flex-col md:flex-row gap-4">
                           <button type="button" onClick={() => setIsAddingPayment(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all order-2 md:order-1">Annuler</button>

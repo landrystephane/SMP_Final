@@ -668,6 +668,87 @@ handlers['db:addPayment'] = async (payment) => {
 
 };
 
+handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositorName, includeTransport, includeExam }) => {
+    const sid = getActiveSchoolId();
+    const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
+    if (!student) throw new Error('Élève non autorisé.');
+
+    const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(student.class_id);
+    if (!feeConfig) throw new Error('Aucun barème de frais configuré pour cette classe.');
+
+    const installments = db.prepare('SELECT i.*, COALESCE(cif.amount, 0) as configured_amount FROM installments i LEFT JOIN class_installment_fees cif ON i.id = cif.installment_id AND cif.class_id = ? ORDER BY i.id ASC').all(student.class_id);
+    const existingPayments = db.prepare('SELECT * FROM payments WHERE student_id = ?').all(studentId);
+
+    const paidByType = (type) => existingPayments.filter(p => p.payment_type === type).reduce((sum, p) => sum + p.amount, 0);
+    const paidByInstallment = (instId) => existingPayments.filter(p => p.installment_id === instId).reduce((sum, p) => sum + p.amount, 0);
+
+    let remaining = parseFloat(totalAmount);
+    const receipts = [];
+
+    const createReceipt = (amount, type, installmentId = null) => {
+        const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+        db.prepare('INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name) VALUES (?, ?, ?, ?, ?, ?, ?)').run(studentId, amount, type, userId, receiptNumber, installmentId, depositorName || '');
+        if (type === 'Transport') db.prepare('UPDATE students SET has_transport = 1 WHERE id = ?').run(studentId);
+        receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null });
+    };
+
+    // 1. Inscription
+    const regFee = feeConfig.registration_fee || 0;
+    const regPaid = paidByType('Inscription');
+    const regDue = Math.max(0, regFee - regPaid);
+    if (regDue > 0 && remaining > 0) {
+        const pay = Math.min(remaining, regDue);
+        createReceipt(pay, 'Inscription');
+        remaining -= pay;
+    }
+
+    // 2. Transport (si demandé)
+    if (includeTransport && remaining > 0) {
+        const transFee = feeConfig.transport_fee || 0;
+        const transPaid = paidByType('Transport');
+        const transDue = Math.max(0, transFee - transPaid);
+        if (transDue > 0) {
+            const pay = Math.min(remaining, transDue);
+            createReceipt(pay, 'Transport');
+            remaining -= pay;
+        }
+    }
+
+    // 3. Examen (si demandé)
+    if (includeExam && remaining > 0) {
+        const examFee = feeConfig.exam_fee || 0;
+        const examPaid = paidByType('Examen');
+        const examDue = Math.max(0, examFee - examPaid);
+        if (examDue > 0) {
+            const pay = Math.min(remaining, examDue);
+            createReceipt(pay, 'Examen');
+            remaining -= pay;
+        }
+    }
+
+    // 4. Tranches de pension dans l'ordre
+    for (const inst of installments) {
+        if (remaining <= 0) break;
+        const instAmount = inst.configured_amount || 0;
+        if (instAmount <= 0) continue;
+        const instPaid = paidByInstallment(inst.id);
+        const instDue = Math.max(0, instAmount - instPaid);
+        if (instDue > 0) {
+            const pay = Math.min(remaining, instDue);
+            createReceipt(pay, 'Scolarité', inst.id);
+            remaining -= pay;
+        }
+    }
+
+    // 5. Si reste encore de l'argent (excédent), enregistrer comme pension générale
+    if (remaining > 0) {
+        createReceipt(remaining, 'Scolarité');
+        remaining = 0;
+    }
+
+    return { success: true, receipts, studentName: `${student.last_name} ${student.first_name}`, className: student.className };
+};
+
 handlers['db:deletePayment'] = async (id) => {
     const sid = getActiveSchoolId();
     const payment = db.prepare('SELECT p.student_id, p.payment_type FROM payments p JOIN students s ON p.student_id = s.id WHERE p.id = ? AND s.school_id = ?').get(id, sid);
