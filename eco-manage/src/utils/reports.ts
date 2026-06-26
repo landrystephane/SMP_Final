@@ -541,39 +541,131 @@ export const generateAnnualAuditReport = (data: any) => {
     const isEn = i18n.language.startsWith('en');
 
     // PAGE 1: COVER PAGE
-    doc.setFillColor(primary[0], primary[1], primary[2]);
-    doc.rect(0, 0, 210, 120, 'F');
+    const fmtCover = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
-    // Title
-    doc.setFontSize(24);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text(school.name.toUpperCase(), 105, 50, { align: 'center' });
-
-    doc.setFontSize(14);
-    doc.setTextColor(secondary[0], secondary[1], secondary[2]);
-    doc.text(isEn ? "ACADEMIC & FINANCIAL AUDIT REPORT" : "RAPPORT D'AUDIT ACADÉMIQUE & FINANCIER", 105, 75, { align: 'center' });
-
-    doc.setFontSize(11);
-    doc.setTextColor(200, 200, 200);
-    doc.setFont('helvetica', 'italic');
-    doc.text(isEn ? `School Year : ${yearName}` : `Année Académique / School Year : ${yearName}`, 105, 87, { align: 'center' });
-
-    doc.setTextColor(30, 41, 59);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    const auditGenDate = new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    doc.text(isEn ? `Report Generated on : ${auditGenDate}` : `Rapport Généré le : ${auditGenDate}`, 20, 160);
-    doc.text(isEn ? `School Address : ${school.address || 'Yaoundé, Cameroon'}` : `Adresse de l'Établissement : ${school.address || 'Yaoundé, Cameroun'}`, 20, 168);
-    doc.text(isEn ? `Phone Contact : ${school.contact_phone || 'N/A'}` : `Contact Téléphonique : ${school.contact_phone || 'N/A'}`, 20, 176);
-
-    doc.setDrawColor(primary[0], primary[1], primary[2]);
-    doc.line(20, 185, 190, 185);
-
+    // --- Bilingual Header ---
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 12);
+    doc.text('REPUBLIC OF CAMEROON', 190, 12, { align: 'right' });
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(120, 120, 120);
-    doc.text(isEn ? 'Eco-Manage Audit Engine v1.0 - Unalterable Official Document' : 'Eco-Manage Audit Engine v1.0 - Document Officiel Inaltérable', 105, 275, { align: 'center' });
+    doc.text('Paix - Travail - Patrie', 20, 16);
+    doc.text('Peace - Work - Fatherland', 190, 16, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text(school.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 21);
+    doc.text(school.header_english || "MINISTRY OF BASIC EDUCATION", 190, 21, { align: 'right' });
+
+    // Thin separator under header
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(20, 25, 190, 25);
+
+    // --- School Name ---
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(school.name.toUpperCase(), 105, 42, { align: 'center' });
+
+    // --- School address, BP, phone ---
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    const addressParts: string[] = [];
+    if (school.address) addressParts.push(school.address);
+    if (school.bp) addressParts.push(`BP: ${school.bp}`);
+    if (school.contact_phone) addressParts.push(`Tél: ${school.contact_phone}`);
+    if (addressParts.length > 0) {
+        doc.text(addressParts.join('  -  '), 105, 50, { align: 'center' });
+    }
+
+    // --- Horizontal separator ---
+    doc.setDrawColor(primary[0], primary[1], primary[2]);
+    doc.setLineWidth(0.8);
+    doc.line(30, 58, 180, 58);
+
+    // --- Title ---
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(secondary[0], secondary[1], secondary[2]);
+    doc.text(isEn ? "ACADEMIC & FINANCIAL AUDIT REPORT" : "RAPPORT D'AUDIT ACADÉMIQUE & FINANCIER", 105, 80, { align: 'center' });
+
+    // --- Year ---
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(isEn ? `School Year: ${yearName}` : `Année Scolaire ${yearName}`, 105, 92, { align: 'center' });
+
+    // --- Summary Box ---
+    const boxX = 40;
+    const boxY = 110;
+    const boxW = 130;
+    const boxH = 72;
+
+    // Box background
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(primary[0], primary[1], primary[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 3, 3, 'FD');
+
+    // Box title bar
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.roundedRect(boxX, boxY, boxW, 12, 3, 3, 'F');
+    // Cover bottom corners of the title bar
+    doc.rect(boxX, boxY + 9, boxW, 3, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(isEn ? 'KEY METRICS' : 'INDICATEURS CLÉS', 105, boxY + 8, { align: 'center' });
+
+    // Metrics rows
+    const totalRev = stats.totalRevenue || 0;
+    const totalExp = stats.totalExpenses || 0;
+    const balance = totalRev - totalExp;
+    const rowStartY = boxY + 22;
+    const rowH = 13;
+
+    const metrics = [
+        { label: isEn ? 'Total Students' : 'Total Élèves', value: `${stats.totalStudents || students.length}` },
+        { label: isEn ? 'Total Revenue' : 'Total Recettes', value: `${fmtCover(totalRev)} FCFA` },
+        { label: isEn ? 'Total Expenses' : 'Total Dépenses', value: `${fmtCover(totalExp)} FCFA` },
+        { label: isEn ? 'Balance' : 'Solde', value: `${fmtCover(balance)} FCFA` }
+    ];
+
+    metrics.forEach((m, i) => {
+        const y = rowStartY + i * rowH;
+        // Alternating row shading
+        if (i % 2 === 1) {
+            doc.setFillColor(240, 242, 245);
+            doc.rect(boxX + 1, y - 5, boxW - 2, rowH, 'F');
+        }
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(80, 80, 80);
+        doc.text(m.label, boxX + 8, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text(m.value, boxX + boxW - 8, y, { align: 'right' });
+    });
+
+    // --- Generated date and footer ---
+    const auditGenDate = new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(isEn ? `Generated on: ${auditGenDate}` : `Généré le: ${auditGenDate}`, 105, 210, { align: 'center' });
+
+    // Footer line
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(30, 268, 180, 268);
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(140, 140, 140);
+    doc.text(isEn ? 'Eco-Manage Audit Engine v1.0 - Unalterable Official Document' : 'Eco-Manage Audit Engine v1.0 - Document Officiel Inaltérable', 105, 273, { align: 'center' });
 
     // PAGE 2: FINANCIAL & ACADEMIC AUDIT
     doc.addPage();
@@ -658,7 +750,7 @@ export const generateAnnualAuditReport = (data: any) => {
         return [
             p.receipt_number,
             `${stud.last_name} ${stud.first_name}`,
-            `${p.amount.toLocaleString()} FCFA`,
+            `${fmtNum(p.amount)} FCFA`,
             p.payment_type,
             new Date(p.payment_date).toLocaleDateString(isEn ? 'en-US' : 'fr-FR')
         ];

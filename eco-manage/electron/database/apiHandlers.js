@@ -449,6 +449,9 @@ handlers['db:sendAnnouncement'] = async (announcement) => {
 };
 
 handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     return db.prepare('UPDATE students SET bus_route_id = ? WHERE id = ?').run(routeId, studentId);
 };
 
@@ -571,6 +574,9 @@ handlers['db:unlockGrades'] = async ({ classId, term, month }) => {
 };
 
 handlers['db:getClassSubjectsValidationStatus'] = async ({ classId, term, month }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const parsedClassId = parseInt(classId, 10);
   const parsedTerm = parseInt(term, 10);
   const subjects = db.prepare(`
@@ -595,6 +601,9 @@ handlers['db:getClassSubjectsValidationStatus'] = async ({ classId, term, month 
 };
 
 handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const parsedClassId = parseInt(classId, 10);
   const parsedSubjectId = parseInt(subjectId, 10);
   const parsedTerm = parseInt(term, 10);
@@ -606,6 +615,9 @@ handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month 
 };
 
 handlers['db:validateClassGrades'] = async ({ classId, term, month }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const parsedClassId = parseInt(classId, 10);
   const parsedTerm = parseInt(term, 10);
   const result = db.prepare(`
@@ -1104,6 +1116,9 @@ handlers['db:toggleSchoolSubject'] = async ({ schoolId, subjectId, isActive }) =
 };
 
 handlers['db:getClassSubjects'] = async (classId) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare(`
     SELECT s.*, cs.coefficient, cs.is_optional
     FROM subjects s
@@ -1376,10 +1391,16 @@ handlers['db:addBusRoute'] = async ({ name, bus_number, driver_id, schoolId }) =
 };
 
 handlers['db:updateBusRoute'] = async ({ id, name, bus_number, driver_id }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(id, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     return db.prepare('UPDATE bus_routes SET name = ?, bus_number = ?, driver_id = ? WHERE id = ?').run(name, bus_number, driver_id, id);
 };
 
 handlers['db:deleteBusRoute'] = async (routeId) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     db.prepare('UPDATE students SET transport_point_id = NULL WHERE transport_point_id IN (SELECT id FROM transport_points WHERE route_id = ?)').run(routeId);
     db.prepare('DELETE FROM transport_points WHERE route_id = ?').run(routeId);
     db.prepare('DELETE FROM transport_attendance WHERE route_id = ?').run(routeId);
@@ -1402,10 +1423,16 @@ handlers['db:deleteTransportPoint'] = async (pointId) => {
 
 handlers['db:getTransportPoints'] = async (routeId) => {
     if (!routeId) return [];
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     return db.prepare('SELECT * FROM transport_points WHERE route_id = ? ORDER BY estimated_time_from_start').all(routeId);
 };
 
 handlers['db:getRouteStudents'] = async (routeId) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     // Only fetch students who have made a transport payment, sorted by class
     return db.prepare(`
         SELECT s.*, c.name as class_name
@@ -1513,8 +1540,9 @@ handlers['db:getTransportHistory'] = async ({ routeId, date }) => {
         JOIN students s ON ta.student_id = s.id
         LEFT JOIN transport_points tp ON s.transport_point_id = tp.id
         WHERE ta.route_id = ?
+          AND ta.route_id IN (SELECT id FROM bus_routes WHERE school_id = ?)
     `;
-    const params = [routeId];
+    const params = [routeId, sid];
     if (date) {
         query += ' AND ta.date = ?';
         params.push(date);
@@ -1562,7 +1590,8 @@ handlers['db:notifyTransportProximity'] = async ({ pointId, driverId }) => {
 };
 
 handlers['db:getMobileKeys'] = async () => {
-    return db.prepare('SELECT * FROM mobile_access_keys').all();
+    const sid = getActiveSchoolId();
+    return db.prepare('SELECT mk.* FROM mobile_access_keys mk JOIN users u ON mk.assigned_to_user_id = u.id WHERE u.school_id = ?').all(sid);
 };
 
 handlers['db:generateMobileKey'] = async ({ name, userId }) => {
@@ -1644,6 +1673,14 @@ handlers['db:getSystemRequests'] = async ({ schoolId }) => {
 };
 
 handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
+    const sid = getActiveSchoolId();
+    if (records && records.length > 0) {
+        const studentIds = [...new Set(records.map(r => r.studentId))];
+        for (const sId of studentIds) {
+            const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(sId, sid);
+            if (!student) throw new Error('Élève non autorisé pour cet établissement.');
+        }
+    }
     const upsert = db.prepare(`
         INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by, schedule_id)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -1707,6 +1744,9 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
 };
 
 handlers['db:getAttendance'] = async ({ classId, date, scheduleId }) => {
+    const sid = getActiveSchoolId();
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     if (scheduleId !== undefined && scheduleId !== null && scheduleId !== '') {
         return db.prepare(`
           SELECT a.*, s.first_name, s.last_name
@@ -1725,6 +1765,9 @@ handlers['db:getAttendance'] = async ({ classId, date, scheduleId }) => {
 };
 
 handlers['db:getAttendanceReport'] = async ({ classId, startDate, endDate }) => {
+    const sid = getActiveSchoolId();
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     // Return all schedules summed per student, per date
     return db.prepare(`
       SELECT a.student_id, a.date, s.first_name, s.last_name, s.matricule, SUM(a.hours_absent) as hours_absent
@@ -2898,6 +2941,9 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
 };
 
 handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) => {
+    const sid = getActiveSchoolId();
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
     return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(tId, cId, term, month);
@@ -2955,7 +3001,8 @@ handlers['db:sendParentTicket'] = async (ticket) => {
 };
 
 handlers['db:getClassGradingScale'] = async (classId) => {
-  const cls = db.prepare('SELECT grading_scale_id FROM classes WHERE id = ?').get(classId);
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT grading_scale_id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls || !cls.grading_scale_id) {
     return null;
   }
@@ -3020,11 +3067,17 @@ handlers['db:deleteGradingScale'] = async (id) => {
 };
 
 handlers['db:setClassGradingScale'] = async ({ classId, scaleId }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const sId = scaleId ? parseInt(scaleId, 10) : null;
   return db.prepare('UPDATE classes SET grading_scale_id = ? WHERE id = ?').run(sId, classId);
 };
 
 handlers['db:getTeacherAssignedSubjects'] = async ({ classId, teacherId }) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare(`
     SELECT s.*, cs.coefficient, cs.is_optional
     FROM class_teacher_subjects cts
@@ -3034,7 +3087,33 @@ handlers['db:getTeacherAssignedSubjects'] = async ({ classId, teacherId }) => {
   `).all(classId, teacherId);
 };
 
+handlers['db:getTeacherClasses'] = async ({ teacherId, schoolId }) => {
+    const sid = getActiveSchoolId(schoolId);
+    // Get classes from assignedClasses field
+    const teacher = db.prepare('SELECT assigned_classes FROM users WHERE id = ? AND school_id = ?').get(teacherId, sid);
+    let classIds = new Set();
+    if (teacher && teacher.assigned_classes) {
+        try {
+            const parsed = JSON.parse(teacher.assigned_classes);
+            parsed.forEach((id) => classIds.add(typeof id === 'string' ? parseInt(id) : id));
+        } catch(e) {}
+    }
+    // Also get classes from class_teacher_subjects
+    const subjectAssignments = db.prepare('SELECT DISTINCT class_id FROM class_teacher_subjects WHERE teacher_id = ?').all(teacherId);
+    subjectAssignments.forEach(a => classIds.add(a.class_id));
+    // Also include classes where teacher is main or assistant
+    const mainClasses = db.prepare('SELECT id FROM classes WHERE (main_teacher_id = ? OR assistant_teacher_id = ?) AND school_id = ?').all(teacherId, teacherId, sid);
+    mainClasses.forEach(c => classIds.add(c.id));
+
+    if (classIds.size === 0) return [];
+    const ids = Array.from(classIds);
+    return db.prepare(`SELECT * FROM classes WHERE id IN (${ids.map(() => '?').join(',')}) AND school_id = ?`).all(...ids, sid);
+};
+
 handlers['db:getClassTeacherAssignments'] = async (classId) => {
+  const sid = getActiveSchoolId();
+  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   return db.prepare(`
     SELECT cts.*, u.full_name as teacherName, s.name as subjectName
     FROM class_teacher_subjects cts
@@ -3276,9 +3355,12 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
 };
 
 handlers['db:getTodayTransportAttendance'] = async ({ routeId, direction }) => {
+  const sid = getActiveSchoolId();
+  const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+  if (!route) throw new Error('Route non autorisée pour cet établissement.');
   return db.prepare(`
-    SELECT student_id, status 
-    FROM transport_attendance 
+    SELECT student_id, status
+    FROM transport_attendance
     WHERE route_id = ? AND date = date('now') AND direction = ?
   `).all(routeId, direction);
 };

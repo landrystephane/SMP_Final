@@ -105,10 +105,15 @@ app.get('/api/health', (req, res) => {
 
 // Migration de 'auth:login'
 app.post('/api/auth/login', loginLimiter, (req, res) => {
-    const { username, password } = req.body;
-    
+    let { username, password } = req.body;
+
     try {
-        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR matricule = ?').get(username, username);
+        // Normalize phone number for parent login
+        let normalizedUsername = (username || '').trim();
+        if (normalizedUsername.startsWith('+237')) normalizedUsername = normalizedUsername.slice(4);
+        if (normalizedUsername.startsWith('237') && normalizedUsername.length > 9) normalizedUsername = normalizedUsername.slice(3);
+
+        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR username = ? OR matricule = ?').get(username, normalizedUsername, username);
         
         if (!user) return res.status(401).json({ error: 'Utilisateur ou mot de passe incorrect' });
         

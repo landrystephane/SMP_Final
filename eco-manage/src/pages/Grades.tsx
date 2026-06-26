@@ -46,13 +46,14 @@ const Grades: React.FC = () => {
         if (user?.role === 'TEACHER') {
             let assignedIds: number[] = [];
             try {
-                if (typeof user.assignedClasses === 'string') {
-                    assignedIds = JSON.parse(user.assignedClasses);
-                } else if (Array.isArray(user.assignedClasses)) {
-                    assignedIds = user.assignedClasses;
-                }
+                const teacherClasses = await (window.electronAPI as any).getTeacherClasses({ teacherId: user.id, schoolId: user.schoolId });
+                assignedIds = (teacherClasses || []).map((tc: any) => tc.id || tc.class_id);
             } catch (e) {
-                console.error('Failed to parse assigned classes:', e);
+                // Fallback to JWT assignedClasses
+                try {
+                    const raw = typeof user.assignedClasses === 'string' ? JSON.parse(user.assignedClasses) : (user.assignedClasses || []);
+                    assignedIds = raw.map((id: any) => typeof id === 'string' ? parseInt(id) : id);
+                } catch(e2) {}
             }
             const filtered = c.filter((cls: any) => assignedIds.includes(cls.id));
             setClasses(filtered);
