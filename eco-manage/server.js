@@ -103,6 +103,16 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'SaaS Web API is running perfectly!' });
 });
 
+// Public route: list active schools (name + address only, no sensitive data)
+app.get('/api/schools-list', (req, res) => {
+    try {
+        const schools = db.prepare("SELECT id, name, address FROM schools WHERE is_active = 1 AND deleted_at IS NULL ORDER BY name ASC").all();
+        res.json({ schools });
+    } catch(e) {
+        res.json({ schools: [] });
+    }
+});
+
 // Migration de 'auth:login'
 app.post('/api/auth/login', loginLimiter, (req, res) => {
     let { username, password } = req.body;
