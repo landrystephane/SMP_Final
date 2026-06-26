@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./eco-manage
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Build frontend
         working-directory: ./eco-manage
@@ -57,7 +57,8 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd /var/www/saas
-            cp /var/opt/eco-hub-data/school.db /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db
+            mkdir -p /var/opt/eco-hub-data/backups
+            cp /var/opt/eco-hub-data/school.db /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
             rm -rf dist/
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
