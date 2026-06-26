@@ -21,6 +21,7 @@ const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
+  const [dashSchool, setDashSchool] = useState<any>(null);
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
@@ -37,6 +38,11 @@ const Dashboard: React.FC = () => {
       }
       try {
         if (window.electronAPI && user) {
+          if (!dashSchool) {
+              const schs = await window.electronAPI.getSchools();
+              const sch = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString());
+              if (sch) setDashSchool(sch);
+          }
           if (user.role === 'TEACHER') {
               const data = await window.electronAPI.getTeacherDashboardStats({
                   schoolId: user.schoolId,
@@ -184,7 +190,7 @@ const Dashboard: React.FC = () => {
                                 });
                                 
                                 generateSchedulePdf({
-                                    school: { name: user?.schoolName || '' },
+                                    school: dashSchool || { name: '' },
                                     title: `Emploi du Temps - ${user?.fullName}`,
                                     columns,
                                     rows
@@ -327,7 +333,7 @@ const Dashboard: React.FC = () => {
                                         return [exam.date, `${exam.start_time} - ${exam.end_time}`, exam.class_name, exam.subject_name];
                                     });
                                     generateExamSchedulePdf({
-                                        school: { name: user?.schoolName || '' },
+                                        school: dashSchool || { name: '' },
                                         title: `Programme des Évaluations - ${user?.fullName}`,
                                         columns,
                                         rows

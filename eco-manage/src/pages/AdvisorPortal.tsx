@@ -21,6 +21,7 @@ const AdvisorPortal: React.FC = () => {
     const [classes, setClasses] = useState<any[]>([]);
     const [routes, setRoutes] = useState<any[]>([]);
     const [students, setStudents] = useState<any[]>([]);
+    const [currentSchool, setCurrentSchool] = useState<any>(null);
 
     const [selectedRoute, setSelectedRoute] = useState<string>('');
 
@@ -72,6 +73,7 @@ const AdvisorPortal: React.FC = () => {
                 setSelectedClass(c[0].id.toString());
             }
             const mySchool = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString()) || schs[0];
+            setCurrentSchool(mySchool);
             if (mySchool && mySchool.timetable_slots) {
                 try {
                     setTimetableSlots(JSON.parse(mySchool.timetable_slots));
@@ -641,7 +643,7 @@ const AdvisorPortal: React.FC = () => {
                                             const saturday = new Date(curr.setDate(firstDay + 5)).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
                                             generateSchedulePdf({
-                                                school: { name: user?.schoolName || '' },
+                                                school: currentSchool || { name: '' },
                                                 title: `Programme des cours du Lundi ${monday} au Samedi ${saturday}`,
                                                 subtitle: `Emploi du Temps - Classe : ${classObj?.name}`,
                                                 columns,
@@ -914,7 +916,7 @@ const AdvisorPortal: React.FC = () => {
                                                 return [exam.date, `${exam.start_time} - ${exam.end_time}`, subjectName, teacherName];
                                             });
                                             generateExamSchedulePdf({
-                                                school: { name: user?.schoolName || '' },
+                                                school: currentSchool || { name: '' },
                                                 title: `Programme des Évaluations - ${classObj?.name}`,
                                                 columns,
                                                 rows
