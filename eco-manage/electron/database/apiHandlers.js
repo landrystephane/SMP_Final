@@ -1770,6 +1770,7 @@ handlers['db:updateUser'] = async (userToUpdate) => {
   const finalSection = section || existing.section;
   const finalGender = gender || existing.gender;
 
+  const updateSchoolId = currentUser?.role === 'SUPERADMIN' ? existing.school_id : sid;
   const transaction = db.transaction(() => {
     if (password && password.trim()) {
         const hash = bcrypt.hashSync(password.trim(), 10);
@@ -1777,13 +1778,13 @@ handlers['db:updateUser'] = async (userToUpdate) => {
           UPDATE users SET
             username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ?
           WHERE id = ? AND school_id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id, sid);
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id, updateSchoolId);
     } else {
         db.prepare(`
           UPDATE users SET
             username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?
           WHERE id = ? AND school_id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id, sid);
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id, updateSchoolId);
     }
 
     if (finalRole === 'TEACHER') {

@@ -221,7 +221,8 @@ const SystemAdmin: React.FC = () => {
           }
 
           setEditingFounder(null);
-          // Reload users for this school
+          setEditFounderPassword('');
+          alert("Informations du fondateur mises à jour avec succès !");
           const users = await window.electronAPI.getUsers(selectedSchool.id);
           setSchoolUsers(users || []);
       } catch (err: any) {
