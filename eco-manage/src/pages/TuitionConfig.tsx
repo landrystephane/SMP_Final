@@ -54,20 +54,26 @@ const TuitionConfig: React.FC = () => {
     loadData();
   }, [user]);
 
+  const saveTimerRef = React.useRef<any>(null);
   const handleUpdateBase = async (classId: number, fee: number, reg: number, trans: number, exam: number) => {
     if (window.electronAPI) {
       try {
         await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => showNotification("Frais de scolarité mis à jour", "success"), 1500);
       } catch (err: any) {
         showNotification("Erreur: " + err.message, "error");
       }
     }
   };
 
+  const installTimerRef = React.useRef<any>(null);
   const handleUpdateInstallmentFee = async (classId: number, installmentId: number, amount: number) => {
       if (window.electronAPI) {
           try {
               await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
+              if (installTimerRef.current) clearTimeout(installTimerRef.current);
+              installTimerRef.current = setTimeout(() => showNotification("Tranche mise à jour", "success"), 1500);
           } catch (err: any) {
               showNotification("Erreur: " + err.message, "error");
           }
@@ -90,6 +96,7 @@ const TuitionConfig: React.FC = () => {
                   schoolId: user.schoolId,
                   deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
               });
+              showNotification("Échéance mise à jour", "success");
           } catch (err: any) {
               showNotification("Erreur: " + err.message, "error");
           }

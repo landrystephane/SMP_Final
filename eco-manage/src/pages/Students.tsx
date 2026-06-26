@@ -259,7 +259,7 @@ const Students: React.FC = () => {
                                 className={`p-1.5 rounded-md transition-all ${s.status === 'BLOCKED' ? 'text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-400' : 'text-amber-500 hover:bg-amber-500/10 hover:text-amber-400'}`}
                                 title={s.status === 'BLOCKED' ? 'Débloquer cet élève' : 'Bloquer cet élève'}
                             >
-                                {s.status === 'BLOCKED' ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                                {s.status === 'BLOCKED' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                             </button>
                             <button
                                 onClick={() => handleDeleteStudent(s.id)}

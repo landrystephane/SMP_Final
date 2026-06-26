@@ -573,6 +573,7 @@ const SystemAdmin: React.FC = () => {
                           const nextActive = s.is_active === 0 ? 1 : 0;
                           if (window.electronAPI && (window.electronAPI as any).toggleSchoolStatus) {
                               await (window.electronAPI as any).toggleSchoolStatus({ id: s.id, isActive: nextActive });
+                              alert(nextActive ? `L'école "${s.name}" a été réactivée.` : `L'école "${s.name}" a été suspendue.`);
                               loadSchools();
                           }
                       }}

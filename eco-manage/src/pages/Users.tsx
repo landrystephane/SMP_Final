@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Shield, Trash2, CheckCircle, Lock, Search, Edit, X } from 'lucide-react';
+import { UserPlus, Shield, Trash2, CheckCircle, Lock, Unlock, Search, Edit, X } from 'lucide-react';
 import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -531,7 +531,7 @@ const Users: React.FC = () => {
                          )}
                          {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
                              <button onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)} className={`p-3 rounded-2xl border border-transparent transition-all ${u.is_active !== 0 ? 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20'}`} title={u.is_active !== 0 ? "Désactiver l'accès" : "Réactiver l'accès"}>
-                                 {u.is_active !== 0 ? <Lock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                                 {u.is_active !== 0 ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                              </button>
                          )}
                          {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
