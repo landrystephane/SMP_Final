@@ -113,10 +113,15 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
         if (normalizedUsername.startsWith('+237')) normalizedUsername = normalizedUsername.slice(4);
         if (normalizedUsername.startsWith('237') && normalizedUsername.length > 9) normalizedUsername = normalizedUsername.slice(3);
 
-        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender FROM users WHERE username = ? OR username = ? OR matricule = ?').get(username, normalizedUsername, username);
+        const user = db.prepare('SELECT id, username, password as hash, full_name as fullName, role, school_id as schoolId, assigned_classes as assignedClasses, matricule, civility, section, gender, is_active as isActive FROM users WHERE username = ? OR username = ? OR matricule = ?').get(username, normalizedUsername, username);
         
         if (!user) return res.status(401).json({ error: 'Utilisateur ou mot de passe incorrect' });
-        
+
+        // Block login if user is deactivated
+        if (user.isActive === 0) {
+            return res.status(403).json({ error: "Votre compte a été désactivé. Veuillez contacter l'administration." });
+        }
+
         user.full_name = user.fullName;
 
         // Block login if school is deleted or suspended

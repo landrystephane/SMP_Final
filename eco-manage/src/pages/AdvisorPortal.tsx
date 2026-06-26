@@ -1084,8 +1084,8 @@ const AdvisorPortal: React.FC = () => {
                                         type="text"
                                         placeholder="ex: 08:00"
                                         value={schedStart}
-                                        onChange={(e) => setSchedStart(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        disabled
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none opacity-70 cursor-not-allowed"
                                     />
                                 </div>
                                 <div>
@@ -1094,8 +1094,8 @@ const AdvisorPortal: React.FC = () => {
                                         type="text"
                                         placeholder="ex: 10:00"
                                         value={schedEnd}
-                                        onChange={(e) => setSchedEnd(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        disabled
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none opacity-70 cursor-not-allowed"
                                     />
                                 </div>
                             </div>
@@ -1254,8 +1254,8 @@ const AdvisorPortal: React.FC = () => {
                                     <input
                                         type="time"
                                         value={examStart}
-                                        onChange={(e) => setExamStart(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        disabled
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none opacity-70 cursor-not-allowed"
                                     />
                                 </div>
                                 <div>
@@ -1263,8 +1263,8 @@ const AdvisorPortal: React.FC = () => {
                                     <input
                                         type="time"
                                         value={examEnd}
-                                        onChange={(e) => setExamEnd(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
+                                        disabled
+                                        className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none opacity-70 cursor-not-allowed"
                                     />
                                 </div>
                             </div>
