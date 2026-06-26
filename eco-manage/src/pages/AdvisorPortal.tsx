@@ -12,6 +12,7 @@ const AdvisorPortal: React.FC = () => {
     const [termStructure, setTermStructure] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS' | 'EXAMS_PROGRAM'>('PLANNING');
     const [examSchedules, setExamSchedules] = useState<any[]>([]);
+    const [examWeekOffset, setExamWeekOffset] = useState(0);
     const [showExamModal, setShowExamModal] = useState(false);
     const [examDate, setExamDate] = useState('');
     const [examStart, setExamStart] = useState('');
@@ -888,149 +889,99 @@ const AdvisorPortal: React.FC = () => {
                 </div>
             )}
 
-            {activeTab === 'EXAMS_PROGRAM' && (
-                <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
-                    <div className="space-y-6">
-                        <div className="glass-card p-6 border-slate-800">
-                            <div className="flex justify-between items-center mb-8">
-                                <h2 className="text-xl font-black text-white flex items-center">
-                                    <BookOpen className="w-6 h-6 mr-3 text-amber-500" />
-                                    Programme des Évaluations
-                                </h2>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => {
-                                            if (!selectedClass) {
-                                                showNotification("Veuillez sélectionner une classe.", "warning");
-                                                return;
-                                            }
-                                            const classObj = classes.find(c => c.id.toString() === selectedClass);
-                                            const columns = [t('date', 'Date'), t('schedule_time', 'Horaires'), t('subject_primary_header', 'Matière'), t('teacher_supervisor', 'Enseignant/Surveillant')];
-                                            const filteredForPdf = examSchedules.filter(exam => {
-                                                if (selectedCalendarMonth === 'ALL') return true;
-                                                return exam.date.split('-')[1] === selectedCalendarMonth;
-                                            });
-                                            const rows = filteredForPdf.map(exam => {
-                                                const subjectName = getSubjectName(parseInt(exam.subject_id));
-                                                const teacherName = getTeacherName(parseInt(exam.teacher_id));
-                                                return [exam.date, `${exam.start_time} - ${exam.end_time}`, subjectName, teacherName];
-                                            });
-                                            generateExamSchedulePdf({
-                                                school: currentSchool || { name: '' },
-                                                title: `Programme des Évaluations - ${classObj?.name}`,
-                                                columns,
-                                                rows
-                                            });
-                                        }} 
-                                        className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                    >
-                                        Télécharger PDF
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            if (!selectedClass) {
-                                                showNotification("Veuillez sélectionner une classe dans le filtre.", "warning");
-                                                return;
-                                            }
-                                            setShowExamModal(true);
-                                        }} 
-                                        className="btn-primary text-[10px]"
-                                    >
-                                        PROGRAMMER UNE ÉVALUATION
-                                    </button>
-                                </div>
+            {activeTab === 'EXAMS_PROGRAM' && (() => {
+                const getWeekDates = (offset: number) => {
+                    const now = new Date();
+                    const monday = new Date(now);
+                    monday.setDate(now.getDate() - (now.getDay() || 7) + 1 + offset * 7);
+                    return Array.from({ length: 6 }, (_, i) => {
+                        const d = new Date(monday);
+                        d.setDate(monday.getDate() + i);
+                        return { date: d.toISOString().split('T')[0], label: d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) };
+                    });
+                };
+                const weekDates = getWeekDates(examWeekOffset);
+                const getExamForSlot = (date: string, start: string) => examSchedules.find(e => e.date === date && e.start_time?.trim() === start?.trim());
+                const statusColors: Record<string, string> = { 'PENDING_TEACHER': 'border-amber-500/30 text-amber-400', 'APPROVED': 'border-emerald-500/30 text-emerald-400', 'FORCED_APPROVED': 'border-blue-500/30 text-blue-400', 'PENDING_ADMIN': 'border-rose-500/30 text-rose-400', 'REJECTED': 'border-rose-500/30 text-rose-400' };
+                const statusLabelsMap: Record<string, string> = { 'PENDING_TEACHER': 'En attente', 'APPROVED': 'Accepté', 'FORCED_APPROVED': 'Forcé', 'PENDING_ADMIN': 'Refusé', 'REJECTED': 'Refusé' };
+
+                return (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="glass-card p-6 border-slate-800">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-white flex items-center">
+                                <BookOpen className="w-6 h-6 mr-3 text-amber-500" />
+                                {t('exam_schedule_grid', 'Programme des Évaluations')}
+                            </h2>
+                            <div className="flex gap-2 items-center">
+                                <button onClick={() => setExamWeekOffset(examWeekOffset - 1)} className="p-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-all text-xs font-black">◀</button>
+                                <button onClick={() => setExamWeekOffset(0)} className="px-3 py-2 bg-amber-500/10 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-wider border border-amber-500/20">{t('this_week', 'Cette semaine')}</button>
+                                <button onClick={() => setExamWeekOffset(examWeekOffset + 1)} className="p-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-all text-xs font-black">▶</button>
+                                <button onClick={() => {
+                                    if (!selectedClass) { showNotification("Veuillez sélectionner une classe.", "warning"); return; }
+                                    const classObj = classes.find(c => c.id.toString() === selectedClass);
+                                    const columns = [t('date', 'Date'), t('schedule_time', 'Horaires'), t('subject_primary_header', 'Matière'), t('teacher_supervisor', 'Enseignant/Surveillant')];
+                                    const rows = examSchedules.map(exam => [exam.date, `${exam.start_time} - ${exam.end_time}`, getSubjectName(parseInt(exam.subject_id)), getTeacherName(parseInt(exam.teacher_id))]);
+                                    generateExamSchedulePdf({ school: currentSchool || { name: '' }, title: `Programme des Évaluations - ${classObj?.name}`, columns, rows });
+                                }} className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">{t('download_pdf', 'Télécharger PDF')}</button>
                             </div>
+                        </div>
 
-                            {!selectedClass ? (
-                                <div className="p-10 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-                                    Veuillez choisir une classe dans le filtre ci-dessus.
-                                </div>
-                            ) : examSchedules.length === 0 ? (
-                                <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                                    <p className="text-slate-400 font-bold mb-4">Aucune évaluation programmée pour cette classe.</p>
-                                    <button 
-                                        onClick={() => setShowExamModal(true)} 
-                                        className="px-6 py-2 bg-amber-500 text-slate-950 font-black text-[10px] rounded-xl uppercase tracking-widest hover:bg-amber-400 transition-all"
-                                    >
-                                        + Programmer la première évaluation
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                                <th className="px-6 py-4">Date</th>
-                                                <th className="px-6 py-4">Horaires</th>
-                                                <th className="px-6 py-4">Matière</th>
-                                                <th className="px-6 py-4">Surveillant</th>
-                                                <th className="px-6 py-4">Statut</th>
-                                                <th className="px-6 py-4 text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 bg-slate-900/30">
-                                            {examSchedules.filter(exam => selectedCalendarMonth === 'ALL' || exam.date.split('-')[1] === selectedCalendarMonth).map(exam => {
-                                                const statusLabels: Record<string, {label: string, color: string}> = {
-                                                    'PENDING_TEACHER': { label: 'En attente', color: 'bg-amber-500/20 text-amber-400' },
-                                                    'APPROVED': { label: 'Accepté', color: 'bg-emerald-500/20 text-emerald-400' },
-                                                    'FORCED_APPROVED': { label: 'Forcé', color: 'bg-blue-500/20 text-blue-400' },
-                                                    'PENDING_ADMIN': { label: 'Refusé (en attente)', color: 'bg-rose-500/20 text-rose-400' },
-                                                    'REJECTED': { label: 'Refusé', color: 'bg-rose-500/20 text-rose-400' },
-                                                };
-                                                const st = statusLabels[exam.status] || { label: exam.status || 'En attente', color: 'bg-slate-500/20 text-slate-400' };
-                                                const isRefused = exam.status === 'PENDING_ADMIN' || exam.status === 'REJECTED';
+                        {!selectedClass ? (
+                            <div className="p-10 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">{t('select_class_filter', 'Veuillez choisir une classe dans le filtre ci-dessus.')}</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <div className="grid grid-cols-7 gap-3 min-w-[900px]">
+                                    <div className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{t('hour', 'Heure')}</div>
+                                    {weekDates.map(wd => (
+                                        <div key={wd.date} className="p-3 text-[10px] font-black text-slate-500 uppercase text-center border-b border-white/5">{wd.label}</div>
+                                    ))}
 
-                                                return (
-                                                <tr key={exam.id} className={`hover:bg-white/5 transition-colors ${isRefused ? 'bg-rose-500/5' : ''}`}>
-                                                    <td className="px-6 py-4 text-white font-black text-sm">{exam.date}</td>
-                                                    <td className="px-6 py-4 text-slate-400 text-sm font-bold">{exam.start_time} - {exam.end_time}</td>
-                                                    <td className="px-6 py-4 text-amber-500 font-bold uppercase text-xs">{getSubjectName(exam.subject_id)}</td>
-                                                    <td className="px-6 py-4 text-slate-300 text-xs">{getTeacherName(exam.teacher_id)}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${st.color}`}>{st.label}</span>
-                                                        {exam.rejection_reason && <p className="text-[10px] text-rose-400 mt-1 italic">Motif : {exam.rejection_reason}</p>}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right space-y-2">
-                                                        {isRefused && (
-                                                            <div className="flex items-center gap-2 justify-end">
-                                                                <select
-                                                                    title="Choisir un remplaçant"
-                                                                    value={replacementTeacher[exam.id] || ''}
-                                                                    onChange={(e) => setReplacementTeacher(prev => ({...prev, [exam.id]: e.target.value}))}
-                                                                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-amber-500 max-w-[140px]"
-                                                                >
-                                                                    <option value="">Remplaçant...</option>
-                                                                    {teachers.filter(t => t.id !== exam.teacher_id).map(t => (
-                                                                        <option key={t.id} value={t.id}>{t.full_name || t.fullName}</option>
-                                                                    ))}
-                                                                </select>
-                                                                <button
-                                                                    onClick={() => handleReassignSurveillant(exam.id)}
-                                                                    disabled={!replacementTeacher[exam.id]}
-                                                                    className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                                                >
-                                                                    Remplacer
-                                                                </button>
+                                    {timetableSlots.map((slot: any, si: number) => (
+                                        <React.Fragment key={`exam-slot-${si}`}>
+                                            <div className="p-4 bg-slate-950/50 rounded-xl text-[10px] font-black text-slate-400 text-center flex flex-col items-center justify-center border border-slate-800">
+                                                <span>{slot.start} - {slot.end}</span>
+                                            </div>
+                                            {slot.isBreak ? (
+                                                <div className="col-span-6 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                </div>
+                                            ) : weekDates.map(wd => {
+                                                const exam = getExamForSlot(wd.date, slot.start);
+                                                if (exam) {
+                                                    const stColor = statusColors[exam.status] || 'border-slate-700 text-slate-400';
+                                                    const stLabel = statusLabelsMap[exam.status] || exam.status;
+                                                    return (
+                                                        <div key={wd.date} className={`p-3 rounded-xl border text-left transition-all w-full flex flex-col justify-between bg-blue-500/10 ${stColor} h-full relative group`}>
+                                                            <div>
+                                                                <div className="text-[9px] font-black uppercase break-all leading-tight text-amber-500">{getSubjectName(exam.subject_id)}</div>
+                                                                <div className="text-[8px] text-white/50 mt-1 uppercase font-bold break-words leading-tight">{getTeacherName(exam.teacher_id)}</div>
                                                             </div>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleDeleteExam(exam.id)}
-                                                            className="p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
+                                                            <div className="flex items-center justify-between mt-2">
+                                                                <span className="text-[7px] font-black uppercase tracking-wider opacity-70">{stLabel}</span>
+                                                                <button onClick={() => handleDeleteExam(exam.id)} className="opacity-0 group-hover:opacity-100 p-1 text-rose-400 hover:text-rose-300 transition-all"><Trash2 className="w-3 h-3" /></button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <button key={wd.date} onClick={() => {
+                                                        if (!selectedClass) { showNotification("Veuillez sélectionner une classe.", "warning"); return; }
+                                                        setExamDate(wd.date); setExamStart(slot.start); setExamEnd(slot.end); setShowExamModal(true);
+                                                    }} className="p-4 bg-slate-900/10 border border-dashed border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/5 rounded-xl text-[10px] font-bold text-slate-600 hover:text-amber-500 text-center flex flex-col items-center justify-center uppercase tracking-widest group transition-all">
+                                                        <span className="hidden group-hover:block opacity-100">+ PROG.</span>
+                                                    </button>
                                                 );
                                             })}
-                                        </tbody>
-                                    </table>
+                                        </React.Fragment>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Grades Inspection Slide-over Drawer / Modal */}
             {showDetailModal && selectedSubjectForDetail && (
