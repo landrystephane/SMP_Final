@@ -145,6 +145,7 @@ const Finance: React.FC = () => {
                         payment_date: new Date().toISOString(),
                         amount: receipt.amount,
                         payment_type: receipt.type,
+                        installment_name: receipt.installmentName || null,
                         depositor_name: newPayment.depositorName,
                         student_id: parseInt(newPayment.studentId)
                     };

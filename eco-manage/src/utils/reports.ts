@@ -427,7 +427,8 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primary[0], primary[1], primary[2]);
     doc.text(isEn ? `AMOUNT PAID: ${safeNum(payment.amount)} FCFA` : `MONTANT PAYÉ: ${safeNum(payment.amount)} FCFA`, 20, startY + 50);
-    doc.text(isEn ? `PURPOSE: ${payment.payment_type.toUpperCase()}` : `MOTIF: ${payment.payment_type.toUpperCase()}`, 20, startY + 58);
+    const purposeLabel = payment.installment_name ? `${payment.payment_type.toUpperCase()} - ${payment.installment_name.toUpperCase()}` : payment.payment_type.toUpperCase();
+    doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 20, startY + 58);
 
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
@@ -438,7 +439,8 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
     doc.text(isEn ? `Total Paid: ${safeNum(financials.totalPaid)} FCFA` : `Total versé: ${safeNum(financials.totalPaid)} FCFA`, 30, startY + 89);
     doc.text(isEn ? `Balance: ${safeNum(financials.balance)} FCFA` : `Reste à payer: ${safeNum(financials.balance)} FCFA`, 30, startY + 96);
 
-    const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? 'PARTIAL PAYMENT / ADVANCE' : 'AVANCE');
+    const installmentLabel = payment.installment_name ? ` - ${payment.installment_name.toUpperCase()}` : '';
+    const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`);
     const statusColor = financials.balance <= 0 ? [34, 197, 94] : [245, 158, 11]; // Green for full, Orange for partial
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
