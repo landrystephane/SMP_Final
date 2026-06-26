@@ -170,9 +170,21 @@ const Attendance: React.FC = () => {
                   let isUnlocked = chk(unlockS2) || chk(unlockST2);
 
                   if (teacherSchedules.length === 0 && !isUnlocked) {
-                      setIsLocked(true);
-                      setNotProgrammedMsg(t('no_scheduled_class_today', "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui."));
-                      setMaxAllowedHours(0);
+                      // Check if teacher is assigned to this class via class_teacher_subjects
+                      let hasSubjectAssignment = false;
+                      try {
+                          const assignments = await (window.electronAPI as any).getClassTeacherAssignments(parseInt(selectedClass));
+                          hasSubjectAssignment = assignments?.some((a: any) => a.teacher_id === user.id);
+                      } catch(e) {}
+                      if (!hasSubjectAssignment) {
+                          setIsLocked(true);
+                          setNotProgrammedMsg(t('no_scheduled_class_today', "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui."));
+                          setMaxAllowedHours(0);
+                      } else {
+                          setIsLocked(false);
+                          setMaxAllowedHours(8);
+                          setNotProgrammedMsg('');
+                      }
                   }
                   setAvailableSchedules(teacherSchedules);
                   setSelectedSchedule(''); // Reset selection when date/class changes
