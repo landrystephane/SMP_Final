@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import SystemAdmin from './SystemAdmin';
 import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
+import { onDataChanged } from '../utils/dataSync';
 
 
 const DAYS_OF_WEEK_KEYS = [
@@ -102,14 +103,20 @@ const Dashboard: React.FC = () => {
     };
     loadCurrency();
 
-    // Auto-refresh stats every 10 seconds for real-time updates
+    // Auto-refresh stats every 10 seconds for real-time updates (fallback)
     const interval = setInterval(() => {
         if (isMounted) loadStats();
     }, 10000);
 
+    // Instant refresh whenever any action mutates data elsewhere in the app
+    const unsubscribe = onDataChanged(() => {
+        if (isMounted) loadStats();
+    });
+
     return () => {
         isMounted = false;
         clearInterval(interval);
+        unsubscribe();
     };
   }, [selectedSection, selectedCycle, user]);
 
@@ -430,11 +437,11 @@ const Dashboard: React.FC = () => {
                     <table className="w-full text-left">
                         <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
                             <tr>
-                                <th className="p-4">Rang</th>
-                                <th className="p-4">Matricule</th>
-                                <th className="p-4">Nom et Prénom</th>
-                                <th className="p-4">Classe</th>
-                                <th className="p-4 text-right">Moyenne</th>
+                                <th className="p-4">{t('dash_rank_header')}</th>
+                                <th className="p-4">{t('matricule')}</th>
+                                <th className="p-4">{t('full_name')}</th>
+                                <th className="p-4">{t('class')}</th>
+                                <th className="p-4 text-right">{t('class_average')}</th>
                             </tr>
                         </thead>
                         <tbody className="text-slate-300">
@@ -449,7 +456,7 @@ const Dashboard: React.FC = () => {
                             ))}
                             {!stats.students?.length && (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-500">Aucun élève trouvé.</td>
+                                    <td colSpan={5} className="p-8 text-center text-slate-500">{t('dash_no_student_found')}</td>
                                 </tr>
                             )}
                         </tbody>
@@ -467,9 +474,9 @@ const Dashboard: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-500 pb-12">
             <div>
                 <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
-                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Financier</p>
+                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('dash_financial_overview')}</p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Recouvrements (Recettes) */}
                 <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
@@ -478,7 +485,7 @@ const Dashboard: React.FC = () => {
                         <CreditCard className="text-emerald-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_receipts')}</p>
                   <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
                 </div>
 
@@ -489,7 +496,7 @@ const Dashboard: React.FC = () => {
                         <Wallet className="text-rose-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_disbursements')}</p>
                   <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
                 </div>
 
@@ -500,7 +507,7 @@ const Dashboard: React.FC = () => {
                         <Activity className="text-amber-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
+                  <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">{t('cash_balance')}</p>
                   <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">{currency}</span></p>
                 </div>
 
@@ -518,16 +525,16 @@ const Dashboard: React.FC = () => {
 
             <div className="glass-card p-6 border-none shadow-xl">
                 <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
-                    État de recouvrement par Salle de Classe
+                    {t('dash_class_recovery_status')}
                 </h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
                             <tr>
-                                <th className="p-4">Classe</th>
-                                <th className="p-4 text-center">Effectif Total</th>
-                                <th className="p-4 text-center">Élèves à jour</th>
-                                <th className="p-4 text-right">Progression</th>
+                                <th className="p-4">{t('class')}</th>
+                                <th className="p-4 text-center">{t('dash_total_enrollment_header')}</th>
+                                <th className="p-4 text-center">{t('dash_up_to_date_students_header')}</th>
+                                <th className="p-4 text-right">{t('dash_progression_header')}</th>
                             </tr>
                         </thead>
                         <tbody className="text-slate-300">
@@ -550,7 +557,7 @@ const Dashboard: React.FC = () => {
                             )})}
                             {!stats.classStats?.length && (
                                 <tr>
-                                    <td colSpan={4} className="p-8 text-center text-slate-500">Aucune donnée disponible.</td>
+                                    <td colSpan={4} className="p-8 text-center text-slate-500">{t('dash_no_data_available')}</td>
                                 </tr>
                             )}
                         </tbody>
@@ -566,9 +573,9 @@ const Dashboard: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-500 pb-12">
             <div>
                 <h1 className="text-3xl font-black text-white tracking-tight">{t('dashboard')} - {user.fullName}</h1>
-                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">Aperçu Pédagogique</p>
+                <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('dash_pedagogy_overview')}</p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="glass-card p-6 border-none group">
                   <div className="flex items-center justify-between mb-4">
@@ -576,7 +583,7 @@ const Dashboard: React.FC = () => {
                         <UsersIcon className="text-amber-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Effectif Global</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
                 </div>
 
@@ -586,33 +593,33 @@ const Dashboard: React.FC = () => {
                         <AlertTriangle className="text-rose-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Absences Globales</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('dash_global_absences')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.totalAbsences}</p>
                 </div>
-                
+
                 <div className="glass-card p-6 border-none group">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-emerald-500/10 rounded-2xl">
                         <Activity className="text-emerald-500 w-6 h-6" />
                     </div>
                   </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Taux de Réussite Global</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('dash_overall_success_rate')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.overallPassRate?.toFixed(1)}%</p>
                 </div>
             </div>
 
             <div className="glass-card p-6 border-none shadow-xl">
                 <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
-                    Statistiques par Salle de Classe
+                    {t('dash_stats_by_class')}
                 </h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
                             <tr>
-                                <th className="p-4">Classe</th>
-                                <th className="p-4 text-center">Effectif Total</th>
-                                <th className="p-4 text-center">Absences</th>
-                                <th className="p-4 text-right">Taux de réussite</th>
+                                <th className="p-4">{t('class')}</th>
+                                <th className="p-4 text-center">{t('dash_total_enrollment_header')}</th>
+                                <th className="p-4 text-center">{t('dash_absences_header')}</th>
+                                <th className="p-4 text-right">{t('dash_success_rate_header')}</th>
                             </tr>
                         </thead>
                         <tbody className="text-slate-300">
@@ -634,7 +641,7 @@ const Dashboard: React.FC = () => {
                             )})}
                             {!stats.classStats?.length && (
                                 <tr>
-                                    <td colSpan={4} className="p-8 text-center text-slate-500">Aucune donnée disponible.</td>
+                                    <td colSpan={4} className="p-8 text-center text-slate-500">{t('dash_no_data_available')}</td>
                                 </tr>
                             )}
                         </tbody>
@@ -780,28 +787,28 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-emerald-500/10 rounded-2xl"><CreditCard className="text-emerald-500 w-6 h-6" /></div>
           </div>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Recettes</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_receipts')}</p>
           <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-rose-500/10 rounded-2xl"><Wallet className="text-rose-500 w-6 h-6" /></div>
           </div>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Décaissements</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_disbursements')}</p>
           <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/20 rounded-2xl"><Activity className="text-amber-500 w-6 h-6" /></div>
           </div>
-          <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">Solde en Caisse</p>
+          <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">{t('cash_balance')}</p>
           <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">{currency}</span></p>
         </div>
         <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-blue-500/10 rounded-2xl"><AlertTriangle className="text-blue-500 w-6 h-6" /></div>
           </div>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Arriérés</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('arrears')}</p>
           <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
       </div>

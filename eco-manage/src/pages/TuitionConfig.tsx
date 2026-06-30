@@ -60,9 +60,9 @@ const TuitionConfig: React.FC = () => {
       try {
         await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = setTimeout(() => showNotification("Frais de scolarité mis à jour", "success"), 1500);
+        saveTimerRef.current = setTimeout(() => showNotification(t('tc_tuition_fees_updated', 'Frais de scolarité mis à jour'), "success"), 1500);
       } catch (err: any) {
-        showNotification("Erreur: " + err.message, "error");
+        showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
       }
     }
   };
@@ -73,9 +73,9 @@ const TuitionConfig: React.FC = () => {
           try {
               await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
               if (installTimerRef.current) clearTimeout(installTimerRef.current);
-              installTimerRef.current = setTimeout(() => showNotification("Tranche mise à jour", "success"), 1500);
+              installTimerRef.current = setTimeout(() => showNotification(t('tc_installment_updated', 'Tranche mise à jour'), "success"), 1500);
           } catch (err: any) {
-              showNotification("Erreur: " + err.message, "error");
+              showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
           }
       }
   };
@@ -96,9 +96,9 @@ const TuitionConfig: React.FC = () => {
                   schoolId: user.schoolId,
                   deadlines: updated.map(d => ({ installmentId: d.installment_id, deadlineDate: d.deadline_date }))
               });
-              showNotification("Échéance mise à jour", "success");
+              showNotification(t('tc_deadline_updated', 'Échéance mise à jour'), "success");
           } catch (err: any) {
-              showNotification("Erreur: " + err.message, "error");
+              showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
           }
       }
   };
@@ -127,10 +127,10 @@ const TuitionConfig: React.FC = () => {
               
               showNotification(t('settings_updated', 'Paramètres mis à jour avec succès.'), "success");
           } catch (e: any) {
-              showNotification(`Erreur: ${e.message}`, "error");
+              showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: e.message }), "error");
           }
       } else {
-          showNotification("Erreur: Les paramètres de l'école n'ont pas pu être chargés.", "error");
+          showNotification(t('tc_school_settings_load_error', 'Erreur: Les paramètres de l\'école n\'ont pas pu être chargés.'), "error");
       }
   };
 
@@ -145,27 +145,27 @@ const TuitionConfig: React.FC = () => {
           try {
               const res = await window.electronAPI.addInstallment(newInstallmentName.trim().toUpperCase());
               if (res && res.error) {
-                  showNotification('Erreur: ' + res.error, "error");
+                  showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: res.error }), "error");
                   return;
               }
               setShowAddModal(false);
-              showNotification("Tranche ajoutée avec succès", "success");
+              showNotification(t('tc_installment_added', 'Tranche ajoutée avec succès'), "success");
               loadData();
           } catch (err: any) {
-              showNotification('Erreur: ' + err.message, "error");
+              showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
           }
       }
   };
 
   const handleDeleteInstallment = async (id: number, name: string) => {
-      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la tranche : ${name} ? Cela supprimera également les configurations de paiement associées.`)) return;
+      if (!window.confirm(t('tc_confirm_delete_installment', 'Êtes-vous sûr de vouloir supprimer la tranche : {{name}} ? Cela supprimera également les configurations de paiement associées.', { name }))) return;
       if (window.electronAPI) {
           try {
               await window.electronAPI.deleteInstallment(id);
-              showNotification("Tranche supprimée", "success");
+              showNotification(t('tc_installment_deleted', 'Tranche supprimée'), "success");
               loadData();
           } catch (err: any) {
-              showNotification("Erreur: " + err.message, "error");
+              showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
           }
       }
   };
@@ -183,7 +183,7 @@ const TuitionConfig: React.FC = () => {
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black text-white tracking-tighter italic">FINANCE <span className="text-amber-500">ENGINE</span></h1>
+          <h1 className="text-4xl font-black text-white tracking-tighter italic">{t('tc_finance_engine_title', 'FINANCE')} <span className="text-amber-500">{t('tc_finance_engine_title_accent', 'ENGINE')}</span></h1>
           <p className="text-slate-500 mt-2 uppercase text-[10px] font-black tracking-[0.4em]">{t('tuition_config_subtitle', 'Configuration des Tranches & Échéanciers')}</p>
         </div>
 
@@ -230,7 +230,7 @@ const TuitionConfig: React.FC = () => {
                           </div>
                           <span className="font-black text-xl text-white uppercase tracking-tighter mb-4">{inst.name}</span>
                           <div className="w-full">
-                              <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Date limite</label>
+                              <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">{t('tc_deadline_label', 'Date limite')}</label>
                               <input 
                                   type="date" 
                                   value={deadlineRecord?.deadline_date || ''}
@@ -253,8 +253,8 @@ const TuitionConfig: React.FC = () => {
                 <tr className="bg-slate-950 text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] border-b border-white/5">
                     <th className="px-10 py-8">{t('class_level', 'Classe / Niveau')}</th>
                     <th className="px-10 py-8">{t('registration_fee', 'Inscription Fixe (FCFA)')}</th>
-                    <th className="px-10 py-8">Transport (FCFA)</th>
-                    <th className="px-10 py-8">Examen (FCFA)</th>
+                    <th className="px-10 py-8">{t('tc_transport_col', 'Transport (FCFA)')}</th>
+                    <th className="px-10 py-8">{t('tc_exam_col', 'Examen (FCFA)')}</th>
                     <th className="px-10 py-8">{t('total_pension', 'Pension Totale (FCFA)')}</th>
                     {installments.map(inst => (
                         <th key={inst.id} className="px-10 py-8 text-amber-500 bg-amber-500/5">{inst.name}</th>
@@ -385,25 +385,25 @@ const TuitionConfig: React.FC = () => {
           <div className="flex justify-between items-center mb-8">
               <div>
                   <h2 className="text-2xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
-                      <Bus className="w-6 h-6 text-amber-500" /> Paramètres de Transport
+                      <Bus className="w-6 h-6 text-amber-500" /> {t('tc_transport_settings_title', 'Paramètres de Transport')}
                   </h2>
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Configuration globale des frais de transport scolaire</p>
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('tc_transport_settings_desc', 'Configuration globale des frais de transport scolaire')}</p>
               </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Modèle de Facturation</label>
-                  <select 
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('tc_billing_model_label', 'Modèle de Facturation')}</label>
+                  <select
                       value={transportFeeModel}
                       onChange={(e) => setTransportFeeModel(e.target.value as any)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                   >
-                      <option value="ANNUAL">Annuel (Forfait Global)</option>
-                      <option value="MONTHLY">Mensuel (Abonnement par mois)</option>
+                      <option value="ANNUAL">{t('tc_annual_flat_rate', 'Annuel (Forfait Global)')}</option>
+                      <option value="MONTHLY">{t('tc_monthly_subscription', 'Mensuel (Abonnement par mois)')}</option>
                   </select>
               </div>
               <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Montant ({transportFeeModel === 'MONTHLY' ? 'Par Mois' : 'Annuel'}) en FCFA</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('tc_amount_per_period_label', 'Montant ({{period}}) en FCFA', { period: transportFeeModel === 'MONTHLY' ? t('tc_per_month', 'Par Mois') : t('tc_annual', 'Annuel') })}</label>
                   <input 
                       type="number"
                       value={transportFeeAmount}
@@ -418,7 +418,7 @@ const TuitionConfig: React.FC = () => {
                   onClick={handleUpdateTransportSettings}
                   className="px-8 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/20"
               >
-                  Enregistrer les paramètres de transport
+                  {t('tc_save_transport_settings', 'Enregistrer les paramètres de transport')}
               </button>
           </div>
       </div>
@@ -428,17 +428,17 @@ const TuitionConfig: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-black text-white italic tracking-tight">NOUVELLE TRANCHE</h3>
+                    <h3 className="text-xl font-black text-white italic tracking-tight">{t('tc_new_installment_title', 'NOUVELLE TRANCHE')}</h3>
                     <button onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-white transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nom de la tranche</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('tc_installment_name_label', 'Nom de la tranche')}</label>
                         <input
                             type="text"
-                            placeholder="ex: 4E TRANCHE"
+                            placeholder={t('tc_installment_name_placeholder', 'ex: 4E TRANCHE')}
                             value={newInstallmentName}
                             onChange={(e) => setNewInstallmentName(e.target.value)}
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
@@ -450,7 +450,7 @@ const TuitionConfig: React.FC = () => {
                         disabled={!newInstallmentName.trim()}
                         className="w-full bg-amber-500 text-slate-950 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 transition-all disabled:opacity-50"
                     >
-                        Créer la tranche
+                        {t('tc_create_installment', 'Créer la tranche')}
                     </button>
                 </div>
             </div>

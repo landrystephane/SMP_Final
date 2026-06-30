@@ -29,6 +29,7 @@ const CustomizationSettings: React.FC = () => {
     const [headerFrench, setHeaderFrench] = useState("MINISTÈRE DE L'ÉDUCATION DE BASE");
     const [headerEnglish, setHeaderEnglish] = useState("MINISTRY OF BASIC EDUCATION");
     const [honorRollThreshold, setHonorRollThreshold] = useState<number>(15.0);
+    const [honorTitleText, setHonorTitleText] = useState("TABLEAU D'HONNEUR");
     const [timetableSlots, setTimetableSlots] = useState<any[]>([]);
     const [evaluationPeriods, setEvaluationPeriods] = useState<any[]>([]);
     const [termStructure, setTermStructure] = useState<any[]>([]);
@@ -96,6 +97,7 @@ const CustomizationSettings: React.FC = () => {
                     setBulletinSigRight(mySchool.bulletin_sig_right || "LE DIRECTEUR (HEADMASTER)");
                     setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
                     setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
+                    setHonorTitleText(mySchool.honor_title_text || "TABLEAU D'HONNEUR");
 
                     try {
                         setTimetableSlots(mySchool.timetable_slots ? JSON.parse(mySchool.timetable_slots) : [
@@ -175,7 +177,7 @@ const CustomizationSettings: React.FC = () => {
                 }
             }
         } catch (e: any) {
-            console.error("Erreur lors du chargement des paramètres:", e);
+            console.error(t('cust_load_settings_error', { message: e.message }));
         } finally {
             setLoading(false);
         }
@@ -235,26 +237,26 @@ const CustomizationSettings: React.FC = () => {
             });
 
             if (res.error) throw new Error(res.error);
-            showNotification(editingScale.id ? "Échelle de notation mise à jour !" : "Nouvelle échelle de notation créée !", "success");
+            showNotification(editingScale.id ? t('cust_scale_updated_success') : t('cust_scale_created_success'), "success");
             setIsEditingScale(false);
             loadSettings();
         } catch (err: any) {
-            showNotification("Erreur lors de l'enregistrement du barème : " + err.message, "error");
+            showNotification(t('cust_scale_save_error', { message: err.message }), "error");
         }
     };
 
     const handleDeleteScale = async (scaleId: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce barème ? Les classes qui l'utilisent repasseront en notation standard.")) return;
+        if (!window.confirm(t('cust_confirm_delete_scale'))) return;
         if (!window.electronAPI) return;
 
         try {
             const res = await (window.electronAPI as any).deleteGradingScale(scaleId);
             if (res.error) throw new Error(res.error);
-            showNotification("Échelle de notation supprimée avec succès !", "success");
+            showNotification(t('cust_scale_deleted_success'), "success");
             setIsEditingScale(false);
             loadSettings();
         } catch (err: any) {
-            showNotification("Erreur lors de la suppression : " + err.message, "error");
+            showNotification(t('cust_scale_delete_error', { message: err.message }), "error");
         }
     };
 
@@ -280,6 +282,7 @@ const CustomizationSettings: React.FC = () => {
                 header_french: headerFrench,
                 header_english: headerEnglish,
                 honor_roll_threshold: honorRollThreshold,
+                honor_title_text: honorTitleText,
                 timetable_slots: JSON.stringify(timetableSlots),
                 evaluation_periods: JSON.stringify(evaluationPeriods),
                 term_structure: JSON.stringify(termStructure),
@@ -311,7 +314,7 @@ const CustomizationSettings: React.FC = () => {
             await window.electronAPI.setSetting({ key: 'currency', value: currency });
 
             setSuccess(true);
-            showNotification("Paramètres enregistrés avec succès !", "success");
+            showNotification(t('cust_settings_saved_success'), "success");
             setTimeout(() => setSuccess(false), 3000);
             loadSettings();
         } catch (err: any) {
@@ -380,18 +383,18 @@ const CustomizationSettings: React.FC = () => {
                                     type="text"
                                     value={schoolName}
                                     onChange={(e) => setSchoolName(e.target.value)}
-                                    placeholder="Nom officiel"
+                                    placeholder={t('cust_official_name_placeholder')}
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_motto', 'Devise de l\'École')}</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_motto_label')}</label>
                                 <input
                                     type="text"
                                     value={schoolMotto}
                                     onChange={(e) => setSchoolMotto(e.target.value)}
-                                    placeholder="Ex: Éducation pour l'excellence"
+                                    placeholder={t('cust_school_motto_placeholder')}
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
                             </div>
@@ -402,7 +405,7 @@ const CustomizationSettings: React.FC = () => {
                                     type="text"
                                     value={schoolAddress}
                                     onChange={(e) => setSchoolAddress(e.target.value)}
-                                    placeholder="Ex: Quartier Bastos, Yaoundé"
+                                    placeholder={t('cust_address_placeholder')}
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
                             </div>
@@ -413,13 +416,13 @@ const CustomizationSettings: React.FC = () => {
                                     type="text"
                                     value={schoolBp}
                                     onChange={(e) => setSchoolBp(e.target.value)}
-                                    placeholder="Ex: B.P. 1234, Yaoundé"
+                                    placeholder={t('cust_bp_placeholder')}
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Devise Monétaire (Currency)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_currency_label')}</label>
                                 <input
                                     type="text"
                                     value={currency}
@@ -483,12 +486,12 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
                         <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
                             <Layout className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pedagogy_settings', 'Pédagogie & Emploi du Temps')}</h2>
+                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pedagogy_settings')}</h2>
                         </div>
 
                         <div className="space-y-8">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_threshold', 'Moyenne Minimum - Tableau d\'Honneur ( /20)')}</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_threshold')}</label>
                                 <input
                                     type="number"
                                     min="10"
@@ -500,11 +503,24 @@ const CustomizationSettings: React.FC = () => {
                                 />
                             </div>
 
+                            {/* Honor Roll Certificate customization (reuses primary/secondary colors above) */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_title_text', 'Titre du Certificat (Tableau d\'Honneur)')}</label>
+                                <input
+                                    type="text"
+                                    value={honorTitleText}
+                                    onChange={(e) => setHonorTitleText(e.target.value)}
+                                    placeholder="TABLEAU D'HONNEUR"
+                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                />
+                                <p className="text-[10px] text-slate-500">{t('cust_honor_title_text_hint', "Le certificat utilise déjà la couleur primaire (bordure/nom) et la couleur secondaire (titre) définies ci-dessus.")}</p>
+                            </div>
+
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Structure des Périodes d'Évaluation (Trimestres / Séquences)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_eval_periods_structure')}</label>
                                     {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                        <button 
+                                        <button
                                             type="button"
                                             onClick={() => {
                                                 const newId = termStructure.length > 0 ? Math.max(...termStructure.map(t => t.term_id)) + 1 : 1;
@@ -512,7 +528,7 @@ const CustomizationSettings: React.FC = () => {
                                             }}
                                             className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
                                         >
-                                            + Ajouter une Période
+                                            {t('cust_add_period')}
                                         </button>
                                     )}
                                 </div>
@@ -520,7 +536,7 @@ const CustomizationSettings: React.FC = () => {
                                 {!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
                                     <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold flex items-start gap-2">
                                         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span>La modification de la structure des trimestres et séquences n'est pas activée. Cette section est en mode lecture seule pour des raisons de sécurité.</span>
+                                        <span>{t('cust_term_structure_readonly_warning')}</span>
                                     </div>
                                 )}
 
@@ -538,7 +554,7 @@ const CustomizationSettings: React.FC = () => {
                                                         newStruct[tIdx].name = e.target.value;
                                                         setTermStructure(newStruct);
                                                     }}
-                                                    placeholder="Ex: 1ER TRIMESTRE, 1ER SEMESTRE"
+                                                    placeholder={t('cust_term_name_placeholder')}
                                                     className="flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-black text-white outline-none focus:border-amber-500 uppercase disabled:opacity-60"
                                                 />
                                                 {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
@@ -557,7 +573,7 @@ const CustomizationSettings: React.FC = () => {
 
                                             <div className="pl-6 space-y-2">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Séquences associées :</span>
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('cust_associated_sequences')}</span>
                                                     {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
                                                         <button
                                                             type="button"
@@ -570,7 +586,7 @@ const CustomizationSettings: React.FC = () => {
                                                             }}
                                                             className="text-[8px] font-black text-amber-500 hover:underline uppercase tracking-wider"
                                                         >
-                                                            + Ajouter une séquence
+                                                            {t('cust_add_sequence')}
                                                         </button>
                                                     )}
                                                 </div>
@@ -586,11 +602,11 @@ const CustomizationSettings: React.FC = () => {
                                                                 newStruct[tIdx].sequences[sIdx].name = e.target.value;
                                                                 setTermStructure(newStruct);
                                                             }}
-                                                            placeholder="Ex: Séquence 1"
+                                                            placeholder={t('cust_sequence_name_placeholder')}
                                                             className="flex-1 bg-transparent border-b border-white/5 px-2 py-0.5 text-xs font-semibold text-slate-300 outline-none focus:border-amber-500 disabled:opacity-60"
                                                         />
                                                         <div className="flex items-center gap-1.5 border-l border-white/10 pl-3">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase">Poids</span>
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase">{t('cust_weight_label')}</span>
                                                             <input
                                                                 type="number"
                                                                 min="0.1"
@@ -620,20 +636,20 @@ const CustomizationSettings: React.FC = () => {
                                                         )}
                                                     </div>
                                                 ))}
-                                                {term.sequences.length === 0 && (
-                                                    <p className="text-[10px] text-slate-600 italic">Aucune séquence dans cette période.</p>
+                                {term.sequences.length === 0 && (
+                                                    <p className="text-[10px] text-slate-600 italic">{t('cust_no_sequence_in_period')}</p>
                                                 )}
                                             </div>
                                         </div>
                                     ))}
                                     {termStructure.length === 0 && (
-                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">Aucune période d'évaluation définie !</p>
+                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">{t('cust_no_eval_period_defined')}</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Échéances des Tranches de Scolarité</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_installment_deadlines')}</label>
                                 <div className="space-y-3">
                                     {installments.map(inst => {
                                         const deadline = installmentDeadlines.find(d => d.installment_id === inst.id)?.deadline_date || '';
@@ -663,13 +679,13 @@ const CustomizationSettings: React.FC = () => {
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_timetable_slots', 'Configuration des Plages Horaires')}</label>
-                                    <button 
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_timetable_slots')}</label>
+                                    <button
                                         type="button"
                                         onClick={() => setTimetableSlots([...timetableSlots, { label: 'Nouveau', start: '00:00', end: '00:00', isBreak: false }])}
                                         className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
                                     >
-                                        + Ajouter une plage
+                                        {t('cust_add_time_slot')}
                                     </button>
                                 </div>
                                 <div className="space-y-3">
@@ -683,7 +699,7 @@ const CustomizationSettings: React.FC = () => {
                                                     newSlots[index].label = e.target.value;
                                                     setTimetableSlots(newSlots);
                                                 }}
-                                                placeholder="Libellé (ex: 08:00 - 10:00)"
+                                                placeholder={t('cust_slot_label_placeholder')}
                                                 className="w-full md:w-1/3 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500"
                                             />
                                             <div className="flex items-center gap-2 w-full md:w-auto">
@@ -721,9 +737,9 @@ const CustomizationSettings: React.FC = () => {
                                                         }}
                                                         className="w-4 h-4 rounded accent-amber-500"
                                                     />
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pause ?</span>
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('cust_is_break_label')}</span>
                                                 </label>
-                                                <button 
+                                                <button
                                                     type="button"
                                                     onClick={() => {
                                                         const newSlots = timetableSlots.filter((_, i) => i !== index);
@@ -737,7 +753,7 @@ const CustomizationSettings: React.FC = () => {
                                         </div>
                                     ))}
                                     {timetableSlots.length === 0 && (
-                                        <p className="text-center text-slate-500 text-sm font-bold italic py-4">Aucune plage horaire définie. L'emploi du temps sera vide.</p>
+                                        <p className="text-center text-slate-500 text-sm font-bold italic py-4">{t('cust_no_time_slot_defined')}</p>
                                     )}
                                 </div>
                             </div>
@@ -749,7 +765,7 @@ const CustomizationSettings: React.FC = () => {
                         <div className="flex items-center justify-between border-b border-white/5 pb-4">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <Palette className="w-5 h-5" />
-                                <h2 className="text-lg font-black uppercase text-white tracking-wide">Échelles & Barèmes de Notation</h2>
+                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_grading_scales_title')}</h2>
                             </div>
                             {!isEditingScale && (
                                 <button
@@ -768,7 +784,7 @@ const CustomizationSettings: React.FC = () => {
                                     className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-955 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
                                 >
                                     <Plus className="w-3.5 h-3.5" />
-                                    Nouveau Barème
+                                    {t('cust_new_scale_btn')}
                                 </button>
                             )}
                         </div>
@@ -776,10 +792,10 @@ const CustomizationSettings: React.FC = () => {
                         {!isEditingScale ? (
                             <div className="space-y-4">
                                 <p className="text-xs text-slate-400 leading-relaxed font-bold">
-                                    Configurez les échelles d'évaluation (ex: mentions cotes de la maternelle, plages de notes du primaire) pour ensuite les attribuer aux classes de votre école.
+                                    {t('cust_grading_scales_desc')}
                                 </p>
                                 {gradingScales.length === 0 ? (
-                                    <p className="text-center text-slate-500 text-xs font-bold py-6 italic">Aucun barème personnalisé créé. Les classes utilisent par défaut la notation sur 20 brute.</p>
+                                    <p className="text-center text-slate-500 text-xs font-bold py-6 italic">{t('cust_no_custom_scale')}</p>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {gradingScales.map((scale: any) => (
@@ -793,11 +809,11 @@ const CustomizationSettings: React.FC = () => {
                                             >
                                                 <h4 className="text-sm font-black text-white">{scale.name}</h4>
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                    Type : {scale.is_numerical ? t('grade_conversion', 'Conversion de note') : t('literal_grade', 'Cote littérale directe')}
+                                                    {t('cust_scale_type_label')} {scale.is_numerical ? t('grade_conversion') : t('literal_grade')}
                                                 </p>
                                                 {scale.is_numerical ? (
                                                     <p className="text-[10px] text-amber-500 font-black mt-1">
-                                                        Plage brute : {scale.min_value} à {scale.max_value}
+                                                        {t('cust_raw_range_label', { min: scale.min_value, max: scale.max_value })}
                                                     </p>
                                                 ) : null}
                                                 <div className="flex flex-wrap gap-1 mt-3">
@@ -816,34 +832,34 @@ const CustomizationSettings: React.FC = () => {
                             <div className="space-y-6 animate-in fade-in duration-200">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nom de l'échelle</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_scale_name_label')}</label>
                                         <input
                                             required
                                             type="text"
                                             value={editingScale.name}
                                             onChange={(e) => setEditingScale({ ...editingScale, name: e.target.value })}
-                                            placeholder="Ex: Évaluation Compétences Maternelle"
+                                            placeholder={t('cust_scale_name_placeholder')}
                                             className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                         />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Modèle d'échelle</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_scale_model_label')}</label>
                                             <select
                                                 value={editingScale.is_numerical}
                                                 onChange={(e) => setEditingScale({ ...editingScale, is_numerical: parseInt(e.target.value) })}
                                                 className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                                             >
-                                                <option value={1}>Numérique avec plages (Conversion)</option>
-                                                <option value={0}>Littérale pure (Saisie de symbole)</option>
+                                                <option value={1}>{t('cust_scale_numerical_opt')}</option>
+                                                <option value={0}>{t('cust_scale_literal_opt')}</option>
                                             </select>
                                         </div>
 
                                         {parseInt(editingScale.is_numerical) === 1 && (
                                             <>
                                                 <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Note minimale</label>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_min_grade_label')}</label>
                                                     <input
                                                         type="number"
                                                         step="0.1"
@@ -853,7 +869,7 @@ const CustomizationSettings: React.FC = () => {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Note maximale</label>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_max_grade_label')}</label>
                                                     <input
                                                         type="number"
                                                         step="0.1"
@@ -869,25 +885,25 @@ const CustomizationSettings: React.FC = () => {
 
                                 <div className="space-y-4 border-t border-white/5 pt-4">
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-black uppercase text-white tracking-widest">Options / Mentions de l'échelle</h3>
+                                        <h3 className="text-xs font-black uppercase text-white tracking-widest">{t('cust_scale_options_title')}</h3>
                                         <button
                                             type="button"
                                             onClick={handleAddScaleOption}
                                             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border border-white/5"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
-                                            Ajouter Cote
+                                            {t('cust_add_grade_btn')}
                                         </button>
                                     </div>
 
                                     {editingScale.options.length === 0 ? (
-                                        <p className="text-center text-slate-500 text-xs font-bold py-4 italic">Aucune mention ajoutée. Veuillez ajouter au moins une mention.</p>
+                                        <p className="text-center text-slate-500 text-xs font-bold py-4 italic">{t('cust_no_mention_added')}</p>
                                     ) : (
                                         <div className="space-y-3">
                                             {editingScale.options.map((opt: any, idx: number) => (
                                                 <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-950/50 border border-white/5 rounded-2xl items-center relative">
                                                     <div>
-                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Symbole (ex: NAD)</label>
+                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_symbol_label')}</label>
                                                         <input
                                                             required
                                                             type="text"
@@ -900,7 +916,7 @@ const CustomizationSettings: React.FC = () => {
                                                     {parseInt(editingScale.is_numerical) === 1 ? (
                                                         <>
                                                             <div>
-                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Borne Min (inclus)</label>
+                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_min_range_label')}</label>
                                                                 <input
                                                                     required
                                                                     type="number"
@@ -911,7 +927,7 @@ const CustomizationSettings: React.FC = () => {
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Borne Max (inclus)</label>
+                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_max_range_label')}</label>
                                                                 <input
                                                                     required
                                                                     type="number"
@@ -926,7 +942,7 @@ const CustomizationSettings: React.FC = () => {
 
                                                     <div className={parseInt(editingScale.is_numerical) === 1 ? 'md:col-span-1' : 'md:col-span-2'}>
                                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">
-                                                            {parseInt(editingScale.is_numerical) === 1 ? 'Équivalent (Moy.)' : 'Valeur numérique (ex: 20)'}
+                                                            {parseInt(editingScale.is_numerical) === 1 ? t('cust_equivalent_avg_label') : t('cust_numeric_value_label')}
                                                         </label>
                                                         <input
                                                             required
@@ -940,7 +956,7 @@ const CustomizationSettings: React.FC = () => {
 
                                                     <div className="flex items-center space-x-2 pt-4 md:pt-0">
                                                         <div className="flex-1">
-                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">Description (Optionnel)</label>
+                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_description_optional_label')}</label>
                                                             <input
                                                                 type="text"
                                                                 value={opt.description}
@@ -968,16 +984,16 @@ const CustomizationSettings: React.FC = () => {
                                         onClick={() => setIsEditingScale(false)}
                                         className="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition-colors"
                                     >
-                                        Retour / Annuler
+                                        {t('cust_back_cancel_btn')}
                                     </button>
-                                    
+
                                     {editingScale.id && (
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteScale(editingScale.id)}
                                             className="px-5 py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl font-bold hover:bg-rose-500/30 transition-colors"
                                         >
-                                            Supprimer
+                                            {t('cust_delete_btn')}
                                         </button>
                                     )}
 
@@ -987,7 +1003,7 @@ const CustomizationSettings: React.FC = () => {
                                         className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-2xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
                                     >
                                         <Save className="w-5 h-5" />
-                                        Enregistrer
+                                        {t('cust_save_btn')}
                                     </button>
                                 </div>
                             </div>
@@ -1085,21 +1101,21 @@ const CustomizationSettings: React.FC = () => {
 
                         <div className="space-y-8 animate-in fade-in duration-300">
                             <div className="space-y-2 text-slate-400 text-xs font-bold">
-                                <p>Le système hybride permet à l'application de générer le tableau central des notes de façon dynamique (avec pagination automatique si besoin) tout en conservant le design de votre établissement.</p>
+                                <p>{t('cust_hybrid_template_desc')}</p>
                             </div>
 
                             {/* Header Image Uploader */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Image de l'En-tête (JPG / PNG - Max 3 Mo)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_image_label')}</label>
                                 <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
                                     {headerImage ? (
                                         <div className="space-y-4">
                                             <img src={headerImage} alt="Header" className="max-h-32 mx-auto rounded-lg shadow-lg" />
-                                            <button type="button" onClick={() => setHeaderImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer l'En-tête</button>
+                                            <button type="button" onClick={() => setHeaderImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_header')}</button>
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image large pour l'en-tête</p>
+                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_wide_header_image')}</p>
                                             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setHeaderImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
                                             <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
                                         </div>
@@ -1109,16 +1125,16 @@ const CustomizationSettings: React.FC = () => {
 
                             {/* Watermark Image Uploader */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Filigrane / Watermark de Fond (JPG / PNG - Translucide)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_watermark_label')}</label>
                                 <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
                                     {watermarkImage ? (
                                         <div className="space-y-4">
                                             <img src={watermarkImage} alt="Watermark" className="max-h-32 mx-auto rounded-lg shadow-lg opacity-50" />
-                                            <button type="button" onClick={() => setWatermarkImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer le Filigrane</button>
+                                            <button type="button" onClick={() => setWatermarkImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_watermark')}</button>
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image de fond (logo de l'école estompé)</p>
+                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_watermark_image')}</p>
                                             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setWatermarkImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
                                             <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
                                         </div>
@@ -1128,16 +1144,16 @@ const CustomizationSettings: React.FC = () => {
 
                             {/* Footer Image Uploader */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Image de Pied de Page / Cachets & Signatures (JPG / PNG)</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_footer_image_label')}</label>
                                 <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
                                     {footerImage ? (
                                         <div className="space-y-4">
                                             <img src={footerImage} alt="Footer" className="max-h-32 mx-auto rounded-lg shadow-lg" />
-                                            <button type="button" onClick={() => setFooterImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">Supprimer le Pied de page</button>
+                                            <button type="button" onClick={() => setFooterImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_footer')}</button>
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">Sélectionnez une image contenant les cachets et signatures</p>
+                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_footer_image')}</p>
                                             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setFooterImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
                                             <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
                                         </div>
@@ -1153,7 +1169,7 @@ const CustomizationSettings: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 text-blue-400">
                                 <FileText className="w-6 h-6" />
-                                <h3 className="text-lg font-black uppercase tracking-tight">Modèle de Bulletin Personnalisé</h3>
+                                <h3 className="text-lg font-black uppercase tracking-tight">{t('custom_bulletin_title')}</h3>
                             </div>
                             <div
                                 onClick={() => setBulletinUseCustom(bulletinUseCustom === 1 ? 0 : 1)}
@@ -1162,12 +1178,12 @@ const CustomizationSettings: React.FC = () => {
                                 <div className={`w-5 h-5 bg-white rounded-full transition-transform ${bulletinUseCustom === 1 ? 'translate-x-7' : ''}`} />
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500">Activez cette option si votre école a son propre modèle de bulletin (image A4 complète). Le système placera les données de chaque élève aux coordonnées que vous définissez.</p>
+                        <p className="text-xs text-slate-500">{t('custom_bulletin_desc')}</p>
 
                         {bulletinUseCustom === 1 && (
                             <div className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Image du bulletin vierge (A4, format portrait)</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('upload_blank_bulletin')}</label>
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -1176,14 +1192,14 @@ const CustomizationSettings: React.FC = () => {
                                     />
                                     {bulletinTemplate && (
                                         <div className="mt-2 border border-slate-800 rounded-xl overflow-hidden max-h-[300px]">
-                                            <img src={bulletinTemplate} alt="Aperçu bulletin" className="w-full object-contain" />
+                                            <img src={bulletinTemplate} alt={t('preview_bulletin')} className="w-full object-contain" />
                                         </div>
                                     )}
                                 </div>
 
                                 <div>
-                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4">Coordonnées des champs (X, Y en mm)</h4>
-                                    <p className="text-[10px] text-slate-500 mb-4">X = position horizontale (0=gauche, 210=droite). Y = position verticale (0=haut, 297=bas). Ajustez pour que les données tombent dans les bonnes cases de votre modèle.</p>
+                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4">{t('field_coordinates')}</h4>
+                                    <p className="text-[10px] text-slate-500 mb-4">{t('field_coordinates_desc')}</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {[
                                             { key: 'studentName', label: t('field_student_name', 'Nom de l\'élève') },
@@ -1218,7 +1234,7 @@ const CustomizationSettings: React.FC = () => {
                                             </div>
                                         ))}
                                         <div className="bg-slate-900/50 p-3 rounded-xl border border-blue-500/20 space-y-2 md:col-span-2 lg:col-span-3">
-                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Tableau des notes (position + largeur)</label>
+                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('field_table')}</label>
                                             <div className="flex gap-4">
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">X</span>
@@ -1235,7 +1251,7 @@ const CustomizationSettings: React.FC = () => {
                                                     />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <span className="text-[9px] text-slate-600 font-bold">Largeur (mm)</span>
+                                                    <span className="text-[9px] text-slate-600 font-bold">{t('field_width')}</span>
                                                     <input type="number" value={bulletinMapping.table?.width || 170}
                                                         onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), width: parseInt(e.target.value) || 170}})}
                                                         className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
@@ -1253,47 +1269,47 @@ const CustomizationSettings: React.FC = () => {
                     <div className="glass-card p-6 space-y-6 border-slate-800">
                         <div className="flex items-center space-x-3 text-rose-400">
                             <ShieldAlert className="w-6 h-6" />
-                            <h3 className="text-lg font-black uppercase tracking-tight">Configuration des Alertes Financières</h3>
+                            <h3 className="text-lg font-black uppercase tracking-tight">{t('financial_alerts_config')}</h3>
                         </div>
-                        <p className="text-xs text-slate-500">Définissez les seuils qui déclencheront des alertes sur le tableau de bord.</p>
+                        <p className="text-xs text-slate-500">{t('financial_alerts_config_desc')}</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Seuil Impayés (%)</label>
-                                <p className="text-[10px] text-slate-600 italic">Alerte si un élève a payé moins de ce % de sa pension</p>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('unpaid_threshold')}</label>
+                                <p className="text-[10px] text-slate-600 italic">{t('unpaid_threshold_desc')}</p>
                                 <input
                                     type="number" min="10" max="100" step="5"
                                     value={alertUnpaidThreshold}
                                     onChange={(e) => setAlertUnpaidThreshold(parseInt(e.target.value) || 50)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
                                 />
-                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte si élève a payé moins de {alertUnpaidThreshold}%</p>
+                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_unpaid_alert', { value: alertUnpaidThreshold })}</p>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Seuil Décaissements (%)</label>
-                                <p className="text-[10px] text-slate-600 italic">Alerte si les dépenses dépassent ce % des recettes</p>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('expense_ratio_threshold')}</label>
+                                <p className="text-[10px] text-slate-600 italic">{t('expense_ratio_threshold_desc')}</p>
                                 <input
                                     type="number" min="10" max="100" step="5"
                                     value={alertExpenseRatio}
                                     onChange={(e) => setAlertExpenseRatio(parseInt(e.target.value) || 50)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
                                 />
-                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte si décaissements dépassent {alertExpenseRatio}% des recettes</p>
+                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_expense_alert', { value: alertExpenseRatio })}</p>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('deadline_alert_days', 'Alerte Échéance Tranches (jours avant)')}</label>
-                                <p className="text-[10px] text-slate-600 italic">Nombre de jours avant l'échéance d'une tranche pour alerter</p>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('deadline_alert_days')}</label>
+                                <p className="text-[10px] text-slate-600 italic">{t('cust_deadline_days_desc')}</p>
                                 <input type="number" min="1" max="30" value={alertDeadlineDays}
                                     onChange={(e) => setAlertDeadlineDays(parseInt(e.target.value) || 7)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
-                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte {alertDeadlineDays} jours avant l'échéance</p>
+                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_deadline_alert', { value: alertDeadlineDays })}</p>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('grade_deadline_alert_days', 'Alerte Fin Saisie Notes (jours avant)')}</label>
-                                <p className="text-[10px] text-slate-600 italic">Nombre de jours avant la fin de la période de saisie pour alerter</p>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('grade_deadline_alert_days')}</label>
+                                <p className="text-[10px] text-slate-600 italic">{t('cust_grade_deadline_days_desc')}</p>
                                 <input type="number" min="1" max="15" value={alertGradeDeadlineDays}
                                     onChange={(e) => setAlertGradeDeadlineDays(parseInt(e.target.value) || 3)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
-                                <p className="text-[10px] text-amber-500 font-bold">Actuel: Alerte {alertGradeDeadlineDays} jours avant la fin de saisie</p>
+                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_grade_deadline_alert', { value: alertGradeDeadlineDays })}</p>
                             </div>
                         </div>
                     </div>

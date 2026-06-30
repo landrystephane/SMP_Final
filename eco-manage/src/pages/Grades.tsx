@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { notifyDataChanged } from '../utils/dataSync';
+import { getRoleLabel } from '../utils/roleLabels';
 
 const Grades: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { hasRole, user } = useAuth();
   const { showNotification } = useNotification();
 
@@ -242,9 +244,9 @@ const Grades: React.FC = () => {
       if (!window.electronAPI || !user || !selectedClass || !selectedTerm || !selectedMonth) return;
       const classObj = classes.find(c => c.id.toString() === selectedClass);
       const className = classObj ? `${classObj.name} (${classObj.code})` : selectedClass;
-      const subject = `Demande de déblocage : Notes ${className}`;
-      const message = `Bonjour,\n\nJe souhaite modifier les notes de la classe ${className} pour la période ${selectedMonth} (Trimestre ${selectedTerm}). Veuillez s'il vous plaît débloquer ces notes.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`;
-      
+      const subject = t('gr_unlock_request_subject', 'Demande de déblocage : Notes {{className}}', { className });
+      const message = t('gr_unlock_request_message', 'Bonjour,\n\nJe souhaite modifier les notes de la classe {{className}} pour la période {{month}} (Trimestre {{term}}). Veuillez s\'il vous plaît débloquer ces notes.\n\nMerci d\'avance.\n\nEnseignant : {{teacherName}}', { className, month: selectedMonth, term: selectedTerm, teacherName: user.fullName || user.username });
+
       try {
           await window.electronAPI.submitSystemRequest({
               requestType: 'GRADE_REACTIVATION',
@@ -256,15 +258,15 @@ const Grades: React.FC = () => {
                   month: selectedMonth
               }
           });
-          showNotification("Votre demande de déblocage a été envoyée avec succès à l'administration.", "success");
+          showNotification(t('gr_unlock_request_sent', "Votre demande de déblocage a été envoyée avec succès à l'administration."), "success");
       } catch (e: any) {
-          showNotification("Erreur lors de l'envoi de la demande: " + e.message, "error");
+          showNotification(t('gr_send_request_error', "Erreur lors de l'envoi de la demande: ") + e.message, "error");
       }
   };
 
   const handleSave = async () => {
     if (isLocked || isPastDeadline) {
-        showNotification("La saisie est bloquée (période fermée ou délai dépassé).", "error");
+        showNotification(t('gr_entry_blocked', "La saisie est bloquée (période fermée ou délai dépassé)."), "error");
         return;
     }
     const formattedGrades = Object.entries(grades)
@@ -306,29 +308,30 @@ const Grades: React.FC = () => {
         // Notify ADVISOR that grades were saved
         await window.electronAPI.createNotification({
             role: 'ADVISOR',
-            message: `Des notes ont été enregistrées pour la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) par ${user?.fullName || 'un enseignant'}.`,
+            message: t('gr_notif_grades_saved', 'Des notes ont été enregistrées pour la classe {{className}} ({{month}}, Trimestre {{term}}) par {{teacherName}}.', { className: classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass, month: selectedMonth, term: selectedTerm, teacherName: getRoleLabel(user?.role, i18n.language) }),
             type: 'INFO',
             school_id: user?.schoolId
         });
 
-        showNotification("✅ Les notes ont été enregistrées avec succès !", "success");
+        showNotification("✅ " + t('gr_grades_saved_success', "Les notes ont été enregistrées avec succès !"), "success");
         handleLoadContext();
+        notifyDataChanged();
       } else {
-        showNotification("Erreur: " + result.error, "error");
+        showNotification(t('gr_save_error', "Erreur: ") + result.error, "error");
       }
     } else {
       // Mobile / Web fallback
       const key = `pending_grades_${Date.now()}`;
       localStorage.setItem(key, JSON.stringify(formattedGrades));
-      showNotification("✅ Notes sauvegardées localement !", "success");
+      showNotification("✅ " + t('gr_grades_saved_locally', "Notes sauvegardées localement !"), "success");
     }
   };
 
   const handleUnlock = async () => {
     if (window.electronAPI) {
         setConfirmModal({
-            title: t('confirm_unlock') || "Déverrouiller les notes",
-            message: "Êtes-vous sûr de vouloir déverrouiller toutes les notes pour cette classe, cette période et ce mois ?",
+            title: t('confirm_unlock') || t('gr_unlock_confirm_title', "Déverrouiller les notes"),
+            message: t('gr_unlock_confirm_msg', "Êtes-vous sûr de vouloir déverrouiller toutes les notes pour cette classe, cette période et ce mois ?"),
             onConfirm: async () => {
                 await window.electronAPI.unlockGrades({
                     classId: parseInt(selectedClass),
@@ -336,7 +339,7 @@ const Grades: React.FC = () => {
                     month: selectedMonth
                 });
                 setIsLocked(false);
-                showNotification("Notes déverrouillées avec succès !", "success");
+                showNotification(t('gr_grades_unlocked_success', "Notes déverrouillées avec succès !"), "success");
                 handleLoadContext();
             }
         });
@@ -346,8 +349,8 @@ const Grades: React.FC = () => {
   const handleValidateClass = async () => {
     if (window.electronAPI) {
         setConfirmModal({
-            title: t('validate_and_lock', "Valider et verrouiller"),
-            message: "Voulez-vous valider et verrouiller toutes les notes de cette classe pour ce trimestre et ce mois ? Cela permettra d'imprimer les bulletins officiels.",
+            title: t('gr_validate_lock_title', "Valider et verrouiller"),
+            message: t('gr_validate_lock_msg', "Voulez-vous valider et verrouiller toutes les notes de cette classe pour ce trimestre et ce mois ? Cela permettra d'imprimer les bulletins officiels."),
             onConfirm: async () => {
                 try {
                     const result = await (window.electronAPI as any).validateClassGrades({
@@ -355,20 +358,21 @@ const Grades: React.FC = () => {
                         term: selectedTerm,
                         month: selectedMonth
                     });
-                    
+
                     // Notify Secretary/Advisor
                     await window.electronAPI.createNotification({
-                        role: 'SECRETARY',
-                        message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${selectedMonth}, Trimestre ${selectedTerm}) ont été validées par le Directeur. Les bulletins sont prêts pour l'impression.`,
+                        role: 'SG',
+                        message: t('gr_notif_grades_validated', 'Les notes de la classe {{className}} ({{month}}, Trimestre {{term}}) ont été validées par {{role}}. Les bulletins sont prêts pour l\'impression.', { className: classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass, month: selectedMonth, term: selectedTerm, role: getRoleLabel(user?.role, i18n.language) }),
                         type: 'INFO',
                         school_id: user?.schoolId
                     });
 
                     setIsClassValidated(true);
-                    showNotification("✅ Toutes les notes ont été validées et verrouillées !", "success");
+                    showNotification("✅ " + t('gr_grades_validated_lock_success', "Toutes les notes ont été validées et verrouillées !"), "success");
                     handleLoadContext();
+                    notifyDataChanged();
                 } catch (err: any) {
-                    showNotification("Erreur lors de la validation : " + err.message, "error");
+                    showNotification(t('gr_validation_error', "Erreur lors de la validation : ") + err.message, "error");
                 }
             }
         });
@@ -394,11 +398,11 @@ const Grades: React.FC = () => {
           });
 
           if (!classObj || !teacher) {
-              showNotification("Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation.", "error");
+              showNotification(t('gr_no_titulaire_error', "Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation."), "error");
               setShowOverrideModal(false);
               return;
           }
-          
+
           const newDeadline = new Date();
           newDeadline.setDate(newDeadline.getDate() + parseInt(overrideDays));
           const formattedDate = newDeadline.toISOString().split('T')[0];
@@ -413,7 +417,7 @@ const Grades: React.FC = () => {
                   grantedBy: user?.id
               });
           } catch (err) {
-              showNotification("Erreur lors de l'application de la dérogation.", "error");
+              showNotification(t('gr_override_apply_error', "Erreur lors de l'application de la dérogation."), "error");
               setShowOverrideModal(false);
               return;
           }
@@ -421,11 +425,11 @@ const Grades: React.FC = () => {
           await window.electronAPI.createNotification({
               school_id: user?.schoolId,
               user_id: teacher.id,
-              message: `Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe ${classObj.name} jusqu'au ${formattedDate}.`,
+              message: t('gr_notif_override_granted', 'Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe {{className}} jusqu\'au {{date}}.', { className: classObj.name, date: formattedDate }),
               type: 'SYSTEM'
           });
 
-          showNotification(`Dérogation accordée jusqu'au ${formattedDate}.`, "success");
+          showNotification(t('gr_override_granted_msg', 'Dérogation accordée jusqu\'au {{date}}.', { date: formattedDate }), "success");
           setShowOverrideModal(false);
           handleLoadContext();
       }
@@ -452,11 +456,11 @@ const Grades: React.FC = () => {
                       reason: reactivationReason
                   }
               });
-              showNotification("Demande de réactivation envoyée au directeur.", "success");
+              showNotification(t('gr_reactivation_sent', "Demande de réactivation envoyée au directeur."), "success");
               setShowReactivationModal(false);
               setReactivationReason('');
           } catch (e: any) {
-              showNotification("Erreur lors de l'envoi : " + e.message, "error");
+              showNotification(t('gr_send_request_error', "Erreur lors de l'envoi : ") + e.message, "error");
           }
       }
   };
@@ -500,10 +504,10 @@ const Grades: React.FC = () => {
             term: selectedTerm,
             month: selectedMonth
         });
-        showNotification("Notes validées avec succès !", "success");
+        showNotification(t('grades_validated_success', "Notes validées avec succès !"), "success");
         loadValidationStatuses();
     } catch (err: any) {
-        showNotification("Erreur lors de la validation : " + err.message, "error");
+        showNotification(t('gr_validation_error', "Erreur lors de la validation : ") + err.message, "error");
     }
   };
 
@@ -558,7 +562,7 @@ const Grades: React.FC = () => {
             }
         } catch (err: any) {
             console.error("Error generating report card:", err);
-            alert("Erreur lors de la génération du bulletin : " + err.message);
+            alert(t('gr_report_generation_error', "Erreur lors de la génération du bulletin : ") + err.message);
         }
     }
   }
@@ -610,7 +614,7 @@ const Grades: React.FC = () => {
                     setSelectedMonth('');
                 }
             }}>
-            {termStructure.length === 0 && <option value="">-- Aucune période configurée --</option>}
+            {termStructure.length === 0 && <option value="">{t('gr_no_period_configured', '-- Aucune période configurée --')}</option>}
             {termStructure.map(ts => (
                 <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
             ))}
@@ -625,7 +629,7 @@ const Grades: React.FC = () => {
                     <option key={seq.id} value={seq.id}>{seq.name}</option>
                 ))
             ) : (
-                <option value="">-- Aucune séquence --</option>
+                <option value="">{t('gr_no_sequence_configured', '-- Aucune séquence --')}</option>
             )}
           </select>
         </div>
@@ -652,14 +656,14 @@ const Grades: React.FC = () => {
                     {isPastDeadline && (
                       <div className="flex items-center space-x-2">
                         <span className="flex items-center text-[10px] font-black text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-amber-500/20">
-                            <AlertCircle className="w-3 h-3 mr-2" /> DÉLAI DÉPASSÉ
+                            <AlertCircle className="w-3 h-3 mr-2" /> {t('deadline_exceeded', 'DÉLAI DÉPASSÉ')}
                         </span>
                         {user?.role === 'TEACHER' && (
                           <button
                             onClick={handleRequestReactivation}
                             className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full font-bold text-[10px] uppercase hover:bg-amber-500/30 transition-all border border-amber-500/30"
                           >
-                            Demander Réactivation
+                            {t('request_reactivation_btn', 'Demander Réactivation')}
                           </button>
                         )}
                       </div>
@@ -669,7 +673,7 @@ const Grades: React.FC = () => {
                             onClick={handleRequestUnlock}
                             className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
                         >
-                            Demander Déblocage
+                            {t('request_unlock_btn', 'Demander Déblocage')}
                         </button>
                     )}
                 </div>
@@ -678,9 +682,9 @@ const Grades: React.FC = () => {
                         <button
                             onClick={handleGrantOverride}
                             className="bg-indigo-500/20 text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-500/30 transition-all border border-indigo-500/30 flex items-center"
-                            title="Accorder une dérogation de délai à l'enseignant"
+                            title={t('grant_override_tooltip', "Accorder une dérogation de délai à l'enseignant")}
                         >
-                            DÉROGATION
+                            {t('override_label', 'DÉROGATION')}
                         </button>
                     )}
                     {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && !isClassValidated && (
@@ -688,12 +692,12 @@ const Grades: React.FC = () => {
                             onClick={handleValidateClass}
                             className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all inline-flex items-center shadow-lg shadow-emerald-600/20"
                         >
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> VALIDER LES IMPRESSIONS
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> {t('validate_for_printing', 'VALIDER LES IMPRESSIONS')}
                         </button>
                     )}
                     {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && isClassValidated && (
                         <span className="flex items-center text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
-                            <CheckCircle2 className="w-3 h-3 mr-2" /> CLASSE VALIDÉE
+                            <CheckCircle2 className="w-3 h-3 mr-2" /> {t('class_validated_badge', 'CLASSE VALIDÉE')}
                         </span>
                     )}
                     {!isLocked ? (
@@ -860,8 +864,8 @@ const Grades: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}
-                            disabled={(!bulletinsValidated && user?.role === 'SECRETARY') || !isLocked}
-                            title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'est pas encore autorisée par la direction." : (!isLocked ? "Les notes de la classe ne sont pas encore validées et verrouillées." : "")}
+                            disabled={!isLocked}
+                            title={!isLocked ? t('gr_print_not_validated', "Les notes de la classe ne sont pas encore validées et verrouillées.") : ""}
                             className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                               <FileText className="w-5 h-5" />
@@ -879,22 +883,22 @@ const Grades: React.FC = () => {
         <div className="glass-card overflow-hidden border-slate-800">
           <div className="p-6 border-b border-white/5 flex items-center">
             <BookOpen className="w-5 h-5 text-purple-400 mr-2" />
-            <h2 className="text-lg font-black text-white uppercase tracking-tight">Enseignants de ma classe</h2>
+            <h2 className="text-lg font-black text-white uppercase tracking-tight">{t('gr_class_teachers_heading', 'Enseignants de ma classe')}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                  <th className="px-6 py-4">Matière</th>
-                  <th className="px-6 py-4">Enseignant</th>
-                  <th className="px-6 py-4 text-center">Coef</th>
+                  <th className="px-6 py-4">{t('gr_subject_col', 'Matière')}</th>
+                  <th className="px-6 py-4">{t('gr_teacher_col', 'Enseignant')}</th>
+                  <th className="px-6 py-4 text-center">{t('gr_coef_col', 'Coef')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-slate-900/30">
                 {subjects.map(subj => (
                   <tr key={subj.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-black text-white uppercase text-sm">{subj.name}</td>
-                    <td className="px-6 py-4 text-xs text-slate-300">{subj.teacher_name || (subj._readOnly ? 'Autre enseignant' : user?.fullName || 'Moi')}</td>
+                    <td className="px-6 py-4 text-xs text-slate-300">{subj.teacher_name || (subj._readOnly ? t('other_teacher') : user?.fullName || t('me'))}</td>
                     <td className="px-6 py-4 text-center text-xs font-bold text-white">{subj.coefficient}</td>
                   </tr>
                 ))}
@@ -909,48 +913,48 @@ const Grades: React.FC = () => {
         <div className="glass-card overflow-hidden border-slate-800">
           <div className="p-6 border-b border-white/5 flex items-center">
             <Award className="w-5 h-5 text-amber-500 mr-2" />
-            <h2 className="text-lg font-black text-white uppercase tracking-tight">Validation des notes par matière</h2>
+            <h2 className="text-lg font-black text-white uppercase tracking-tight">{t('gr_subject_validation_heading', 'Validation des notes par matière')}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                  <th className="px-6 py-4">Matière</th>
-                  <th className="px-6 py-4">Domaine / Bloc</th>
-                  <th className="px-6 py-4 text-center">Coef</th>
-                  <th className="px-6 py-4">Statut Saisie</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-4">{t('gr_subject_col', 'Matière')}</th>
+                  <th className="px-6 py-4">{t('gr_domain_block_col', 'Domaine / Bloc')}</th>
+                  <th className="px-6 py-4 text-center">{t('gr_coef_col', 'Coef')}</th>
+                  <th className="px-6 py-4">{t('gr_entry_status_col', 'Statut Saisie')}</th>
+                  <th className="px-6 py-4 text-right">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-slate-900/30">
                 {subjectStatuses.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-8 text-slate-500 font-bold text-xs">
-                      Aucune matière programmée pour cette classe et cette période.
+                      {t('gr_no_subject_programmed', 'Aucune matière programmée pour cette classe et cette période.')}
                     </td>
                   </tr>
                 ) : (
                   subjectStatuses.map(subj => {
                     let statusBadge = (
-                      <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/5 rounded-full text-[9px] font-black uppercase tracking-wider">Pas de notes</span>
+                      <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/5 rounded-full text-[9px] font-black uppercase tracking-wider">{t('gr_no_grades_badge', 'Pas de notes')}</span>
                     );
                     if (subj.hasGrades) {
                       if (subj.isValidated) {
                         statusBadge = (
                           <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[9px] font-black uppercase tracking-wider inline-flex items-center">
-                            <CheckCircle2 className="w-3 h-3 mr-1" /> Validé
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> {t('validated')}
                           </span>
                         );
                       } else {
                         statusBadge = (
-                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">En attente de validation</span>
+                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-[9px] font-black uppercase tracking-wider">{t('pending_validation')}</span>
                         );
                       }
                     }
                     return (
                       <tr key={subj.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-black text-white uppercase text-sm tracking-tight">{subj.name}</td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">{subj.domain || 'Général'}</td>
+                        <td className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">{subj.domain || t('gr_general_domain', 'Général')}</td>
                         <td className="px-6 py-4 text-center text-xs font-bold text-white">{subj.coefficient}</td>
                         <td className="px-6 py-4">{statusBadge}</td>
                         <td className="px-6 py-4 text-right">
@@ -960,7 +964,7 @@ const Grades: React.FC = () => {
                                 onClick={() => handleViewSubjectDetails(subj)}
                                 className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all inline-flex items-center text-[10px] font-black uppercase tracking-wider"
                               >
-                                <Eye className="w-3.5 h-3.5 mr-1" /> Inspecter
+                                <Eye className="w-3.5 h-3.5 mr-1" /> {t('inspect')}
                               </button>
                             )}
                             {subj.hasGrades && !subj.isValidated && (
@@ -968,7 +972,7 @@ const Grades: React.FC = () => {
                                 onClick={() => handleValidateSubject(subj.id)}
                                 className="bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale-105 active:scale-95 transition-all"
                               >
-                                Valider les notes
+                                {t('validate_grades')}
                               </button>
                             )}
                           </div>
@@ -990,7 +994,7 @@ const Grades: React.FC = () => {
             <div className="p-6 border-b border-white/5 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-white uppercase">{selectedSubjectForDetail.name}</h3>
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Revue des notes de la classe</p>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{t('class_grades_review')}</p>
               </div>
               <button onClick={() => setShowDetailModal(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
                 <X className="w-5 h-5" />
@@ -1000,9 +1004,9 @@ const Grades: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="text-slate-500 text-[9px] font-black uppercase tracking-widest border-b border-white/5">
-                    <th className="pb-3">Élève</th>
-                    <th className="pb-3">Matricule</th>
-                    <th className="pb-3 text-right">Note/20</th>
+                    <th className="pb-3">{t('student')}</th>
+                    <th className="pb-3">{t('matricule')}</th>
+                    <th className="pb-3 text-right">{t('gr_score_out_of_20', 'Note/20')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-bold">
@@ -1012,7 +1016,7 @@ const Grades: React.FC = () => {
                       <td className="py-3 text-slate-400 text-xs">{g.matricule}</td>
                       <td className="py-3 text-right">
                         <span className={`px-3 py-1.5 rounded-lg text-xs font-black ${g.score === null ? 'bg-slate-800 text-slate-500' : g.score >= 10 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                          {g.score !== null ? Number(g.score).toFixed(2) : 'Abs/Non saisi'}
+                          {g.score !== null ? Number(g.score).toFixed(2) : t('gr_abs_not_entered', 'Abs/Non saisi')}
                         </span>
                       </td>
                     </tr>
@@ -1022,7 +1026,7 @@ const Grades: React.FC = () => {
             </div>
             <div className="p-6 border-t border-white/5 flex justify-end">
               <button onClick={() => setShowDetailModal(false)} className="bg-slate-800 text-white hover:bg-slate-700 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all">
-                Fermer
+                {t('close')}
               </button>
             </div>
           </div>
@@ -1042,7 +1046,7 @@ const Grades: React.FC = () => {
                 onClick={() => setConfirmModal(null)}
                 className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button
                 onClick={() => {
@@ -1051,7 +1055,7 @@ const Grades: React.FC = () => {
                 }}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
               >
-                Confirmer
+                {t('confirm_btn', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -1063,20 +1067,20 @@ const Grades: React.FC = () => {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="space-y-2 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white italic">Accorder une dérogation</h3>
+              <h3 className="text-lg font-black text-white italic">{t('gr_grant_override_title', 'Accorder une dérogation')}</h3>
               <button onClick={() => setShowOverrideModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Nombre de jours supplémentaires</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('gr_extra_days_label', 'Nombre de jours supplémentaires')}</label>
                 <input
                   type="number"
                   value={overrideDays}
                   onChange={e => setOverrideDays(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white font-bold"
-                  placeholder="ex: 3"
+                  placeholder={t('gr_extra_days_placeholder', 'ex: 3')}
                 />
               </div>
             </div>
@@ -1085,13 +1089,13 @@ const Grades: React.FC = () => {
                 onClick={() => setShowOverrideModal(false)}
                 className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button
                 onClick={submitOverride}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
               >
-                Confirmer
+                {t('confirm_btn', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -1103,20 +1107,20 @@ const Grades: React.FC = () => {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="space-y-2 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white italic">Demande de réactivation</h3>
+              <h3 className="text-lg font-black text-white italic">{t('gr_reactivation_request_title', 'Demande de réactivation')}</h3>
               <button onClick={() => setShowReactivationModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
-              <p className="text-slate-400 text-xs font-semibold">Le délai de saisie est dépassé. Vous pouvez soumettre une demande motivée de réactivation exceptionnelle au Directeur de l'école.</p>
+              <p className="text-slate-400 text-xs font-semibold">{t('gr_deadline_exceeded_desc', "Le délai de saisie est dépassé. Vous pouvez soumettre une demande motivée de réactivation exceptionnelle au Directeur de l'école.")}</p>
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Motif de la demande</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('gr_reason_label', 'Motif de la demande')}</label>
                 <textarea
                   value={reactivationReason}
                   onChange={e => setReactivationReason(e.target.value)}
                   className="w-full h-24 bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm font-semibold"
-                  placeholder="ex: Problème de connexion, notes reçues tardivement..."
+                  placeholder={t('gr_reason_placeholder', 'ex: Problème de connexion, notes reçues tardivement...')}
                 />
               </div>
             </div>
@@ -1125,13 +1129,13 @@ const Grades: React.FC = () => {
                 onClick={() => setShowReactivationModal(false)}
                 className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button
                 onClick={submitReactivationRequest}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
               >
-                Envoyer la demande
+                {t('send_request_btn', 'Envoyer la demande')}
               </button>
             </div>
           </div>

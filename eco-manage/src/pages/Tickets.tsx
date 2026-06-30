@@ -31,7 +31,7 @@ const Tickets: React.FC = () => {
   const [newAnnContent, setNewAnnContent] = useState('');
   const [newAnnTarget, setNewAnnTarget] = useState<string>('ALL');
 
-  const canPublish = ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'SECRETARY', 'TEACHER'].includes(user?.role || '');
+  const canPublish = ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'TEACHER'].includes(user?.role || '');
 
   const loadData = async () => {
     if (window.electronAPI && user) {
@@ -83,7 +83,7 @@ const Tickets: React.FC = () => {
                       message: newTicketMessage
                   }
               });
-              alert("Votre demande système a été soumise avec succès ! L'administration la traitera sous peu.");
+              alert(t('tick_system_request_success', "Votre demande système a été soumise avec succès ! L'administration la traitera sous peu."));
           } else {
               if (receiverRole === 'ALL_PARENTS') {
                   await window.electronAPI.sendTicket({
@@ -102,7 +102,7 @@ const Tickets: React.FC = () => {
                   });
               } else if (receiverRole === 'TITULAIRE') {
                   if (!receiverId) {
-                      alert("Veuillez sélectionner l'enfant et son enseignant.");
+                      alert(t('tick_select_child_teacher', "Veuillez sélectionner l'enfant et son enseignant."));
                       return;
                   }
                   await window.electronAPI.sendTicket({
@@ -121,7 +121,7 @@ const Tickets: React.FC = () => {
                   });
               } else if (receiverRole === 'CLASS_TEACHERS') {
                   if (!selectedClassId) {
-                      alert("Veuillez sélectionner une classe.");
+                      alert(t('tick_select_a_class', "Veuillez sélectionner une classe."));
                       return;
                   }
                   const cls = classes.find(c => c.id?.toString() === selectedClassId);
@@ -136,7 +136,7 @@ const Tickets: React.FC = () => {
                   if (cls?.assistant_teacher_id) teacherIds.add(cls.assistant_teacher_id);
                   teacherIds.delete(user.id);
                   if (teacherIds.size === 0) {
-                      alert("Aucun autre enseignant trouvé pour cette classe.");
+                      alert(t('tick_no_teacher_found', "Aucun autre enseignant trouvé pour cette classe."));
                       return;
                   }
                   for (const tid of teacherIds) {
@@ -151,7 +151,7 @@ const Tickets: React.FC = () => {
                   }
               } else if (receiverRole === 'CLASS_PARENTS') {
                   if (!selectedClassId) {
-                      alert("Veuillez sélectionner une classe.");
+                      alert(t('tick_select_a_class', "Veuillez sélectionner une classe."));
                       return;
                   }
                   const classStudents = studentsList.filter(s => s.class_id?.toString() === selectedClassId?.toString());
@@ -161,7 +161,7 @@ const Tickets: React.FC = () => {
                       if (parentUser) parentIds.add(parentUser.id);
                   }
                   if (parentIds.size === 0) {
-                      alert("Aucun parent trouvé pour cette classe.");
+                      alert(t('tick_no_parent_found', "Aucun parent trouvé pour cette classe."));
                       return;
                   }
                   for (const pid of parentIds) {
@@ -198,11 +198,11 @@ const Tickets: React.FC = () => {
                      });
                   }
               }
-              alert("Message envoyé !");
+              alert(t('tick_message_sent', "Message envoyé !"));
           }
 
           setNewTicketMessage('');
-          setNewTicketSubject('Message interne');
+          setNewTicketSubject(t('internal_message_default', 'Message interne'));
           setReceiverId('');
           setReceiverRole('DIRECTOR');
           setSelectedClassId('');
@@ -224,10 +224,10 @@ const Tickets: React.FC = () => {
               actionData.hours = extensionHours[ticketId] || 24;
           }
           await window.electronAPI.resolveTicket({ ticketId, status, actionData });
-          alert("Action effectuée avec succès !");
+          alert(t('tick_action_success', "Action effectuée avec succès !"));
           loadData();
       } catch (err: any) {
-          alert("Erreur lors de l'action : " + err.message);
+          alert(t('tick_action_error', "Erreur lors de l'action : ") + err.message);
       }
   };
 
@@ -254,7 +254,7 @@ const Tickets: React.FC = () => {
 
   const visibleAnnouncements = announcements.filter(a => {
       if (!user) return false;
-      if (['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'SECRETARY'].includes(user.role)) {
+      if (['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'].includes(user.role)) {
           return true; // Administrators see everything
       }
       if (a.target === 'ALL') return true;
@@ -324,7 +324,7 @@ const Tickets: React.FC = () => {
                       <div>
                         <h3 className="text-lg font-bold text-white">{a.title}</h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {t('published_by', 'Diffusé par')} <span className="text-amber-500 font-semibold">{a.sender_name || t('administration')}</span>
+                          {t('published_by', 'Diffusé par')} <span className="text-amber-500 font-semibold">{a.sender_name || t('administration', 'Administration')}</span>
                         </p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -341,7 +341,7 @@ const Tickets: React.FC = () => {
                     <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{a.content}</p>
 
                     <div className="text-[10px] text-slate-500 flex justify-between items-center pt-2 border-t border-white/5">
-                      <span>{schoolName ? `Établissement ${schoolName}` : 'Établissement'}</span>
+                      <span>{schoolName ? t('tick_school_with_name', 'Établissement {{name}}', { name: schoolName }) : t('tick_school_label', 'Établissement')}</span>
                       <span>{new Date(a.created_at).toLocaleString('fr-FR')}</span>
                     </div>
                   </div>
@@ -379,9 +379,9 @@ const Tickets: React.FC = () => {
                   >
                     <option value="ALL">{t('target_all_option', 'Tout le monde (Personnels)')}</option>
                     <option value="STAFF">{t('target_staff_option', 'Personnels de l\'école uniquement')}</option>
-                    <option value="PARENTS">Tous les parents</option>
+                    <option value="PARENTS">{t('tick_all_parents_option', 'Tous les parents')}</option>
                     {user?.role === 'TEACHER' && classes.filter(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id).map(c => (
-                        <option key={`CLASS_${c.id}`} value={`CLASS_${c.id}`}>Aux parents de la classe : {c.name}</option>
+                        <option key={`CLASS_${c.id}`} value={`CLASS_${c.id}`}>{t('tick_class_parents_option', 'Aux parents de la classe : {{className}}', { className: c.name })}</option>
                     ))}
                   </select>
                 </div>
@@ -431,25 +431,25 @@ const Tickets: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {tickets.map((ticket) => {
-                  let senderIdentity = ticket.sender_name || t('administration');
+                  let senderIdentity = ticket.sender_name || t('administration', 'Administration');
                   if (ticket.sender_civility) {
                       const civ = ticket.sender_civility === 'M.' ? t('mr', 'Monsieur') : (ticket.sender_civility === 'Mme' ? t('mrs', 'Madame') : ticket.sender_civility);
                       senderIdentity = `${civ} ${senderIdentity}`;
                   } else if (ticket.sender_name && ticket.sender_role !== 'SUPERADMIN') {
-                      senderIdentity = `Monsieur/Madame ${senderIdentity}`;
+                      senderIdentity = `${t('tick_mr_mrs', 'Monsieur/Madame')} ${senderIdentity}`;
                   }
-                  
+
                   let senderContext = '';
                   if (ticket.sender_role === 'TEACHER' && ticket.teacher_classes) {
-                      senderContext = `(Enseignant - Salle: ${ticket.teacher_classes})`;
+                      senderContext = t('tick_context_teacher', '(Enseignant - Salle: {{room}})', { room: ticket.teacher_classes });
                   } else if (ticket.sender_role === 'PARENT' && ticket.parent_students) {
-                      senderContext = `(Parent de: ${ticket.parent_students})`;
+                      senderContext = t('tick_context_parent', '(Parent de: {{students}})', { students: ticket.parent_students });
                   } else if (ticket.sender_role === 'DIRECTOR') {
-                      senderContext = `(La Direction)`;
+                      senderContext = t('tick_context_director', '(La Direction)');
                   } else if (ticket.sender_role === 'BURSAR') {
-                      senderContext = `(L'Économat)`;
+                      senderContext = t('tick_context_bursar', '(L\'Économat)');
                   } else if (ticket.sender_role === 'DRIVER') {
-                      senderContext = `(Chauffeur)`;
+                      senderContext = t('tick_context_driver', '(Chauffeur)');
                   } else if (ticket.sender_role) {
                       senderContext = `(${ticket.sender_role})`;
                   }
@@ -468,46 +468,46 @@ const Tickets: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          (ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système')
+                          (ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système' || !ticket.request_type || ticket.request_type === 'STANDARD')
                             ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                            : ticket.status === 'OPEN' 
-                              ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
+                            : ticket.status === 'OPEN'
+                              ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
                               : 'bg-green-500/10 text-green-500 border border-green-500/20'
                         }`}>
-                          {(ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système')
+                          {(ticket.subject === 'Alerte Système' || ticket.subject === 'Notification Système' || !ticket.request_type || ticket.request_type === 'STANDARD')
                             ? t('status_info', 'INFORMATION')
                             : ticket.status === 'OPEN' ? t('status_pending', 'EN ATTENTE') : t('status_resolved', 'RÉSOLU')}
                         </span>
                         
-                        {ticket.status === 'OPEN' && ticket.request_type && ticket.sender_id !== user?.id && (
+                        {ticket.status === 'OPEN' && ticket.request_type && ticket.request_type !== 'STANDARD' && ticket.sender_id !== user?.id && (
                             <div className="mt-2 flex flex-col items-end gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
                                 {ticket.request_type === 'GRADE_EXTENSION' && (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[9px] text-slate-400 font-bold uppercase">Durée :</span>
-                                        <select 
+                                        <span className="text-[9px] text-slate-400 font-bold uppercase">{t('tick_duration_label', 'Durée :')}</span>
+                                        <select
                                             value={extensionHours[ticket.id] || 24}
                                             onChange={(e) => setExtensionHours({...extensionHours, [ticket.id]: parseInt(e.target.value)})}
                                             className="bg-slate-800 text-white text-[10px] p-1 rounded border border-slate-700 outline-none"
                                         >
-                                            <option value={2}>2 Heures</option>
-                                            <option value={12}>12 Heures</option>
-                                            <option value={24}>24 Heures</option>
-                                            <option value={48}>48 Heures</option>
+                                            <option value={2}>{t('tick_2_hours', '2 Heures')}</option>
+                                            <option value={12}>{t('tick_12_hours', '12 Heures')}</option>
+                                            <option value={24}>{t('tick_24_hours', '24 Heures')}</option>
+                                            <option value={48}>{t('tick_48_hours', '48 Heures')}</option>
                                         </select>
                                     </div>
                                 )}
                                 <div className="flex gap-2">
-                                    <button 
+                                    <button
                                         onClick={() => handleResolveTicket(ticket.id, 'RESOLVED', ticket.request_type)}
                                         className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all shadow-lg"
                                     >
                                         {ticket.request_type === 'GRADE_EXTENSION' ? t('validate_extension', 'Valider Extension') : t('approve', 'Approuver')}
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => handleResolveTicket(ticket.id, 'REJECTED', ticket.request_type)}
                                         className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all"
                                     >
-                                        Refuser
+                                        {t('tick_reject', 'Refuser')}
                                     </button>
                                 </div>
                             </div>
@@ -534,23 +534,23 @@ const Tickets: React.FC = () => {
                     onChange={(e) => {
                         const type = e.target.value;
                         setRequestType(type);
-                        setNewTicketSubject(type === 'STANDARD' ? 'Message interne' : e.target.options[e.target.selectedIndex].text);
+                        setNewTicketSubject(type === 'STANDARD' ? t('internal_message_default', 'Message interne') : e.target.options[e.target.selectedIndex].text);
                         if (type === 'GRADE_EXTENSION') setRequestData({ term: termStructure[0]?.term_id, sequence: termStructure[0]?.sequences?.[0]?.id, classId: classes[0]?.id });
                     }}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                 >
-                    <option value="STANDARD">Message standard / Autre</option>
+                    <option value="STANDARD">{t('tick_standard_message', 'Message standard / Autre')}</option>
                     {(user?.role === 'TEACHER' || user?.role === 'DIRECTOR') && (
                         <>
-                            <option value="GRADE_EXTENSION">Demande d'extension de délai (Saisie des notes)</option>
-                            <option value="ABSENCE_JUSTIFICATION">Justificatif de saisie d'absences</option>
+                            <option value="GRADE_EXTENSION">{t('tick_grade_extension_request', "Demande d'extension de délai (Saisie des notes)")}</option>
+                            <option value="ABSENCE_JUSTIFICATION">{t('tick_absence_justification', "Justificatif de saisie d'absences")}</option>
                         </>
                     )}
                     {(user?.role === 'BURSAR' || user?.role === 'FOUNDER') && (
-                        <option value="CASH_WITHDRAWAL">Demande de décaissement / retrait d'argent</option>
+                        <option value="CASH_WITHDRAWAL">{t('tick_cash_withdrawal', "Demande de décaissement / retrait d'argent")}</option>
                     )}
-                    {user?.role === 'SECRETARY' && (
-                        <option value="PRINT_AUTHORIZATION">Autorisation d'impression des bulletins</option>
+                    {user?.role === 'SG' && (
+                        <option value="PRINT_AUTHORIZATION">{t('tick_print_authorization', "Autorisation d'impression des bulletins")}</option>
                     )}
                 </select>
               </div>
@@ -558,19 +558,19 @@ const Tickets: React.FC = () => {
               {requestType === 'GRADE_EXTENSION' && (
                   <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe concernée</label>
-                          <select 
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_class_concerned', 'Classe concernée')}</label>
+                          <select
                             value={requestData.classId}
                             onChange={(e) => setRequestData({...requestData, classId: parseInt(e.target.value)})}
                             className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"
                           >
-                              <option value="">Sélectionner...</option>
+                              <option value="">{t('tick_select_placeholder', 'Sélectionner...')}</option>
                               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Période / Séquence</label>
-                          <select 
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_period_sequence', 'Période / Séquence')}</label>
+                          <select
                             value={`${requestData.term}_${requestData.sequence}`}
                             onChange={(e) => {
                                 const [t, s] = e.target.value.split('_');
@@ -578,7 +578,7 @@ const Tickets: React.FC = () => {
                             }}
                             className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"
                           >
-                              <option value="_">Sélectionner...</option>
+                              <option value="_">{t('tick_select_placeholder', 'Sélectionner...')}</option>
                               {termStructure.flatMap(t => t.sequences?.map((s: any) => (
                                   <option key={`${t.term_id}_${s.id}`} value={`${t.term_id}_${s.id}`}>{t.name} - {s.name}</option>
                               )))}
@@ -586,26 +586,26 @@ const Tickets: React.FC = () => {
                       </div>
                   </div>
               )}
-              
+
               {requestType === 'ABSENCE_JUSTIFICATION' && (
                   <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Date / Période</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_date_period', 'Date / Période')}</label>
                           <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs" />
                       </div>
                   </div>
               )}
-              
+
               {requestType === 'CASH_WITHDRAWAL' && (
                   <div className="grid grid-cols-1 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Montant demandé</label>
-                          <input 
-                            type="number" 
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_amount_requested', 'Montant demandé')}</label>
+                          <input
+                            type="number"
                             placeholder="Ex: 50000"
                             value={requestData.amount || ''}
                             onChange={(e) => setRequestData({...requestData, amount: e.target.value})}
-                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs" 
+                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"
                           />
                       </div>
                   </div>
@@ -613,7 +613,7 @@ const Tickets: React.FC = () => {
 
               <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cible (Rôle)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_target_role', 'Cible (Rôle)')}</label>
                     <select
                         value={receiverRole}
                         onChange={(e) => { setReceiverRole(e.target.value); setReceiverId(''); setStudentSearchTerm(''); setSelectedClassId(''); }}
@@ -621,31 +621,31 @@ const Tickets: React.FC = () => {
                     >
                         {user?.role === 'PARENT' ? (
                             <>
-                                <option value="TITULAIRE">Enseignant Titulaire de mon enfant</option>
-                                <option value="DIRECTOR">La Direction</option>
-                                <option value="FOUNDER">Le Fondateur</option>
+                                <option value="TITULAIRE">{t('titulaire_of_child', 'Enseignant Titulaire de mon enfant')}</option>
+                                <option value="DIRECTOR">{t('tick_director_office', 'La Direction')}</option>
+                                <option value="FOUNDER">{t('tick_founder_office', 'Le Fondateur')}</option>
                             </>
                         ) : (
                             <>
-                                <option value="FOUNDER">Le Fondateur</option>
-                                <option value="DIRECTOR">La Direction</option>
-                                <option value="SG">Secrétariat Général</option>
-                                <option value="BURSAR">Économat</option>
-                                <option value="ADVISOR">Conseiller Pédagogique</option>
+                                <option value="FOUNDER">{t('tick_founder_office', 'Le Fondateur')}</option>
+                                <option value="DIRECTOR">{t('tick_director_office', 'La Direction')}</option>
+                                <option value="SG">{t('tick_sg_office', 'Secrétariat Général')}</option>
+                                <option value="BURSAR">{t('tick_bursar_office', 'Économat')}</option>
+                                <option value="ADVISOR">{t('tick_advisor_office', 'Conseiller Pédagogique')}</option>
                                 {user?.role === 'TEACHER' && classes.some(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id) && (
-                                    <option value="PARENT">Parent d'un élève (Privé)</option>
+                                    <option value="PARENT">{t('tick_parent_of_student', "Parent d'un élève (Privé)")}</option>
                                 )}
                                 {user?.role === 'TEACHER' && classes.some(c => c.main_teacher_id === user?.id) && (
-                                    <option value="CLASS_TEACHERS">Enseignants de ma classe</option>
+                                    <option value="CLASS_TEACHERS">{t('class_teachers_msg', 'Enseignants de ma classe')}</option>
                                 )}
                                 {user?.role !== 'TEACHER' && user?.role !== 'PARENT' && (
-                                    <option value="PARENT">Parent d'un élève (Privé)</option>
+                                    <option value="PARENT">{t('tick_parent_of_student', "Parent d'un élève (Privé)")}</option>
                                 )}
-                                {user?.role === 'SECRETARY' && (
+                                {user?.role === 'SG' && (
                                     <>
-                                        <option value="ALL_PARENTS">Tous les Parents (Diffusion)</option>
-                                        <option value="CLASS_PARENTS">Parents d'une classe spécifique</option>
-                                        <option value="TEACHER">Un Enseignant</option>
+                                        <option value="ALL_PARENTS">{t('all_parents_broadcast', 'Tous les Parents (Diffusion)')}</option>
+                                        <option value="CLASS_PARENTS">{t('class_parents_specific', "Parents d'une classe spécifique")}</option>
+                                        <option value="TEACHER">{t('a_teacher', 'Un Enseignant')}</option>
                                     </>
                                 )}
                             </>
@@ -653,19 +653,19 @@ const Tickets: React.FC = () => {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ou Personne précise</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_or_specific_person', 'Ou Personne précise')}</label>
                     <select
                         value={receiverId}
-                        onChange={(e) => { 
+                        onChange={(e) => {
                             const val = e.target.value;
-                            setReceiverId(val ? Number(val) : ''); 
+                            setReceiverId(val ? Number(val) : '');
                             if (val) setReceiverRole('');
                         }}
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                     >
-                        <option value="">-- Ignorer (utiliser le rôle) --</option>
+                        <option value="">{t('tick_ignore_use_role', '-- Ignorer (utiliser le rôle) --')}</option>
                         {Array.from(new Set(usersList.filter(u => u.role !== 'PARENT').map(u => u.role))).map(role => (
-                            <optgroup key={role} label={role === 'TEACHER' ? 'ENSEIGNANTS' : role === 'DIRECTOR' ? 'DIRECTION' : role}>
+                            <optgroup key={role} label={role === 'TEACHER' ? t('tick_teachers_group', 'ENSEIGNANTS') : role === 'DIRECTOR' ? t('tick_direction_group', 'DIRECTION') : role}>
                                 {usersList.filter(u => u.role === role).map(u => (
                                     <option key={u.id} value={u.id}>{u.fullName || u.full_name}</option>
                                 ))}
@@ -677,13 +677,13 @@ const Tickets: React.FC = () => {
 
               {receiverRole === 'CLASS_PARENTS' && (
                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe ciblée</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('target_class', 'Classe ciblée')}</label>
                       <select
                           value={selectedClassId}
                           onChange={(e) => setSelectedClassId(e.target.value)}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                       >
-                          <option value="">-- Sélectionner une classe --</option>
+                          <option value="">{t('select_class', '-- Sélectionner une classe --')}</option>
                           {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level} - {c.section})</option>)}
                       </select>
                   </div>
@@ -691,20 +691,20 @@ const Tickets: React.FC = () => {
 
               {receiverRole === 'TITULAIRE' && user?.role === 'PARENT' && (
                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Choisir l'enfant</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('choose_child', "Choisir l'enfant")}</label>
                       <select
                           value={receiverId}
                           onChange={(e) => setReceiverId(e.target.value ? Number(e.target.value) : '')}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                       >
-                          <option value="">-- Sélectionner --</option>
+                          <option value="">{t('select_option', '-- Sélectionner --')}</option>
                           {studentsList.filter(s => s.parent_contact === user?.username).map(s => {
                               const cls = classes.find(c => c.id === s.class_id);
                               const titulaire = cls ? usersList.find(u => u.id === cls.main_teacher_id) : null;
                               const suppleant = cls ? usersList.find(u => u.id === cls.assistant_teacher_id) : null;
                               return [
-                                  titulaire && <option key={`tit-${s.id}`} value={titulaire.id}>{s.first_name} {s.last_name} - Titulaire: {titulaire.fullName || titulaire.full_name} ({cls?.name})</option>,
-                                  suppleant && <option key={`sup-${s.id}`} value={suppleant.id}>{s.first_name} {s.last_name} - Suppléant: {suppleant.fullName || suppleant.full_name} ({cls?.name})</option>
+                                  titulaire && <option key={`tit-${s.id}`} value={titulaire.id}>{t('tick_child_main_teacher_option', '{{firstName}} {{lastName}} - Titulaire: {{teacherName}} ({{className}})', { firstName: s.first_name, lastName: s.last_name, teacherName: titulaire.fullName || titulaire.full_name, className: cls?.name })}</option>,
+                                  suppleant && <option key={`sup-${s.id}`} value={suppleant.id}>{t('tick_child_assistant_teacher_option', '{{firstName}} {{lastName}} - Suppléant: {{teacherName}} ({{className}})', { firstName: s.first_name, lastName: s.last_name, teacherName: suppleant.fullName || suppleant.full_name, className: cls?.name })}</option>
                               ];
                           })}
                       </select>
@@ -713,13 +713,13 @@ const Tickets: React.FC = () => {
 
               {receiverRole === 'CLASS_TEACHERS' && user?.role === 'TEACHER' && (
                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classe concernée</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_class_concerned', 'Classe concernée')}</label>
                       <select
                           value={selectedClassId}
                           onChange={(e) => setSelectedClassId(e.target.value)}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
                       >
-                          <option value="">-- Sélectionner --</option>
+                          <option value="">{t('select_option', '-- Sélectionner --')}</option>
                           {classes.filter(c => c.main_teacher_id === user?.id).map(c => (
                               <option key={c.id} value={c.id}>{c.name} ({c.level} - {c.section})</option>
                           ))}
@@ -729,10 +729,10 @@ const Tickets: React.FC = () => {
 
               {receiverRole === 'PARENT' && (
                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Rechercher l'élève (Destinataire: Parent)</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_search_student_recipient', 'Rechercher l\'élève (Destinataire: Parent)')}</label>
                       <input
                           type="text"
-                          placeholder="Tapez le nom de l'élève..."
+                          placeholder={t('tick_type_student_name', "Tapez le nom de l'élève...")}
                           value={studentSearchTerm}
                           onChange={(e) => setStudentSearchTerm(e.target.value)}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-amber-500"
@@ -743,25 +743,25 @@ const Tickets: React.FC = () => {
                                   const teacherClassIds = user?.role === 'TEACHER' ? classes.filter(c => c.main_teacher_id === user?.id || c.assistant_teacher_id === user?.id).map(c => c.id) : null;
                                   const filtered = studentsList.filter(s => { if (teacherClassIds && !teacherClassIds.includes(s.class_id)) return false; const safeFirst = (s.first_name || '').trim(); const safeLast = (s.last_name || '').trim(); const fullName = `${safeFirst} ${safeLast}`.replace(/\s+/g, ' ').toLowerCase(); const revName = `${safeLast} ${safeFirst}`.replace(/\s+/g, ' ').toLowerCase(); const search = studentSearchTerm.replace(/\s+/g, ' ').toLowerCase().trim(); return fullName.includes(search) || revName.includes(search) || safeFirst.toLowerCase().includes(search) || safeLast.toLowerCase().includes(search); }).slice(0, 10);
                                   if (filtered.length === 0) {
-                                      return <div className="p-2 text-xs text-slate-400 text-center italic">Aucun élève trouvé contenant "{studentSearchTerm}" (Parmi {studentsList.length} élèves)</div>;
+                                      return <div className="p-2 text-xs text-slate-400 text-center italic">{t('tick_no_student_found_search', 'Aucun élève trouvé contenant "{{search}}" (Parmi {{total}} élèves)', { search: studentSearchTerm, total: studentsList.length })}</div>;
                                   }
                                   return filtered.map(s => (
-                                      <div 
-                                          key={s.id} 
+                                      <div
+                                          key={s.id}
                                           onClick={() => {
                                               setStudentSearchTerm(`${s.first_name} ${s.last_name}`);
                                               const parentUser = usersList.find(u => u.role === 'PARENT' && u.username === s.parent_contact);
                                               if (parentUser) {
                                                   setReceiverId(parentUser.id);
                                               } else {
-                                                  alert("Cet élève n'a pas de compte parent configuré (numéro de parent non trouvé).");
+                                                  alert(t('tick_no_parent_account', "Cet élève n'a pas de compte parent configuré (numéro de parent non trouvé)."));
                                                   setReceiverId('');
                                               }
                                           }}
                                           className="p-2 text-xs text-white cursor-pointer hover:bg-slate-700 border-b border-slate-700/50 flex justify-between items-center"
                                       >
-                                          <span><span className="font-bold text-amber-500">{s.first_name} {s.last_name}</span> (Classe: {classes?.find(c => c.id === s.class_id)?.name || 'N/A'})</span>
-                                          <span className="text-[10px] text-slate-400">Parent: {s.parent_name || 'Inconnu'}</span>
+                                          <span><span className="font-bold text-amber-500">{s.first_name} {s.last_name}</span> ({t('tick_class_label', 'Classe:')} {classes?.find(c => c.id === s.class_id)?.name || 'N/A'})</span>
+                                          <span className="text-[10px] text-slate-400">{t('tick_parent_label', 'Parent:')} {s.parent_name || t('tick_unknown_parent', 'Inconnu')}</span>
                                       </div>
                                   ));
                               })()}

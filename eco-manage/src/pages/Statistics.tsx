@@ -19,6 +19,7 @@ const Statistics: React.FC = () => {
   const [honorClass, setHonorClass] = useState<string>('ALL');
   const [activeCycle, setActiveCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [school, setSchool] = useState<any>(null);
+  const [reportTemplate, setReportTemplate] = useState<any>(null);
   const [allClasses, setAllClasses] = useState<any[]>([]);
   const [currency, setCurrency] = useState('FCFA');
 
@@ -38,6 +39,12 @@ const Statistics: React.FC = () => {
         const schoolsList = await window.electronAPI.getSchools();
         const curSchool = schoolsList.find((s: any) => s.id?.toString() === user.schoolId?.toString());
         setSchool(curSchool);
+        if (curSchool && window.electronAPI.getReportTemplate) {
+          try {
+            const tpl = await window.electronAPI.getReportTemplate(curSchool.id);
+            setReportTemplate(tpl);
+          } catch (e) {}
+        }
         const curr = await window.electronAPI.getSetting('currency');
         if (curr) setCurrency(curr);
       }
@@ -147,7 +154,7 @@ const Statistics: React.FC = () => {
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{t('honor_rolls', 'Honor Rolls')}</p>
               <h3 className="text-4xl font-black text-white">{stats.honorRoll ? stats.honorRoll.length : 0}</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-purple-500">
-                  Moyennes &ge; {stats.honorRollThreshold || 15}/20
+                  {t('stats_avg_threshold', 'Moyennes ≥ {{threshold}}/20', { threshold: stats.honorRollThreshold || 15 })}
               </div>
           </div>
       </div>
@@ -199,7 +206,7 @@ const Statistics: React.FC = () => {
                   <div className="flex justify-between items-center relative z-10 mb-8">
                       <div>
                           <h2 className="text-2xl font-black text-slate-950 italic tracking-tight uppercase">{t('honor_roll', 'Tableau d\'Honneur')}</h2>
-                          <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest">Meilleurs élèves (Moy {">="} {stats.honorRollThreshold || 15}/20)</p>
+                          <p className="text-amber-950/70 text-[10px] font-black uppercase tracking-widest">{t('stats_best_students', 'Meilleurs élèves (Moy {{op}} {{threshold}}/20)', { op: '≥', threshold: stats.honorRollThreshold || 15 })}</p>
                       </div>
                   </div>
 
@@ -222,7 +229,7 @@ const Statistics: React.FC = () => {
                           const keys = Array.from(allPossibleKeys).sort();
                           
                           if (keys.length === 0) {
-                              return <div className="flex items-center justify-center h-32"><p className="text-center text-amber-950/60 text-sm font-black uppercase tracking-widest py-4">Aucun élève au tableau d'honneur</p></div>;
+                              return <div className="flex items-center justify-center h-32"><p className="text-center text-amber-950/60 text-sm font-black uppercase tracking-widest py-4">{t('stats_no_honor_roll', "Aucun élève au tableau d'honneur")}</p></div>;
                           }
                           
                           const cycles = Array.from(new Set(keys.map(k => k.split(' > ')[0])));
@@ -250,29 +257,29 @@ const Statistics: React.FC = () => {
                                           onChange={(e) => { setHonorCycle(e.target.value); setHonorClass('ALL'); }}
                                           className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
                                       >
-                                          <option value="ALL">Tous les cycles</option>
+                                          <option value="ALL">{t('stats_all_cycles_opt', 'Tous les cycles')}</option>
                                           {cycles.map(c => <option key={c} value={c}>{c}</option>)}
                                       </select>
-                                      <select 
+                                      <select
                                           value={honorSection}
                                           onChange={(e) => { setHonorSection(e.target.value); setHonorClass('ALL'); }}
                                           className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
                                       >
-                                          <option value="ALL">Toutes les sections</option>
+                                          <option value="ALL">{t('stats_all_sections_opt', 'Toutes les sections')}</option>
                                           {sections.map(s => <option key={s} value={s}>{s}</option>)}
                                       </select>
-                                      <select 
+                                      <select
                                           value={honorClass}
                                           onChange={(e) => setHonorClass(e.target.value)}
                                           className="w-full bg-amber-900/10 border border-amber-900/20 text-amber-950 font-bold p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
                                       >
-                                          <option value="ALL">Toutes les classes</option>
+                                          <option value="ALL">{t('stats_all_classes_opt', 'Toutes les classes')}</option>
                                           {classesList.map(c => <option key={c} value={c}>{c}</option>)}
                                       </select>
                                   </div>
-                                  
+
                                   {filteredKeys.length === 0 && (
-                                      <p className="text-center text-amber-950/60 text-xs font-bold py-4">Aucun résultat pour ces filtres.</p>
+                                      <p className="text-center text-amber-950/60 text-xs font-bold py-4">{t('stats_no_results_filters', 'Aucun résultat pour ces filtres.')}</p>
                                   )}
                                   
                                   {filteredKeys.map((groupName, gIdx) => {
@@ -281,7 +288,7 @@ const Statistics: React.FC = () => {
                                           <div key={gIdx} className="space-y-3">
                                               <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-900/10 pb-1">{groupName}</h3>
                                               {groupStudents.length === 0 ? (
-                                                  <p className="text-amber-900/50 text-[10px] italic text-center py-2 font-bold">Aucun élève n'a atteint le seuil requis ({stats.honorRollThreshold || 15}/20)</p>
+                                                  <p className="text-amber-900/50 text-[10px] italic text-center py-2 font-bold">{t('stats_no_student_threshold', "Aucun élève n'a atteint le seuil requis ({{threshold}}/20)", { threshold: stats.honorRollThreshold || 15 })}</p>
                                               ) : (
                                                   groupStudents.map((s: any, i: number) => (
                                                       <div key={i} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
@@ -308,7 +315,11 @@ const Statistics: React.FC = () => {
                           const honorRoll = stats.honorRoll || [];
                           if (honorRoll.length === 0) return;
                           honorRoll.forEach((student: any) => {
-                            generateHonorCertificate(student.name, student.class, student.avg, school);
+                            generateHonorCertificate(student.name, student.class, student.avg, school, {
+                              rank: student.rank,
+                              totalStudents: student.totalStudents,
+                              template: reportTemplate
+                            });
                           });
                           alert(t('certificates_generated', "Certificats d'honneur générés avec succès."));
                       }}

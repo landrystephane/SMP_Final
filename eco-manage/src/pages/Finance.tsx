@@ -3,6 +3,7 @@ import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, C
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { notifyDataChanged } from '../utils/dataSync';
 
 const Finance: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -75,7 +76,7 @@ const Finance: React.FC = () => {
                 installmentId: paymentData.installmentId ? parseInt(paymentData.installmentId) : null
             });
             if (res && res.error) {
-                showNotification(`Erreur de paiement: ${res.error}`, "error");
+                showNotification(t('fin_payment_error', 'Erreur de paiement: {{error}}', { error: res.error }), "error");
                 return;
             }
             if (res.receiptNumber) {
@@ -89,11 +90,12 @@ const Finance: React.FC = () => {
                 // @ts-ignore
                 import('../utils/reports').then(m => m.generatePaymentReceipt(pd, s, financials, activeSchool));
             }
-            showNotification("Paiement enregistré avec succès !", "success");
+            showNotification(t('fin_payment_success', 'Paiement enregistré avec succès !'), "success");
             loadData();
+            notifyDataChanged();
         } catch (err: any) {
             console.error(err);
-            showNotification("Erreur: " + err.message, "error");
+            showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
         }
     }
   };
@@ -101,16 +103,16 @@ const Finance: React.FC = () => {
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPayment.depositorName.trim()) {
-        showNotification("Le nom de celui qui fait le versement est obligatoire.", "warning");
+        showNotification(t('fin_depositor_name_required', 'Le nom de celui qui fait le versement est obligatoire.'), "warning");
         return;
     }
     if (!newPayment.studentId) {
-        showNotification("Veuillez sélectionner un élève.", "warning");
+        showNotification(t('fin_select_student_required', 'Veuillez sélectionner un élève.'), "warning");
         return;
     }
     const parsedAmount = parseFloat(newPayment.amount.toString().replace(/\s+/g, ''));
     if (!parsedAmount || parsedAmount <= 0) {
-        showNotification("Veuillez saisir un montant valide.", "warning");
+        showNotification(t('fin_valid_amount_required', 'Veuillez saisir un montant valide.'), "warning");
         return;
     }
 
@@ -127,7 +129,7 @@ const Finance: React.FC = () => {
             });
 
             if (res && res.error) {
-                showNotification(`Erreur de paiement: ${res.error}`, "error");
+                showNotification(t('fin_payment_error', 'Erreur de paiement: {{error}}', { error: res.error }), "error");
                 setIsAddingPayment(false);
                 return;
             }
@@ -158,9 +160,9 @@ const Finance: React.FC = () => {
 
                 // Build ventilation summary
                 const summary = res.receipts.map((r: any) => `${r.installmentName || r.type} ${r.amount.toLocaleString()} ${currency}`).join(', ');
-                showNotification(`Paiement ventilé: ${summary}`, "success");
+                showNotification(t('fin_payment_ventilated', 'Paiement ventilé: {{summary}}', { summary }), "success");
             } else {
-                showNotification("Paiement enregistré avec succès !", "success");
+                showNotification(t('fin_payment_success', 'Paiement enregistré avec succès !'), "success");
             }
 
             setIsAddingPayment(false);
@@ -172,15 +174,16 @@ const Finance: React.FC = () => {
                 await window.electronAPI.createNotification({
                     school_id: localStorage.getItem('impersonated_school_id') || currentUser?.schoolId,
                     role: currentUser?.role || 'ALL',
-                    message: `Un paiement de ${parsedAmount.toLocaleString()} ${currency} a été enregistré pour l'élève ${studentInfo?.last_name} ${studentInfo?.first_name || ''} (ventilation automatique).`,
+                    message: t('fin_notif_payment_registered', 'Un paiement de {{amount}} {{currency}} a été enregistré pour l\'élève {{lastName}} {{firstName}} (ventilation automatique).', { amount: parsedAmount.toLocaleString(), currency, lastName: studentInfo?.last_name, firstName: studentInfo?.first_name || '' }),
                     type: 'FINANCE'
                 });
             } catch(e) { console.error("Notification failed", e); }
 
             loadData();
+            notifyDataChanged();
         } catch (err: any) {
             console.error(err);
-            showNotification("Erreur: " + err.message, "error");
+            showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
         }
     }
   };
@@ -201,16 +204,17 @@ const Finance: React.FC = () => {
             await window.electronAPI.createNotification({
                 school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
                 role: 'FOUNDER',
-                message: `Une demande de ${newExpense.amount} ${currency} a été soumise par l'Économe pour: ${newExpense.reason}. \n\nVeuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`,
+                message: t('fin_notif_expense_request', 'Une demande de {{amount}} {{currency}} a été soumise par l\'Économe pour: {{reason}}. \n\nVeuillez vous rendre dans l\'onglet "Gestion Financière > Décaissements" pour l\'approuver ou la rejeter.', { amount: newExpense.amount, currency, reason: newExpense.reason }),
                 type: 'FINANCE'
             });
 
             setNewExpense({ amount: '', reason: '' });
-            showNotification("Demande de décaissement soumise pour validation.", "success");
+            showNotification(t('fin_expense_submitted', 'Demande de décaissement soumise pour validation.'), "success");
             loadData();
+            notifyDataChanged();
         } catch (err: any) {
             console.error(err);
-            showNotification("Erreur: " + err.message, "error");
+            showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
         }
     }
   };
@@ -231,24 +235,27 @@ const Finance: React.FC = () => {
                 await window.electronAPI.createNotification({
                     school_id: localStorage.getItem('impersonated_school_id') || user?.schoolId,
                     user_id: exp.requested_by,
-                    message: `Votre demande de ${exp.amount} ${currency} a été ${status === 'VALIDATED' ? 'approuvée' : 'rejetée'} par ${user.fullName}.`,
+                    message: status === 'VALIDATED'
+                        ? t('fin_notif_expense_approved', 'Votre demande de {{amount}} {{currency}} a été approuvée par {{fullName}}.', { amount: exp.amount, currency, fullName: user.fullName })
+                        : t('fin_notif_expense_rejected', 'Votre demande de {{amount}} {{currency}} a été rejetée par {{fullName}}.', { amount: exp.amount, currency, fullName: user.fullName }),
                     type: 'FINANCE'
                 });
             }
 
-            showNotification(status === 'VALIDATED' ? "Décaissement approuvé" : "Décaissement rejeté", "success");
+            showNotification(status === 'VALIDATED' ? t('fin_expense_approved', 'Décaissement approuvé') : t('fin_expense_rejected', 'Décaissement rejeté'), "success");
             loadData();
+            notifyDataChanged();
         } catch (err: any) {
             console.error(err);
-            showNotification("Erreur: " + err.message, "error");
+            showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
         }
     }
   };
 
   const handleNotifyRetards = async (installmentId: number) => {
       setConfirmModal({
-          title: "Envoyer les relances d'échéance",
-          message: "Voulez-vous envoyer une notification d'échéance à tous les parents retardataires pour cette tranche ?",
+          title: t('fin_send_reminders_title', 'Envoyer les relances d\'échéance'),
+          message: t('fin_send_reminders_msg', 'Voulez-vous envoyer une notification d\'échéance à tous les parents retardataires pour cette tranche ?'),
           onConfirm: async () => {
               setIsNotifying(true);
               try {
@@ -259,13 +266,13 @@ const Finance: React.FC = () => {
                           senderId: user.id
                       });
                       if (res.success) {
-                          showNotification(`${res.notifiedCount} notifications envoyées avec succès.`, "success");
+                          showNotification(t('fin_notifications_sent', '{{count}} notifications envoyées avec succès.', { count: res.notifiedCount }), "success");
                       } else {
-                          showNotification(`Erreur: ${res.error}`, "error");
+                          showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: res.error }), "error");
                       }
                   }
               } catch (err: any) {
-                  showNotification(`Erreur: ${err.message}`, "error");
+                  showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
               }
               setIsNotifying(false);
           }
@@ -439,9 +446,9 @@ const Finance: React.FC = () => {
                             <div className="p-3 bg-indigo-500/10 rounded-2xl group-hover:bg-indigo-500 transition-all">
                                 <FileText className="text-indigo-500 group-hover:text-slate-950 w-6 h-6" />
                             </div>
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Alertes</span>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{t('fin_alerts_label', 'Alertes')}</span>
                         </div>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Relance des Échéances</p>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">{t('fin_reminders_label', 'Relance des Échéances')}</p>
                         <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1 text-[10px] text-white outline-none mb-3" id="notify-installment-select">
                             {installments.map(inst => {
                                 const dl = deadlines.find(d => d.installment_id === inst.id)?.deadline_date;
@@ -457,7 +464,7 @@ const Finance: React.FC = () => {
                         disabled={isNotifying || installments.length === 0}
                         className="w-full py-2 bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-50"
                     >
-                        {isNotifying ? 'Envoi...' : 'Notifier Retardataires'}
+                        {isNotifying ? t('fin_sending', 'Envoi...') : t('fin_notify_late_payers', 'Notifier Retardataires')}
                     </button>
                 </div>
             </div>
@@ -489,9 +496,9 @@ const Finance: React.FC = () => {
                                         students,
                                         classes
                                     });
-                                    showNotification("Rapport financier exporté avec succès", "success");
+                                    showNotification(t('fin_report_exported', 'Rapport financier exporté avec succès'), "success");
                                 } catch (err: any) {
-                                    showNotification("Erreur: " + err.message, "error");
+                                    showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
                                 }
                             }}
                             className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
@@ -519,7 +526,7 @@ const Finance: React.FC = () => {
                                     <td className="px-6 py-4 font-mono text-sm text-amber-500 font-bold tracking-tighter">#{p.receipt_number}</td>
                                     <td className="px-6 py-4">
                                         <div className="font-black uppercase text-white text-sm tracking-tight">{p.last_name} {p.first_name}</div>
-                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{classes.find(c => c.id === p.class_id)?.name || 'Classe N/A'}</div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{classes.find(c => c.id === p.class_id)?.name || t('fin_class_na', 'Classe N/A')}</div>
                                     </td>
                                     <td className="px-6 py-4 font-black text-white">{p.amount.toLocaleString()} <span className="text-[10px] text-slate-500">{currency}</span></td>
                                     <td className="px-6 py-4">
@@ -604,7 +611,7 @@ const Finance: React.FC = () => {
                                     import('../utils/reports').then(m => m.generateFinancialList(filteredStudentsForPrint, filterFeeType, filterStatus, activeSchool));
                                 }}
                                 className="p-3.5 bg-indigo-500/10 text-indigo-500 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-lg"
-                                title="Imprimer la liste"
+                                title={t('fin_print_list_tooltip', 'Imprimer la liste')}
                             >
                                 <Printer className="w-5 h-5" />
                             </button>
@@ -628,9 +635,9 @@ const Finance: React.FC = () => {
                                     setFilterClass('ALL');
                                 }}
                             >
-                                <option value="ALL">Toutes les sections</option>
-                                <option value="Francophone">Francophone</option>
-                                <option value="Anglophone">Anglophone</option>
+                                <option value="ALL">{t('fin_all_sections_opt', 'Toutes les sections')}</option>
+                                <option value="Francophone">{t('section_francophone_label', 'Francophone')}</option>
+                                <option value="Anglophone">{t('section_anglophone_label', 'Anglophone')}</option>
                             </select>
 
                             <select
@@ -642,9 +649,9 @@ const Finance: React.FC = () => {
                                 }}
                                 disabled={filterSection === 'ALL'}
                             >
-                                <option value="ALL">Tous les cycles</option>
-                                <option value="Maternelle">Maternelle</option>
-                                <option value="Primaire">Primaire</option>
+                                <option value="ALL">{t('fin_all_cycles_opt', 'Tous les cycles')}</option>
+                                <option value="Maternelle">{t('cycle_nursery_label', 'Maternelle')}</option>
+                                <option value="Primaire">{t('cycle_primary_label', 'Primaire')}</option>
                             </select>
 
                             <select
@@ -653,32 +660,32 @@ const Finance: React.FC = () => {
                                 onChange={(e) => setFilterClass(e.target.value)}
                                 disabled={filterLevel === 'ALL'}
                             >
-                                <option value="ALL">Toutes les salles</option>
+                                <option value="ALL">{t('fin_all_classrooms_opt', 'Toutes les salles')}</option>
                                 {classes
                                     .filter(c => c.section === filterSection && c.level === filterLevel)
                                     .map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                             </select>
-                            
+
                             <select
                                 className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
                                 value={filterFeeType}
                                 onChange={(e) => setFilterFeeType(e.target.value)}
                             >
-                                <option value="Scolarité">Frais Scolarité</option>
-                                <option value="Transport">Frais Transport</option>
-                                <option value="Examen">Frais Examen</option>
+                                <option value="Scolarité">{t('fin_tuition_fee_opt', 'Frais Scolarité')}</option>
+                                <option value="Transport">{t('fin_transport_fee_opt', 'Frais Transport')}</option>
+                                <option value="Examen">{t('fin_exam_fee_opt', 'Frais Examen')}</option>
                             </select>
-                            
+
                             <select
                                 className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
                             >
-                                <option value="ALL">Tous statuts</option>
-                                <option value="UP_TO_DATE">À jour</option>
-                                <option value="IN_ARREARS">Non à jour (Arriérés)</option>
+                                <option value="ALL">{t('fin_all_statuses_opt', 'Tous statuts')}</option>
+                                <option value="UP_TO_DATE">{t('fin_up_to_date_opt', 'À jour')}</option>
+                                <option value="IN_ARREARS">{t('fin_in_arrears_opt', 'Non à jour (Arriérés)')}</option>
                             </select>
                         </div>
                     )}
@@ -714,7 +721,7 @@ const Finance: React.FC = () => {
                                         <td className={`px-6 py-4 text-sm font-black ${fin.balance > 0 && !s.has_moratoire ? 'text-rose-500' : 'text-emerald-500'}`}>
                                             <div className="flex items-center gap-2">
                                                 {fin.balance <= 0 ? t('paid_status') : `${fin.balance.toLocaleString()} ${currency}`}
-                                                {s.has_moratoire === 1 && fin.balance > 0 && <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-[10px] uppercase font-bold" title="Autorisé exceptionnellement">Moratoire</span>}
+                                                {s.has_moratoire === 1 && fin.balance > 0 && <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-[10px] uppercase font-bold" title={t('fin_authorized_exceptionally', 'Autorisé exceptionnellement')}>{t('fin_moratoire', 'Moratoire')}</span>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -759,7 +766,7 @@ const Finance: React.FC = () => {
                   <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50 flex-shrink-0">
                       <div>
                         <h2 className="text-2xl font-black text-white tracking-tight">{t('register_payment')}</h2>
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Saisie sécurisée des fonds</p>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">{t('fin_secure_entry', 'Saisie sécurisée des fonds')}</p>
                       </div>
                       <button type="button" onClick={() => setIsAddingPayment(false)} className="p-2 hover:bg-white/5 rounded-full transition-all"><Plus className="w-8 h-8 rotate-45 text-slate-500" /></button>
                   </div>
@@ -774,9 +781,9 @@ const Finance: React.FC = () => {
                                   setPaymentFilterClass('ALL');
                               }}
                           >
-                              <option value="ALL">Toutes les sections</option>
-                              <option value="FRANCOPHONE">Francophone</option>
-                              <option value="ANGLOPHONE">Anglophone</option>
+                              <option value="ALL">{t('fin_all_sections_opt', 'Toutes les sections')}</option>
+                              <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                              <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
                           </select>
 
                           <select
@@ -788,9 +795,9 @@ const Finance: React.FC = () => {
                               }}
                               disabled={paymentFilterSection === 'ALL'}
                           >
-                              <option value="ALL">Tous les cycles</option>
-                              <option value="MATERNELLE">Maternelle</option>
-                              <option value="PRIMAIRE">Primaire</option>
+                              <option value="ALL">{t('fin_all_cycles_opt', 'Tous les cycles')}</option>
+                              <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
+                              <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
                           </select>
 
                           <select
@@ -799,7 +806,7 @@ const Finance: React.FC = () => {
                               onChange={(e) => setPaymentFilterClass(e.target.value)}
                               disabled={paymentFilterLevel === 'ALL'}
                           >
-                              <option value="ALL">Toutes les salles</option>
+                              <option value="ALL">{t('fin_all_classrooms_opt', 'Toutes les salles')}</option>
                               {classes
                                   .filter(c => (paymentFilterSection === 'ALL' || c.section === paymentFilterSection) && (paymentFilterLevel === 'ALL' || c.level === paymentFilterLevel))
                                   .map(c => (
@@ -814,7 +821,7 @@ const Finance: React.FC = () => {
                           </label>
                           <input
                               type="text"
-                              placeholder="Rechercher un élève (Nom, Matricule...)"
+                              placeholder={t('fin_search_student_placeholder', 'Rechercher un élève (Nom, Matricule...)')}
                               className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
                               value={newPayment.studentId ? `${students.find(s => s.id.toString() === newPayment.studentId)?.last_name} ${students.find(s => s.id.toString() === newPayment.studentId)?.first_name}` : paymentSearchQuery}
                               onChange={(e) => {
@@ -874,8 +881,8 @@ const Finance: React.FC = () => {
                                   <Plus className="w-4 h-4 rotate-45" />
                               </button>
                               <div className="flex justify-between items-center mb-2 pr-8">
-                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">État du Compte (Scolarité)</span>
-                                  <span className="text-sm font-black text-white">{finScol.balance.toLocaleString()} {currency} Restant</span>
+                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t('fin_account_status_tuition', 'État du Compte (Scolarité)')}</span>
+                                  <span className="text-sm font-black text-white">{t('fin_remaining_amount', '{{amount}} {{currency}} Restant', { amount: finScol.balance.toLocaleString(), currency })}</span>
                               </div>
                               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                   <div
@@ -894,7 +901,7 @@ const Finance: React.FC = () => {
                                                   className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
                                               />
                                               <div>
-                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">Inclure Transport</span>
+                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">{t('fin_include_transport', 'Inclure Transport')}</span>
                                                   <span className="text-[10px] text-slate-500 ml-2">({classConfig?.transportFee?.toLocaleString()} {currency})</span>
                                               </div>
                                           </label>
@@ -908,7 +915,7 @@ const Finance: React.FC = () => {
                                                   className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
                                               />
                                               <div>
-                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">Inclure Examen</span>
+                                                  <span className="text-xs font-black text-white group-hover/cb:text-amber-500 transition-colors">{t('fin_include_exam', 'Inclure Examen')}</span>
                                                   <span className="text-[10px] text-slate-500 ml-2">({classConfig?.examFee?.toLocaleString()} {currency})</span>
                                               </div>
                                           </label>
@@ -935,13 +942,13 @@ const Finance: React.FC = () => {
                             <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600 uppercase tracking-widest">{currency}</span>
                         </div>
                         <p className="text-[10px] text-slate-600 font-bold mt-1 leading-relaxed">
-                            Le montant sera ventilé automatiquement : Inscription &rarr; Transport &rarr; Examen &rarr; Tranches de pension
+                            {t('fin_amount_ventilation_note', 'Le montant sera ventilé automatiquement : Inscription → Transport → Examen → Tranches de pension')}
                         </p>
                       </div>
 
                       <div className="space-y-2 pt-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                              <User className="w-3 h-3 mr-2" /> NOM DU DÉPOSANT / PAYEUR <span className="text-rose-500 ml-1">*</span>
+                              <User className="w-3 h-3 mr-2" /> {t('fin_depositor_name_label', 'NOM DU DÉPOSANT / PAYEUR')} <span className="text-rose-500 ml-1">*</span>
                           </label>
                           <input
                               required
@@ -949,13 +956,13 @@ const Finance: React.FC = () => {
                               className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                               value={newPayment.depositorName}
                               onChange={(e) => setNewPayment({...newPayment, depositorName: e.target.value.toUpperCase()})}
-                              placeholder="Ex: TCHATCHOUANG PAUL"
+                              placeholder={t('fin_depositor_name_placeholder', 'Ex: TCHATCHOUANG PAUL')}
                           />
                       </div>
 
 
                       <div className="pt-6 flex flex-col md:flex-row gap-4">
-                          <button type="button" onClick={() => setIsAddingPayment(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all order-2 md:order-1">Annuler</button>
+                          <button type="button" onClick={() => setIsAddingPayment(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all order-2 md:order-1">{t('cancel')}</button>
                           <button type="submit" className="flex-[2] py-4 px-8 bg-amber-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-amber-500/20 hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center order-1 md:order-2">
                             <ArrowUpRight className="w-5 h-5 mr-3" /> {t('validate_and_print')}
                           </button>
@@ -971,7 +978,7 @@ const Finance: React.FC = () => {
             <div className="lg:col-span-2 space-y-4">
               <h2 className="text-xl font-black text-white flex items-center tracking-tight">
                 <Wallet className="w-6 h-6 mr-3 text-rose-500" />
-                HISTORIQUE DES DÉCAISSEMENTS
+                {t('fin_disbursements_history', 'HISTORIQUE DES DÉCAISSEMENTS')}
               </h2>
               <div className="space-y-4">
                 {expenses.map((exp) => (
@@ -980,27 +987,27 @@ const Finance: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-black text-white">{exp.amount.toLocaleString()} {currency}</h3>
                         <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${exp.status === 'VALIDATED' ? 'bg-emerald-500/10 text-emerald-500' : exp.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                          {exp.status === 'PENDING' ? 'EN ATTENTE' : exp.status === 'VALIDATED' ? 'APPROUVÉ' : 'REJETÉ'}
+                          {exp.status === 'PENDING' ? t('status_pending_upper', 'EN ATTENTE') : exp.status === 'VALIDATED' ? t('status_approved_upper', 'APPROUVÉ') : t('status_rejected_upper', 'REJETÉ')}
                         </span>
                       </div>
                       <p className="text-sm font-medium text-slate-300">{exp.reason}</p>
                       <div className="flex gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">
-                        <span>Demandé par: <span className="text-amber-500">{exp.requester_name}</span></span>
-                        <span>Le: {new Date(exp.created_at).toLocaleString('fr-FR')}</span>
+                        <span>{t('fin_requested_by', 'Demandé par:')} <span className="text-amber-500">{exp.requester_name}</span></span>
+                        <span>{t('fin_on_date', 'Le:')} {new Date(exp.created_at).toLocaleString('fr-FR')}</span>
                       </div>
                       {exp.validator_name && (
                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">
-                           Traité par: <span className={exp.status === 'VALIDATED' ? 'text-emerald-500' : 'text-rose-500'}>{exp.validator_name}</span>
+                           {t('fin_processed_by', 'Traité par:')} <span className={exp.status === 'VALIDATED' ? 'text-emerald-500' : 'text-rose-500'}>{exp.validator_name}</span>
                          </div>
                       )}
                     </div>
                     {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && exp.status === 'PENDING' && (
                       <div className="flex items-center gap-2 w-full md:w-auto">
                         <button onClick={() => handleValidateExpense(exp.id, 'VALIDATED')} className="flex-1 md:flex-none px-4 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                          Approuver
+                          {t('fin_approve', 'Approuver')}
                         </button>
                         <button onClick={() => handleValidateExpense(exp.id, 'REJECTED')} className="flex-1 md:flex-none px-4 py-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                          Rejeter
+                          {t('fin_reject', 'Rejeter')}
                         </button>
                       </div>
                     )}
@@ -1008,7 +1015,7 @@ const Finance: React.FC = () => {
                 ))}
                 {expenses.length === 0 && (
                   <div className="p-8 text-center text-slate-500 italic text-sm">
-                    Aucune demande de décaissement enregistrée.
+                    {t('fin_no_expense_requests', 'Aucune demande de décaissement enregistrée.')}
                   </div>
                 )}
               </div>
@@ -1017,14 +1024,14 @@ const Finance: React.FC = () => {
             <div className="space-y-4">
               <h2 className="text-xl font-black text-white flex items-center tracking-tight">
                 <Plus className="w-6 h-6 mr-3 text-amber-500" />
-                NOUVELLE DEMANDE
+                {t('fin_new_request', 'NOUVELLE DEMANDE')}
               </h2>
               <form onSubmit={handleAddExpense} className="glass-card p-6 space-y-6 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-rose-500" />
                 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                    <Wallet className="w-3 h-3 mr-2" /> Montant ({currency})
+                    <Wallet className="w-3 h-3 mr-2" /> {t('fin_amount_currency_label', 'Montant ({{currency}})', { currency })}
                   </label>
                   <input
                     required
@@ -1038,20 +1045,20 @@ const Finance: React.FC = () => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center">
-                    <FileText className="w-3 h-3 mr-2" /> Motif de la dépense
+                    <FileText className="w-3 h-3 mr-2" /> {t('fin_expense_reason_label', 'Motif de la dépense')}
                   </label>
                   <textarea
                     required
                     rows={4}
                     value={newExpense.reason}
                     onChange={(e) => setNewExpense({...newExpense, reason: e.target.value})}
-                    placeholder="Ex: Achat de fournitures, Paiement prestataire..."
+                    placeholder={t('fin_expense_reason_placeholder', 'Ex: Achat de fournitures, Paiement prestataire...')}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm text-slate-300 outline-none focus:ring-2 focus:ring-amber-500 transition-all resize-none"
                   />
                 </div>
 
                 <button type="submit" className="w-full py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-400 active:scale-95 transition-all shadow-lg shadow-amber-500/20">
-                  Soumettre au Fondateur
+                  {t('fin_submit_to_founder', 'Soumettre au Fondateur')}
                 </button>
               </form>
             </div>
@@ -1067,14 +1074,14 @@ const Finance: React.FC = () => {
                     <div className="p-6 border-b border-white/5 bg-indigo-500/10">
                         <h2 className="text-xl font-black text-indigo-400 uppercase tracking-tight flex items-center italic">
                             <Clock className="w-5 h-5 mr-3" />
-                            Abonnés Transport
+                            {t('fin_transport_subscribers', 'Abonnés Transport')}
                         </h2>
                         <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
                             {(() => {
                                 const relevant = payments.filter(p => p.payment_type === 'Transport' && p.amount > 0);
                                 const ids = [...new Set(relevant.map(p => p.student_id))];
                                 return ids.length;
-                            })()} Élèves Inscrits
+                            })()} {t('fin_students_enrolled', 'Élèves Inscrits')}
                         </p>
                     </div>
                     <div className="divide-y divide-white/5 bg-slate-950/40">
@@ -1083,7 +1090,7 @@ const Finance: React.FC = () => {
                             const ids = [...new Set(relevant.map(p => p.student_id))];
                             const list = ids.map(id => students.find(s => s.id === id)).filter(Boolean);
                             if (list.length === 0) {
-                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">Aucun abonnement</div>;
+                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">{t('fin_no_subscription', 'Aucun abonnement')}</div>;
                             }
                             return list.map(s => {
                                 const c = classes.find(c => c.id === s.class_id);
@@ -1093,7 +1100,7 @@ const Finance: React.FC = () => {
                                             <p className="text-sm font-black text-white uppercase">{s.last_name} {s.first_name}</p>
                                             <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{c?.name}</p>
                                         </div>
-                                        <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                        <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">{t('fin_paid_badge', 'Payé')}</div>
                                     </div>
                                 );
                             });
@@ -1106,7 +1113,7 @@ const Finance: React.FC = () => {
                     <div className="p-6 border-b border-white/5 bg-rose-500/10">
                         <h2 className="text-xl font-black text-rose-400 uppercase tracking-tight flex items-center italic">
                             <FileText className="w-5 h-5 mr-3" />
-                            Candidats Examens
+                            {t('fin_exam_candidates', 'Candidats Examens')}
                         </h2>
                         <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
                             {(() => {
@@ -1117,7 +1124,7 @@ const Finance: React.FC = () => {
                                     return name.includes('CM2') || name.includes('CLASS6');
                                 });
                                 return candidates.length;
-                            })()} Élèves Inscrits
+                            })()} {t('fin_students_enrolled', 'Élèves Inscrits')}
                         </p>
                     </div>
                     <div className="divide-y divide-white/5 bg-slate-950/40 max-h-64 overflow-y-auto">
@@ -1128,9 +1135,9 @@ const Finance: React.FC = () => {
                                 const name = c.name.toUpperCase().replace(/\s+/g, '');
                                 return name.includes('CM2') || name.includes('CLASS6');
                             }).sort((a, b) => a.last_name.localeCompare(b.last_name));
-                            
+
                             if (candidates.length === 0) {
-                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">Aucun candidat</div>;
+                                return <div className="p-8 text-center text-slate-500 font-black text-xs uppercase tracking-widest">{t('fin_no_candidate', 'Aucun candidat')}</div>;
                             }
                             return candidates.map(s => {
                                 const c = classes.find(c => c.id === s.class_id);
@@ -1142,9 +1149,9 @@ const Finance: React.FC = () => {
                                             <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">{c?.name}</p>
                                         </div>
                                         {hasPaid ? (
-                                            <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">Payé</div>
+                                            <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-xl">{t('fin_paid_badge', 'Payé')}</div>
                                         ) : (
-                                            <div className="text-xs font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-xl">Non Payé</div>
+                                            <div className="text-xs font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-xl">{t('fin_not_paid_badge', 'Non Payé')}</div>
                                         )}
                                     </div>
                                 );
@@ -1167,7 +1174,7 @@ const Finance: React.FC = () => {
                 onClick={() => setConfirmModal(null)}
                 className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest border border-white/5"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button
                 onClick={() => {
@@ -1176,7 +1183,7 @@ const Finance: React.FC = () => {
                 }}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all text-xs font-black uppercase tracking-widest"
               >
-                Confirmer
+                {t('sys_confirm', 'CONFIRMER')}
               </button>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { Calendar, UserCheck, Clock, Save, AlertCircle, FileText, Search, Printe
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { generateAttendanceReport } from '../utils/reports';
+import { notifyDataChanged } from '../utils/dataSync';
 
 const Attendance: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -24,7 +25,7 @@ const Attendance: React.FC = () => {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
           const u = JSON.parse(storedUser);
-          if (u.role === 'SECRETARY' || u.role === 'DIRECTOR') return 'REPORT';
+          if (u.role === 'SG' || u.role === 'DIRECTOR') return 'REPORT';
       }
       return 'INPUT';
   });
@@ -64,7 +65,7 @@ const Attendance: React.FC = () => {
         if (user?.role === 'TEACHER') {
             if (!unlocked && !selectedSchedule && availableSchedules.length > 0) {
                 setIsLocked(true);
-                setNotProgrammedMsg(t('select_slot_for_attendance', "Veuillez sélectionner un créneau horaire pour faire l'appel."));
+                setNotProgrammedMsg(t('att_select_slot', "Veuillez sélectionner un créneau horaire pour faire l'appel."));
                 setMaxAllowedHours(0);
                 setAbsences({});
                 return;
@@ -92,10 +93,10 @@ const Attendance: React.FC = () => {
 
                   if (isPast && !unlocked && hasRecords) {
                       setIsLocked(true);
-                      setNotProgrammedMsg(t('course_ended_deadline_passed', "Le cours est terminé. Délai de saisie dépassé."));
+                      setNotProgrammedMsg(t('att_course_ended_deadline', "Le cours est terminé. Délai de saisie dépassé."));
                   } else if (isPast && !unlocked && !hasRecords) {
                       setIsLocked(true);
-                      setNotProgrammedMsg(t('course_ended_not_recorded', "Le cours est terminé. Vous n'avez pas enregistré l'appel à temps."));
+                      setNotProgrammedMsg(t('att_course_ended_not_recorded', "Le cours est terminé. Vous n'avez pas enregistré l'appel à temps."));
                   } else {
                       setNotProgrammedMsg('');
                   }
@@ -103,7 +104,7 @@ const Attendance: React.FC = () => {
                 setMaxAllowedHours(0);
                 setIsLocked(true);
                 if (availableSchedules.length > 0) {
-                    setNotProgrammedMsg(t('invalid_slot', "Créneau invalide ou introuvable."));
+                    setNotProgrammedMsg(t('att_invalid_slot', "Créneau invalide ou introuvable."));
                 }
             } else {
                 // Admin unlocked it, allow default max hours
@@ -178,11 +179,29 @@ const Attendance: React.FC = () => {
                       } catch(e) {}
                       if (!hasSubjectAssignment) {
                           setIsLocked(true);
-                          setNotProgrammedMsg(t('no_scheduled_class_today', "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui."));
+                          setNotProgrammedMsg(t('att_no_scheduled_class', "Vous ne pouvez pas faire l'appel car vous n'avez aucun cours programmé dans cette classe aujourd'hui."));
                           setMaxAllowedHours(0);
                       } else {
                           setIsLocked(false);
                           setMaxAllowedHours(8);
+                          setNotProgrammedMsg('');
+                      }
+                  } else if (teacherSchedules.length > 0 && !isUnlocked) {
+                      // Lock attendance once the latest scheduled session of the day has ended
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      if (currentDate === todayStr) {
+                          const latestEnd = teacherSchedules.reduce((max: string, s: any) => (s.end_time || '') > max ? (s.end_time || '') : max, '');
+                          const nowStr = new Date().toTimeString().slice(0, 5);
+                          if (latestEnd && nowStr > latestEnd) {
+                              setIsLocked(true);
+                              setNotProgrammedMsg(t('att_time_passed', "L'heure de votre cours est passée. Vous ne pouvez plus enregistrer la présence. Veuillez faire une demande de déblocage."));
+                              setMaxAllowedHours(0);
+                          } else {
+                              setIsLocked(false);
+                              setNotProgrammedMsg('');
+                          }
+                      } else {
+                          setIsLocked(false);
                           setNotProgrammedMsg('');
                       }
                   }
@@ -240,9 +259,9 @@ const Attendance: React.FC = () => {
       const classObj = classes.find(c => c.id.toString() === selectedClass);
       const className = classObj ? `${classObj.name} (${classObj.code})` : selectedClass;
       const formattedDate = new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR');
-      const subject = t('unlock_request_subject', `Demande de déblocage : Présences ${className}`);
-      const message = t('unlock_request_message', `Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe ${className} du ${formattedDate}. Veuillez s'il vous plaît débloquer cette fiche.\n\nMerci d'avance.\n\nEnseignant : ${user.fullName || user.username}`);
-      
+      const subject = t('att_unlock_request_subject', 'Demande de déblocage : Présences {{className}}', { className });
+      const message = t('att_unlock_request_message', 'Bonjour,\n\nJe souhaite modifier la fiche de présence de la classe {{className}} du {{date}}. Veuillez s\'il vous plaît débloquer cette fiche.\n\nMerci d\'avance.\n\nEnseignant : {{teacherName}}', { className, date: formattedDate, teacherName: user.fullName || user.username });
+
       try {
           await window.electronAPI.submitSystemRequest({
               requestType: 'ATTENDANCE_REACTIVATION',
@@ -254,9 +273,9 @@ const Attendance: React.FC = () => {
                   rawDate: currentDate
               }
           });
-          alert(t('unlock_request_sent', "Votre demande de déblocage a été envoyée avec succès à l'administration."));
+          alert(t('att_unlock_request_sent', "Votre demande de déblocage a été envoyée avec succès à l'administration."));
       } catch (e: any) {
-          alert(t('error_sending_request', "Erreur lors de l'envoi de la demande: ") + e.message);
+          alert(t('att_error_sending_request', "Erreur lors de l'envoi de la demande: ") + e.message);
       }
   };
 
@@ -269,10 +288,10 @@ const Attendance: React.FC = () => {
               value: newValue ? 'true' : 'false'
           });
           setIsUnlockedByAdmin(newValue);
-          alert(newValue ? t('sheet_unlocked', "La fiche a été déverrouillée pour l'enseignant.") : t('sheet_relocked', "La fiche a été verrouillée à nouveau."));
+          alert(newValue ? t('att_sheet_unlocked', "La fiche a été déverrouillée pour l'enseignant.") : t('att_sheet_relocked', "La fiche a été verrouillée à nouveau."));
           await loadExistingAttendance();
       } catch (e: any) {
-          alert(t('error_lock_change', "Erreur lors du changement de verrouillage: ") + e.message);
+          alert(t('att_error_lock_change', "Erreur lors du changement de verrouillage: ") + e.message);
       }
   };
 
@@ -290,9 +309,10 @@ const Attendance: React.FC = () => {
               try {
                   const res = await window.electronAPI.saveAttendanceBulk({ records, userId: user.id });
                   if (res && res.error) {
-                      alert(`${t('error_label', 'Erreur')}: ${res.error}`);
+                      alert(`${t('error_prefix')}: ${res.error}`);
                       return;
                   }
+                  notifyDataChanged();
                   if (res && res.exceeders && res.exceeders.length > 0) {
                       setExceedersToNotify(res.exceeders);
                   } else {
@@ -321,7 +341,7 @@ const Attendance: React.FC = () => {
           }));
           const key = `pending_attendance_${Date.now()}`;
           localStorage.setItem(key, JSON.stringify(records));
-          alert(t('absences_saved_locally', "Absences sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC."));
+          alert(t('att_saved_locally', "Absences sauvegardées localement ! Allez dans le Centre de Synchronisation pour les envoyer au PC."));
       }
   };
 
@@ -349,19 +369,19 @@ const Attendance: React.FC = () => {
           if (reportPeriod === 'DAY') {
               startDateStr = reportDate;
               endDateStr = reportDate;
-              periodText = isEn ? `DATE: ${reportDate}` : t('day_of', `JOURNÉE DU: ${reportDate}`);
+              periodText = isEn ? `DATE: ${reportDate}` : t('att_day_of', 'JOURNÉE DU: {{date}}', { date: reportDate });
           } else if (reportPeriod === 'WEEK') {
-              if (!reportWeek) throw new Error(t('select_a_week', 'Sélectionnez une semaine'));
+              if (!reportWeek) throw new Error(t('att_select_a_week', 'Sélectionnez une semaine'));
               const { start, end } = getWeekDateRange(reportWeek);
               startDateStr = start.toISOString().split('T')[0];
               endDateStr = end.toISOString().split('T')[0];
-              periodText = isEn ? `WEEK: ${reportWeek}` : t('week_of', `SEMAINE: ${reportWeek}`);
+              periodText = isEn ? `WEEK: ${reportWeek}` : t('att_week_of', 'SEMAINE: {{week}}', { week: reportWeek });
           } else if (reportPeriod === 'MONTH') {
               startDateStr = `${reportMonth}-01`;
               const [y, m] = reportMonth.split('-');
               const endOfMonth = new Date(parseInt(y), parseInt(m), 0);
               endDateStr = endOfMonth.toISOString().split('T')[0];
-              periodText = isEn ? `MONTH: ${reportMonth}` : t('month_of', `MOIS: ${reportMonth}`);
+              periodText = isEn ? `MONTH: ${reportMonth}` : t('att_month_of', 'MOIS: {{month}}', { month: reportMonth });
           }
 
           const records = await window.electronAPI.getAttendanceReport({
@@ -381,7 +401,7 @@ const Attendance: React.FC = () => {
           }
 
           if (finalRecords.length === 0) {
-              alert(t('no_records_for_period', 'Aucune présence enregistrée pour cette période'));
+              alert(t('att_no_records_for_period', 'Aucune présence enregistrée pour cette période'));
               setIsGenerating(false);
               return;
           }
@@ -398,7 +418,7 @@ const Attendance: React.FC = () => {
           });
 
       } catch (err: any) {
-          alert('Error: ' + err.message);
+          alert(`${t('error_prefix')}: ${err.message}`);
       } finally {
           setIsGenerating(false);
       }
@@ -412,13 +432,13 @@ const Attendance: React.FC = () => {
           <p className="text-slate-500 mt-1 uppercase text-xs font-black tracking-widest">{t('attendance_desc')}</p>
         </div>
         <div className="flex bg-slate-900 rounded-xl p-1 border border-slate-800">
-            {user?.role !== 'SECRETARY' && user?.role !== 'DIRECTOR' && (
+            {user?.role !== 'SG' && user?.role !== 'DIRECTOR' && (
                 <button
                     onClick={() => setActiveTab('INPUT')}
                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'INPUT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
                 >
                     <Calendar className="w-4 h-4 mr-2" />
-                    {t('saisie', 'Saisie')}
+                    {t('att_tab_entry', 'Saisie')}
                 </button>
             )}
             <button
@@ -426,7 +446,7 @@ const Attendance: React.FC = () => {
                 className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${activeTab === 'REPORT' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
                 <FileText className="w-4 h-4 mr-2" />
-                {t('rapports', 'Rapports')}
+                {t('att_tab_reports', 'Rapports')}
             </button>
         </div>
       </div>
@@ -463,15 +483,15 @@ const Attendance: React.FC = () => {
         
         {user?.role === 'TEACHER' && selectedClass && activeTab === 'INPUT' && (
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('select_course_slot', 'Sélectionner le cours (Créneau)')}</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('att_select_course_slot', 'Sélectionner le cours (Créneau)')}</label>
               <select
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all disabled:opacity-30"
                 value={selectedSchedule}
                 onChange={(e) => setSelectedSchedule(e.target.value)}
               >
-                <option value="">{t('choose_slot', '-- Choisir un créneau --')}</option>
+                <option value="">{t('att_choose_slot', '-- Choisir un créneau --')}</option>
                 {availableSchedules.length === 0 ? (
-                    <option value="" disabled>{t('no_course_scheduled_today', 'Aucun cours programmé ce jour')}</option>
+                    <option value="" disabled>{t('att_no_course_today', 'Aucun cours programmé ce jour')}</option>
                 ) : (
                     availableSchedules.map(s => {
                         const today = new Date().toISOString().split('T')[0];
@@ -486,10 +506,10 @@ const Attendance: React.FC = () => {
                                 isFuture = true;
                             }
                         }
-                        
+
                         return (
                             <option key={s.id} value={s.id} disabled={isFuture}>
-                                {s.start_time} - {s.end_time} : {subjectsMap[s.subject_id] || t('unknown_subject', 'Matière inconnue')} {isFuture ? t('not_started_yet', '(Pas encore commencé)') : ''}
+                                {s.start_time} - {s.end_time} : {subjectsMap[s.subject_id] || t('att_unknown_subject', 'Matière inconnue')} {isFuture ? t('att_not_started_yet', '(Pas encore commencé)') : ''}
                             </option>
                         );
                     })
@@ -515,7 +535,7 @@ const Attendance: React.FC = () => {
                     <div>
                         <h2 className="text-lg font-bold">{t('daily_call')} : {classes.find(c => c.id.toString() === selectedClass)?.name}</h2>
                         <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">
-                            {isLocked && notProgrammedMsg ? notProgrammedMsg : isLocked ? t('attendance_sheet_locked', "Fiche de présence verrouillée") : `Maximum : ${maxAllowedHours}h ${t('of_absence', "d'absence")}`}
+                            {isLocked && notProgrammedMsg ? notProgrammedMsg : isLocked ? t('att_sheet_locked', "Fiche de présence verrouillée") : `${t('att_maximum_label', 'Maximum')} : ${maxAllowedHours}h ${t('att_of_absence', "d'absence")}`}
                         </p>
                     </div>
                 </div>
@@ -529,7 +549,7 @@ const Attendance: React.FC = () => {
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                             }`}
                         >
-                            {isUnlockedByAdmin ? t('relock', "Re-verrouiller") : t('unlock_btn', "Débloquer")}
+                            {isUnlockedByAdmin ? t('att_relock', "Re-verrouiller") : t('att_unlock', "Débloquer")}
                         </button>
                     )}
                     {!isLocked && (
@@ -548,11 +568,11 @@ const Attendance: React.FC = () => {
                     <div className="flex items-center space-x-3">
                         <AlertCircle className="w-6 h-6 flex-shrink-0" />
                         <div>
-                            <p className="font-bold text-sm">{notProgrammedMsg ? t('attendance_sheet_blocked', "Fiche de présence bloquée") : t('attendance_sheet_locked', "Fiche de présence verrouillée")}</p>
+                            <p className="font-bold text-sm">{notProgrammedMsg ? t('att_sheet_blocked', "Fiche de présence bloquée") : t('att_sheet_locked', "Fiche de présence verrouillée")}</p>
                             <p className="text-xs text-slate-400">
-                                {notProgrammedMsg 
+                                {notProgrammedMsg
                                     ? notProgrammedMsg
-                                    : "Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage."}
+                                    : t('att_already_recorded_desc', "Cette fiche a déjà été enregistrée pour aujourd'hui. Les modifications sont désactivées pour les enseignants. Si vous avez commis une erreur, veuillez envoyer une requête de déblocage.")}
                             </p>
                         </div>
                     </div>
@@ -561,7 +581,7 @@ const Attendance: React.FC = () => {
                             onClick={handleRequestUnlock}
                             className="w-full md:w-auto px-6 py-2 bg-amber-500 text-slate-950 font-black rounded-lg text-xs hover:bg-amber-400 active:scale-95 transition-all shadow-md"
                         >
-                            Demander le déblocage
+                            {t('att_request_unlock_btn', 'Demander le déblocage')}
                         </button>
                     )}
                 </div>
@@ -643,25 +663,25 @@ const Attendance: React.FC = () => {
               <div className="glass-card p-6 border-none shadow-xl bg-slate-900 text-white">
                   <div className="flex items-center mb-6 text-amber-500">
                       <Printer className="w-6 h-6 mr-3" />
-                      <h2 className="text-xl font-bold">{t('generate_attendance_report', 'Générer la Liste de Présence')}</h2>
+                      <h2 className="text-xl font-bold">{t('att_generate_report_title', 'Générer la Liste de Présence')}</h2>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('period', 'Période')}</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('att_period_label', 'Période')}</label>
                           <select
                               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
                               value={reportPeriod}
                               onChange={(e) => setReportPeriod(e.target.value as any)}
                           >
-                              <option value="DAY">{t('day', 'Journée')}</option>
-                              <option value="WEEK">{t('week', 'Semaine')}</option>
-                              <option value="MONTH">{t('month', 'Mois')}</option>
+                              <option value="DAY">{t('att_day_label', 'Journée')}</option>
+                              <option value="WEEK">{t('att_week_label', 'Semaine')}</option>
+                              <option value="MONTH">{t('att_month_label', 'Mois')}</option>
                           </select>
                       </div>
 
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('date_selection', 'Sélection Date')}</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('att_date_selection', 'Sélection Date')}</label>
                           <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl focus-within:ring-2 focus-within:ring-amber-500">
                               <CalendarDays className="w-5 h-5 mr-3 text-slate-500" />
                               {reportPeriod === 'DAY' && (
@@ -677,12 +697,12 @@ const Attendance: React.FC = () => {
                       </div>
 
                        <div className="space-y-2 relative">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('search_student', 'Rechercher un élève (Optionnel)')}</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('att_search_student_label', 'Rechercher un élève (Optionnel)')}</label>
                           <div className="flex items-center bg-slate-950 border border-slate-800 p-3 rounded-xl focus-within:ring-2 focus-within:ring-amber-500">
                               <Search className="w-5 h-5 mr-3 text-slate-500" />
-                              <input 
-                                  type="text" 
-                                  placeholder="Nom, Prénom, Matricule..." 
+                              <input
+                                  type="text"
+                                  placeholder={t('att_search_student_placeholder', 'Nom, Prénom, Matricule...')}
                                   value={reportSearch}
                                   onChange={(e) => {
                                       setReportSearch(e.target.value);
@@ -729,11 +749,11 @@ const Attendance: React.FC = () => {
                       >
                           {isGenerating ? (
                               <span className="flex items-center">
-                                  <Clock className="w-5 h-5 mr-2 animate-spin" /> {t('generating', 'Génération...')}
+                                  <Clock className="w-5 h-5 mr-2 animate-spin" /> {t('att_generating', 'Génération...')}
                               </span>
                           ) : (
                               <span className="flex items-center">
-                                  <FileText className="w-5 h-5 mr-2" /> {t('generate_pdf', 'Générer le PDF')}
+                                  <FileText className="w-5 h-5 mr-2" /> {t('att_generate_pdf', 'Générer le PDF')}
                               </span>
                           )}
                       </button>
@@ -748,16 +768,16 @@ const Attendance: React.FC = () => {
                   <div className="flex items-center justify-center w-16 h-16 bg-rose-500/20 text-rose-500 rounded-full mb-6 mx-auto">
                       <AlertCircle className="w-8 h-8" />
                   </div>
-                  <h3 className="text-xl font-bold text-center text-white mb-2">Convocations Envoyées</h3>
+                  <h3 className="text-xl font-bold text-center text-white mb-2">{t('att_summons_sent_title', 'Convocations Envoyées')}</h3>
                   <p className="text-slate-400 text-center text-sm mb-6">
-                      Les présences ont été enregistrées avec succès.<br/>
-                      Cependant, les élèves suivants ont dépassé 15h d'absences cumulées. Un message de convocation automatique a été envoyé à leurs parents.
+                      {t('att_summons_sent_desc', 'Les présences ont été enregistrées avec succès.')}<br/>
+                      {t('att_summons_sent_desc2', "Cependant, les élèves suivants ont dépassé 15h d'absences cumulées. Un message de convocation automatique a été envoyé à leurs parents.")}
                   </p>
                   <div className="space-y-3 mb-8 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                       {exceedersToNotify.map((ex, i) => (
                           <div key={i} className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
                               <span className="font-bold text-white text-sm">{ex.firstName} {ex.lastName}</span>
-                              <span className="text-rose-500 font-black text-sm bg-rose-500/10 px-3 py-1 rounded-lg">{ex.total}h d'absence</span>
+                              <span className="text-rose-500 font-black text-sm bg-rose-500/10 px-3 py-1 rounded-lg">{ex.total}{t('att_hours_absence_suffix', "h d'absence")}</span>
                           </div>
                       ))}
                   </div>
@@ -774,7 +794,7 @@ const Attendance: React.FC = () => {
                       }}
                       className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black transition-all shadow-lg hover:shadow-amber-500/25 active:scale-95"
                   >
-                      Compris
+                      {t('att_understood', 'Compris')}
                   </button>
               </div>
           </div>

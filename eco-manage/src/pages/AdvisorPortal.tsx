@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
+import { notifyDataChanged } from '../utils/dataSync';
 
 const AdvisorPortal: React.FC = () => {
     const { user } = useAuth();
@@ -213,11 +214,11 @@ const AdvisorPortal: React.FC = () => {
         if (!window.electronAPI || !selectedClass) return;
         if (schedType !== 'PAUSE') {
             if (!schedSubject) {
-                showNotification("Veuillez sélectionner une matière.", "warning");
+                showNotification(t('adv_select_subject_warning', 'Veuillez sélectionner une matière.'), "warning");
                 return;
             }
             if (!schedTeacher) {
-                showNotification("Veuillez sélectionner un enseignant.", "warning");
+                showNotification(t('adv_select_teacher_warning', 'Veuillez sélectionner un enseignant.'), "warning");
                 return;
             }
         }
@@ -236,25 +237,25 @@ const AdvisorPortal: React.FC = () => {
             
             const res = await window.electronAPI.updateSchedule(payload);
             if (res && res.error) throw new Error(res.error);
-            showNotification("Emploi du temps mis à jour avec succès !", "success");
+            showNotification(t('adv_schedule_updated_success', 'Emploi du temps mis à jour avec succès !'), "success");
             setShowScheduleModal(false);
             loadSchedules();
         } catch (err: any) {
-            showNotification("Erreur lors de l'enregistrement de l'emploi du temps : " + err.message, "error");
+            showNotification(t('adv_schedule_save_error', "Erreur lors de l'enregistrement de l'emploi du temps : ") + err.message, "error");
         }
     };
 
     const handleDeleteSchedule = async (id: number) => {
         if (!window.electronAPI) return;
-        if (window.confirm("Voulez-vous supprimer ce cours de l'emploi du temps ?")) {
+        if (window.confirm(t('adv_confirm_delete_course', "Voulez-vous supprimer ce cours de l'emploi du temps ?"))) {
             try {
                 const res = await (window.electronAPI as any).deleteSchedule(id);
                 if (res && res.error) throw new Error(res.error);
-                showNotification("Cours supprimé avec succès !", "success");
+                showNotification(t('adv_course_deleted_success', 'Cours supprimé avec succès !'), "success");
                 setShowScheduleModal(false);
                 loadSchedules();
             } catch (err: any) {
-                showNotification("Erreur lors de la suppression : " + err.message, "error");
+                showNotification(t('adv_delete_error', "Erreur lors de la suppression : ") + err.message, "error");
             }
         }
     };
@@ -262,7 +263,7 @@ const AdvisorPortal: React.FC = () => {
     const handleSaveExam = async () => {
         if (!window.electronAPI || !selectedClass) return;
         if (!examSubject || !examTeacher || !examDate || !examStart || !examEnd) {
-            showNotification("Veuillez remplir tous les champs (Matière, Surveillant, Date, Heures).", "warning");
+            showNotification(t('adv_fill_all_fields_warning', 'Veuillez remplir tous les champs (Matière, Surveillant, Date, Heures).'), "warning");
             return;
         }
         try {
@@ -284,31 +285,31 @@ const AdvisorPortal: React.FC = () => {
             const subjObj = getSubjectName(parseInt(examSubject));
             await window.electronAPI.createNotification({
                 user_id: teacherObj?.id, // Send only to this teacher
-                message: `Vous êtes programmé(e) pour surveiller l'évaluation de ${subjObj} le ${examDate} de ${examStart} à ${examEnd}.`,
+                message: t('adv_notif_surveillance_scheduled', 'Vous êtes programmé(e) pour surveiller l\'évaluation de {{subject}} le {{date}} de {{start}} à {{end}}.', { subject: subjObj, date: examDate, start: examStart, end: examEnd }),
                 type: 'ACTION_REQUIRED',
                 request_type: 'EXAM_SURVEILLANCE_REQUEST',
                 request_data: JSON.stringify({ exam_id: res.id }),
                 school_id: user?.schoolId
             });
 
-            showNotification("Évaluation programmée avec succès !", "success");
+            showNotification(t('adv_exam_scheduled_success', 'Évaluation programmée avec succès !'), "success");
             setShowExamModal(false);
             loadSchedules();
         } catch (err: any) {
-            showNotification("Erreur lors de l'enregistrement de l'évaluation : " + err.message, "error");
+            showNotification(t('adv_exam_save_error', "Erreur lors de l'enregistrement de l'évaluation : ") + err.message, "error");
         }
     };
 
     const handleDeleteExam = async (id: number) => {
         if (!window.electronAPI) return;
-        if (window.confirm("Voulez-vous supprimer cette évaluation du programme ?")) {
+        if (window.confirm(t('adv_confirm_delete_exam', "Voulez-vous supprimer cette évaluation du programme ?"))) {
             try {
                 const res = await window.electronAPI.deleteEvaluationSchedule(id);
                 if (res && res.error) throw new Error(res.error);
-                showNotification("Évaluation supprimée avec succès !", "success");
+                showNotification(t('adv_exam_deleted_success', 'Évaluation supprimée avec succès !'), "success");
                 loadSchedules();
             } catch (err: any) {
-                showNotification("Erreur lors de la suppression : " + err.message, "error");
+                showNotification(t('adv_delete_error', "Erreur lors de la suppression : ") + err.message, "error");
             }
         }
     };
@@ -322,16 +323,16 @@ const AdvisorPortal: React.FC = () => {
                 newTeacherId: parseInt(newTeacherId),
                 schoolId: user?.schoolId
             });
-            showNotification("Surveillant remplacé avec succès. Une notification a été envoyée au nouvel enseignant.", "success");
+            showNotification(t('adv_surveillant_replaced_success', 'Surveillant remplacé avec succès. Une notification a été envoyée au nouvel enseignant.'), "success");
             setReplacementTeacher(prev => { const copy = {...prev}; delete copy[examId]; return copy; });
             loadSchedules();
         } catch (err: any) {
-            showNotification("Erreur : " + err.message, "error");
+            showNotification(t('error_prefix', 'Erreur') + " : " + err.message, "error");
         }
     };
 
-    const getSubjectName = (subId: number) => classSubjects.find(s => s.id === subId)?.name || `Matière #${subId}`;
-    const getTeacherName = (tId: number) => teachers.find(t => t.id === tId)?.fullName || teachers.find(t => t.id === tId)?.full_name || `Enseignant #${tId}`;
+    const getSubjectName = (subId: number) => classSubjects.find(s => s.id === subId)?.name || t('adv_subject_hash', 'Matière #{{id}}', { id: subId });
+    const getTeacherName = (tId: number) => teachers.find(t => t.id === tId)?.fullName || teachers.find(t => t.id === tId)?.full_name || t('adv_teacher_hash', 'Enseignant #{{id}}', { id: tId });
     const getScheduleForSlot = (day: number, start: string) => {
         return schedules.find(s => s.day_of_week === day && s.start_time?.trim() === start?.trim());
     };
@@ -377,14 +378,15 @@ const AdvisorPortal: React.FC = () => {
             });
             
             await window.electronAPI.createNotification({
-                role: 'SECRETARY',
-                message: `Les notes de la classe ${classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass} (${monthLabel}, Trimestre ${selectedTerm}) ont été validées. Les bulletins sont prêts pour l'impression.`,
+                role: 'SG',
+                message: t('adv_notif_grades_validated', 'Les notes de la classe {{className}} ({{month}}, Trimestre {{term}}) ont été validées. Les bulletins sont prêts pour l\'impression.', { className: classes.find(c => c.id.toString() === selectedClass)?.name || selectedClass, month: monthLabel, term: selectedTerm }),
                 type: 'ACTION_REQUIRED',
                 school_id: user?.schoolId
             });
 
             showNotification(t('grades_validated_success', "Notes validées avec succès ! Cette matière est désormais visible sur les bulletins."), "success");
             loadValidationStatuses();
+            notifyDataChanged();
         } catch (err: any) {
             showNotification(t('validation_error', "Erreur lors de la validation: ") + err.message, "error");
         }
@@ -393,25 +395,25 @@ const AdvisorPortal: React.FC = () => {
     const handleLaunchGradeEntry = async () => {
         try {
             if (!window.electronAPI) {
-                alert("Erreur : API Electron non disponible");
+                alert(t('adv_electron_api_unavailable', 'Erreur : API Electron non disponible'));
                 return;
             }
-            
+
             // Remove window.confirm as it blocks/hangs in some Electron setups
             const res = await window.electronAPI.createNotification({
                 role: 'TEACHER',
-                message: `La période de saisie des notes pour ${monthLabel} (Trimestre ${selectedTerm}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.`,
+                message: t('adv_notif_entry_open', 'La période de saisie des notes pour {{month}} (Trimestre {{term}}) est désormais OUVERTE. Merci de bien vouloir remplir vos notes à temps.', { month: monthLabel, term: selectedTerm }),
                 type: 'ACTION_REQUIRED',
                 school_id: user?.schoolId
             });
-            
+
             if (res && res.error) {
-                showNotification("Erreur base de données : " + res.error, "error");
+                showNotification(t('adv_db_error', 'Erreur base de données : ') + res.error, "error");
             } else {
-                showNotification("Tous les enseignants ont été notifiés !", "success");
+                showNotification(t('adv_all_teachers_notified', 'Tous les enseignants ont été notifiés !'), "success");
             }
         } catch (err: any) {
-            showNotification("Erreur lors de la notification: " + err.message, "error");
+            showNotification(t('adv_notification_error', 'Erreur lors de la notification: ') + err.message, "error");
         }
     };
 
@@ -456,7 +458,7 @@ const AdvisorPortal: React.FC = () => {
                             onChange={(e) => { setSelectedCycle(e.target.value); setSelectedClass(''); }}
                             className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
                         >
-                            <option value="ALL">TOUS</option>
+                            <option value="ALL">{t('adv_all_masc', 'TOUS')}</option>
                             <option value="PRIMAIRE">PRIMAIRE</option>
                             <option value="MATERNELLE">MATERNELLE</option>
                         </select>
@@ -469,7 +471,7 @@ const AdvisorPortal: React.FC = () => {
                             onChange={(e) => { setSelectedSection(e.target.value); setSelectedClass(''); }}
                             className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
                         >
-                            <option value="ALL">TOUTES</option>
+                            <option value="ALL">{t('adv_all_fem', 'TOUTES')}</option>
                             <option value="FRANCOPHONE">FRANCOPHONE</option>
                             <option value="ANGLOPHONE">ANGLOPHONE</option>
                         </select>
@@ -508,7 +510,7 @@ const AdvisorPortal: React.FC = () => {
                                 }}
                                 className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-32"
                             >
-                                {termStructure.length === 0 && <option value="">-- Aucune période --</option>}
+                                {termStructure.length === 0 && <option value="">{t('gr_no_period_configured', '-- Aucune période configurée --')}</option>}
                                 {termStructure.map(ts => (
                                     <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
                                 ))}
@@ -530,7 +532,7 @@ const AdvisorPortal: React.FC = () => {
                                             <option key={seq.id} value={seq.id}>{seq.name}</option>
                                         ))
                                     ) : (
-                                        <option value="">-- Aucune séquence --</option>
+                                        <option value="">{t('gr_no_sequence_configured', '-- Aucune séquence --')}</option>
                                     )}
                                 </select>
                             </div>
@@ -543,26 +545,26 @@ const AdvisorPortal: React.FC = () => {
                                         onChange={(e) => setSelectedCalendarMonth(e.target.value)}
                                         className="bg-slate-950 border border-slate-800 text-white font-bold text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500 w-36"
                                     >
-                                        <option value="ALL">TOUS LES MOIS</option>
-                                        <option value="01">Janvier</option>
-                                        <option value="02">Février</option>
-                                        <option value="03">Mars</option>
-                                        <option value="04">Avril</option>
-                                        <option value="05">Mai</option>
-                                        <option value="06">Juin</option>
-                                        <option value="07">Juillet</option>
-                                        <option value="08">Août</option>
-                                        <option value="09">Septembre</option>
-                                        <option value="10">Octobre</option>
-                                        <option value="11">Novembre</option>
-                                        <option value="12">Décembre</option>
+                                        <option value="ALL">{t('adv_all_months', 'TOUS LES MOIS')}</option>
+                                        <option value="01">{t('month_jan', 'Janvier')}</option>
+                                        <option value="02">{t('month_feb', 'Février')}</option>
+                                        <option value="03">{t('month_mar', 'Mars')}</option>
+                                        <option value="04">{t('month_apr', 'Avril')}</option>
+                                        <option value="05">{t('month_may', 'Mai')}</option>
+                                        <option value="06">{t('month_jun', 'Juin')}</option>
+                                        <option value="07">{t('month_jul', 'Juillet')}</option>
+                                        <option value="08">{t('month_aug', 'Août')}</option>
+                                        <option value="09">{t('month_sep', 'Septembre')}</option>
+                                        <option value="10">{t('month_oct', 'Octobre')}</option>
+                                        <option value="11">{t('month_nov', 'Novembre')}</option>
+                                        <option value="12">{t('month_dec', 'Décembre')}</option>
                                     </select>
                                 </div>
                             )}
                             
                             {user?.role !== 'ADVISOR' && activeTab === 'EVALUATIONS' && (
                                 <div className="flex flex-col justify-end h-full">
-                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">Action</label>
+                                    <label className="text-[9px] font-black uppercase text-slate-500 block mb-1 opacity-0">{t('actions', 'Actions')}</label>
                                     <button
                                         onClick={handleLaunchGradeEntry}
                                         className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase tracking-wider"
@@ -593,10 +595,10 @@ const AdvisorPortal: React.FC = () => {
                                     {t('weekly_schedule', 'Emploi du Temps Hebdomadaire')}
                                 </h2>
                                 <div className="flex gap-2">
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             if (!selectedClass) {
-                                                showNotification("Veuillez sélectionner une classe.", "warning");
+                                                showNotification(t('adv_select_class_warning', 'Veuillez sélectionner une classe.'), "warning");
                                                 return;
                                             }
                                             const classObj = classes.find(c => c.id.toString() === selectedClass);
@@ -645,24 +647,24 @@ const AdvisorPortal: React.FC = () => {
 
                                             generateSchedulePdf({
                                                 school: currentSchool || { name: '' },
-                                                title: `Programme des cours du Lundi ${monday} au Samedi ${saturday}`,
-                                                subtitle: `Emploi du Temps - Classe : ${classObj?.name}`,
+                                                title: t('adv_schedule_pdf_title', 'Programme des cours du Lundi {{monday}} au Samedi {{saturday}}', { monday, saturday }),
+                                                subtitle: t('adv_schedule_pdf_subtitle', 'Emploi du Temps - Classe : {{className}}', { className: classObj?.name }),
                                                 columns,
                                                 rows
                                             });
-                                        }} 
+                                        }}
                                         className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
                                     >
-                                        Télécharger PDF
+                                        {t('download_pdf', 'Télécharger PDF')}
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             if (!selectedClass) {
-                                                showNotification("Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.", "warning");
+                                                showNotification(t('adv_select_class_before_schedule', 'Veuillez sélectionner une classe dans le menu déroulant ci-dessus avant de programmer un cours.'), "warning");
                                                 return;
                                             }
                                             handleOpenScheduleModal();
-                                        }} 
+                                        }}
                                         className="btn-primary text-[10px]"
                                     >
                                         {t('schedule_class', 'PROGRAMMER COURS')}
@@ -672,7 +674,7 @@ const AdvisorPortal: React.FC = () => {
 
                             {!selectedClass ? (
                                 <div className="p-10 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-                                    Veuillez choisir une classe dans le filtre ci-dessus pour gérer son emploi du temps.
+                                    {t('adv_choose_class_to_manage_schedule', "Veuillez choisir une classe dans le filtre ci-dessus pour gérer son emploi du temps.")}
                                 </div>
                             ) : (
                                 (() => {
@@ -698,13 +700,13 @@ const AdvisorPortal: React.FC = () => {
                                     if (allSlots.length === 0) {
                                         return (
                                             <div className="p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                                                <p className="text-slate-400 font-bold mb-4">Aucun cours programmé pour le moment.</p>
-                                                <p className="text-xs text-slate-500 mb-6">L'emploi du temps se construira au fur et à mesure.</p>
-                                                <button 
-                                                    onClick={() => handleOpenScheduleModal()} 
+                                                <p className="text-slate-400 font-bold mb-4">{t('adv_no_course_scheduled_yet', 'Aucun cours programmé pour le moment.')}</p>
+                                                <p className="text-xs text-slate-500 mb-6">{t('adv_schedule_will_build', "L'emploi du temps se construira au fur et à mesure.")}</p>
+                                                <button
+                                                    onClick={() => handleOpenScheduleModal()}
                                                     className="px-6 py-2 bg-amber-500 text-slate-950 font-black text-[10px] rounded-xl uppercase tracking-widest hover:bg-amber-400 transition-all"
                                                 >
-                                                    + Ajouter un cours ou une pause
+                                                    + {t('adv_add_course_or_break', 'Ajouter un cours ou une pause')}
                                                 </button>
                                             </div>
                                         );
@@ -732,7 +734,7 @@ const AdvisorPortal: React.FC = () => {
                                             {/* Days columns */}
                                             {slot.isBreak ? (
                                                 <div className="col-span-6 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">{t('adv_pause_upper', 'PAUSE')}</span>
                                                 </div>
                                             ) : (
                                                 DAYS_OF_WEEK.map(day => {
@@ -754,7 +756,7 @@ const AdvisorPortal: React.FC = () => {
                                                                 onClick={() => handleOpenScheduleModal(sData)}
                                                                 className={`p-4 rounded-xl border text-center hover:scale-[1.02] active:scale-95 transition-all w-full flex items-center justify-center ${typeColor}`}
                                                             >
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest">Pause</span>
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest">{t('adv_pause_label', 'Pause')}</span>
                                                             </button>
                                                         );
                                                     }
@@ -770,7 +772,7 @@ const AdvisorPortal: React.FC = () => {
                                                                 <div className="text-[8px] text-white/50 mt-1 uppercase font-bold break-words leading-tight">{getTeacherName(sData.teacher_id)}</div>
                                                             </div>
                                                             <div className="text-[7px] font-black uppercase tracking-wider mt-2 opacity-50">
-                                                                {sData.type || 'COURS'}
+                                                                {sData.type || t('adv_course_upper', 'COURS')}
                                                             </div>
                                                         </button>
                                                     );
@@ -782,7 +784,7 @@ const AdvisorPortal: React.FC = () => {
                                                         onClick={() => handleOpenScheduleModal(null, day.key, slot.start, slot.end)}
                                                         className="p-4 bg-slate-900/10 border border-dashed border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/5 rounded-xl text-[10px] font-bold text-slate-600 hover:text-amber-500 text-center flex flex-col items-center justify-center uppercase tracking-widest group transition-all"
                                                     >
-                                                        <span className="hidden group-hover:block opacity-100">+ PROG.</span>
+                                                        <span className="hidden group-hover:block opacity-100">+ {t('adv_prog_abbr', 'PROG.')}</span>
                                                     </button>
                                                 );
                                             })
@@ -820,7 +822,7 @@ const AdvisorPortal: React.FC = () => {
                                     {!selectedClass ? (
                                         <tr>
                                             <td colSpan={5} className="text-center py-8 text-slate-500 font-bold text-xs">
-                                                Veuillez sélectionner une classe pour charger les matières.
+                                                {t('adv_select_class_to_load_subjects', 'Veuillez sélectionner une classe pour charger les matières.')}
                                             </td>
                                         </tr>
                                     ) : subjectStatuses.length === 0 ? (

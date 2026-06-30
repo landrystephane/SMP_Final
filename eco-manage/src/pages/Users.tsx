@@ -110,11 +110,11 @@ const Users: React.FC = () => {
     const fullNameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
     const usernameRegex = /^[A-Za-z0-9._-]+$/;
     if (!fullNameRegex.test(newUser.fullName.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent contient des caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
+        setFormError(t('usr_name_input_error'));
         return;
     }
     if (!usernameRegex.test(newUser.username.trim())) {
-        setFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres, chiffres, points, tirets ou underscores sans espaces.");
+        setFormError(t('usr_username_input_error'));
         return;
     }
 
@@ -148,7 +148,7 @@ const Users: React.FC = () => {
           phone: '',
           classRole: 'MAIN'
       });
-      setFormSuccess("L'utilisateur a été créé avec succès !");
+      setFormSuccess(t('usr_user_created_success'));
       setTimeout(() => setFormSuccess(null), 5000);
       loadData();
     }
@@ -162,11 +162,11 @@ const Users: React.FC = () => {
       const fullNameRegex = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'_&.]*$/;
       const usernameRegex = /^[A-Za-z0-9._-]+$/;
       if (!fullNameRegex.test(editUserForm.fullName.trim())) {
-          setEditFormError("🚨 ERREUR DE SAISIE :\nLe Nom de l'agent contient des caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .");
+          setEditFormError(t('usr_name_input_error'));
           return;
       }
       if (!usernameRegex.test(editUserForm.username.trim())) {
-          setEditFormError("🚨 ERREUR DE SAISIE :\nLe nom d'utilisateur (Identifiant) ne doit contenir que des lettres, chiffres, points, tirets ou underscores sans espaces.");
+          setEditFormError(t('usr_username_input_error'));
           return;
       }
 
@@ -196,7 +196,7 @@ const Users: React.FC = () => {
                   return;
               }
 
-              showNotification("Agent mis à jour avec succès !", "success");
+              showNotification(t('usr_account_updated_success'), "success");
               setEditingUser(null);
               loadData();
           } catch (err: any) {
@@ -213,7 +213,7 @@ const Users: React.FC = () => {
               if (res && res.error) {
                   showNotification(res.error, "error");
               } else {
-                  showNotification("Compte supprimé", "success");
+                  showNotification(t('usr_account_deleted'), "success");
                   loadData();
               }
           } catch (err: any) {
@@ -223,14 +223,14 @@ const Users: React.FC = () => {
   };
 
   const handleToggleActive = async (id: number, currentStatus: boolean, name: string) => {
-      if (!window.confirm(`Voulez-vous vraiment ${currentStatus ? 'désactiver' : 'réactiver'} le compte de ${name} ?`)) return;
+      if (!window.confirm(t('usr_confirm_toggle_active', { action: t(currentStatus ? 'usr_deactivate_action' : 'usr_reactivate_action'), name }))) return;
       if (window.electronAPI) {
           try {
               const res = await window.electronAPI.toggleUserActive({ id, isActive: !currentStatus });
               if (res && res.error) {
                   showNotification(res.error, "error");
               } else {
-                  showNotification(currentStatus ? "Compte désactivé" : "Compte réactivé", "success");
+                  showNotification(t(currentStatus ? 'usr_account_deactivated' : 'usr_account_reactivated'), "success");
                   loadData();
               }
           } catch (err: any) {
@@ -308,7 +308,7 @@ const Users: React.FC = () => {
                                  value={newUser.fullName}
                                  onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
                                  required
-                                 placeholder="Joseph Mballa"
+                                 placeholder={t('usr_fullname_placeholder', 'Joseph Mballa')}
                              />
                          </div>
                      </div>
@@ -321,7 +321,7 @@ const Users: React.FC = () => {
                              value={newUser.phone}
                              onChange={(val) => setNewUser({...newUser, phone: val || ''})}
                              className="input-field w-full flex items-center phone-input-glass text-amber-500 font-mono"
-                             placeholder="Ex: +237 699000000"
+                             placeholder={t('usr_phone_placeholder', 'Ex: +237 699000000')}
                          />
                      </div>
                     <div className="grid grid-cols-1 gap-4">
@@ -333,7 +333,7 @@ const Users: React.FC = () => {
                                 value={newUser.username}
                                 onChange={(e) => setNewUser({...newUser, username: e.target.value.toLowerCase()})}
                                 required
-                                placeholder="j.mballa"
+                                placeholder={t('usr_username_placeholder', 'j.mballa')}
                             />
                         </div>
                         <div className="space-y-2">
@@ -359,7 +359,6 @@ const Users: React.FC = () => {
                             )}
                             <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
                             <option value="SG">{t('role_SG', 'Secrétaire Général')}</option>
-                            <option value="SECRETARY">{t('role_SECRETARY', 'Secrétaire')}</option>
                             <option value="BURSAR">{t('role_BURSAR')}</option>
                             <option value="TEACHER">{t('role_TEACHER')}</option>
                             <option value="ADVISOR">{t('role_ADVISOR')}</option>
@@ -406,14 +405,14 @@ const Users: React.FC = () => {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Rôle</label>
+                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('usr_role_select_label')}</label>
                                     <select
                                         className="input-field w-full border-amber-500/20 bg-amber-500/5 appearance-none"
                                         value={newUser.classRole}
                                         onChange={(e) => setNewUser({...newUser, classRole: e.target.value})}
                                     >
-                                        <option value="MAIN">Titulaire</option>
-                                        <option value="ASSISTANT">Suppléant</option>
+                                        <option value="MAIN">{t('usr_role_main')}</option>
+                                        <option value="ASSISTANT">{t('usr_role_assistant')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -454,7 +453,7 @@ const Users: React.FC = () => {
                   <th className="px-8 py-6">{t('username')}</th>
                   <th className="px-8 py-6">{t('role_label')}</th>
                   <th className="px-8 py-6">{t('access_status_header')}</th>
-                  <th className="px-8 py-6 text-right">Actions</th>
+                  <th className="px-8 py-6 text-right">{t('usr_actions_header')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-slate-900/30">
@@ -467,11 +466,11 @@ const Users: React.FC = () => {
                         </div>
                         <div>
                             <div className="font-black text-white uppercase text-base tracking-tight group-hover:text-amber-500 transition-colors">
-                                {u.civility ? `${u.civility} ` : ''}{u.fullName || t('user_default', 'Utilisateur')}
+                                {u.civility ? `${u.civility} ` : ''}{u.fullName || t('usr_default_user')}
                             </div>
                              <div className="flex flex-wrap gap-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-                                 <span className="text-amber-500/80">MATRICULE: {u.matricule || `STF-${u.id}`}</span>
-                                 {u.phone && <span className="text-slate-400">• TEL: {u.phone}</span>}
+                                 <span className="text-amber-500/80">{t('usr_matricule_prefix', 'MATRICULE')}: {u.matricule || `STF-${u.id}`}</span>
+                                 {u.phone && <span className="text-slate-400">• {t('usr_tel_prefix', 'TEL')}: {u.phone}</span>}
                                  {u.role === 'TEACHER' && u.section && (
                                      <>
                                          <span>•</span>
@@ -488,7 +487,7 @@ const Users: React.FC = () => {
                                                  return (
                                                      <>
                                                          <span>•</span>
-                                                         <span className="text-emerald-500">CLASSE: {cls.name}</span>
+                                                         <span className="text-emerald-500">{t('usr_classe_prefix', 'CLASSE')}: {cls.name}</span>
                                                      </>
                                                  );
                                              }
@@ -516,10 +515,10 @@ const Users: React.FC = () => {
                                     ? 'text-emerald-500 bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10 hover:border-emerald-500/40'
                                     : 'text-rose-500 bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10 hover:border-rose-500/40'
                             }`}
-                            title={u.is_active !== 0 ? "Désactiver ce compte" : "Réactiver ce compte"}
+                            title={u.is_active !== 0 ? t('usr_deactivate_account_tooltip') : t('usr_reactivate_account_tooltip')}
                         >
                             <div className={`w-1.5 h-1.5 rounded-full mr-2 ${u.is_active !== 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                            {u.is_active !== 0 ? t('status_active') : 'INACTIF'}
+                            {u.is_active !== 0 ? t('status_active') : t('usr_status_inactive')}
                         </button>
                     </td>
                      <td className="px-8 py-6 text-right">
@@ -530,7 +529,7 @@ const Users: React.FC = () => {
                              </button>
                          )}
                          {((currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'FOUNDER') || (currentUser?.role === 'DIRECTOR' && u.role !== 'FOUNDER' && u.role !== 'SUPERADMIN')) && (
-                             <button onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)} className={`p-3 rounded-2xl border border-transparent transition-all ${u.is_active !== 0 ? 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20'}`} title={u.is_active !== 0 ? "Désactiver l'accès" : "Réactiver l'accès"}>
+                             <button onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)} className={`p-3 rounded-2xl border border-transparent transition-all ${u.is_active !== 0 ? 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20'}`} title={u.is_active !== 0 ? t('usr_deactivate_access_tooltip') : t('usr_reactivate_access_tooltip')}>
                                  {u.is_active !== 0 ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                              </button>
                          )}
@@ -627,7 +626,6 @@ const Users: React.FC = () => {
                                     )}
                                     <option value="DIRECTOR">{t('role_DIRECTOR')}</option>
                                     <option value="SG">{t('role_SG', 'Secrétaire Général')}</option>
-                                    <option value="SECRETARY">{t('role_SECRETARY', 'Secrétaire')}</option>
                                     <option value="BURSAR">{t('role_BURSAR')}</option>
                                     <option value="TEACHER">{t('role_TEACHER')}</option>
                                     <option value="ADVISOR">{t('role_ADVISOR')}</option>
@@ -685,14 +683,14 @@ const Users: React.FC = () => {
                                       </select>
                                   </div>
                                   <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Rôle</label>
+                                      <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">{t('usr_role_select_label')}</label>
                                       <select
                                           className="input-field w-full bg-amber-500/5 appearance-none"
                                           value={editUserForm.classRole}
                                           onChange={(e) => setEditUserForm({...editUserForm, classRole: e.target.value})}
                                       >
-                                          <option value="MAIN">Titulaire</option>
-                                          <option value="ASSISTANT">Suppléant</option>
+                                          <option value="MAIN">{t('usr_role_main')}</option>
+                                          <option value="ASSISTANT">{t('usr_role_assistant')}</option>
                                       </select>
                                   </div>
                               </div>

@@ -22,6 +22,7 @@ const SystemAdmin: React.FC = () => {
   const [globalSubjects, setGlobalSubjects] = useState<any[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
   const [schoolSubjects, setSchoolSubjects] = useState<number[]>([]);
+  const [disabledModules, setDisabledModules] = useState<string[]>([]);
   const [schoolUsers, setSchoolUsers] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
@@ -94,9 +95,9 @@ const SystemAdmin: React.FC = () => {
           setIsLoadingLogs(true);
           try {
               const logs = await (window.electronAPI as any).getErrorLogs();
-              setErrorLogs(logs || 'Aucun journal d\'erreurs détecté.');
+              setErrorLogs(logs || t('sys_no_error_logs_detected'));
           } catch (err: any) {
-              setErrorLogs('Erreur lors du chargement des logs: ' + err.message);
+              setErrorLogs(t('sys_error_loading_logs', { message: err.message }));
           } finally {
               setIsLoadingLogs(false);
           }
@@ -158,13 +159,13 @@ const SystemAdmin: React.FC = () => {
               if (res?.error) {
                   showNotification(res.error, "error");
               } else {
-                  showNotification(`La matière "${newSubject.name}" a été ajoutée au répertoire global.`, "success");
+                  showNotification(t('sys_subject_added_global', { name: newSubject.name }), "success");
                   setNewSubject({ name: '', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' });
                   setIsAddingSubject(false);
                   loadGlobalSubjects();
               }
           } catch (err: any) {
-              showNotification(err.message || "Erreur lors de l'ajout de la matière", "error");
+              showNotification(err.message || t('sys_error_adding_subject'), "error");
           }
       }
   }
@@ -222,7 +223,7 @@ const SystemAdmin: React.FC = () => {
 
           setEditingFounder(null);
           setEditFounderPassword('');
-          alert("Informations du fondateur mises à jour avec succès !");
+          alert(t('sys_founder_updated_success'));
           const users = await window.electronAPI.getUsers(selectedSchool.id);
           setSchoolUsers(users || []);
       } catch (err: any) {
@@ -248,8 +249,44 @@ const SystemAdmin: React.FC = () => {
 
           const users = await window.electronAPI.getUsers(school.id);
           setSchoolUsers(users || []);
+
+          try {
+              const disabled = await (window.electronAPI as any).getDisabledModules(school.id);
+              setDisabledModules(disabled || []);
+          } catch(e) { setDisabledModules([]); }
       }
   }
+
+  const AVAILABLE_MODULES = [
+      { key: 'students', label: 'Gestion des Élèves' },
+      { key: 'grades', label: 'Saisie des Notes' },
+      { key: 'pedagogy_advisor', label: 'Conseiller Pédagogique' },
+      { key: 'finance', label: 'Gestion Financière' },
+      { key: 'tuition_config', label: 'Configuration Scolarité' },
+      { key: 'attendance', label: 'Cahier de Présence' },
+      { key: 'stats', label: 'Statistiques' },
+      { key: 'admin', label: 'Contrôle Accès' },
+      { key: 'users', label: 'Utilisateurs' },
+      { key: 'parents', label: 'Portail Parents' },
+      { key: 'transport', label: 'Transport' },
+      { key: 'tickets', label: 'Requêtes' },
+      { key: 'customization', label: 'Personnalisation' },
+      { key: 'archives', label: 'Archives Annuelles' },
+  ];
+
+  const handleToggleModule = async (moduleKey: string) => {
+      if (!selectedSchool || !window.electronAPI) return;
+      const newDisabled = disabledModules.includes(moduleKey)
+          ? disabledModules.filter(m => m !== moduleKey)
+          : [...disabledModules, moduleKey];
+      setDisabledModules(newDisabled);
+      try {
+          await (window.electronAPI as any).setDisabledModules({ schoolId: selectedSchool.id, modules: newDisabled });
+      } catch(e: any) {
+          showNotification(e.message, "error");
+          setDisabledModules(disabledModules);
+      }
+  };
 
   const handleSaveMetadata = async () => {
       if (!selectedSchool || !window.electronAPI) return;
@@ -331,8 +368,8 @@ const SystemAdmin: React.FC = () => {
 
   const handleRenewSubscription = async (months: number, amount: number) => {
       if (!selectedSchool || !window.electronAPI) return;
-      if (!window.confirm(`Confirmer la réception de ${amount} FCFA en espèces pour un renouvellement de ${months} mois ?`)) return;
-      
+      if (!window.confirm(t('sys_confirm_payment_reception', { amount, months }))) return;
+
       try {
           if ((window.electronAPI as any).validatePayment) {
               await (window.electronAPI as any).validatePayment({
@@ -341,12 +378,12 @@ const SystemAdmin: React.FC = () => {
                   amount: amount,
                   superAdminId: user?.id
               });
-              alert(t('Paiement validé avec succès. L\'abonnement a été prolongé.'));
+              alert(t('sys_payment_validated_success'));
               loadSchools();
               // Update local state to close the menu if needed
               setSelectedSchool({...selectedSchool, subscription_status: 'ACTIVE'});
           } else {
-              alert("L'API n'est pas encore connectée pour cette action.");
+              alert(t('sys_api_not_connected'));
           }
       } catch (err: any) {
           alert(t('sys_error') + ': ' + err.message);
@@ -358,11 +395,11 @@ const SystemAdmin: React.FC = () => {
       setConfirmPasswordError('');
       setConfirmPasswordModal({
           isOpen: true,
-          title: "Supprimer l'école",
-          description: `Veuillez confirmer la mise à la corbeille de l'établissement "${name}". Ses utilisateurs n'auront plus accès à l'application.`,
+          title: t('delete_school_title'),
+          description: t('sys_delete_school_desc', { name }),
           onConfirm: async (password) => {
               if (!password || password.trim() === '') {
-                  setConfirmPasswordError('Le mot de passe ne peut pas être vide.');
+                  setConfirmPasswordError(t('sys_password_cannot_be_empty'));
                   return;
               }
               if (window.electronAPI) {
@@ -372,7 +409,7 @@ const SystemAdmin: React.FC = () => {
                           setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
-                          showNotification(`École "${name}" mise à la corbeille avec succès.`, "success");
+                          showNotification(t('sys_school_trashed_success', { name }), "success");
                           loadSchools();
                           loadDeletedSchools();
                       }
@@ -389,11 +426,11 @@ const SystemAdmin: React.FC = () => {
       setConfirmPasswordError('');
       setConfirmPasswordModal({
           isOpen: true,
-          title: "Suppression Définitive",
-          description: `ATTENTION : Vous êtes sur le point de détruire DEFINITIVEMENT l'établissement "${name}" ainsi que toutes ses dépendances (élèves, classes, paiements, notes, enseignants, historiques). Cette action est irréversible !`,
+          title: t('sys_permanent_delete_title'),
+          description: t('sys_permanent_delete_desc', { name }),
           onConfirm: async (password) => {
               if (!password || password.trim() === '') {
-                  setConfirmPasswordError('Le mot de passe ne peut pas être vide.');
+                  setConfirmPasswordError(t('sys_password_cannot_be_empty'));
                   return;
               }
               if (window.electronAPI && window.electronAPI.permanentlyDeleteSchool) {
@@ -403,7 +440,7 @@ const SystemAdmin: React.FC = () => {
                           setConfirmPasswordError(res.error);
                       } else {
                           setConfirmPasswordModal(prev => ({ ...prev, isOpen: false }));
-                          showNotification(`École "${name}" supprimée DÉFINITIVEMENT.`, "success");
+                          showNotification(t('sys_school_deleted_permanently', { name }), "success");
                           loadDeletedSchools();
                       }
                   } catch (err: any) {
@@ -415,7 +452,7 @@ const SystemAdmin: React.FC = () => {
   };
 
   const handleDeleteSubject = async (id: number) => {
-      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette matière ? Cette action est irréversible.")) return;
+      if (!window.confirm(t('sys_confirm_delete_subject'))) return;
       if (window.electronAPI) {
           await window.electronAPI.deleteGlobalSubject(id);
           loadGlobalSubjects();
@@ -423,7 +460,7 @@ const SystemAdmin: React.FC = () => {
   };
 
   const handleDeleteFounder = async (id: number) => {
-      if (!window.confirm("Retirer cet accès fondateur ?")) return;
+      if (!window.confirm(t('sys_confirm_remove_founder_access'))) return;
       if (window.electronAPI && selectedSchool) {
           await window.electronAPI.deleteUser(id);
           const users = await window.electronAPI.getUsers(selectedSchool.id);
@@ -555,7 +592,7 @@ const SystemAdmin: React.FC = () => {
                   {s.access_code && (
                   <div className="flex items-center gap-3 text-xs font-bold">
                     <Lock className="w-4 h-4 text-amber-500" />
-                    <span className="text-slate-500">Code d'accès :</span>
+                    <span className="text-slate-500">{t('sys_access_code_label')}</span>
                     <span className="text-amber-500 font-black tracking-widest bg-amber-500/10 px-3 py-1 rounded-lg">{s.access_code}</span>
                   </div>
                   )}
@@ -580,7 +617,7 @@ const SystemAdmin: React.FC = () => {
                           const nextActive = s.is_active === 0 ? 1 : 0;
                           if (window.electronAPI && (window.electronAPI as any).toggleSchoolStatus) {
                               await (window.electronAPI as any).toggleSchoolStatus({ id: s.id, isActive: nextActive });
-                              alert(nextActive ? `L'école "${s.name}" a été réactivée.` : `L'école "${s.name}" a été suspendue.`);
+                              alert(nextActive ? t('sys_school_reactivated', { name: s.name }) : t('sys_school_suspended_msg', { name: s.name }));
                               loadSchools();
                           }
                       }}
@@ -764,7 +801,7 @@ const SystemAdmin: React.FC = () => {
                       </div>
                       <div className="p-8 space-y-4">
                         <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
-                          {t('sys_auto_delete_in')} {diffDays} {diffDays > 1 ? t('days', 'jours') : t('day', 'jour')}
+                          {t('sys_auto_delete_in')} {diffDays} {diffDays > 1 ? t('days') : t('day')}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                            <MapPin className="w-4 h-4 text-slate-600" /> {s.address}
@@ -926,7 +963,7 @@ const SystemAdmin: React.FC = () => {
                                 />
                               </div>
                               <div className="flex items-center justify-between pt-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Exiger code de matière</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('sys_require_subject_code_label')}</label>
                                 <input
                                   type="checkbox"
                                   className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
@@ -935,7 +972,7 @@ const SystemAdmin: React.FC = () => {
                                 />
                               </div>
                               <div className="flex items-center justify-between pt-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Autoriser modif. trimestres</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('sys_allow_term_edit_label')}</label>
                                 <input
                                   type="checkbox"
                                   className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
@@ -945,7 +982,7 @@ const SystemAdmin: React.FC = () => {
                               </div>
                               <div className="pt-6 border-t border-white/5 mt-6">
                                 <button onClick={handleSaveMetadata} className="w-full py-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-400 transition-all flex justify-center items-center gap-2">
-                                  {t('save')} les métadonnées
+                                  {t('sys_save_metadata_btn')}
                                 </button>
                               </div>
                             </div>
@@ -973,15 +1010,15 @@ const SystemAdmin: React.FC = () => {
                               ))}
                               <div className="pt-4 border-t border-white/5 space-y-3">
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">Exiger code de matière :</span>
+                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">{t('sys_require_subject_code_colon')}</span>
                                   <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedSchool.requires_subject_code === 1 ? 'bg-amber-500/15 text-amber-500' : 'bg-slate-800 text-slate-400'}`}>
-                                    {selectedSchool.requires_subject_code === 1 ? 'ACTIF' : 'INACTIF'}
+                                    {selectedSchool.requires_subject_code === 1 ? t('sys_status_active_upper') : t('sys_status_inactive_upper')}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">Modif. trimestres par fondateur :</span>
+                                  <span className="text-slate-500 uppercase text-[10px] font-black tracking-widest">{t('sys_term_edit_by_founder_colon')}</span>
                                   <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedSchool.allow_founder_term_edit === 1 ? 'bg-emerald-500/15 text-emerald-500' : 'bg-slate-800 text-slate-400'}`}>
-                                    {selectedSchool.allow_founder_term_edit === 1 ? 'AUTORISÉ' : 'REFUSÉ'}
+                                    {selectedSchool.allow_founder_term_edit === 1 ? t('sys_status_authorized') : t('sys_status_refused')}
                                   </span>
                                 </div>
                               </div>
@@ -1080,31 +1117,31 @@ const SystemAdmin: React.FC = () => {
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
-                              <Activity className="w-6 h-6 text-emerald-500" /> SaaS Abonnement
+                              <Activity className="w-6 h-6 text-emerald-500" /> {t('sys_saas_subscription')}
                             </h3>
                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedSchool.subscription_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                                {selectedSchool.subscription_status || 'INCONNU'}
+                                {selectedSchool.subscription_status || t('sys_status_unknown')}
                             </span>
                           </div>
                           <div className="space-y-4">
                               <div>
-                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Date d'expiration</p>
-                                  <p className="text-lg font-black text-white">{selectedSchool.subscription_end_date ? new Date(selectedSchool.subscription_end_date).toLocaleDateString() : 'Non définie'}</p>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t('sys_expiration_date')}</p>
+                                  <p className="text-lg font-black text-white">{selectedSchool.subscription_end_date ? new Date(selectedSchool.subscription_end_date).toLocaleDateString() : t('sys_not_defined')}</p>
                               </div>
                               <div className="pt-4 border-t border-white/5 space-y-3">
-                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Valider un paiement (Espèces)</p>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t('sys_validate_cash_payment')}</p>
                                   <div className="flex flex-col gap-3">
                                       <div className="flex gap-3">
                                           <div className="flex-1">
-                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Mois achetés</label>
+                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('sys_months_purchased')}</label>
                                               <input type="number" id="sub_months" defaultValue={1} min={1} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
                                           </div>
                                           <div className="flex-1">
-                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Montant (FCFA)</label>
+                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('sys_amount_fcfa_label')}</label>
                                               <input type="number" id="sub_amount" defaultValue={5000} min={0} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
                                           </div>
                                       </div>
-                                      <button 
+                                      <button
                                         onClick={() => {
                                             const m = parseInt((document.getElementById('sub_months') as HTMLInputElement).value) || 1;
                                             const a = parseInt((document.getElementById('sub_amount') as HTMLInputElement).value) || 0;
@@ -1112,7 +1149,7 @@ const SystemAdmin: React.FC = () => {
                                         }}
                                         className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
                                       >
-                                          Confirmer le Paiement
+                                          {t('sys_confirm_payment_btn')}
                                       </button>
                                   </div>
                               </div>
@@ -1157,6 +1194,35 @@ const SystemAdmin: React.FC = () => {
                           </div>
                         </section>
 
+                        <section className="glass-card p-10 bg-slate-900 border-white/10">
+                          <div className="flex justify-between items-center mb-10">
+                            <div>
+                              <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase flex items-center gap-4">
+                                <Lock className="w-8 h-8 text-rose-500" /> Modules de l'Application
+                              </h3>
+                              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Désactivez silencieusement des modules pour cette école. L'utilisateur ne verra aucune trace de cette restriction.</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {AVAILABLE_MODULES.map(mod => {
+                                const isDisabled = disabledModules.includes(mod.key);
+                                return (
+                                    <button
+                                      key={mod.key}
+                                      onClick={() => handleToggleModule(mod.key)}
+                                      className={`p-6 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isDisabled ? 'bg-rose-500/5 border-rose-500/40 opacity-60' : 'bg-slate-950/50 border-slate-800 hover:border-emerald-600'}`}
+                                    >
+                                        <p className={`font-black uppercase text-sm tracking-tight ${isDisabled ? 'text-rose-400 line-through' : 'text-slate-300'}`}>{mod.label}</p>
+                                        <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${isDisabled ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-800 group-hover:border-emerald-600'}`}>
+                                            {isDisabled ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4 text-slate-700 group-hover:text-emerald-600" />}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                          </div>
+                        </section>
+
                         <div className="flex justify-end pt-10">
                           <button
                             onClick={() => setSelectedSchool(null)}
@@ -1182,16 +1248,16 @@ const SystemAdmin: React.FC = () => {
                   <form onSubmit={handleAddSchool} className="p-6 md:p-10 space-y-6 md:space-y-8 overflow-y-auto flex-1">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_school_full_name')}</label>
-                          <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder="Ex: Collège Bilingue Adonaï" />
+                          <input required className="input-field w-full text-xl py-5" value={newSchool.name} onChange={e => setNewSchool({...newSchool, name: e.target.value})} placeholder={t('sys_school_name_placeholder')} />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_city_neighborhood')}</label>
-                            <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder="Ex: Yaoundé, Quartier Mvan" />
+                            <input required className="input-field w-full" value={newSchool.address} onChange={e => setNewSchool({...newSchool, address: e.target.value})} placeholder={t('sys_address_placeholder')} />
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_bp_box')}</label>
-                            <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder="Ex: BP 1234" />
+                            <input className="input-field w-full" value={newSchool.bp} onChange={e => setNewSchool({...newSchool, bp: e.target.value})} placeholder={t('sys_bp_placeholder')} />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1213,26 +1279,26 @@ const SystemAdmin: React.FC = () => {
                       </div>
 
                       <div className="pt-4 border-t border-white/10 space-y-4">
-                        <h3 className="text-sm font-black text-white uppercase tracking-widest">Configuration Avancée</h3>
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest">{t('sys_advanced_config')}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Structure Académique</label>
-                              <select 
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_academic_structure')}</label>
+                              <select
                                   className="input-field w-full"
                                   value={newSchool.term_structure}
                                   onChange={e => setNewSchool({...newSchool, term_structure: e.target.value})}
                               >
-                                  <option value="3_TERMS_2_SEQS">3 Trimestres (2 Séquences chacun)</option>
-                                  <option value="3_TERMS_NO_SEQS">3 Trimestres (Sans séquences)</option>
-                                  <option value="2_SEMESTERS_2_SEQS">2 Semestres (2 Séquences chacun)</option>
-                                  <option value="2_SEMESTERS_3_SEQS">2 Semestres (3 Séquences chacun)</option>
+                                  <option value="3_TERMS_2_SEQS">{t('sys_term_3_2seq')}</option>
+                                  <option value="3_TERMS_NO_SEQS">{t('sys_term_3_noseq')}</option>
+                                  <option value="2_SEMESTERS_2_SEQS">{t('sys_term_2sem_2seq')}</option>
+                                  <option value="2_SEMESTERS_3_SEQS">{t('sys_term_2sem_3seq')}</option>
                               </select>
                           </div>
-                          
+
                           <label className="flex items-center gap-3 cursor-pointer bg-slate-950/50 p-4 rounded-xl border border-white/5 hover:border-amber-500/30 transition-colors">
                               <div className="relative flex items-center">
-                                  <input 
-                                      type="checkbox" 
+                                  <input
+                                      type="checkbox"
                                       className="sr-only peer"
                                       checked={newSchool.allow_founder_term_edit === 1}
                                       onChange={(e) => setNewSchool({...newSchool, allow_founder_term_edit: e.target.checked ? 1 : 0})}
@@ -1241,15 +1307,15 @@ const SystemAdmin: React.FC = () => {
                                   <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
                               </div>
                               <div>
-                                  <div className="text-xs font-bold text-white">Fondateur modifie les trimestres</div>
-                                  <div className="text-[10px] text-slate-400">Autorise le fondateur à éditer la structure</div>
+                                  <div className="text-xs font-bold text-white">{t('sys_founder_edits_terms')}</div>
+                                  <div className="text-[10px] text-slate-400">{t('sys_founder_edits_terms_desc')}</div>
                               </div>
                           </label>
 
                           <label className="flex items-center gap-3 cursor-pointer bg-slate-950/50 p-4 rounded-xl border border-white/5 hover:border-amber-500/30 transition-colors">
                               <div className="relative flex items-center">
-                                  <input 
-                                      type="checkbox" 
+                                  <input
+                                      type="checkbox"
                                       className="sr-only peer"
                                       checked={newSchool.requires_subject_code === 1}
                                       onChange={(e) => setNewSchool({...newSchool, requires_subject_code: e.target.checked ? 1 : 0})}
@@ -1258,8 +1324,8 @@ const SystemAdmin: React.FC = () => {
                                   <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
                               </div>
                               <div>
-                                  <div className="text-xs font-bold text-white">Code requis pour les matières</div>
-                                  <div className="text-[10px] text-slate-400">Exige un code d'activation SuperAdmin</div>
+                                  <div className="text-xs font-bold text-white">{t('sys_subject_code_required')}</div>
+                                  <div className="text-[10px] text-slate-400">{t('sys_subject_code_required_desc')}</div>
                               </div>
                           </label>
                         </div>
@@ -1280,8 +1346,8 @@ const SystemAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-md max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
-                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic">Créer le Fondateur</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Propriétaire principal pour {selectedSchool?.name}</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic">{t('sys_create_founder_title')}</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">{t('sys_founder_owner_for')} {selectedSchool?.name}</p>
                   </div>
                   <form onSubmit={handleAddFounder} className="p-6 md:p-10 space-y-6 overflow-y-auto flex-1">
                       {founderError && (
@@ -1290,20 +1356,20 @@ const SystemAdmin: React.FC = () => {
                           </div>
                       )}
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom Complet</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_full_name')}</label>
                           <input required className="input-field w-full" value={newFounder.fullName} onChange={e => setNewFounder({...newFounder, fullName: e.target.value})} placeholder="John Doe" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom d'Utilisateur (Identifiant pour la connexion)</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_username_login')}</label>
                           <input required className="input-field w-full" value={newFounder.username} onChange={e => setNewFounder({...newFounder, username: e.target.value})} placeholder="admin_name" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mot de Passe de Connexion</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_login_password')}</label>
                           <input required type="password" className="input-field w-full font-mono" value={newFounder.password} onChange={e => setNewFounder({...newFounder, password: e.target.value})} />
                       </div>
                       <div className="pt-8 flex gap-4">
                           <button type="button" onClick={() => setIsAddingFounder(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">{t('cancel')}</button>
-                          <button type="submit" className="btn-primary flex-[2] py-4">CRÉER LE FONDATEUR</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">{t('sys_create_founder_btn')}</button>
                       </div>
                   </form>
               </div>
@@ -1315,39 +1381,39 @@ const SystemAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 md:p-6 animate-in zoom-in-95 duration-300">
               <div className="glass-card w-full max-w-xl max-h-[90vh] bg-slate-900 border-white/10 shadow-2xl p-0 flex flex-col overflow-y-auto custom-scrollbar max-h-[90vh]">
                   <div className="p-6 md:p-10 border-b border-white/5 bg-slate-900/50 flex-shrink-0">
-                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">Ajouter une Matière Globale</h2>
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Ajouter un nouveau module d'enseignement au registre général</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic text-amber-500">{t('sys_add_global_subj')}</h2>
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">{t('sys_add_subj_desc')}</p>
                   </div>
                   <form onSubmit={handleAddSubject} className="p-6 md:p-10 space-y-6 overflow-y-auto flex-1">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la Matière</label>
-                          <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="Ex: Mathématiques, Éveil..." />
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subj_name')}</label>
+                          <input required className="input-field w-full" value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder={t('sys_subject_name_placeholder')} />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domaine / Catégorie</label>
-                            <input required className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})} placeholder="Ex: Sciences et Technologie" />
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subj_domain')}</label>
+                            <input required className="input-field w-full" value={newSubject.domain} onChange={e => setNewSubject({...newSubject, domain: e.target.value})} placeholder={t('sys_subject_domain_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_section')}</label>
                             <select className="input-field w-full" value={newSubject.section} onChange={e => setNewSubject({...newSubject, section: e.target.value})}>
-                                <option value="FRANCOPHONE">Francophone</option>
-                                <option value="ANGLOPHONE">Anglophone</option>
+                                <option value="FRANCOPHONE">{t('sys_section_francophone_opt')}</option>
+                                <option value="ANGLOPHONE">{t('sys_section_anglophone_opt')}</option>
                             </select>
                         </div>
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_subj_level')}</label>
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
-                              <option value="MATERNELLE">Maternelle</option>
-                              <option value="PRIMAIRE">Primaire</option>
-                              <option value="COLLEGE">Collège</option>
-                              <option value="LYCEE">Lycée</option>
+                              <option value="MATERNELLE">{t('sys_level_maternelle_opt')}</option>
+                              <option value="PRIMAIRE">{t('sys_level_primaire_opt')}</option>
+                              <option value="COLLEGE">{t('sys_level_college_opt')}</option>
+                              <option value="LYCEE">{t('sys_level_lycee_opt')}</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">
-                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Annuler</button>
-                          <button type="submit" className="btn-primary flex-[2] py-4">ENREGISTRER LA MATIÈRE</button>
+                          <button type="button" onClick={() => setIsAddingSubject(false)} className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">{t('cancel')}</button>
+                          <button type="submit" className="btn-primary flex-[2] py-4">{t('sys_register_subj_btn')}</button>
                       </div>
                   </form>
               </div>
@@ -1373,7 +1439,7 @@ const SystemAdmin: React.FC = () => {
                           </div>
                       )}
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Saisir votre mot de passe Admin</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('sys_enter_admin_password')}</label>
                           <input
                               required
                               type="password"
@@ -1397,13 +1463,13 @@ const SystemAdmin: React.FC = () => {
                               }}
                               className="flex-1 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all"
                           >
-                              Annuler
+                              {t('cancel')}
                           </button>
                           <button
                               type="submit"
                               className="btn-primary flex-[2] py-4 bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/10"
                           >
-                              CONFIRMER
+                              {t('sys_confirm')}
                           </button>
                       </div>
                   </form>

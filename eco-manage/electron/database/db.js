@@ -222,6 +222,7 @@ function initDb() {
         addCol('bulletin_pdf_template', '');
         addCol('bulletin_pdf_mapping', '{}');
         addCol('timetable_slots', '[{"label":"08:00 - 10:00","start":"08:00","end":"10:00","isBreak":false},{"label":"10:00 - 12:00","start":"10:00","end":"12:00","isBreak":false},{"label":"12:00 - 13:00","start":"12:00","end":"13:00","isBreak":true},{"label":"13:00 - 15:00","start":"13:00","end":"15:00","isBreak":false},{"label":"15:00 - 17:00","start":"15:00","end":"17:00","isBreak":false}]');
+        addCol('honor_title_text', "TABLEAU D'HONNEUR");
         if (!schoolCols.find(c => c.name === 'honor_roll_threshold')) {
             console.log(`[Migration] Adding honor_roll_threshold to schools`);
             db.prepare(`ALTER TABLE schools ADD COLUMN honor_roll_threshold REAL DEFAULT 15.0`).run();
@@ -658,6 +659,20 @@ function initDb() {
             console.log('[Migration] School access codes generated');
         }
     } catch(e) { console.error('Access code migration error:', e.message); }
+
+    // Consolidate SECRETARY role into SG (Secretaire General now covers all Secretary permissions)
+    try {
+        db.prepare("UPDATE users SET role = 'SG' WHERE role = 'SECRETARY'").run();
+    } catch(e) { console.error('SECRETARY to SG role migration error:', e.message); }
+
+    // Per-school disabled modules (SuperAdmin can silently grey out modules per school)
+    try {
+        const schoolCols2 = db.prepare("PRAGMA table_info(schools)").all();
+        if (!schoolCols2.find(c => c.name === 'disabled_modules')) {
+            db.prepare("ALTER TABLE schools ADD COLUMN disabled_modules TEXT DEFAULT '[]'").run();
+            console.log('[Migration] disabled_modules column added to schools');
+        }
+    } catch(e) { console.error('disabled_modules migration error:', e.message); }
 
     console.log('Database initialized and migrated at:', dbPath);
 }

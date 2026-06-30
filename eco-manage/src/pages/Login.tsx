@@ -131,7 +131,7 @@ const Login: React.FC = () => {
         ) : (
           <div className="glass-card p-10 border-slate-700/50 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
-              <button onClick={() => { setStep('CODE'); setSelectedSchool(null); setIsSuperAdmin(false); setError(''); }} className="text-slate-500 hover:text-white transition-colors" title="Retour">
+              <button onClick={() => { setStep('CODE'); setSelectedSchool(null); setIsSuperAdmin(false); setError(''); }} className="text-slate-500 hover:text-white transition-colors" title={t('back_tooltip', 'Retour')}>
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <div className="text-center flex-1">

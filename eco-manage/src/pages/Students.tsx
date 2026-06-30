@@ -5,6 +5,7 @@ import { generateRegistrationSheet, generateStudentsListReport } from '../utils/
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { notifyDataChanged } from '../utils/dataSync';
 
 const Students: React.FC = () => {
   const { t } = useTranslation();
@@ -44,6 +45,7 @@ const Students: React.FC = () => {
               await window.electronAPI.deleteStudent(id);
               showNotification(t('student_deleted_success', "Élève supprimé avec succès"), "success");
               loadData();
+              notifyDataChanged();
           } catch (err: any) {
               showNotification(err.message, "error");
           }
@@ -52,16 +54,22 @@ const Students: React.FC = () => {
 
   const handleToggleBlockStatus = async (student: any) => {
       const newStatus = student.status === 'BLOCKED' ? 'ACTIVE' : 'BLOCKED';
-      const confirmMsg = newStatus === 'BLOCKED' 
-          ? "Voulez-vous vraiment bloquer cet élève ? Il n'aura plus accès à certaines fonctionnalités."
-          : "Voulez-vous débloquer cet élève ?";
+      const confirmMsg = newStatus === 'BLOCKED'
+          ? t('confirm_block_student', "Voulez-vous vraiment bloquer cet élève ? Il n'aura plus accès à certaines fonctionnalités.")
+          : t('confirm_unblock_student', "Voulez-vous débloquer cet élève ?");
       if (!window.confirm(confirmMsg)) return;
 
       if (window.electronAPI) {
           try {
               await window.electronAPI.updateStudentStatus({ id: student.id, status: newStatus });
-              showNotification(`Élève ${newStatus === 'BLOCKED' ? 'bloqué' : 'débloqué'} avec succès`, "success");
+              showNotification(
+                  newStatus === 'BLOCKED'
+                      ? t('student_blocked_success', 'Élève bloqué avec succès')
+                      : t('student_unblocked_success', 'Élève débloqué avec succès'),
+                  "success"
+              );
               loadData();
+              notifyDataChanged();
           } catch (err: any) {
               showNotification(err.message, "error");
           }
@@ -214,8 +222,8 @@ const Students: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <div className="font-bold text-white uppercase">{s.last_name}</div>
                         {s.status === 'BLOCKED' && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title="Cet élève a été bloqué par l'administration.">
-                                Bloqué
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title={t('blocked_tooltip', "Cet élève a été bloqué par l'administration.")}>
+                                {t('blocked_badge', 'Bloqué')}
                             </span>
                         )}
                     </div>
@@ -230,8 +238,8 @@ const Students: React.FC = () => {
                     <div className="flex items-center gap-2">
                         {classes.find(c => c.id === s.class_id)?.name || 'N/A'}
                         {s.has_paid_registration === 0 && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title="Cet élève n'a pas encore payé son inscription complète et est donc inactif dans la salle de classe.">
-                                Non-Inscrit
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20" title={t('not_registered_tooltip', "Cet élève n'a pas encore payé son inscription complète et est donc inactif dans la salle de classe.")}>
+                                {t('not_registered_badge', 'Non-Inscrit')}
                             </span>
                         )}
                     </div>
@@ -257,14 +265,14 @@ const Students: React.FC = () => {
                             <button
                                 onClick={() => handleToggleBlockStatus(s)}
                                 className={`p-1.5 rounded-md transition-all ${s.status === 'BLOCKED' ? 'text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-400' : 'text-amber-500 hover:bg-amber-500/10 hover:text-amber-400'}`}
-                                title={s.status === 'BLOCKED' ? 'Débloquer cet élève' : 'Bloquer cet élève'}
+                                title={s.status === 'BLOCKED' ? t('unblock_student_tooltip', 'Débloquer cet élève') : t('block_student_tooltip', 'Bloquer cet élève')}
                             >
                                 {s.status === 'BLOCKED' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                             </button>
                             <button
                                 onClick={() => handleDeleteStudent(s.id)}
                                 className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
-                                title="Supprimer cet élève"
+                                title={t('delete_student_tooltip', 'Supprimer cet élève')}
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
@@ -298,7 +306,7 @@ const Students: React.FC = () => {
                             res = await window.electronAPI.addStudent({ ...data, schoolId: user?.schoolId });
                         }
                         if (res && res.error) {
-                            showNotification(`Error: ${res.error}`, "error");
+                            showNotification(`${t('error_prefix', 'Erreur')}: ${res.error}`, "error");
                             return;
                         }
                         showNotification(
@@ -308,6 +316,7 @@ const Students: React.FC = () => {
                             "success"
                         );
                         loadData();
+                        notifyDataChanged();
                         setIsAdding(false);
                         setEditingStudent(null);
                     } catch (err: any) {

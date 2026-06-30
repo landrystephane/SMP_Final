@@ -147,10 +147,10 @@ const Transport: React.FC = () => {
               setShowAddRoute(false);
               setNewRoute({ name: '', bus_number: '', driver_id: '' });
               loadData();
-              showNotification("Ligne de bus créée avec succès", "success");
+              showNotification(t('trans_route_created_success', 'Ligne de bus créée avec succès'), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de la création de la ligne de bus", "error");
+              showNotification(t('trans_route_create_error', 'Erreur lors de la création de la ligne de bus'), "error");
           }
       }
   };
@@ -169,10 +169,10 @@ const Transport: React.FC = () => {
               setShowAddPoint(false);
               setNewPoint({ name: '' });
               loadPoints();
-              showNotification("Point d'arrêt ajouté", "success");
+              showNotification(t('trans_point_added_success', "Point d'arrêt ajouté"), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de l'ajout du point d'arrêt", "error");
+              showNotification(t('trans_point_add_error', "Erreur lors de l'ajout du point d'arrêt"), "error");
           }
       }
   };
@@ -182,10 +182,10 @@ const Transport: React.FC = () => {
           try {
               await window.electronAPI.deleteTransportPoint(id);
               loadPoints();
-              showNotification("Point d'arrêt supprimé", "success");
+              showNotification(t('trans_point_deleted_success', "Point d'arrêt supprimé"), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de la suppression du point d'arrêt", "error");
+              showNotification(t('trans_point_delete_error', "Erreur lors de la suppression du point d'arrêt"), "error");
           }
       }
   };
@@ -219,10 +219,10 @@ const Transport: React.FC = () => {
                   const updated = (r || []).find((rt: any) => rt.id === editRoute.id);
                   if (updated) setSelectedRoute(updated);
               }
-              showNotification("Ligne mise à jour", "success");
+              showNotification(t('trans_route_updated_success', 'Ligne mise à jour'), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de la mise à jour de la ligne", "error");
+              showNotification(t('trans_route_update_error', 'Erreur lors de la mise à jour de la ligne'), "error");
           }
       }
   };
@@ -238,10 +238,10 @@ const Transport: React.FC = () => {
                   setTransportHistory([]);
               }
               loadData();
-              showNotification("Ligne de bus supprimée", "success");
+              showNotification(t('trans_route_deleted_success', 'Ligne de bus supprimée'), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de la suppression de la ligne de bus", "error");
+              showNotification(t('trans_route_delete_error', 'Erreur lors de la suppression de la ligne de bus'), "error");
           }
       }
   };
@@ -251,10 +251,10 @@ const Transport: React.FC = () => {
           try {
               await window.electronAPI.unassignStudentFromTransport(studentId);
               loadPoints();
-              showNotification("Élève désassigné", "success");
+              showNotification(t('trans_student_unassigned_success', 'Élève désassigné'), "success");
           } catch (err) {
               console.error(err);
-              showNotification("Erreur lors de la désassignation de l'élève", "error");
+              showNotification(t('trans_student_unassign_error', "Erreur lors de la désassignation de l'élève"), "error");
           }
       }
   };
@@ -688,11 +688,11 @@ const Transport: React.FC = () => {
                   <div className="space-y-4">
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('line_name', 'Nom de la Ligne')}</label>
-                          <input type="text" value={newRoute.name} onChange={e => setNewRoute({...newRoute, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Route Nord" />
+                          <input type="text" value={newRoute.name} onChange={e => setNewRoute({...newRoute, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('trans_line_name_placeholder', 'ex: Route Nord')} />
                       </div>
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('bus_plate', 'Matricule du Bus')}</label>
-                          <input type="text" value={newRoute.bus_number} onChange={e => setNewRoute({...newRoute, bus_number: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: CE-1234-A" />
+                          <input type="text" value={newRoute.bus_number} onChange={e => setNewRoute({...newRoute, bus_number: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('trans_bus_plate_placeholder', 'ex: CE-1234-A')} />
                       </div>
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('assigned_driver', 'Chauffeur Assigne')}</label>
@@ -720,7 +720,7 @@ const Transport: React.FC = () => {
                   <div className="space-y-4">
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('point_name', 'Nom du Point')}</label>
-                          <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Carrefour Bastos" />
+                          <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('trans_point_name_placeholder', 'ex: Carrefour Bastos')} />
                       </div>
                       <div className="flex gap-3 pt-4">
                           <button onClick={() => setShowAddPoint(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-xs font-black text-white uppercase">{t('cancel', 'Annuler')}</button>
@@ -739,11 +739,11 @@ const Transport: React.FC = () => {
                   <div className="space-y-4">
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('line_name', 'Nom de la Ligne')}</label>
-                          <input type="text" value={editRoute.name} onChange={e => setEditRoute({...editRoute, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Route Nord" />
+                          <input type="text" value={editRoute.name} onChange={e => setEditRoute({...editRoute, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('trans_line_name_placeholder', 'ex: Route Nord')} />
                       </div>
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('bus_plate', 'Matricule du Bus')}</label>
-                          <input type="text" value={editRoute.bus_number} onChange={e => setEditRoute({...editRoute, bus_number: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: CE-1234-A" />
+                          <input type="text" value={editRoute.bus_number} onChange={e => setEditRoute({...editRoute, bus_number: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('trans_bus_plate_placeholder', 'ex: CE-1234-A')} />
                       </div>
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('assigned_driver', 'Chauffeur Assigne')}</label>

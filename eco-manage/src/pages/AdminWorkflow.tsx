@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { generateClassReportCards } from '../utils/reports';
+import { onDataChanged } from '../utils/dataSync';
 
 const AdminWorkflow: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -103,6 +104,17 @@ const AdminWorkflow: React.FC = () => {
     loadPeriodSettings();
   }, [user]);
 
+  useEffect(() => {
+    // Live-refresh class validation status (and other settings-driven state)
+    // whenever grades are validated/saved elsewhere (e.g. Advisor or Director portals),
+    // so the EN ATTENTE / VALIDÉ badges and print buttons update without a manual reload.
+    const unsubscribe = onDataChanged(() => {
+        loadPeriodSettings();
+        loadActingStatus();
+    });
+    return unsubscribe;
+  }, [user]);
+
   const handleUpdatePeriod = async () => {
     if (window.electronAPI) {
         await window.electronAPI.setSetting({ key: 'period_start', value: period.start });
@@ -145,17 +157,26 @@ const AdminWorkflow: React.FC = () => {
 
   const toggleBulletinsValidation = async () => {
     if (window.electronAPI) {
-        const newValue = !bulletinsValidated;
-        await window.electronAPI.setSetting({ key: 'bulletins_validated', value: newValue.toString() });
-        setBulletinsValidated(newValue);
+        try {
+            const newValue = !bulletinsValidated;
+            await window.electronAPI.setSetting({ key: 'bulletins_validated', value: newValue.toString() });
+            setBulletinsValidated(newValue);
 
-        if (newValue) {
-            await window.electronAPI.createNotification({
-                school_id: user?.schoolId,
-                role: 'SECRETARY',
-                message: 'La validation globale des bulletins a été activée par la direction. Vous pouvez maintenant imprimer les bulletins des classes dont les notes sont verrouillées.',
-                type: 'INFO'
-            });
+            if (newValue) {
+                await window.electronAPI.createNotification({
+                    school_id: user?.schoolId,
+                    role: 'SG',
+                    message: 'La validation globale des bulletins a été activée par la direction. Vous pouvez maintenant imprimer les bulletins des classes dont les notes sont verrouillées.',
+                    type: 'INFO'
+                });
+            }
+
+            const isEn = i18n.language?.startsWith('en') ?? false;
+            alert(isEn
+                ? `Global report card validation ${newValue ? 'enabled' : 'disabled'}. Printing is now ${newValue ? 'authorized' : 'blocked'} for locked classes.`
+                : `Validation globale des bulletins ${newValue ? 'activée' : 'désactivée'}. L'impression est désormais ${newValue ? 'autorisée' : 'bloquée'} pour les classes verrouillées.`);
+        } catch (err: any) {
+            alert("Erreur lors de la mise à jour du statut de validation : " + err.message);
         }
     }
   };
@@ -561,32 +582,34 @@ const AdminWorkflow: React.FC = () => {
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              {classes.map((c) => (
+              {classes.map((c) => {
+                const isClassLockedRow = lockedClasses.some(k => k.startsWith(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`);
+                return (
                 <tr key={c.id} className="border-t border-slate-850 hover:bg-slate-900/20">
                   <td className="py-4 font-bold text-white">{c.name}</td>
                   <td className="py-4 text-xs font-semibold text-slate-400">{c.level} • {c.section}</td>
                   <td className="py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${bulletinsValidated ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                        {bulletinsValidated ? 'VALIDÉ' : 'EN ATTENTE'}
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClassLockedRow ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        {isClassLockedRow ? 'VALIDÉ' : 'EN ATTENTE'}
                     </span>
                   </td>
                   <td className="py-4">
                     <div className="flex gap-2">
                         <button
                         onClick={() => handlePrintClassReportCards(c.id)}
-                        disabled={printingClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY') || !lockedClasses.some(k => k.startsWith(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`)}
+                        disabled={printingClassId === c.id || !isClassLockedRow}
                         className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : (!lockedClasses.some(k => k.startsWith(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`) ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin du trimestre actuel")}
+                        title={!isClassLockedRow ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin du trimestre actuel"}
                         >
                         <Printer className="w-4 h-4" />
                         {printingClassId === c.id ? "Impression..." : t('start_printing')}
                         </button>
-                        
+
                         <button
                         onClick={() => handlePrintAnnualReportCards(c.id)}
-                        disabled={printingAnnualClassId === c.id || (!bulletinsValidated && user?.role === 'SECRETARY') || !lockedClasses.some(k => k.startsWith(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`)}
+                        disabled={printingAnnualClassId === c.id || !isClassLockedRow}
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={(!bulletinsValidated && user?.role === 'SECRETARY') ? "L'impression n'a pas encore été validée par la direction." : (!lockedClasses.some(k => k.startsWith(`class_locked_${c.id}_${getActiveTerm()}_`) || k === `class_locked_${c.id}_${getActiveTerm()}_${getActiveSequence()}`) ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin Annuel (Moyenne des trimestres)")}
+                        title={!isClassLockedRow ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin Annuel (Moyenne des trimestres)"}
                         >
                         <Printer className="w-4 h-4" />
                         {printingAnnualClassId === c.id ? "Impression..." : "B. Annuel"}
@@ -594,7 +617,7 @@ const AdminWorkflow: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>

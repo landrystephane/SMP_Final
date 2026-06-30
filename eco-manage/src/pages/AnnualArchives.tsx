@@ -45,7 +45,7 @@ const AnnualArchives: React.FC = () => {
         if (!yearName.trim()) return;
         if (!window.electronAPI || !user) return;
 
-        const confirmArchive = window.confirm(`Attention ! Êtes-vous sûr de vouloir clôturer l'année scolaire "${yearName}" ? Une sauvegarde SQLite complète et inaltérable sera générée dans votre répertoire /backups.`);
+        const confirmArchive = window.confirm(t('arch_confirm_create', 'Attention ! Êtes-vous sûr de vouloir clôturer l\'année scolaire "{{yearName}}" ? Une sauvegarde SQLite complète et inaltérable sera générée dans votre répertoire /backups.', { yearName }));
         if (!confirmArchive) return;
 
         setArchiving(true);
@@ -56,15 +56,15 @@ const AnnualArchives: React.FC = () => {
             });
 
             if (res.success) {
-                alert(`Année scolaire clôturée avec succès ! Sauvegarde physique sauvegardée sous : ${res.backupFilePath}`);
+                alert(t('arch_success', 'Année scolaire clôturée avec succès ! Sauvegarde physique sauvegardée sous : {{path}}', { path: res.backupFilePath }));
                 setYearName('');
                 loadData();
             } else {
-                alert(`Erreur lors de l'archivage : ${res.error || 'Erreur inconnue'}`);
+                alert(t('arch_error', 'Erreur lors de l\'archivage : {{error}}', { error: res.error || t('arch_unknown_error', 'Erreur inconnue') }));
             }
         } catch (err: any) {
             console.error(err);
-            alert(`Erreur lors de la sauvegarde : ${err.message}`);
+            alert(t('arch_save_error', 'Erreur lors de la sauvegarde : {{message}}', { message: err.message }));
         } finally {
             setArchiving(false);
         }
@@ -109,7 +109,7 @@ const AnnualArchives: React.FC = () => {
     if (loading) return (
         <div className="h-[50vh] flex flex-col items-center justify-center space-y-4">
             <Archive className="w-12 h-12 text-amber-500 animate-pulse" />
-            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">Chargement des archives et journaux d'audits...</p>
+            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">{t('arch_loading', "Chargement des archives et journaux d'audits...")}</p>
         </div>
     );
 
@@ -123,9 +123,9 @@ const AnnualArchives: React.FC = () => {
                         <Archive className="w-8 h-8" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">Archives Annuelles & Grand Livre</h1>
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">{t('arch_title', 'Archives Annuelles & Grand Livre')}</h1>
                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-                            Clôturez vos années scolaires, gérez vos sauvegardes physiques et téléchargez vos bilans d'audits
+                            {t('arch_subtitle', 'Clôturez vos années scolaires, gérez vos sauvegardes physiques et téléchargez vos bilans d\'audits')}
                         </p>
                     </div>
                 </div>
@@ -134,7 +134,7 @@ const AnnualArchives: React.FC = () => {
                     onClick={handleDownloadAudit}
                     className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-6 py-4.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-amber-500 hover:text-slate-950 active:scale-95 transition-all shadow-xl"
                 >
-                    <Download className="w-4 h-4" /> Télécharger l'Audit Annuel (PDF)
+                    <Download className="w-4 h-4" /> {t('arch_download_audit', "Télécharger l'Audit Annuel (PDF)")}
                 </button>
             </div>
 
@@ -147,7 +147,7 @@ const AnnualArchives: React.FC = () => {
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <BarChart3 className="w-5 h-5" />
-                                <h2 className="text-sm font-black uppercase text-white tracking-wider">Livre Journal des Transactions Actives</h2>
+                                <h2 className="text-sm font-black uppercase text-white tracking-wider">{t('arch_journal_title', 'Livre Journal des Transactions Actives')}</h2>
                             </div>
 
                             {/* Filters */}
@@ -158,7 +158,7 @@ const AnnualArchives: React.FC = () => {
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Nom, reçu, matricule..."
+                                        placeholder={t('arch_search_placeholder', 'Nom, reçu, matricule...')}
                                         className="bg-transparent text-xs font-bold text-white outline-none w-32 md:w-48 placeholder-slate-600"
                                     />
                                 </div>
@@ -168,11 +168,11 @@ const AnnualArchives: React.FC = () => {
                                     onChange={(e) => setFilterType(e.target.value)}
                                     className="bg-slate-950 border border-white/5 text-slate-300 rounded-xl px-3 py-2 text-[10px] font-black uppercase outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                                 >
-                                    <option value="ALL">Tous les Motifs</option>
-                                    <option value="Inscription">Inscriptions</option>
-                                    <option value="Scolarité">Scolarités</option>
-                                    <option value="Transport">Transports</option>
-                                    <option value="Examen">Examens</option>
+                                    <option value="ALL">{t('arch_all_reasons', 'Tous les Motifs')}</option>
+                                    <option value="Inscription">{t('arch_reason_registration', 'Inscriptions')}</option>
+                                    <option value="Scolarité">{t('arch_reason_tuition', 'Scolarités')}</option>
+                                    <option value="Transport">{t('arch_reason_transport', 'Transports')}</option>
+                                    <option value="Examen">{t('arch_reason_exam', 'Examens')}</option>
                                 </select>
                             </div>
                         </div>
@@ -182,18 +182,18 @@ const AnnualArchives: React.FC = () => {
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                        <th className="py-4">Reçu N°</th>
-                                        <th className="py-4">Élève (Student)</th>
-                                        <th className="py-4">Type</th>
-                                        <th className="py-4">Date</th>
-                                        <th className="py-4 text-right">Montant (FCFA)</th>
+                                        <th className="py-4">{t('arch_receipt_no', 'Reçu N°')}</th>
+                                        <th className="py-4">{t('arch_student_col', 'Élève (Student)')}</th>
+                                        <th className="py-4">{t('arch_type_col', 'Type')}</th>
+                                        <th className="py-4">{t('arch_date_col', 'Date')}</th>
+                                        <th className="py-4 text-right">{t('arch_amount_col', 'Montant (FCFA)')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5 font-bold text-slate-300">
                                     {filteredPayments.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="py-12 text-center text-slate-500 uppercase tracking-widest text-[10px]">
-                                                Aucune transaction enregistrée
+                                                {t('arch_no_transactions', 'Aucune transaction enregistrée')}
                                             </td>
                                         </tr>
                                     ) : (
@@ -235,21 +235,21 @@ const AnnualArchives: React.FC = () => {
                     <div className="glass-card p-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] shadow-2xl space-y-4">
                         <div className="flex items-center space-x-3 text-red-400">
                             <ShieldAlert className="w-5 h-5 animate-pulse" />
-                            <h2 className="text-sm font-black uppercase tracking-wider text-white">Clôture Annuelle de l'École</h2>
+                            <h2 className="text-sm font-black uppercase tracking-wider text-white">{t('arch_year_closure_title', "Clôture Annuelle de l'École")}</h2>
                         </div>
                         <p className="text-slate-400 text-[10px] font-bold leading-relaxed">
-                            Cette action sauvegarde l'état actuel complet de la base de données (élèves, notes, versements) dans un fichier d'archives SQLite physique dans votre répertoire local `/backups`.
+                            {t('arch_year_closure_desc', "Cette action sauvegarde l'état actuel complet de la base de données (élèves, notes, versements) dans un fichier d'archives SQLite physique dans votre répertoire local `/backups`.")}
                         </p>
 
                         <form onSubmit={handleCreateArchive} className="space-y-4 pt-2">
                             <div className="space-y-2">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Libellé de l'Année Scolaire</label>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">{t('arch_year_label', "Libellé de l'Année Scolaire")}</label>
                                 <input
                                     type="text"
                                     required
                                     value={yearName}
                                     onChange={(e) => setYearName(e.target.value)}
-                                    placeholder="Ex: 2025-2026"
+                                    placeholder={t('arch_year_placeholder', 'Ex: 2025-2026')}
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-red-500 transition-all placeholder-slate-600"
                                 />
                             </div>
@@ -259,7 +259,7 @@ const AnnualArchives: React.FC = () => {
                                 disabled={archiving}
                                 className="w-full bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
                             >
-                                <Database className="w-4 h-4" /> {archiving ? 'Archivage...' : "Lancer l'Archivage Physique"}
+                                <Database className="w-4 h-4" /> {archiving ? t('arch_archiving_progress', 'Archivage...') : t('arch_launch_archive', "Lancer l'Archivage Physique")}
                             </button>
                         </form>
                     </div>
@@ -268,13 +268,13 @@ const AnnualArchives: React.FC = () => {
                     <div className="glass-card p-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] shadow-2xl space-y-5">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <Archive className="w-5 h-5" />
-                            <h2 className="text-sm font-black uppercase text-white tracking-wider">Années Scolaires Clôturées</h2>
+                            <h2 className="text-sm font-black uppercase text-white tracking-wider">{t('arch_closed_years_title', 'Années Scolaires Clôturées')}</h2>
                         </div>
 
                         <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
                             {archives.length === 0 ? (
                                 <div className="text-center py-8 text-slate-500 uppercase tracking-widest text-[9px] font-bold">
-                                    Aucun historique d'archive physique
+                                    {t('arch_no_archive_history', "Aucun historique d'archive physique")}
                                 </div>
                             ) : (
                                 archives.map((a) => (
@@ -285,17 +285,17 @@ const AnnualArchives: React.FC = () => {
                                                 <span className="text-xs font-black text-white">{a.year_name}</span>
                                             </div>
                                             <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider">
-                                                Sauvegardé
+                                                {t('arch_saved_badge', 'Sauvegardé')}
                                             </span>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-2 text-[9px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5 pt-2">
                                             <div>
-                                                <p className="text-slate-600">Élèves</p>
+                                                <p className="text-slate-600">{t('arch_students_label', 'Élèves')}</p>
                                                 <p className="text-white text-xs mt-0.5">{a.total_students}</p>
                                             </div>
                                             <div>
-                                                <p className="text-slate-600">Recettes</p>
+                                                <p className="text-slate-600">{t('arch_revenue_label', 'Recettes')}</p>
                                                 <p className="text-white text-[10px] mt-0.5">{a.total_revenue.toLocaleString()} F</p>
                                             </div>
                                         </div>

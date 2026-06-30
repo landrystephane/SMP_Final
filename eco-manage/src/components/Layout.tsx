@@ -19,6 +19,7 @@ const Layout: React.FC = () => {
   const [schoolName, setSchoolName] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSgActing, setIsSgActing] = useState(false);
+  const [disabledModules, setDisabledModules] = useState<string[]>([]);
 
   const { showNotification } = useNotification();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -67,7 +68,7 @@ const Layout: React.FC = () => {
       if (n.request_type === 'EXAM_SURVEILLANCE_REQUEST') {
           const reqData = JSON.parse(n.request_data || '{}');
           if (action === 'REJECTED') {
-              const reason = window.prompt("Veuillez indiquer le motif de votre refus :");
+              const reason = window.prompt(t('lay_refusal_reason_prompt'));
               if (!reason) return;
               await (window.electronAPI as any).respondExamSurveillance({
                   notificationId: notifId,
@@ -76,7 +77,7 @@ const Layout: React.FC = () => {
                   rejectionReason: reason,
                   schoolId: user?.schoolId
               });
-              showNotification("Refus envoyé à l'administration.", "info");
+              showNotification(t('lay_refusal_sent_admin'), "info");
           } else {
               await (window.electronAPI as any).respondExamSurveillance({
                   notificationId: notifId,
@@ -84,14 +85,14 @@ const Layout: React.FC = () => {
                   status: 'APPROVED',
                   schoolId: user?.schoolId
               });
-              showNotification("Surveillance approuvée avec succès !", "success");
+              showNotification(t('lay_surveillance_approved'), "success");
           }
       } else if (n.request_type === 'EXAM_SURVEILLANCE_REFUSAL') {
           const reqData = JSON.parse(n.request_data || '{}');
           if (action === 'APPROVED') {
               const newTeacherId = selectedReplacementTeacher[notifId];
               if (!newTeacherId) {
-                  showNotification("Veuillez sélectionner un enseignant remplaçant avant d'accepter le refus.", "warning");
+                  showNotification(t('lay_select_replacement_teacher_warning'), "warning");
                   return;
               }
               await (window.electronAPI as any).reassignExamSurveillant({
@@ -101,7 +102,7 @@ const Layout: React.FC = () => {
                   notificationId: notifId
               });
               setSelectedReplacementTeacher(prev => { const copy = {...prev}; delete copy[notifId]; return copy; });
-              showNotification("Refus accepté et surveillant remplacé avec succès.", "success");
+              showNotification(t('lay_refusal_accepted_replaced'), "success");
           } else {
               await (window.electronAPI as any).adminResolveExamRefusal({
                   notificationId: notifId,
@@ -109,7 +110,7 @@ const Layout: React.FC = () => {
                   adminAction: 'FORCE_ASSIGNMENT',
                   schoolId: user?.schoolId
               });
-              showNotification("Surveillance maintenue de force.", "info");
+              showNotification(t('lay_surveillance_maintained'), "info");
           }
       } else if (n.request_type === 'CASH_WITHDRAWAL') {
           await (window.electronAPI as any).resolveSystemRequest({
@@ -118,7 +119,7 @@ const Layout: React.FC = () => {
               resolvedBy: user?.id || 1
           });
           showNotification(
-              action === 'APPROVED' ? "Décaissement approuvé !" : "Décaissement refusé.",
+              action === 'APPROVED' ? t('lay_expense_approved_short') : t('lay_expense_rejected_short'),
               action === 'APPROVED' ? "success" : "info"
           );
       } else {
@@ -130,13 +131,13 @@ const Layout: React.FC = () => {
             resolvedBy: user?.id || 1
           });
           showNotification(
-            action === 'APPROVED' ? "Demande approuvée avec succès !" : "Demande refusée.",
+            action === 'APPROVED' ? t('lay_request_approved_short') : t('lay_request_rejected_short'),
             action === 'APPROVED' ? "success" : "info"
           );
       }
       loadNotifications();
     } catch (e: any) {
-      showNotification(e.message || "Erreur lors du traitement", "error");
+      showNotification(e.message || t('lay_processing_error'), "error");
     }
   };
 
@@ -166,14 +167,14 @@ const Layout: React.FC = () => {
           const currentSchool = schools.find((s: any) => s.id?.toString() === user.schoolId?.toString());
           if (currentSchool) {
             if (currentSchool.is_active === 0 && user.role !== 'SUPERADMIN') {
-              alert("L'accès de votre établissement a été suspendu par l'administrateur.");
+              alert(t('lay_school_suspended_alert'));
               handleLogout();
               return;
             }
             setSchoolName(currentSchool.name);
           } else {
             if (user.schoolId && user.role !== 'SUPERADMIN') {
-              alert("Cet établissement a été supprimé ou désactivé. Accès déconnecté.");
+              alert(t('lay_school_deleted_alert'));
               handleLogout();
               return;
             }
@@ -189,6 +190,10 @@ const Layout: React.FC = () => {
       if (window.electronAPI) {
           const sgActing = await window.electronAPI.getSetting('sg_acting_director');
           setIsSgActing(sgActing === 'true');
+          try {
+              const disabled = await (window.electronAPI as any).getDisabledModules(user?.schoolId);
+              setDisabledModules(disabled || []);
+          } catch(e) { setDisabledModules([]); }
       }
     };
     loadActiveSchool();
@@ -218,26 +223,25 @@ const Layout: React.FC = () => {
   const isImpersonating = localStorage.getItem('impersonated_school_id') !== null;
 
   const menuItems = [
-    { key: 'dashboard', path: '/', icon: LayoutDashboard, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'BURSAR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
-    { key: 'students', path: '/students', icon: Users, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'dashboard', path: '/', icon: LayoutDashboard, roles: ['FOUNDER', 'DIRECTOR', 'BURSAR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'students', path: '/students', icon: Users, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'subjects', path: '/subjects', icon: BookOpen, roles: ['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'classes', path: '/classes', icon: Building2, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'grades', path: '/grades', icon: ClipboardList, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'pedagogy_advisor', path: '/advisor', icon: Award, roles: ['FOUNDER', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'finance', path: '/finance', icon: CreditCard, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
     { key: 'tuition_config', path: '/tuition-config', icon: Settings, roles: ['FOUNDER', 'BURSAR'], hideForSuperAdmin: !isImpersonating },
-    { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'attendance', path: '/attendance', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SG', 'ADVISOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'stats', path: '/stats', icon: TrendingUp, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
-    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
+    { key: 'admin', path: '/admin-workflow', icon: ShieldCheck, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'users', path: '/users', icon: UserCheck, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'parents', path: '/parents', icon: HeartHandshake, roles: ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'mobile_access', path: '/mobile-access', icon: ShieldCheck, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SG'] : ['FOUNDER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
+    { key: 'parents', path: '/parents', icon: HeartHandshake, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport', path: '/transport', icon: Bus, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
-    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'BURSAR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'BURSAR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'customization', path: '/customization', icon: Palette, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'archives', path: '/archives', icon: Archive, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
-    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SECRETARY'], hideForSuperAdmin: !isImpersonating },
+    { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['DRIVER'] },
     { key: 'parent_portal', path: '/parent-portal', icon: HeartHandshake, roles: ['PARENT', 'SUPERADMIN', 'FOUNDER'] },
   ];
@@ -306,7 +310,7 @@ const Layout: React.FC = () => {
           </div>
           <LanguageSwitcher />
           <div className="flex items-center justify-between mt-6 bg-white/5 p-3 rounded-2xl border border-white/5">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Centre d'Alertes</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('lay_alerts_center')}</span>
             <button
               onClick={() => setIsNotifOpen(!isNotifOpen)}
               className="relative p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all animate-pulse-subtle"
@@ -322,6 +326,8 @@ const Layout: React.FC = () => {
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto min-h-0 custom-scrollbar">
           {menuItems.filter(item => {
               if (user?.role === 'SUPERADMIN' && item.hideForSuperAdmin) return false;
+              if (item.key === 'mobile_access' && (window as any).electronAPI?.isWebMode) return false;
+              if (user?.role !== 'SUPERADMIN' && disabledModules.includes(item.key)) return false;
               return hasRole(item.roles as any);
           }).map((item) => (
             <NavLink
@@ -382,7 +388,7 @@ const Layout: React.FC = () => {
                 <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-slate-950"></span>
               </span>
               <span className="text-slate-950 text-xs font-black uppercase tracking-widest">
-                Mode SuperAdmin : Immersion dans l'instance
+                {t('lay_superadmin_immersion_mode')}
               </span>
             </div>
             <button
@@ -392,7 +398,7 @@ const Layout: React.FC = () => {
               }}
               className="bg-slate-950 hover:bg-slate-900 text-amber-500 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg"
             >
-              Quitter l'immersion
+              {t('lay_exit_immersion')}
             </button>
           </div>
         )}
@@ -415,10 +421,10 @@ const Layout: React.FC = () => {
             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
               <div className="flex items-center space-x-2">
                 <Bell className="w-5 h-5 text-amber-500" />
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Centre d'Alertes</h3>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">{t('lay_alerts_center')}</h3>
                 {pendingNotifsCount > 0 && (
                   <span className="bg-rose-500/20 text-rose-400 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                    {pendingNotifsCount} active(s)
+                    {pendingNotifsCount} {t('lay_active_count_suffix')}
                   </span>
                 )}
               </div>
@@ -433,7 +439,7 @@ const Layout: React.FC = () => {
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
               {notifications.length === 0 ? (
                 <div className="text-center py-10">
-                  <p className="text-xs text-slate-500 font-bold">Aucune notification pour le moment.</p>
+                  <p className="text-xs text-slate-500 font-bold">{t('lay_no_notifications_yet')}</p>
                 </div>
               ) : (
                 notifications.map((n) => {
@@ -466,17 +472,17 @@ const Layout: React.FC = () => {
                         <div className="space-y-3 border-t border-white/5 pt-3 mt-2">
                           {(n.request_type === 'GRADE_REACTIVATION' || n.request_type === 'ATTENDANCE_REACTIVATION') && (
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-slate-400 font-bold">Durée de réactivation :</span>
-                              <select 
+                              <span className="text-slate-400 font-bold">{t('lay_reactivation_duration')}</span>
+                              <select
                                 value={durations[n.id] || 24}
                                 onChange={(e) => setDurations({...durations, [n.id]: parseInt(e.target.value)})}
                                 className="bg-slate-950 border border-white/10 text-white rounded-xl px-2 py-1 outline-none text-xs font-black"
                               >
-                                <option value={2}>2 heures</option>
-                                <option value={6}>6 heures</option>
-                                <option value={12}>12 heures</option>
-                                <option value={24}>24 heures</option>
-                                <option value={48}>48 heures</option>
+                                <option value={2}>{t('lay_hours_2')}</option>
+                                <option value={6}>{t('lay_hours_6')}</option>
+                                <option value={12}>{t('lay_hours_12')}</option>
+                                <option value={24}>{t('lay_hours_24')}</option>
+                                <option value={48}>{t('lay_hours_48')}</option>
                               </select>
                             </div>
                           )}
@@ -487,19 +493,19 @@ const Layout: React.FC = () => {
                                 onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                               >
-                                Marquer comme traité
+                                {t('lay_mark_as_processed')}
                               </button>
                             ) : n.request_type === 'EXAM_SURVEILLANCE_REFUSAL' ? (
                               <div className="space-y-2">
                                 <div>
-                                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Enseignant remplaçant</label>
+                                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">{t('lay_replacement_teacher')}</label>
                                   <select
-                                    title="Choisir un remplaçant"
+                                    title={t('lay_replacement_teacher')}
                                     value={selectedReplacementTeacher[n.id] || ''}
                                     onChange={(e) => setSelectedReplacementTeacher(prev => ({...prev, [n.id]: e.target.value}))}
                                     className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-500"
                                   >
-                                    <option value="">-- Sélectionner --</option>
+                                    <option value="">{t('lay_select_placeholder')}</option>
                                     {teachers.map(t => (
                                       <option key={t.id} value={t.id}>{t.full_name || t.fullName}</option>
                                     ))}
@@ -510,13 +516,13 @@ const Layout: React.FC = () => {
                                     onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                     className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                                   >
-                                    Accepter & Remplacer
+                                    {t('lay_accept_and_replace')}
                                   </button>
                                   <button
                                     onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
                                     className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
                                   >
-                                    Forcer (Maintenir)
+                                    {t('lay_force_maintain')}
                                   </button>
                                 </div>
                               </div>
@@ -526,13 +532,13 @@ const Layout: React.FC = () => {
                                   onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                   className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                                 >
-                                  Approuver le décaissement
+                                  {t('lay_approve_disbursement')}
                                 </button>
                                 <button
                                   onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
                                   className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
                                 >
-                                  Refuser
+                                  {t('lay_reject')}
                                 </button>
                               </>
                             ) : (
@@ -541,13 +547,13 @@ const Layout: React.FC = () => {
                                   onClick={() => handleResolveRequest(n.id, 'APPROVED', n)}
                                   className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all"
                                 >
-                                  Approuver
+                                  {t('lay_approve')}
                                 </button>
                                 <button
                                   onClick={() => handleResolveRequest(n.id, 'REJECTED', n)}
                                   className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all border border-rose-500/30"
                                 >
-                                  Refuser
+                                  {t('lay_reject')}
                                 </button>
                               </>
                             )}
@@ -561,7 +567,7 @@ const Layout: React.FC = () => {
                             onClick={() => handleMarkAsRead(n.id)}
                             className="text-[10px] text-amber-500 hover:text-amber-400 font-black uppercase tracking-wider transition-all"
                           >
-                            Marquer comme lu
+                            {t('lay_mark_as_read')}
                           </button>
                         </div>
                       )}

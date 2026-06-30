@@ -95,7 +95,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
     if (!formData.birthDate) {
         errors.birthDate = t('field_required', 'Ce champ est requis');
     } else if (birthYear > currentYear - 2) {
-        errors.birthDate = t('invalid_birth_date_n2', `L'élève doit être né au plus tard le 31 décembre ${currentYear - 2}`);
+        errors.birthDate = t('invalid_birth_date_n2', 'L\'élève doit être né au plus tard le 31 décembre {{year}}', { year: currentYear - 2 });
     }
 
         // Phone validation based on countryCode selected
@@ -116,7 +116,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
 
     if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        setFormError("Veuillez corriger les erreurs de saisie dans le formulaire.");
+        setFormError(t('form_fix_errors', 'Veuillez corriger les erreurs de saisie dans le formulaire.'));
         return;
     }
 
@@ -162,7 +162,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                   else if (!nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, lastName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
                   else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.lastName; return newErr; });
               }}
-                placeholder="Ex: TCHATCHOUANG"
+                placeholder={t('last_name_placeholder', 'Ex: TCHATCHOUANG')}
               />
               {fieldErrors.lastName && (
                 <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.lastName}</p>
@@ -182,7 +182,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                   else if (!nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, firstName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
                   else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.firstName; return newErr; });
               }}
-                placeholder="Ex: Landry"
+                placeholder={t('first_name_placeholder', 'Ex: Landry')}
               />
               {fieldErrors.firstName && (
                 <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.firstName}</p>
@@ -208,7 +208,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 className="input-field w-full mt-1"
                 value={formData.birthPlace}
                 onChange={(e) => setFormData({...formData, birthPlace: e.target.value})}
-                placeholder="Ex: Douala"
+                placeholder={t('birth_place_placeholder', 'Ex: Douala')}
               />
             </div>
             <div className="space-y-1">
@@ -217,7 +217,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 className="input-field w-full mt-1"
                 value={formData.neighborhood}
                 onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
-                placeholder="Ex: Bonapriso"
+                placeholder={t('neighborhood_placeholder', 'Ex: Bonapriso')}
               />
             </div>
             <div className="space-y-1">
@@ -227,8 +227,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                 value={formData.gender}
                 onChange={(e) => setFormData({...formData, gender: e.target.value})}
               >
-                <option value="M" className="bg-slate-900 text-white">Masculin</option>
-                <option value="F" className="bg-slate-900 text-white">Féminin</option>
+                <option value="M" className="bg-slate-900 text-white">{t('gender_male')}</option>
+                <option value="F" className="bg-slate-900 text-white">{t('gender_female')}</option>
               </select>
             </div>
             <div className="space-y-1">
@@ -244,7 +244,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                   if (val.trim() && !nameRegex.test(val.trim())) setFieldErrors(prev => ({...prev, parentName: t('invalid_name_chars', "Caractères invalides. Sont autorisés: lettres, chiffres, espaces et - _ ' & .")}));
                   else setFieldErrors(prev => { const newErr = {...prev}; delete newErr.parentName; return newErr; });
               }}
-                placeholder="Ex: M. / Mme TCHATCHOUANG"
+                placeholder={t('parent_name_placeholder', 'Ex: M. / Mme TCHATCHOUANG')}
               />
               {fieldErrors.parentName && (
                 <p className="text-[10px] text-rose-500 font-bold mt-0.5">{fieldErrors.parentName}</p>
@@ -306,8 +306,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.section}
                     onChange={(e) => setFormData({...formData, section: e.target.value, classId: ''})}
                 >
-                    <option value="FRANCOPHONE" className="bg-slate-900 text-white">Francophone</option>
-                    <option value="ANGLOPHONE" className="bg-slate-900 text-white">Anglophone</option>
+                    <option value="FRANCOPHONE" className="bg-slate-900 text-white">{t('section_francophone_label')}</option>
+                    <option value="ANGLOPHONE" className="bg-slate-900 text-white">{t('section_anglophone_label')}</option>
                 </select>
             </div>
             <div className="space-y-1">
@@ -317,8 +317,8 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.cycle || 'PRIMAIRE'}
                     onChange={(e) => setFormData({...formData, cycle: e.target.value, classId: ''})}
                 >
-                    <option value="PRIMAIRE" className="bg-slate-900 text-white">Primaire</option>
-                    <option value="MATERNELLE" className="bg-slate-900 text-white">Maternelle</option>
+                    <option value="PRIMAIRE" className="bg-slate-900 text-white">{t('cycle_primary_label')}</option>
+                    <option value="MATERNELLE" className="bg-slate-900 text-white">{t('cycle_nursery_label')}</option>
                 </select>
             </div>
             <div className="space-y-1">
@@ -329,7 +329,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ onClose, onSubmit, student })
                     value={formData.classId}
                     onChange={(e) => setFormData({...formData, classId: e.target.value})}
                 >
-                    <option value="" className="bg-slate-900 text-white">Sélectionner la classe...</option>
+                    <option value="" className="bg-slate-900 text-white">{t('select_class_placeholder', 'Sélectionner la classe...')}</option>
                     {classes
                         .filter(c => c.section === formData.section && c.level === (formData.cycle || 'PRIMAIRE'))
                         .map(c => (

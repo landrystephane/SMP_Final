@@ -106,7 +106,11 @@ handlers['auth:login'] = async ({ username, password }) => {
       // Deadline notification check
       try {
           if (user.role === 'TEACHER') {
-              const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('period_end');
+              // Session isn't populated yet at this point in login, so scope manually using the
+              // just-authenticated user's schoolId instead of relying on getActiveSchoolId()/session.
+              const scopedPeriodEndKey = user.schoolId ? `s${user.schoolId}_period_end` : 'period_end';
+              const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopedPeriodEndKey)
+                  || db.prepare('SELECT value FROM settings WHERE key = ?').get('period_end');
               if (periodEndSetting && periodEndSetting.value) {
                   const endDate = new Date(periodEndSetting.value);
                   endDate.setHours(23, 59, 59, 999);
@@ -456,8 +460,11 @@ handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
     return db.prepare('UPDATE students SET bus_route_id = ? WHERE id = ?').run(routeId, studentId);
 };
 
-handlers['db:getGrades'] = async ({ classId, term }) => {
+handlers['db:getGrades'] = async ({ classId, term, month }) => {
   const sid = getActiveSchoolId();
+  if (month !== undefined && month !== null && month !== '') {
+    return db.prepare('SELECT g.* FROM grades g JOIN classes c ON g.class_id = c.id WHERE g.class_id = ? AND g.term = ? AND g.month = ? AND c.school_id = ?').all(classId, term, month, sid);
+  }
   return db.prepare('SELECT g.* FROM grades g JOIN classes c ON g.class_id = c.id WHERE g.class_id = ? AND g.term = ? AND c.school_id = ?').all(classId, term, sid);
 };
 
@@ -505,7 +512,7 @@ handlers['db:saveGrades'] = async (grades) => {
           }
 
           // 2. Validation du délai de saisie (verrouillage automatique)
-          const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('period_end');
+          const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_end'));
           if (periodEndSetting && periodEndSetting.value) {
             const endDate = new Date(periodEndSetting.value);
             endDate.setHours(23, 59, 59, 999);
@@ -620,11 +627,30 @@ handlers['db:validateSubjectGrades'] = async ({ classId, subjectId, term, month 
   const parsedClassId = parseInt(classId, 10);
   const parsedSubjectId = parseInt(subjectId, 10);
   const parsedTerm = parseInt(term, 10);
-  return db.prepare(`
+  const result = db.prepare(`
     UPDATE grades
     SET validated = 1, locked = 1
     WHERE class_id = ? AND subject_id = ? AND term = ? AND month = ?
   `).run(parsedClassId, parsedSubjectId, parsedTerm, month);
+
+  // If every subject that has grades for this class/term/month is now validated,
+  // mark the class itself as locked so AdminWorkflow's per-class status and the
+  // printing gate reflect the advisor's subject-by-subject validation.
+  const remainingUnvalidated = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM class_subjects cs
+    JOIN subjects s ON cs.subject_id = s.id
+    WHERE cs.class_id = ?
+      AND EXISTS (SELECT 1 FROM grades g WHERE g.class_id = cs.class_id AND g.subject_id = s.id AND g.term = ? AND g.month = ?)
+      AND EXISTS (SELECT 1 FROM grades g WHERE g.class_id = cs.class_id AND g.subject_id = s.id AND g.term = ? AND g.month = ? AND g.validated = 0)
+  `).get(parsedClassId, parsedTerm, month, parsedTerm, month).count;
+
+  if (remainingUnvalidated === 0) {
+    const settingKey = `class_locked_${parsedClassId}_${parsedTerm}_${month}`;
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, 'true') ON CONFLICT(key) DO UPDATE SET value = 'true'").run(settingKey);
+  }
+
+  return result;
 };
 
 handlers['db:validateClassGrades'] = async ({ classId, term, month }) => {
@@ -1849,7 +1875,7 @@ handlers['db:addUser'] = async (user) => {
       TEACHER: 'ENS',
       DRIVER: 'CHF',
       BURSAR: 'ECO',
-      SECRETARY: 'SG',
+      SG: 'SG',
       DIRECTOR: 'DIR',
       FOUNDER: 'FND'
   };
@@ -2337,7 +2363,7 @@ handlers['db:updateStudentStatus'] = async ({ id, status }) => {
 
 handlers['db:deleteStudent'] = async (id) => {
     const user = session.getStore()?.user;
-    if (!user || !['FOUNDER', 'DIRECTOR', 'SECRETARY', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+    if (!user || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
     const sid = getActiveSchoolId();
     const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(id, sid);
     if (!student) throw new Error('Élève introuvable ou non autorisé.');
@@ -2495,14 +2521,26 @@ handlers['db:getDashboardStats'] = async (params) => {
   const honorThreshold = schoolConfig.honor_roll_threshold !== undefined ? schoolConfig.honor_roll_threshold : 15.0;
 
   const honorRoll = db.prepare(`
-    SELECT s.first_name, s.last_name, c.name as class_name, c.level as class_level, c.section as class_section, AVG(g.score) as avg
-    FROM students s
-    JOIN classes c ON s.class_id = c.id
-    JOIN grades g ON g.student_id = s.id
-    WHERE s.school_id = ? ${studentWhereStr}
-    GROUP BY s.id
-    HAVING avg >= ?
-    ORDER BY c.level ASC, c.section ASC, c.name ASC, avg DESC
+    WITH class_averages AS (
+      SELECT s.id as student_id, s.first_name, s.last_name, s.class_id,
+             c.name as class_name, c.level as class_level, c.section as class_section,
+             AVG(g.score) as avg
+      FROM students s
+      JOIN classes c ON s.class_id = c.id
+      JOIN grades g ON g.student_id = s.id
+      WHERE s.school_id = ? ${studentWhereStr}
+      GROUP BY s.id
+    ),
+    ranked AS (
+      SELECT *,
+             RANK() OVER (PARTITION BY class_id ORDER BY avg DESC) as class_rank,
+             COUNT(*) OVER (PARTITION BY class_id) as class_total
+      FROM class_averages
+    )
+    SELECT first_name, last_name, class_name, class_level, class_section, avg, class_rank, class_total
+    FROM ranked
+    WHERE avg >= ?
+    ORDER BY class_level ASC, class_section ASC, class_name ASC, avg DESC
   `).all(...(section || (level && level !== 'ALL') ? [schoolId, ...(section ? [section] : []), ...(level && level !== 'ALL' ? [level] : []), honorThreshold] : [schoolId, honorThreshold]));
 
   const totalExpenses = db.prepare(`
@@ -2597,7 +2635,7 @@ handlers['db:getDashboardStats'] = async (params) => {
     totalTuitionDue,
     completedClasses,
     classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
-    honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, level: h.class_level, section: h.class_section, avg: h.avg || 0 })),
+    honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, level: h.class_level, section: h.class_section, avg: h.avg || 0, rank: h.class_rank, totalStudents: h.class_total })),
     honorRollThreshold: honorThreshold,
     financialAlerts
   };
@@ -2904,6 +2942,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         transport_fee_model,
         transport_fee_amount,
         honor_roll_threshold,
+        honor_title_text,
         timetable_slots,
         evaluation_periods,
         term_structure
@@ -2943,6 +2982,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
             transport_fee_model = COALESCE(?, transport_fee_model),
             transport_fee_amount = COALESCE(?, transport_fee_amount),
             honor_roll_threshold = COALESCE(?, honor_roll_threshold),
+            honor_title_text = COALESCE(?, honor_title_text),
             timetable_slots = COALESCE(?, timetable_slots),
             evaluation_periods = COALESCE(?, evaluation_periods),
             term_structure = COALESCE(?, term_structure)
@@ -2968,6 +3008,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         transport_fee_model !== undefined ? transport_fee_model : null,
         transport_fee_amount !== undefined ? transport_fee_amount : null,
         honor_roll_threshold !== undefined ? honor_roll_threshold : null,
+        honor_title_text !== undefined ? honor_title_text : null,
         timetable_slots !== undefined ? timetable_slots : null,
         finalEvaluationPeriods !== undefined ? finalEvaluationPeriods : null,
         term_structure !== undefined ? term_structure : null,
@@ -3135,6 +3176,21 @@ handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubje
       .run(requiresSubjectCode, allowFounderTermEdit, schoolId);
   });
   tx();
+  return { success: true };
+};
+
+handlers['db:getDisabledModules'] = async (schoolId) => {
+  const sid = schoolId || getActiveSchoolId();
+  const school = db.prepare('SELECT disabled_modules FROM schools WHERE id = ?').get(sid);
+  if (!school || !school.disabled_modules) return [];
+  try { return JSON.parse(school.disabled_modules); } catch(e) { return []; }
+};
+
+handlers['db:setDisabledModules'] = async ({ schoolId, modules }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || currentUser.role !== 'SUPERADMIN') throw new Error('Non autorisé.');
+  if (!schoolId) throw new Error('École requise.');
+  db.prepare('UPDATE schools SET disabled_modules = ? WHERE id = ?').run(JSON.stringify(modules || []), schoolId);
   return { success: true };
 };
 

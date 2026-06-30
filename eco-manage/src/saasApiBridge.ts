@@ -55,6 +55,7 @@ export const initSaaSBridge = () => {
 
     // On crée une fausse variable electronAPI pour tromper React
     window.electronAPI = {
+        isWebMode: true,
         login: async (credentials: any) => {
             const res = await apiCall('/auth/login', 'POST', credentials);
             if (res.token) {

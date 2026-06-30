@@ -232,14 +232,14 @@ export const generateReportCard = (data: any) => {
 
             if (!isNursery) {
                 const domainAvg = domainTotalCoef > 0 ? (domainTotalPoints / domainTotalCoef) : 0;
-                tableBody.push([{ 
-                    content: isEn ? `Subtotal ${domain}` : `Sous-total ${domain}`, 
-                    styles: { fontStyle: 'italic', halign: 'right' } 
-                }, 
-                { content: domainAvg.toFixed(2), styles: { fontStyle: 'bold', halign: 'center' } }, 
-                { content: domainTotalCoef.toString(), styles: { fontStyle: 'bold', halign: 'center' } }, 
-                { content: domainTotalPoints.toFixed(2), styles: { fontStyle: 'bold', halign: 'center' } }, 
-                '']);
+                tableBody.push([{
+                    content: isEn ? `Subtotal ${domain}` : `Sous-total ${domain}`,
+                    styles: { fontStyle: 'italic', halign: 'right' }
+                },
+                { content: domainAvg.toFixed(2), styles: { fontStyle: 'bold', halign: 'center' } },
+                { content: domainTotalCoef.toString(), styles: { fontStyle: 'bold', halign: 'center' } },
+                { content: domainTotalPoints.toFixed(2), styles: { fontStyle: 'bold', halign: 'center' } },
+                { content: getPrimaryAppreciation(domainAvg), styles: { fontStyle: 'bold', halign: 'center' } }]);
             }
         });
     }
@@ -768,16 +768,42 @@ export const generateAnnualAuditReport = (data: any) => {
     doc.save(isEn ? `Annual_Audit_Report_${yearName.replace(/[\/\s\\:]+/g, '_')}.pdf` : `Rapport_Annuel_Audit_${yearName.replace(/[\/\s\\:]+/g, '_')}.pdf`);
 };
 
-export const generateHonorCertificate = (studentName: string, className: string, average: number, school?: any) => {
+// Returns the French ordinal suffix form, e.g. 1 -> "1er", 2 -> "2ème", 3 -> "3ème"
+const formatRankFr = (n: number): string => (n === 1 ? `${n}er` : `${n}ème`);
+
+// Returns the English ordinal suffix form, e.g. 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "4th"
+const formatRankEn = (n: number): string => {
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+    switch (n % 10) {
+        case 1: return `${n}st`;
+        case 2: return `${n}nd`;
+        case 3: return `${n}rd`;
+        default: return `${n}th`;
+    }
+};
+
+// Computes the rank (1-based, standard competition ranking - ties share the same rank)
+// of each student within a list, sorted descending by average.
+export const computeClassRanks = (students: { avg: number }[]): number[] => {
+    const sortedAverages = [...students.map(s => s.avg)].sort((a, b) => b - a);
+    return students.map(s => sortedAverages.indexOf(s.avg) + 1);
+};
+
+export const generateHonorCertificate = (studentName: string, className: string, average: number, school?: any, options?: { rank?: number; totalStudents?: number; template?: any }) => {
     const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
     });
     const isEn = i18n.language.startsWith('en');
-    
-    const primary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
-    const secondary = school?.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
+    const { rank, totalStudents, template } = options || {};
+
+    const primaryColor = template?.primary_color || school?.primary_color;
+    const secondaryColor = template?.secondary_color || school?.secondary_color;
+    const primary = primaryColor ? hexToRgb(primaryColor) : [30, 41, 59];
+    const secondary = secondaryColor ? hexToRgb(secondaryColor) : [245, 158, 11];
+    const titleText = school?.honor_title_text || (isEn ? "HONOR ROLL" : "TABLEAU D'HONNEUR");
 
     // Border
     doc.setDrawColor(primary[0], primary[1], primary[2]);
@@ -818,7 +844,7 @@ export const generateHonorCertificate = (studentName: string, className: string,
     // Certificate Title
     doc.setFontSize(30);
     doc.setTextColor(secondary[0], secondary[1], secondary[2]);
-    doc.text(isEn ? "HONOR ROLL" : "TABLEAU D'HONNEUR", 148, 80, { align: 'center' });
+    doc.text(titleText.toUpperCase(), 148, 80, { align: 'center' });
     doc.setFontSize(14);
     doc.setTextColor(100, 100, 100);
     doc.text(isEn ? "HONOR ROLL CERTIFICATE" : "TABLEAU D'HONNEUR", 148, 88, { align: 'center' });
@@ -841,26 +867,38 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.setTextColor(0, 0, 0);
     doc.text(isEn ? `Class: ${className}     |     Term Average: ${average.toFixed(2)} / 20` : `Classe : ${className}     |     Moyenne du Trimestre : ${average.toFixed(2)} / 20`, 148, 135, { align: 'center' });
 
+    // Rank
+    if (rank && totalStudents) {
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        const rankText = isEn
+            ? `Rank: ${formatRankEn(rank)} out of ${totalStudents} students`
+            : `Rang : ${formatRankFr(rank)} sur ${totalStudents} élèves`;
+        doc.text(rankText, 148, 143, { align: 'center' });
+    }
+
     // Appreciation
     let appreciation = isEn ? "VERY SATISFACTORY WORK - CONGRATULATIONS FROM THE JURY" : "TRAVAIL TRÈS SATISFAISANT - FÉLICITATIONS DU JURY";
     if (average >= 18) appreciation = isEn ? "ACADEMIC EXCELLENCE - CONGRATULATIONS AND HONOR ROLL" : "EXCELLENCE ACADÉMIQUE - FÉLICITATIONS ET TABLEAU D'HONNEUR";
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 150, 0);
-    doc.text(appreciation, 148, 148, { align: 'center' });
+    doc.text(appreciation, 148, 154, { align: 'center' });
 
     // Date
     doc.setFontSize(11);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(100, 100, 100);
     const certificateDate = new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-    doc.text(isEn ? `Done at ${school?.address || 'Yaoundé'}, on ${certificateDate}` : `Fait à ${school?.address || 'Yaoundé'}, le ${certificateDate}`, 148, 160, { align: 'center' });
+    doc.text(isEn ? `Done at ${school?.address || 'Yaoundé'}, on ${certificateDate}` : `Fait à ${school?.address || 'Yaoundé'}, le ${certificateDate}`, 148, 165, { align: 'center' });
 
     // Signatures
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(school?.bulletin_sig_left || (isEn ? "Main Teacher" : "L'Enseignant principal"), 40, 180);
-    doc.text(school?.bulletin_sig_right || (isEn ? "School Principal" : "Le Directeur de l'Établissement"), 195, 180);
+    doc.text(school?.bulletin_sig_left || (isEn ? "Main Teacher" : "L'Enseignant principal"), 40, 185);
+    doc.text(school?.bulletin_sig_right || (isEn ? "School Principal" : "Le Directeur de l'Établissement"), 195, 185);
 
     doc.save(isEn ? `Certificate_${studentName.replace(/[\s]+/g, '_')}.pdf` : `Certificat_${studentName.replace(/[\s]+/g, '_')}.pdf`);
 };
