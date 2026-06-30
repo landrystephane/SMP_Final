@@ -313,10 +313,13 @@ const Attendance: React.FC = () => {
                       return;
                   }
                   notifyDataChanged();
+                  const blockedNote = res && res.blockedSkipped > 0
+                      ? `\n\n${t('att_blocked_skipped_note', '{{count}} élève(s) bloqué(s) ignoré(s) (aucune présence enregistrée pour eux).', { count: res.blockedSkipped })}`
+                      : '';
                   if (res && res.exceeders && res.exceeders.length > 0) {
                       setExceedersToNotify(res.exceeders);
                   } else {
-                      alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
+                      alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR') + blockedNote);
                       if (isUnlockedByAdmin) {
                           await window.electronAPI.setSetting({
                               key: `attendance_unlock_${selectedClass}_${currentDate}`,
@@ -601,17 +604,21 @@ const Attendance: React.FC = () => {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {students.map(student => {
                                 const h = absences[student.id] || 0;
+                                const isBlocked = student.status === 'BLOCKED';
                                 return (
-                                    <tr key={student.id} className="hover:bg-slate-800/50 dark:hover:bg-white/5 transition-colors group">
+                                    <tr key={student.id} className={`hover:bg-slate-800/50 dark:hover:bg-white/5 transition-colors group ${isBlocked ? 'opacity-50' : ''}`}>
                                         <td className="px-6 py-4">
-                                            <div className="text-white font-bold uppercase text-sm">{student.last_name}</div>
+                                            <div className="text-white font-bold uppercase text-sm flex items-center gap-2">
+                                                {student.last_name}
+                                                {isBlocked && <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20">{t('blocked_badge', 'Bloqué')}</span>}
+                                            </div>
                                             <div className="text-[10px] text-slate-500 font-bold group-hover:text-slate-300 transition-colors">{student.first_name} • {student.matricule}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center space-x-3">
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.max(0, h - 1)})}
-                                                    disabled={isLocked}
+                                                    disabled={isLocked || isBlocked}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-rose-500 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     -
@@ -619,7 +626,7 @@ const Attendance: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     value={h}
-                                                    disabled={isLocked}
+                                                    disabled={isLocked || isBlocked}
                                                     onChange={(e) => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, Math.max(0, parseInt(e.target.value) || 0))})}
                                                     className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none disabled:opacity-50"
                                                     max={maxAllowedHours}
@@ -627,7 +634,7 @@ const Attendance: React.FC = () => {
                                                 />
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, h + 1)})}
-                                                    disabled={isLocked}
+                                                    disabled={isLocked || isBlocked}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     +

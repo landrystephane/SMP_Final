@@ -348,109 +348,118 @@ export const generateReportCard = (data: any) => {
 export const generatePaymentReceipt = (payment: any, student: any, financials: any, school?: any) => {
     const doc = new jsPDF();
     const primary = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
-    const secondary = school?.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
     const isEn = i18n.language.startsWith('en');
+    const safeNum = (num: number) => num.toLocaleString('en-US').replace(/,/g, ' ');
 
-    if (school) {
-        // Bilingual Header
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'bold');
-        doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 10);
-        doc.text('Paix - Travail - Patrie', 20, 14);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
-        doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 18);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
+    const drawReceiptBlock = (baseY: number, copyLabel: string) => {
+        if (school) {
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text('RÉPUBLIQUE DU CAMEROUN', 20, baseY + 4);
+            doc.text('REPUBLIC OF CAMEROON', 190, baseY + 4, { align: 'right' });
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(5.5);
+            doc.text('Paix - Travail - Patrie', 20, baseY + 7.5);
+            doc.text('Peace - Work - Fatherland', 190, baseY + 7.5, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, baseY + 11);
+            doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 190, baseY + 11, { align: 'right' });
 
-        doc.text('REPUBLIC OF CAMEROON', 190, 10, { align: 'right' });
-        doc.text('Peace - Work - Fatherland', 190, 14, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
-        doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 190, 18, { align: 'right' });
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(primary[0], primary[1], primary[2]);
+            doc.text(school.name.toUpperCase(), 105, baseY + 11, { align: 'center' });
+            doc.setFontSize(7);
+            doc.setTextColor(80, 80, 80);
+            doc.setFont('helvetica', 'normal');
+            const addrLine = `${school.address || ''}${school.bp ? ` - BP: ${school.bp}` : ''}`.trim();
+            if (addrLine) doc.text(addrLine, 105, baseY + 16, { align: 'center' });
+        }
 
-        // Center Logo/School Info
-        doc.setFontSize(12);
+        const titleY = baseY + (school ? 24 : 6);
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(150, 150, 150);
+        doc.text(copyLabel, 190, titleY - 4, { align: 'right' });
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(primary[0], primary[1], primary[2]);
-        doc.text(school.name.toUpperCase(), 105, 26, { align: 'center' });
+        doc.text(isEn ? 'PAYMENT RECEIPT' : 'REÇU DE PAIEMENT', 105, titleY, { align: 'center' });
+
         doc.setFontSize(8);
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'normal');
-        doc.text(school.motto || '', 105, 31, { align: 'center' });
-        doc.text(school.address || '', 105, 35, { align: 'center' });
-        if (school.bp) {
-            doc.text(`BP: ${school.bp}`, 105, 39, { align: 'center' });
-        }
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, 42, 190, 42);
-    }
+        doc.text(isEn ? `RECEIPT NO: ${payment.receipt_number}` : `REÇU N°: ${payment.receipt_number}`, 20, titleY + 6);
+        const receiptDateStr = new Date(payment.payment_date).toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+        doc.text(`DATE: ${receiptDateStr}`, 190, titleY + 6, { align: 'right' });
 
-    const startY = school ? 52 : 20;
+        doc.setDrawColor(220, 220, 220);
+        doc.line(20, titleY + 9, 190, titleY + 9);
 
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(isEn ? 'PAYMENT RECEIPT' : 'REÇU DE PAIEMENT', 105, startY, { align: 'center' });
-    
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.text(isEn ? `RECEIPT NO: ${payment.receipt_number}` : `REÇU N°: ${payment.receipt_number}`, 20, startY + 15);
-    const receiptDateStr = new Date(payment.payment_date).toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.text(`DATE: ${receiptDateStr}`, 190, startY + 15, { align: 'right' });
-
-    doc.setDrawColor(220, 220, 220);
-    doc.line(20, startY + 20, 190, startY + 20);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text(isEn ? 'STUDENT:' : 'ÉLÈVE:', 20, startY + 30);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${student.last_name} ${student.first_name}`, 65, startY + 30);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text(isEn ? 'REG NO:' : 'MATRICULE:', 20, startY + 37);
-    doc.setFont('helvetica', 'normal');
-    doc.text(student.matricule, 65, startY + 37);
-
-    if (payment.depositor_name) {
         doc.setFont('helvetica', 'bold');
-        doc.text(isEn ? 'DEPOSITOR:' : 'DÉPOSANT:', 20, startY + 44);
+        doc.text(isEn ? 'STUDENT:' : 'ÉLÈVE:', 20, titleY + 15);
         doc.setFont('helvetica', 'normal');
-        doc.text(payment.depositor_name, 65, startY + 44);
-    }
+        doc.text(`${student.last_name} ${student.first_name}`, 50, titleY + 15);
+        doc.setFont('helvetica', 'bold');
+        doc.text(isEn ? 'REG NO:' : 'MATRICULE:', 110, titleY + 15);
+        doc.setFont('helvetica', 'normal');
+        doc.text(student.matricule, 140, titleY + 15);
 
-    const safeNum = (num: number) => num.toLocaleString('en-US').replace(/,/g, ' ');
+        if (payment.depositor_name) {
+            doc.setFont('helvetica', 'bold');
+            doc.text(isEn ? 'DEPOSITOR:' : 'DÉPOSANT:', 20, titleY + 20);
+            doc.setFont('helvetica', 'normal');
+            doc.text(payment.depositor_name, 50, titleY + 20);
+        }
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(isEn ? `AMOUNT PAID: ${safeNum(payment.amount)} FCFA` : `MONTANT PAYÉ: ${safeNum(payment.amount)} FCFA`, 20, startY + 50);
-    const purposeLabel = payment.installment_name ? `${payment.payment_type.toUpperCase()} - ${payment.installment_name.toUpperCase()}` : payment.payment_type.toUpperCase();
-    doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 20, startY + 58);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.text(isEn ? `AMOUNT PAID: ${safeNum(payment.amount)} FCFA` : `MONTANT PAYÉ: ${safeNum(payment.amount)} FCFA`, 20, titleY + 28);
+        const purposeLabel = payment.installment_name ? `${payment.payment_type.toUpperCase()} - ${payment.installment_name.toUpperCase()}` : payment.payment_type.toUpperCase();
+        doc.setFontSize(8);
+        doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 110, titleY + 28);
 
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    doc.text(isEn ? 'FINANCIAL STATUS:' : 'SITUATION FINANCIÈRE:', 20, startY + 74);
-    doc.setFont('helvetica', 'normal');
-    doc.text(isEn ? `Total Due: ${safeNum(financials.totalDue)} FCFA` : `Total dû: ${safeNum(financials.totalDue)} FCFA`, 30, startY + 82);
-    doc.text(isEn ? `Total Paid: ${safeNum(financials.totalPaid)} FCFA` : `Total versé: ${safeNum(financials.totalPaid)} FCFA`, 30, startY + 89);
-    doc.text(isEn ? `Balance: ${safeNum(financials.balance)} FCFA` : `Reste à payer: ${safeNum(financials.balance)} FCFA`, 30, startY + 96);
+        doc.setFontSize(7.5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        doc.text(isEn ? `Due: ${safeNum(financials.totalDue)}` : `Dû: ${safeNum(financials.totalDue)}`, 20, titleY + 35);
+        doc.text(isEn ? `Paid: ${safeNum(financials.totalPaid)}` : `Versé: ${safeNum(financials.totalPaid)}`, 80, titleY + 35);
+        doc.text(isEn ? `Balance: ${safeNum(financials.balance)} FCFA` : `Reste: ${safeNum(financials.balance)} FCFA`, 140, titleY + 35);
 
-    const installmentLabel = payment.installment_name ? ` - ${payment.installment_name.toUpperCase()}` : '';
-    const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`);
-    const statusColor = financials.balance <= 0 ? [34, 197, 94] : [245, 158, 11]; // Green for full, Orange for partial
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-    doc.text(paymentStatus, 20, startY + 110);
+        const installmentLabel = payment.installment_name ? ` - ${payment.installment_name.toUpperCase()}` : '';
+        const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`);
+        const statusColor = financials.balance <= 0 ? [34, 197, 94] : [245, 158, 11];
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+        doc.text(paymentStatus, 20, titleY + 43);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    const bursarSigTitle = isEn ? "Bursar Signature" : "Signature de l'Économe";
-    doc.text(school?.receipt_sig_title || bursarSigTitle, 190, startY + 120, { align: 'right' });
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        const bursarSigTitle = isEn ? "Bursar Signature" : "Signature de l'Économe";
+        doc.text(school?.receipt_sig_title || bursarSigTitle, 190, titleY + 43, { align: 'right' });
+
+        doc.setDrawColor(primary[0], primary[1], primary[2]);
+        doc.setLineWidth(0.3);
+        doc.rect(15, baseY - 4, 180, (titleY + 48) - (baseY - 4));
+    };
+
+    drawReceiptBlock(8, isEn ? 'PARENT COPY' : 'COPIE PARENT');
+
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(15, 148, 195, 148);
+    doc.setLineDashPattern([], 0);
+    doc.setFontSize(6);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont('helvetica', 'italic');
+    doc.text(isEn ? '✂ - - - - - - - - - - - - - - - - CUT HERE - - - - - - - - - - - - - - - - ✂' : '✂ - - - - - - - - - - - - - - - - COUPER ICI - - - - - - - - - - - - - - - - ✂', 105, 148.5, { align: 'center' });
+
+    drawReceiptBlock(154, isEn ? 'SCHOOL COPY' : 'COPIE ÉCOLE');
 
     doc.save(`Recu_${payment.receipt_number}.pdf`);
 };

@@ -1748,11 +1748,18 @@ handlers['db:getSystemRequests'] = async ({ schoolId }) => {
 
 handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
     const sid = getActiveSchoolId();
+    let blockedSkipped = 0;
     if (records && records.length > 0) {
         const studentIds = [...new Set(records.map(r => r.studentId))];
+        const blockedIds = new Set();
         for (const sId of studentIds) {
-            const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(sId, sid);
+            const student = db.prepare('SELECT id, status FROM students WHERE id = ? AND school_id = ?').get(sId, sid);
             if (!student) throw new Error('Élève non autorisé pour cet établissement.');
+            if (student.status === 'BLOCKED') blockedIds.add(sId);
+        }
+        if (blockedIds.size > 0) {
+            blockedSkipped = blockedIds.size;
+            records = records.filter(r => !blockedIds.has(r.studentId));
         }
     }
     const upsert = db.prepare(`
@@ -1810,7 +1817,7 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
 
     try {
         transaction();
-        return { success: true, exceeders };
+        return { success: true, exceeders, blockedSkipped };
     } catch (err) {
         return { success: false, error: err.message };
     }

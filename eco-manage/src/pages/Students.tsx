@@ -250,9 +250,15 @@ const Students: React.FC = () => {
                   <td className="px-6 py-4 text-right space-x-2">
                     {s.has_paid_registration === 1 && (
                     <button
-                        onClick={() => generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name }, schoolInfo)}
-                        className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-500/20 rounded-md transition-all"
-                        title={t('registration_sheet_title')}
+                        onClick={() => {
+                            if (s.status === 'BLOCKED') {
+                                showNotification(t('student_blocked_no_action', "Cet élève est bloqué. Aucune action n'est possible (y compris l'impression)."), "error");
+                                return;
+                            }
+                            generateRegistrationSheet({ ...s, className: classes.find(c => c.id === s.class_id)?.name }, schoolInfo);
+                        }}
+                        className={`p-1.5 rounded-md transition-all ${s.status === 'BLOCKED' ? 'text-slate-700 cursor-not-allowed' : 'text-blue-400 hover:text-white hover:bg-blue-500/20'}`}
+                        title={s.status === 'BLOCKED' ? t('student_blocked_no_action', "Cet élève est bloqué. Aucune action n'est possible (y compris l'impression).") : t('registration_sheet_title')}
                     >
                         <FileText className="w-4 h-4" />
                     </button>

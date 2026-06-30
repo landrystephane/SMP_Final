@@ -512,6 +512,10 @@ const Grades: React.FC = () => {
   };
 
   const printStudentReport = async (student: any) => {
+    if (student.status === 'BLOCKED') {
+        showNotification(t('student_blocked_no_action', "Cet élève est bloqué. Aucune action n'est possible (y compris l'impression)."), "error");
+        return;
+    }
     if (window.electronAPI) {
         try {
             const classObj = classes.find(c => c.id.toString() === selectedClass);
