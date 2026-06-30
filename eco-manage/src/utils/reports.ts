@@ -815,11 +815,19 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.rect(13, 13, 271, 184);
 
     // Header
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 50, 23, { align: 'center' });
-    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 247, 23, { align: 'center' });
+    doc.text('RÉPUBLIQUE DU CAMEROUN', 50, 18, { align: 'center' });
+    doc.text('REPUBLIC OF CAMEROON', 247, 18, { align: 'center' });
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.text('Paix - Travail - Patrie', 50, 22, { align: 'center' });
+    doc.text('Peace - Work - Fatherland', 247, 22, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 50, 27, { align: 'center' });
+    doc.text(school?.header_english || "MINISTRY OF BASIC EDUCATION", 247, 27, { align: 'center' });
 
     // School Name and Info
     doc.setFontSize(22);
@@ -847,7 +855,7 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.text(titleText.toUpperCase(), 148, 80, { align: 'center' });
     doc.setFontSize(14);
     doc.setTextColor(100, 100, 100);
-    doc.text(isEn ? "HONOR ROLL CERTIFICATE" : "TABLEAU D'HONNEUR", 148, 88, { align: 'center' });
+    doc.text(isEn ? "HONOR ROLL CERTIFICATE" : "CERTIFICAT DE TABLEAU D'HONNEUR", 148, 88, { align: 'center' });
 
     // Text Content
     doc.setFontSize(14);
