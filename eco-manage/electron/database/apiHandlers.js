@@ -1854,12 +1854,20 @@ handlers['db:getAttendanceReport'] = async ({ classId, startDate, endDate }) => 
 
 handlers['db:getUsers'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  const users = db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active FROM users WHERE school_id = ?').all(sid);
-  return users.map(u => ({ ...u, full_name: u.fullName }));
+  const users = db.prepare('SELECT id, username, full_name as fullName, role, assigned_classes as assignedClasses, matricule, civility, section, gender, phone, is_active, allowed_modules as allowedModulesRaw FROM users WHERE school_id = ?').all(sid);
+  return users.map(u => ({ ...u, full_name: u.fullName, allowedModules: u.allowedModulesRaw ? JSON.parse(u.allowedModulesRaw) : null }));
+};
+
+handlers['db:getMyAllowedModules'] = async () => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) return null;
+  const row = db.prepare('SELECT allowed_modules FROM users WHERE id = ?').get(currentUser.id);
+  if (!row || !row.allowed_modules) return null;
+  try { return JSON.parse(row.allowed_modules); } catch(e) { return null; }
 };
 
 handlers['db:addUser'] = async (user) => {
-  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone, classRole } = user;
+  const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone, classRole, allowedModules } = user;
   const sid = getActiveSchoolId(schoolId);
   
   const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
@@ -1897,9 +1905,9 @@ handlers['db:addUser'] = async (user) => {
 
   const transaction = db.transaction(() => {
     const result = db.prepare(`
-      INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender, phone)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null);
+      INSERT INTO users (username, password, full_name, role, school_id, assigned_classes, matricule, civility, section, gender, phone, allowed_modules)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(username, hash, fullName, role, sid, JSON.stringify(assignedClasses || []), matricule, civility, section, gender, phone || null, (allowedModules && allowedModules.length > 0) ? JSON.stringify(allowedModules) : null);
     
     if (role === 'TEACHER' && assignedClasses && assignedClasses.length > 0) {
         if (classRole === 'ASSISTANT') {
@@ -1951,7 +1959,7 @@ handlers['db:toggleUserActive'] = async ({ id, isActive }) => {
 };
 
 handlers['db:updateUser'] = async (userToUpdate) => {
-  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole, schoolId } = userToUpdate;
+  const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole, schoolId, allowedModules } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
   const sid = getActiveSchoolId(schoolId);
   const currentUser = session.getStore()?.user;
@@ -1978,6 +1986,9 @@ handlers['db:updateUser'] = async (userToUpdate) => {
   const finalCivility = civility || existing.civility;
   const finalSection = section || existing.section;
   const finalGender = gender || existing.gender;
+  const finalAllowedModules = allowedModules !== undefined
+    ? ((allowedModules && allowedModules.length > 0) ? JSON.stringify(allowedModules) : null)
+    : existing.allowed_modules;
 
   const updateSchoolId = currentUser?.role === 'SUPERADMIN' ? existing.school_id : sid;
   const transaction = db.transaction(() => {
@@ -1985,15 +1996,15 @@ handlers['db:updateUser'] = async (userToUpdate) => {
         const hash = bcrypt.hashSync(password.trim(), 10);
         db.prepare(`
           UPDATE users SET
-            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ?
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, password = ?, allowed_modules = ?
           WHERE id = ? AND school_id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, id, updateSchoolId);
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, hash, finalAllowedModules, id, updateSchoolId);
     } else {
         db.prepare(`
           UPDATE users SET
-            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?
+            username = ?, full_name = ?, role = ?, phone = ?, assigned_classes = ?, civility = ?, section = ?, gender = ?, allowed_modules = ?
           WHERE id = ? AND school_id = ?
-        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, id, updateSchoolId);
+        `).run(finalUsername, finalFullName, finalRole, finalPhone, finalAssignedClasses, finalCivility, finalSection, finalGender, finalAllowedModules, id, updateSchoolId);
     }
 
     if (finalRole === 'TEACHER') {

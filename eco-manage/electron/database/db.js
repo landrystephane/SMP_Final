@@ -694,6 +694,15 @@ function initDb() {
         console.log('[Migration] internal_messages table verified/created');
     } catch(e) { console.error('internal_messages migration error:', e.message); }
 
+    // Per-user module permissions (NULL = no restriction, inherit role defaults)
+    try {
+        const userCols = db.prepare("PRAGMA table_info(users)").all();
+        if (!userCols.find(c => c.name === 'allowed_modules')) {
+            db.prepare("ALTER TABLE users ADD COLUMN allowed_modules TEXT DEFAULT NULL").run();
+            console.log('[Migration] allowed_modules column added to users');
+        }
+    } catch(e) { console.error('allowed_modules migration error:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

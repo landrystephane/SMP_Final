@@ -68,7 +68,14 @@ const RoleGuard: React.FC<{ roles: string[]; moduleKey?: string; children: React
       if (moduleKey && window.electronAPI && user?.role !== 'SUPERADMIN') {
         try {
           const disabled = await (window.electronAPI as any).getDisabledModules(user?.schoolId);
-          setIsModuleDisabled((disabled || []).includes(moduleKey));
+          if ((disabled || []).includes(moduleKey)) {
+            setIsModuleDisabled(true);
+          } else {
+            const allowed = await (window.electronAPI as any).getMyAllowedModules();
+            if (allowed && allowed.length > 0 && !allowed.includes(moduleKey)) {
+              setIsModuleDisabled(true);
+            }
+          }
         } catch(e) {}
       }
       setLoading(false);

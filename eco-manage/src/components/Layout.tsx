@@ -20,6 +20,7 @@ const Layout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSgActing, setIsSgActing] = useState(false);
   const [disabledModules, setDisabledModules] = useState<string[]>([]);
+  const [myAllowedModules, setMyAllowedModules] = useState<string[] | null>(null);
 
   const { showNotification } = useNotification();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -194,6 +195,10 @@ const Layout: React.FC = () => {
               const disabled = await (window.electronAPI as any).getDisabledModules(user?.schoolId);
               setDisabledModules(disabled || []);
           } catch(e) { setDisabledModules([]); }
+          try {
+              const allowed = await (window.electronAPI as any).getMyAllowedModules();
+              setMyAllowedModules(allowed);
+          } catch(e) { setMyAllowedModules(null); }
       }
     };
     loadActiveSchool();
@@ -329,6 +334,7 @@ const Layout: React.FC = () => {
               if (user?.role === 'SUPERADMIN' && item.hideForSuperAdmin) return false;
               if (item.key === 'mobile_access' && (window as any).electronAPI?.isWebMode) return false;
               if (user?.role !== 'SUPERADMIN' && disabledModules.includes(item.key)) return false;
+              if (user?.role !== 'SUPERADMIN' && myAllowedModules && myAllowedModules.length > 0 && !myAllowedModules.includes(item.key) && item.key !== 'dashboard' && item.key !== 'profile') return false;
               return hasRole(item.roles as any);
           }).map((item) => (
             <NavLink

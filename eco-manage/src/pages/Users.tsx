@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import { AVAILABLE_MODULES } from '../utils/modules';
 
 const Users: React.FC = () => {
   const { t } = useTranslation();
@@ -27,6 +28,7 @@ const Users: React.FC = () => {
     phone: '',
     classRole: 'MAIN'
   });
+  const [newUserModules, setNewUserModules] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -44,6 +46,7 @@ const Users: React.FC = () => {
     classId: '',
     classRole: 'MAIN'
   });
+  const [editUserModules, setEditUserModules] = useState<string[]>([]);
 
   const loadData = async () => {
     if (window.electronAPI && currentUser) {
@@ -98,6 +101,7 @@ const Users: React.FC = () => {
             classId: assignedClassId,
             classRole: currentClassRole
         });
+        setEditUserModules(editingUser.allowedModules || []);
     }
   }, [editingUser, classes]);
 
@@ -129,25 +133,27 @@ const Users: React.FC = () => {
           ...newUser,
           schoolId: currentUser.schoolId,
           assignedClasses: newUser.classId ? [parseInt(newUser.classId)] : [],
-          classRole: newUser.classRole
+          classRole: newUser.classRole,
+          allowedModules: newUserModules
       });
       if (res && res.error) {
           setFormError(`${t('alert_error')}: ${res.error}`);
           return;
       }
-      setNewUser({ 
-          username: '', 
-          password: '', 
-          fullName: '', 
-          role: 'TEACHER', 
-          classId: '', 
-          civility: 'M.', 
-          section: 'FRANCOPHONE', 
+      setNewUser({
+          username: '',
+          password: '',
+          fullName: '',
+          role: 'TEACHER',
+          classId: '',
+          civility: 'M.',
+          section: 'FRANCOPHONE',
           cycle: 'PRIMAIRE',
           gender: 'M',
           phone: '',
           classRole: 'MAIN'
       });
+      setNewUserModules([]);
       setFormSuccess(t('usr_user_created_success'));
       setTimeout(() => setFormSuccess(null), 5000);
       loadData();
@@ -188,7 +194,8 @@ const Users: React.FC = () => {
                   section: editUserForm.section,
                   gender: editUserForm.gender,
                   assignedClasses: editUserForm.classId ? [parseInt(editUserForm.classId)] : [],
-                  classRole: editUserForm.classRole
+                  classRole: editUserForm.classRole,
+                  allowedModules: editUserModules
               });
 
               if (res && res.error) {
@@ -418,6 +425,25 @@ const Users: React.FC = () => {
                             </div>
                         </div>
                     )}
+
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">{t('usr_module_access_label', 'Accès aux modules (laisser vide = accès complet selon le rôle)')}</label>
+                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-white/5">
+                            {AVAILABLE_MODULES.map(mod => (
+                                <label key={mod.key} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={newUserModules.includes(mod.key)}
+                                        onChange={(e) => {
+                                            setNewUserModules(prev => e.target.checked ? [...prev, mod.key] : prev.filter(m => m !== mod.key));
+                                        }}
+                                        className="accent-amber-500"
+                                    />
+                                    {mod.label}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
 
                     <button className="btn-primary w-full py-5 mt-4">
                         <CheckCircle className="w-5 h-5 mr-3" />
@@ -696,6 +722,25 @@ const Users: React.FC = () => {
                               </div>
                           </div>
                       )}
+
+                      <div className="space-y-2 pt-2 border-t border-white/5">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">{t('usr_module_access_label', 'Accès aux modules (laisser vide = accès complet selon le rôle)')}</label>
+                          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-white/5">
+                              {AVAILABLE_MODULES.map(mod => (
+                                  <label key={mod.key} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                                      <input
+                                          type="checkbox"
+                                          checked={editUserModules.includes(mod.key)}
+                                          onChange={(e) => {
+                                              setEditUserModules(prev => e.target.checked ? [...prev, mod.key] : prev.filter(m => m !== mod.key));
+                                          }}
+                                          className="accent-amber-500"
+                                      />
+                                      {mod.label}
+                                  </label>
+                              ))}
+                          </div>
+                      </div>
 
                       <div className="pt-6 flex justify-end space-x-3">
                           <button type="button" onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-500 uppercase tracking-widest">{t('cancel')}</button>
