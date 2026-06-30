@@ -674,6 +674,26 @@ function initDb() {
         }
     } catch(e) { console.error('disabled_modules migration error:', e.message); }
 
+    // Internal staff messaging (1-to-1 messages between staff accounts)
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS internal_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_id INTEGER NOT NULL,
+                sender_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (school_id) REFERENCES schools(id),
+                FOREIGN KEY (sender_id) REFERENCES users(id),
+                FOREIGN KEY (receiver_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_internal_messages_participants ON internal_messages(school_id, sender_id, receiver_id);
+        `);
+        console.log('[Migration] internal_messages table verified/created');
+    } catch(e) { console.error('internal_messages migration error:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

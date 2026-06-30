@@ -27,6 +27,7 @@ import Statistics from './pages/Statistics';
 import CustomizationSettings from './pages/CustomizationSettings';
 import AnnualArchives from './pages/AnnualArchives';
 import Classes from './pages/Classes';
+import Messaging from './pages/Messaging';
 import './index.css';
 
 import { useTranslation } from 'react-i18next';
@@ -123,6 +124,7 @@ function App() {
               <Route path="customization" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="customization"><CustomizationSettings /></RoleGuard>} />
               <Route path="archives" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="archives"><AnnualArchives /></RoleGuard>} />
               <Route path="classes" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Classes /></RoleGuard>} />
+              <Route path="messaging" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','BURSAR','TEACHER','ADVISOR','DRIVER','SUPERADMIN']} moduleKey="messaging"><Messaging /></RoleGuard>} />
             </Route>
           </Routes>
         </BrowserRouter>

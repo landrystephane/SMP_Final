@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Users, BookOpen, GraduationCap, LayoutDashboard,
   LogOut, Wallet, Building2, Briefcase, Calendar, 
-  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award
+  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award, MessageCircle
 } from 'lucide-react';
 import ErrorBoundary from './ErrorBoundary';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -238,6 +238,7 @@ const Layout: React.FC = () => {
     { key: 'parents', path: '/parents', icon: HeartHandshake, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport', path: '/transport', icon: Bus, roles: ['FOUNDER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'tickets', path: '/tickets', icon: MessageSquare, roles: ['FOUNDER', 'DIRECTOR', 'TEACHER', 'BURSAR', 'DRIVER', 'MAINTENANCE', 'SG'], hideForSuperAdmin: !isImpersonating },
+    { key: 'messaging', path: '/messaging', icon: MessageCircle, roles: ['FOUNDER', 'DIRECTOR', 'SG', 'BURSAR', 'TEACHER', 'ADVISOR', 'DRIVER'], hideForSuperAdmin: !isImpersonating },
     { key: 'customization', path: '/customization', icon: Palette, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'archives', path: '/archives', icon: Archive, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },

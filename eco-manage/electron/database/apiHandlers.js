@@ -3194,6 +3194,72 @@ handlers['db:setDisabledModules'] = async ({ schoolId, modules }) => {
   return { success: true };
 };
 
+const STAFF_MESSAGING_ROLES = ['TEACHER', 'SG', 'BURSAR', 'ADVISOR', 'DIRECTOR', 'FOUNDER', 'DRIVER'];
+
+handlers['db:getStaffContacts'] = async () => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non autorisé.');
+  const sid = getActiveSchoolId();
+  const placeholders = STAFF_MESSAGING_ROLES.map(() => '?').join(',');
+  const contacts = db.prepare(`SELECT id, username, full_name as fullName, role, civility FROM users WHERE school_id = ? AND role IN (${placeholders}) AND is_active = 1 AND id != ?`)
+    .all(sid, ...STAFF_MESSAGING_ROLES, currentUser.id);
+
+  // Attach last message + unread count for each contact
+  return contacts.map(c => {
+    const last = db.prepare(`SELECT message, created_at, sender_id FROM internal_messages
+      WHERE school_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+      ORDER BY created_at DESC LIMIT 1`).get(sid, currentUser.id, c.id, c.id, currentUser.id);
+    const unread = db.prepare(`SELECT COUNT(*) as cnt FROM internal_messages WHERE school_id = ? AND sender_id = ? AND receiver_id = ? AND is_read = 0`)
+      .get(sid, c.id, currentUser.id);
+    return { ...c, lastMessage: last?.message || null, lastMessageAt: last?.created_at || null, unreadCount: unread.cnt };
+  }).sort((a, b) => {
+    if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+    if (!a.lastMessageAt) return 1;
+    if (!b.lastMessageAt) return -1;
+    return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+  });
+};
+
+handlers['db:getConversation'] = async ({ contactId }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non autorisé.');
+  const sid = getActiveSchoolId();
+  const messages = db.prepare(`SELECT * FROM internal_messages
+    WHERE school_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+    ORDER BY created_at ASC`).all(sid, currentUser.id, contactId, contactId, currentUser.id);
+
+  db.prepare('UPDATE internal_messages SET is_read = 1 WHERE school_id = ? AND sender_id = ? AND receiver_id = ? AND is_read = 0')
+    .run(sid, contactId, currentUser.id);
+
+  return messages;
+};
+
+handlers['db:sendInternalMessage'] = async ({ receiverId, message }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non autorisé.');
+  if (!STAFF_MESSAGING_ROLES.includes(currentUser.role)) throw new Error('Vous n\'êtes pas autorisé à utiliser la messagerie interne.');
+  if (!message || !message.trim()) throw new Error('Le message ne peut pas être vide.');
+  const sid = getActiveSchoolId();
+
+  const receiver = db.prepare('SELECT id, role, is_active FROM users WHERE id = ? AND school_id = ?').get(receiverId, sid);
+  if (!receiver) throw new Error('Destinataire introuvable.');
+  if (receiver.is_active === 0) throw new Error('Ce compte est désactivé et ne peut pas recevoir de message.');
+  if (!STAFF_MESSAGING_ROLES.includes(receiver.role)) throw new Error('Ce destinataire ne fait pas partie du personnel.');
+
+  const info = db.prepare('INSERT INTO internal_messages (school_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)')
+    .run(sid, currentUser.id, receiverId, message.trim());
+
+  db.prepare('INSERT INTO notifications (school_id, user_id, message, type, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)')
+    .run(sid, receiverId, `Nouveau message de ${getRoleLabelBackend(currentUser.role)}.`, 'MESSAGE');
+
+  return { success: true, id: info.lastInsertRowid };
+};
+
+function getRoleLabelBackend(role) {
+  const labels = { FOUNDER: 'le Fondateur', DIRECTOR: 'le Directeur', SG: 'le Secrétaire Général', BURSAR: "l'Économe", TEACHER: 'un Enseignant', ADVISOR: 'le Conseiller Pédagogique', DRIVER: 'le Chauffeur' };
+  return labels[role] || 'un membre du personnel';
+}
+
 handlers['db:deleteGradingScale'] = async (id) => {
   const sid = getActiveSchoolId();
   const tx = db.transaction(() => {

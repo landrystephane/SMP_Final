@@ -270,6 +270,7 @@ const SystemAdmin: React.FC = () => {
       { key: 'parents', label: 'Portail Parents' },
       { key: 'transport', label: 'Transport' },
       { key: 'tickets', label: 'Requêtes' },
+      { key: 'messaging', label: 'Messagerie Interne' },
       { key: 'customization', label: 'Personnalisation' },
       { key: 'archives', label: 'Archives Annuelles' },
   ];
