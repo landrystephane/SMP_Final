@@ -548,6 +548,11 @@ const Grades: React.FC = () => {
             const rankIndex = studentsWithAverages.findIndex(s => s.id === student.id);
             const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
             const totalStudents = studentsWithAverages.length;
+            const firstAverage = studentsWithAverages[0]?.avg;
+            const lastAverage = studentsWithAverages[studentsWithAverages.length - 1]?.avg;
+            const classAverage = totalStudents > 0
+                ? studentsWithAverages.reduce((sum: number, s: any) => sum + s.avg, 0) / totalStudents
+                : undefined;
 
             const studentData = studentsWithAverages.find(s => s.id === student.id);
             if (studentData) {
@@ -565,6 +570,9 @@ const Grades: React.FC = () => {
                     term: selectedTerm,
                     rank,
                     totalStudents,
+                    classAverage,
+                    firstAverage,
+                    lastAverage,
                     ignoreValidation: isDirector
                 });
             }

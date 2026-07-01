@@ -518,7 +518,12 @@ handlers['db:saveGrades'] = async (grades) => {
             throw new Error(`Vous n'êtes pas assigné à enseigner cette matière (Class: ${g.class_id}, Subj: ${g.subject_id}, Teacher: ${g.teacher_id}) dans cette classe.`);
           }
 
-          // 2. Validation du délai de saisie (verrouillage automatique)
+          // 2. Vérification du verrou de saisie manuel (prioritaire sur la date)
+          const editingAllowedSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_editing_allowed'));
+          if (editingAllowedSetting && editingAllowedSetting.value === 'false') {
+            throw new Error('La saisie des notes est actuellement bloquée. Contactez la direction pour un déblocage.');
+          }
+          // 3. Validation du délai de saisie (verrouillage automatique)
           const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_end'));
           if (periodEndSetting && periodEndSetting.value) {
             const endDate = new Date(periodEndSetting.value);
@@ -887,13 +892,34 @@ handlers['db:getClassInstallmentFees'] = async (schoolId) => {
 
 handlers['db:updateTuitionFee'] = async ({ classId, totalFee, registrationFee, transportFee = 0, examFee = 0 }) => {
   const sid = getActiveSchoolId();
-  const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
+  const cls = db.prepare('SELECT id, name FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
-  return db.prepare(`
+  const result = db.prepare(`
     INSERT INTO tuition_fees (class_id, total_fee, registration_fee, transport_fee, exam_fee)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(class_id) DO UPDATE SET total_fee = excluded.total_fee, registration_fee = excluded.registration_fee, transport_fee = excluded.transport_fee, exam_fee = excluded.exam_fee
   `).run(classId, totalFee, registrationFee, transportFee, examFee);
+
+  try {
+    const students = db.prepare("SELECT id, parent_contact FROM students WHERE class_id = ? AND school_id = ? AND status = 'ACTIVE'").all(classId, sid);
+    const notifStmt = db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')");
+    const msg = `📋 Frais scolaires mis à jour — Les frais de scolarité de la classe ${cls.name} ont été mis à jour. Montant total : ${Number(totalFee).toLocaleString('fr-FR')} FCFA. Rapprochez-vous de l'économat pour tout renseignement.`;
+    const seen = new Set();
+    for (const student of students) {
+      if (!student.parent_contact) continue;
+      let parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND school_id = ?").get(student.parent_contact, sid);
+      if (!parentUser) {
+        const digits = String(student.parent_contact).replace(/^\+?237/, '').replace(/[^0-9]/g, '');
+        if (digits) parentUser = db.prepare("SELECT id FROM users WHERE (username = ? OR username = ? OR username = ?) AND school_id = ?").get(digits, '237' + digits, '+237' + digits, sid);
+      }
+      if (parentUser && !seen.has(parentUser.id)) {
+        seen.add(parentUser.id);
+        notifStmt.run(sid, parentUser.id, msg);
+      }
+    }
+  } catch(e) { console.error('[updateTuitionFee] notification error:', e.message); }
+
+  return result;
 };
 
 handlers['db:updateClassInstallmentFee'] = async ({ classId, installmentId, amount }) => {

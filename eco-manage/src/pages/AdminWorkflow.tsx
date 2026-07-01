@@ -54,7 +54,14 @@ const AdminWorkflow: React.FC = () => {
           setLockedClasses(locks);
           const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';
         const end = await window.electronAPI.getSetting('period_end') || '2026-05-15';
-        const editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
+        let editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
+        if (editingAllowed && end) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (new Date(end) < today) {
+                editingAllowed = false;
+                await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: 'false' });
+            }
+        }
         const activeTerm = await window.electronAPI.getSetting('active_term') || '1';
         const activeSequence = await window.electronAPI.getSetting('active_sequence') || '';
         const activeId = activeSequence ? `${activeTerm}_${activeSequence}` : activeTerm;
@@ -456,6 +463,11 @@ const AdminWorkflow: React.FC = () => {
                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${period.editingAllowed ? 'translate-x-6' : ''}`} />
               </div>
             </div>
+            {!period.editingAllowed && period.end && new Date(period.end) < new Date() && (
+              <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <span className="text-amber-400 text-xs">⚠️ Saisie automatiquement bloquée — le délai du {new Date(period.end).toLocaleDateString('fr-FR')} est dépassé. La saisie restera bloquée jusqu'à déblocage manuel.</span>
+              </div>
+            )}
             <button onClick={handleUpdatePeriod} className="w-full py-2 bg-slate-gold-gold text-slate-900 rounded font-bold hover:bg-yellow-500 transition-colors">
               {t('update_period')}
             </button>
