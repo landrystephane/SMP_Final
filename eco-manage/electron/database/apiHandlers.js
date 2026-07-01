@@ -1459,11 +1459,12 @@ handlers['db:deleteClass'] = async (classId) => {
 
 handlers['db:getSchedules'] = async (schoolId) => {
     const sid = getActiveSchoolId(schoolId);
-    return db.prepare('SELECT * FROM schedules WHERE school_id = ?').all(sid);
+    // Return only the base template (week_start_date IS NULL) for backwards compat
+    return db.prepare('SELECT * FROM schedules WHERE school_id = ? AND week_start_date IS NULL').all(sid);
 };
 
 handlers['db:updateSchedule'] = async (schedule) => {
-    const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id } = schedule;
+    const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id, week_start_date } = schedule;
     const sid = getActiveSchoolId(school_id);
 
     // Check class conflict
@@ -1498,16 +1499,97 @@ handlers['db:updateSchedule'] = async (schedule) => {
         }
     }
 
+    const wsd = week_start_date || null;
     if (id) {
-        return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, id);
+        return db.prepare(`UPDATE schedules SET class_id=?, teacher_id=?, subject_id=?, day_of_week=?, start_time=?, end_time=?, type=?, week_start_date=? WHERE id=?`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, wsd, id);
     } else {
-        return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id) VALUES (?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, sid);
+        return db.prepare(`INSERT INTO schedules (class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id, week_start_date) VALUES (?,?,?,?,?,?,?,?,?)`).run(class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, sid, wsd);
     }
 };
 
 handlers['db:deleteSchedule'] = async (id) => {
     const sid = getActiveSchoolId();
     return db.prepare('DELETE FROM schedules WHERE id = ? AND school_id = ?').run(id, sid);
+};
+
+// Returns effective schedule for a class+week: week-specific if exists, else template
+handlers['db:getWeekSchedule'] = async ({ schoolId, classId, weekStart }) => {
+    const sid = getActiveSchoolId(schoolId);
+    const weekEntries = db.prepare(
+        'SELECT * FROM schedules WHERE school_id = ? AND class_id = ? AND week_start_date = ?'
+    ).all(sid, classId, weekStart);
+    if (weekEntries.length > 0) {
+        return { isCustom: true, schedules: weekEntries };
+    }
+    const template = db.prepare(
+        'SELECT * FROM schedules WHERE school_id = ? AND class_id = ? AND week_start_date IS NULL'
+    ).all(sid, classId);
+    return { isCustom: false, schedules: template };
+};
+
+// Clone template entries as week-specific starting point
+handlers['db:copyTemplateToWeek'] = async ({ schoolId, classId, weekStart }) => {
+    const sid = getActiveSchoolId(schoolId);
+    db.prepare('DELETE FROM schedules WHERE school_id = ? AND class_id = ? AND week_start_date = ?').run(sid, classId, weekStart);
+    const template = db.prepare(
+        'SELECT * FROM schedules WHERE school_id = ? AND class_id = ? AND week_start_date IS NULL'
+    ).all(sid, classId);
+    const ins = db.prepare(
+        'INSERT INTO schedules (school_id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, week_start_date) VALUES (?,?,?,?,?,?,?,?,?)'
+    );
+    const tx = db.transaction((rows) => { for (const r of rows) ins.run(sid, r.class_id, r.teacher_id, r.subject_id, r.day_of_week, r.start_time, r.end_time, r.type, weekStart); });
+    tx(template);
+    return { success: true, count: template.length };
+};
+
+// Publish a week schedule: notify all concerned teachers and parents
+handlers['db:publishWeekSchedule'] = async ({ schoolId, weekStart, classIds }) => {
+    const sid = getActiveSchoolId(schoolId);
+    const weekDate = new Date(weekStart + 'T00:00:00');
+    const satDate = new Date(weekStart + 'T00:00:00');
+    satDate.setDate(weekDate.getDate() + 5);
+    const fmtFr = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const weekLabel = `du Lundi ${fmtFr(weekDate)} au Samedi ${fmtFr(satDate)}`;
+    const msg = `Emploi du temps mis à jour : ${weekLabel}. Consultez l'application pour voir le nouveau programme.`;
+
+    const notifStmt = db.prepare('INSERT INTO notifications (user_id, school_id, message, type, is_read, created_at) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)');
+    let notifiedTeachers = 0;
+    let notifiedParents = 0;
+    const notifiedUsers = new Set();
+
+    const tx = db.transaction(() => {
+        for (const classId of (classIds || [])) {
+            // Notify teachers with schedules this week for this class
+            const teacherRows = db.prepare(
+                `SELECT DISTINCT teacher_id FROM schedules WHERE school_id = ? AND class_id = ?
+                 AND (week_start_date = ? OR week_start_date IS NULL) AND teacher_id IS NOT NULL`
+            ).all(sid, classId, weekStart);
+            for (const row of teacherRows) {
+                if (!notifiedUsers.has('t' + row.teacher_id)) {
+                    notifStmt.run(row.teacher_id, sid, msg, 'INFO');
+                    notifiedUsers.add('t' + row.teacher_id);
+                    notifiedTeachers++;
+                }
+            }
+            // Notify parents of active students in this class
+            const parentPhones = db.prepare(
+                'SELECT DISTINCT parent_contact FROM students WHERE school_id = ? AND class_id = ? AND status = ? AND parent_contact IS NOT NULL'
+            ).all(sid, classId, 'ACTIVE');
+            for (const row of parentPhones) {
+                const rawPhone = row.parent_contact.replace(/\D/g, '').replace(/^237/, '');
+                const parentUser =
+                    db.prepare("SELECT id FROM users WHERE school_id = ? AND replace(replace(replace(username,'+237',''),'237',''),' ','') = ?").get(sid, rawPhone) ||
+                    db.prepare("SELECT id FROM users WHERE school_id = ? AND username LIKE ?").get(sid, '%' + rawPhone);
+                if (parentUser && !notifiedUsers.has('p' + parentUser.id)) {
+                    notifStmt.run(parentUser.id, sid, msg, 'INFO');
+                    notifiedUsers.add('p' + parentUser.id);
+                    notifiedParents++;
+                }
+            }
+        }
+    });
+    tx();
+    return { success: true, notifiedTeachers, notifiedParents };
 };
 
 handlers['db:getEvaluationSchedules'] = async (schoolId) => {
@@ -3158,7 +3240,7 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
         JOIN students s ON p.student_id = s.id
         WHERE s.school_id = ?
     `).get(sid).total || 0;
-    
+
     const avgObj = db.prepare(`
         SELECT AVG(g.score) as avg
         FROM grades g
@@ -3166,6 +3248,44 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
         WHERE s.school_id = ?
     `).get(sid);
     const averageGrade = avgObj && avgObj.avg ? avgObj.avg : 0;
+
+    // Build comprehensive snapshot of the school year (exclude binary blobs)
+    const snapshotClasses = db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
+    const snapshotStudents = db.prepare('SELECT id,matricule,first_name,last_name,class_id,status,scholarship_reduction,has_paid_registration,parent_contact,created_at FROM students WHERE school_id = ?').all(sid);
+    const snapshotUsers = db.prepare("SELECT id,username,full_name,role,is_active,created_at FROM users WHERE school_id = ? AND role != 'SUPER_ADMIN'").all(sid);
+    const snapshotPayments = db.prepare('SELECT p.*,s.matricule,s.first_name,s.last_name FROM payments p JOIN students s ON p.student_id=s.id WHERE s.school_id = ? ORDER BY p.payment_date').all(sid);
+    const snapshotExpenses = (() => { try { return db.prepare('SELECT * FROM expenses WHERE school_id = ? ORDER BY created_at').all(sid); } catch(e) { return []; } })();
+    const snapshotGrades = db.prepare('SELECT g.*,s.matricule,s.first_name,s.last_name FROM grades g JOIN students s ON g.student_id=s.id WHERE s.school_id = ? ORDER BY g.created_at').all(sid);
+    const snapshotAttendance = db.prepare('SELECT a.*,s.matricule,s.first_name,s.last_name FROM attendance a JOIN students s ON a.student_id=s.id WHERE s.school_id = ? ORDER BY a.date').all(sid);
+    const snapshotSchedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND week_start_date IS NULL').all(sid);
+    const snapshotWeeklySchedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND week_start_date IS NOT NULL').all(sid);
+    const snapshotEvalSchedules = (() => { try { return db.prepare('SELECT * FROM evaluation_schedules WHERE school_id = ?').all(sid); } catch(e) { return []; } })();
+    const snapshotJustifications = (() => {
+        try {
+            return db.prepare('SELECT id,attendance_id,student_id,parent_user_id,teacher_user_id,parent_message,status,teacher_response,created_at,reviewed_at FROM absence_justifications WHERE school_id = ?').all(sid);
+        } catch(e) { return []; }
+    })();
+    const snapshotAnnouncements = (() => { try { return db.prepare('SELECT * FROM announcements WHERE school_id = ?').all(sid); } catch(e) { return []; } })();
+    const snapshotTickets = (() => { try { return db.prepare('SELECT id,sender_id,recipient_id,subject,body,is_read,created_at FROM tickets WHERE school_id = ?').all(sid); } catch(e) { return []; } })();
+
+    const archive_snapshot = JSON.stringify({
+        year: yearName,
+        archived_at: new Date().toISOString(),
+        stats: { totalStudents, totalRevenue, averageGrade },
+        classes: snapshotClasses,
+        students: snapshotStudents,
+        users: snapshotUsers,
+        payments: snapshotPayments,
+        expenses: snapshotExpenses,
+        grades: snapshotGrades,
+        attendance: snapshotAttendance,
+        schedules: snapshotSchedules,
+        weekly_schedules: snapshotWeeklySchedules,
+        evaluation_schedules: snapshotEvalSchedules,
+        absence_justifications: snapshotJustifications,
+        announcements: snapshotAnnouncements,
+        tickets: snapshotTickets
+    });
 
     let backupsDir;
     if (process.versions && process.versions.electron) {
@@ -3185,9 +3305,9 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
     await db.backup(backupFilePath);
 
     const result = db.prepare(`
-        INSERT INTO school_year_archives (school_id, year_name, total_students, total_revenue, average_grade, backup_file_path)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sid, yearName, totalStudents, totalRevenue, averageGrade, backupFilePath);
+        INSERT INTO school_year_archives (school_id, year_name, total_students, total_revenue, average_grade, backup_file_path, archive_snapshot)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sid, yearName, totalStudents, totalRevenue, averageGrade, backupFilePath, archive_snapshot);
 
     return { success: true, id: result.lastInsertRowid, backupFilePath };
 

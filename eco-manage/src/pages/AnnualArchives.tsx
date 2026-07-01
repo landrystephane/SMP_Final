@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Archive, Download, Calendar, Search, DollarSign, Users, Award, ShieldAlert, FolderOpen, ArrowUpRight, BarChart3, Database } from 'lucide-react';
+import { Archive, Download, Calendar, Search, DollarSign, Users, Award, ShieldAlert, FolderOpen, ArrowUpRight, BarChart3, Database, ChevronDown, ChevronUp, BookOpen, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -16,6 +16,8 @@ const AnnualArchives: React.FC = () => {
     const [yearName, setYearName] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('ALL');
+    const [expandedArchive, setExpandedArchive] = useState<number | null>(null);
+    const [archiveTab, setArchiveTab] = useState<'students' | 'payments' | 'grades' | 'attendance' | 'schedules' | 'expenses'>('students');
 
     const loadData = async () => {
         setLoading(true);
@@ -271,41 +273,181 @@ const AnnualArchives: React.FC = () => {
                             <h2 className="text-sm font-black uppercase text-white tracking-wider">{t('arch_closed_years_title', 'Années Scolaires Clôturées')}</h2>
                         </div>
 
-                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
                             {archives.length === 0 ? (
                                 <div className="text-center py-8 text-slate-500 uppercase tracking-widest text-[9px] font-bold">
                                     {t('arch_no_archive_history', "Aucun historique d'archive physique")}
                                 </div>
                             ) : (
-                                archives.map((a) => (
-                                    <div key={a.id} className="bg-slate-950 p-4.5 rounded-2xl border border-white/5 hover:border-amber-500/20 transition-all space-y-3 relative group">
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex items-center space-x-2">
-                                                <Calendar className="w-4 h-4 text-amber-500" />
-                                                <span className="text-xs font-black text-white">{a.year_name}</span>
+                                archives.map((a) => {
+                                    let snap: any = null;
+                                    try { if (a.archive_snapshot) snap = JSON.parse(a.archive_snapshot); } catch(e) {}
+                                    const isExpanded = expandedArchive === a.id;
+                                    return (
+                                    <div key={a.id} className="bg-slate-950 rounded-2xl border border-white/5 hover:border-amber-500/20 transition-all relative">
+                                        {/* Archive header */}
+                                        <div className="p-4 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center space-x-2">
+                                                    <Calendar className="w-4 h-4 text-amber-500" />
+                                                    <span className="text-xs font-black text-white">{a.year_name}</span>
+                                                </div>
+                                                <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider">
+                                                    {t('arch_saved_badge', 'Sauvegardé')}
+                                                </span>
                                             </div>
-                                            <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider">
-                                                {t('arch_saved_badge', 'Sauvegardé')}
-                                            </span>
+                                            <div className="grid grid-cols-3 gap-2 text-[9px] font-black uppercase tracking-wider border-t border-white/5 pt-2">
+                                                <div>
+                                                    <p className="text-slate-600">{t('arch_students_label', 'Élèves')}</p>
+                                                    <p className="text-white text-xs mt-0.5">{snap ? snap.students?.length : a.total_students}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-slate-600">{t('arch_revenue_label', 'Recettes')}</p>
+                                                    <p className="text-white text-[10px] mt-0.5">{(snap ? snap.stats?.totalRevenue : a.total_revenue || 0).toLocaleString()} F</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-slate-600">{t('arch_avg_grade', 'Moy. Gén.')}</p>
+                                                    <p className="text-white text-[10px] mt-0.5">{(snap?.stats?.averageGrade || a.average_grade || 0).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-900/50 p-2 rounded-xl flex items-center space-x-2 text-[8px] text-slate-500 font-bold overflow-hidden truncate">
+                                                <FolderOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                                <span className="truncate" title={a.backup_file_path}>{a.backup_file_path}</span>
+                                            </div>
+                                            {snap && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setExpandedArchive(isExpanded ? null : a.id); setArchiveTab('students'); }}
+                                                    className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-slate-400 hover:text-white transition-all uppercase tracking-widest"
+                                                >
+                                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                    {isExpanded ? t('arch_hide_details', 'Masquer le détail') : t('arch_show_details', 'Voir tout le détail')}
+                                                </button>
+                                            )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 gap-2 text-[9px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5 pt-2">
-                                            <div>
-                                                <p className="text-slate-600">{t('arch_students_label', 'Élèves')}</p>
-                                                <p className="text-white text-xs mt-0.5">{a.total_students}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-600">{t('arch_revenue_label', 'Recettes')}</p>
-                                                <p className="text-white text-[10px] mt-0.5">{a.total_revenue.toLocaleString()} F</p>
-                                            </div>
-                                        </div>
+                                        {/* Expanded snapshot detail */}
+                                        {isExpanded && snap && (
+                                            <div className="border-t border-white/5 p-4 space-y-3">
+                                                {/* Tab bar */}
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {([
+                                                        { key: 'students', label: `Élèves (${snap.students?.length || 0})`, icon: Users },
+                                                        { key: 'payments', label: `Paiements (${snap.payments?.length || 0})`, icon: DollarSign },
+                                                        { key: 'grades', label: `Notes (${snap.grades?.length || 0})`, icon: Award },
+                                                        { key: 'attendance', label: `Présences (${snap.attendance?.length || 0})`, icon: Clock },
+                                                        { key: 'schedules', label: `Emploi du Temps (${(snap.schedules?.length || 0) + (snap.weekly_schedules?.length || 0)})`, icon: BookOpen },
+                                                        { key: 'expenses', label: `Dépenses (${snap.expenses?.length || 0})`, icon: BarChart3 },
+                                                    ] as const).map(tab => (
+                                                        <button key={tab.key} type="button" onClick={() => setArchiveTab(tab.key)}
+                                                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${archiveTab === tab.key ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>
+                                                            <tab.icon className="w-3 h-3" />{tab.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
 
-                                        <div className="bg-slate-900/50 p-2 rounded-xl flex items-center space-x-2 text-[8px] text-slate-500 font-bold overflow-hidden truncate">
-                                            <FolderOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                                            <span className="truncate" title={a.backup_file_path}>{a.backup_file_path}</span>
-                                        </div>
+                                                {/* Tab content */}
+                                                <div className="max-h-64 overflow-y-auto rounded-xl border border-white/5 bg-slate-950/50">
+                                                    {archiveTab === 'students' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Matricule</th><th className="px-3 py-2 text-left">Nom</th><th className="px-3 py-2 text-left">Statut</th>
+                                                            </tr></thead>
+                                                            <tbody>{(snap.students || []).map((s: any) => (
+                                                                <tr key={s.id} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-amber-400 font-black">{s.matricule}</td>
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{s.last_name} {s.first_name}</td>
+                                                                    <td className="px-3 py-1.5"><span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>{s.status}</span></td>
+                                                                </tr>
+                                                            ))}</tbody>
+                                                        </table>
+                                                    )}
+                                                    {archiveTab === 'payments' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Reçu</th><th className="px-3 py-2 text-left">Élève</th><th className="px-3 py-2 text-left">Type</th><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-right">Montant</th>
+                                                            </tr></thead>
+                                                            <tbody>{(snap.payments || []).map((p: any, i: number) => (
+                                                                <tr key={i} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-amber-400 font-black">{p.receipt_number}</td>
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{p.last_name} {p.first_name}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-400">{p.payment_type}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-500">{p.payment_date?.slice(0,10)}</td>
+                                                                    <td className="px-3 py-1.5 text-right text-emerald-400 font-black">{(p.amount || 0).toLocaleString()} F</td>
+                                                                </tr>
+                                                            ))}</tbody>
+                                                        </table>
+                                                    )}
+                                                    {archiveTab === 'grades' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Élève</th><th className="px-3 py-2 text-left">Matière</th><th className="px-3 py-2 text-center">Note</th><th className="px-3 py-2 text-left">Période</th>
+                                                            </tr></thead>
+                                                            <tbody>{(snap.grades || []).map((g: any, i: number) => (
+                                                                <tr key={i} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{g.last_name} {g.first_name}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-400">{g.subject_name || g.subject_id}</td>
+                                                                    <td className="px-3 py-1.5 text-center font-black text-amber-400">{g.score}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-500">T{g.term} {g.month}</td>
+                                                                </tr>
+                                                            ))}</tbody>
+                                                        </table>
+                                                    )}
+                                                    {archiveTab === 'attendance' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Élève</th><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-center">Statut</th><th className="px-3 py-2 text-center">Heures abs.</th>
+                                                            </tr></thead>
+                                                            <tbody>{(snap.attendance || []).map((a: any, i: number) => (
+                                                                <tr key={i} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{a.last_name} {a.first_name}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-400">{a.date}</td>
+                                                                    <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${a.status === 'PRESENT' ? 'text-emerald-400' : a.status === 'JUSTIFIED' ? 'text-blue-400' : 'text-rose-400'}`}>{a.status}</span></td>
+                                                                    <td className="px-3 py-1.5 text-center text-slate-400">{a.hours_absent || 0}</td>
+                                                                </tr>
+                                                            ))}</tbody>
+                                                        </table>
+                                                    )}
+                                                    {archiveTab === 'schedules' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Classe</th><th className="px-3 py-2 text-left">Jour</th><th className="px-3 py-2 text-left">Horaire</th><th className="px-3 py-2 text-left">Type</th><th className="px-3 py-2 text-left">Semaine</th>
+                                                            </tr></thead>
+                                                            <tbody>{[...(snap.schedules || []), ...(snap.weekly_schedules || [])].map((s: any, i: number) => {
+                                                                const days = ['','Lun','Mar','Mer','Jeu','Ven','Sam'];
+                                                                return (
+                                                                <tr key={i} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-slate-400">{s.class_id}</td>
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{days[s.day_of_week] || s.day_of_week}</td>
+                                                                    <td className="px-3 py-1.5 text-amber-400">{s.start_time}–{s.end_time}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-400">{s.type}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-500 text-[8px]">{s.week_start_date || 'Template'}</td>
+                                                                </tr>
+                                                                );
+                                                            })}</tbody>
+                                                        </table>
+                                                    )}
+                                                    {archiveTab === 'expenses' && (
+                                                        <table className="w-full text-[10px]">
+                                                            <thead className="sticky top-0 bg-slate-950"><tr className="text-slate-500 font-black uppercase">
+                                                                <th className="px-3 py-2 text-left">Libellé</th><th className="px-3 py-2 text-left">Catégorie</th><th className="px-3 py-2 text-left">Statut</th><th className="px-3 py-2 text-right">Montant</th>
+                                                            </tr></thead>
+                                                            <tbody>{(snap.expenses || []).map((e: any, i: number) => (
+                                                                <tr key={i} className="border-t border-white/5">
+                                                                    <td className="px-3 py-1.5 text-white font-bold">{e.label || e.description}</td>
+                                                                    <td className="px-3 py-1.5 text-slate-400">{e.category}</td>
+                                                                    <td className="px-3 py-1.5"><span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${e.status === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}`}>{e.status}</span></td>
+                                                                    <td className="px-3 py-1.5 text-right text-rose-400 font-black">{(e.amount || 0).toLocaleString()} F</td>
+                                                                </tr>
+                                                            ))}</tbody>
+                                                        </table>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

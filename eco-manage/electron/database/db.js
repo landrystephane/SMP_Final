@@ -839,6 +839,24 @@ function initDb() {
         }
     } catch(e) { console.error('[Migration] absence_justifications:', e.message); }
 
+    // Migration: week_start_date in schedules (weekly programme feature)
+    try {
+        const schedCols = db.prepare("PRAGMA table_info(schedules)").all();
+        if (!schedCols.find(c => c.name === 'week_start_date')) {
+            db.prepare("ALTER TABLE schedules ADD COLUMN week_start_date DATE").run();
+            console.log('[Migration] week_start_date added to schedules');
+        }
+    } catch(e) { console.error('[Migration] week_start_date:', e.message); }
+
+    // Migration: archive_snapshot in school_year_archives (full year capture)
+    try {
+        const archCols = db.prepare("PRAGMA table_info(school_year_archives)").all();
+        if (!archCols.find(c => c.name === 'archive_snapshot')) {
+            db.prepare("ALTER TABLE school_year_archives ADD COLUMN archive_snapshot TEXT").run();
+            console.log('[Migration] archive_snapshot added to school_year_archives');
+        }
+    } catch(e) { console.error('[Migration] archive_snapshot:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

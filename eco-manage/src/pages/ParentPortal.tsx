@@ -53,6 +53,7 @@ const ParentPortal: React.FC = () => {
                 const cls = await window.electronAPI.getClasses(user.schoolId);
                 const usrs = await window.electronAPI.getUsers(user.schoolId);
                 const msgs = await window.electronAPI.getParentMessages ? await window.electronAPI.getParentMessages({ schoolId: user.schoolId, userId: user.id }) : [];
+                // Load base template schedules (fallback)
                 const scheds = await window.electronAPI.getSchedules(user.schoolId);
                 const subs = await window.electronAPI.getSubjects(user.schoolId);
 
@@ -85,6 +86,17 @@ const ParentPortal: React.FC = () => {
                     setSelectedChild(studs[0]);
                     const details = await window.electronAPI.getStudentDetails(studs[0].id);
                     setStats(details);
+                    // Load current week's effective schedule for first child
+                    if (studs[0].class_id && (window.electronAPI as any).getWeekSchedule) {
+                        const now = new Date();
+                        const dow = now.getDay() || 7;
+                        const mon = new Date(now); mon.setDate(now.getDate() - dow + 1); mon.setHours(0,0,0,0);
+                        const weekStart = mon.toISOString().split('T')[0];
+                        const wr = await (window.electronAPI as any).getWeekSchedule({ schoolId: user.schoolId, classId: studs[0].class_id, weekStart });
+                        const weekScheds = (wr.schedules || []);
+                        // Merge: replace template entries for this class with week-specific ones
+                        setSchedules(prev => [...prev.filter((s: any) => s.class_id !== studs[0].class_id), ...weekScheds]);
+                    }
                 }
             } else {
                 // Mock data for admin/founder preview
@@ -138,6 +150,15 @@ const ParentPortal: React.FC = () => {
             if (window.electronAPI) {
                 const details = await window.electronAPI.getStudentDetails(child.id);
                 setStats(details);
+                // Load current week's effective schedule for this child's class
+                if (child.class_id && (window.electronAPI as any).getWeekSchedule) {
+                    const now = new Date();
+                    const dow = now.getDay() || 7;
+                    const mon = new Date(now); mon.setDate(now.getDate() - dow + 1); mon.setHours(0,0,0,0);
+                    const weekStart = mon.toISOString().split('T')[0];
+                    const wr = await (window.electronAPI as any).getWeekSchedule({ schoolId: user?.schoolId, classId: child.class_id, weekStart });
+                    setSchedules(prev => [...prev.filter((s: any) => s.class_id !== child.class_id), ...(wr.schedules || [])]);
+                }
             }
         } catch (e) {
             console.error(e);
@@ -738,22 +759,32 @@ const ParentPortal: React.FC = () => {
             {(() => {
                 const childSchedules = schedules.filter((s: any) => s.class_id === selectedChild.class_id && s.type !== 'PAUSE');
                 if (childSchedules.length === 0) return null;
-                const days = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+                const dayNums = [1, 2, 3, 4, 5, 6]; // 1=Lun ... 6=Sam
                 const daysFr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
                 const daysEn = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                // Compute current week label
+                const todayForLabel = new Date();
+                const monOffset = todayForLabel.getDay() || 7;
+                const monDate = new Date(todayForLabel); monDate.setDate(todayForLabel.getDate() - monOffset + 1);
+                const satDate = new Date(monDate); satDate.setDate(monDate.getDate() + 5);
+                const fmtShort = (d: Date) => d.toLocaleDateString(i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR', { day: '2-digit', month: 'short' });
+                const weekLabel = `${fmtShort(monDate)} — ${fmtShort(satDate)} ${monDate.getFullYear()}`;
                 return (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
-                            <Calendar className="w-6 h-6 text-blue-400" /> {t('pp_timetable', 'Emploi du Temps')}
-                        </h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
+                                <Calendar className="w-6 h-6 text-blue-400" /> {t('pp_timetable', 'Emploi du Temps')}
+                            </h2>
+                            <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20 uppercase tracking-widest">{weekLabel}</span>
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                            {days.map((day, di) => {
+                            {dayNums.map((dayNum, di) => {
                                 const daySlots = childSchedules
-                                    .filter((s: any) => s.day_of_week === day)
+                                    .filter((s: any) => Number(s.day_of_week) === dayNum)
                                     .sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''));
                                 if (daySlots.length === 0) return null;
                                 return (
-                                    <div key={day} className="glass-card p-4 space-y-2 rounded-2xl border border-white/5 bg-slate-900/50">
+                                    <div key={dayNum} className="glass-card p-4 space-y-2 rounded-2xl border border-white/5 bg-slate-900/50">
                                         <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest border-b border-white/5 pb-2">
                                             {i18n.language.startsWith('en') ? daysEn[di] : daysFr[di]}
                                         </p>
@@ -822,6 +853,7 @@ const ParentPortal: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('pp_recipient_student_teacher', 'Destinataire (Enseignant de l\'élève)')}</label>
                         <select
                             required
+                            title={t('pp_recipient_student_teacher', 'Destinataire')}
                             value={ticketReceiver}
                             onChange={(e) => setTicketReceiver(e.target.value)}
                             className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500"

@@ -58,6 +58,30 @@ const AdvisorPortal: React.FC = () => {
     const [schedTeacher, setSchedTeacher] = useState<string>('');
     const [schedType, setSchedType] = useState<string>('COURSE');
 
+    // Weekly programme state
+    const [schedWeekOffset, setSchedWeekOffset] = useState(0);
+    const [isWeekCustom, setIsWeekCustom] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
+
+    const getWeekStartDate = (offset: number): string => {
+        const now = new Date();
+        const dayOfWeek = now.getDay() || 7;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - dayOfWeek + 1 + offset * 7);
+        monday.setHours(0, 0, 0, 0);
+        return monday.toISOString().split('T')[0];
+    };
+
+    const getWeekLabel = (offset: number): string => {
+        const monStr = getWeekStartDate(offset);
+        const mon = new Date(monStr + 'T12:00:00');
+        const sat = new Date(monStr + 'T12:00:00');
+        sat.setDate(mon.getDate() + 5);
+        const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+        return `Lun. ${fmt(mon)} — Sam. ${fmt(sat)} ${mon.getFullYear()}`;
+    };
+
     const loadData = async () => {
         if (window.electronAPI && user) {
             const [c, r, studs, allUsers, schs] = await Promise.all([
@@ -112,20 +136,65 @@ const AdvisorPortal: React.FC = () => {
     };
 
     const loadSchedules = async () => {
-        if (window.electronAPI && selectedClass) {
-            try {
-                const allSchedules = await window.electronAPI.getSchedules(user?.schoolId);
-                const filtered = allSchedules.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
-                setSchedules(filtered);
+        if (!window.electronAPI || !selectedClass) return;
+        try {
+            const weekStart = getWeekStartDate(schedWeekOffset);
+            const result = await (window.electronAPI as any).getWeekSchedule({
+                schoolId: user?.schoolId,
+                classId: parseInt(selectedClass),
+                weekStart
+            });
+            setSchedules(result.schedules || []);
+            setIsWeekCustom(result.isCustom || false);
 
-                if (window.electronAPI.getEvaluationSchedules) {
-                    const allExams = await window.electronAPI.getEvaluationSchedules(user?.schoolId);
-                    const filteredExams = allExams.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
-                    setExamSchedules(filteredExams);
-                }
-            } catch (e) {
-                console.error("Failed to load schedules", e);
+            if (window.electronAPI.getEvaluationSchedules) {
+                const allExams = await window.electronAPI.getEvaluationSchedules(user?.schoolId);
+                const filteredExams = allExams.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
+                setExamSchedules(filteredExams);
             }
+        } catch (e) {
+            console.error("Failed to load schedules", e);
+        }
+    };
+
+    const handleCopyTemplateToWeek = async () => {
+        if (!window.electronAPI || !selectedClass) return;
+        setIsCopyingTemplate(true);
+        try {
+            const weekStart = getWeekStartDate(schedWeekOffset);
+            const res = await (window.electronAPI as any).copyTemplateToWeek({
+                schoolId: user?.schoolId,
+                classId: parseInt(selectedClass),
+                weekStart
+            });
+            if (res.count === 0) {
+                showNotification(t('adv_no_template_to_copy', 'Aucun cours dans le template. Ajoutez d\'abord des cours au programme de base.'), 'warning');
+            } else {
+                showNotification(t('adv_template_copied', '{{count}} cours copiés depuis le template. Modifiez librement puis publiez.', { count: res.count }), 'success');
+            }
+            await loadSchedules();
+        } catch (err: any) {
+            showNotification(t('error_prefix', 'Erreur') + ': ' + err.message, 'error');
+        } finally {
+            setIsCopyingTemplate(false);
+        }
+    };
+
+    const handlePublishWeekSchedule = async () => {
+        if (!window.electronAPI) return;
+        setIsPublishing(true);
+        try {
+            const weekStart = getWeekStartDate(schedWeekOffset);
+            const classIds = selectedClass ? [parseInt(selectedClass)] : classes.map((c: any) => c.id);
+            const res = await (window.electronAPI as any).publishWeekSchedule({ schoolId: user?.schoolId, weekStart, classIds });
+            showNotification(
+                t('adv_week_published', 'Programme publié ! {{t}} enseignants et {{p}} parents notifiés.', { t: res.notifiedTeachers, p: res.notifiedParents }),
+                'success'
+            );
+        } catch (err: any) {
+            showNotification(t('error_prefix', 'Erreur') + ': ' + err.message, 'error');
+        } finally {
+            setIsPublishing(false);
         }
     };
 
@@ -151,7 +220,7 @@ const AdvisorPortal: React.FC = () => {
             loadClassSubjects();
             loadTeacherAssignments();
         }
-    }, [selectedClass, selectedTerm, selectedSequence]);
+    }, [selectedClass, selectedTerm, selectedSequence, schedWeekOffset]);
 
     const loadTeacherAssignments = async () => {
         if (window.electronAPI && selectedClass) {
@@ -232,7 +301,8 @@ const AdvisorPortal: React.FC = () => {
                 start_time: schedStart,
                 end_time: schedEnd,
                 type: schedType,
-                school_id: user?.schoolId
+                school_id: user?.schoolId,
+                week_start_date: isWeekCustom ? getWeekStartDate(schedWeekOffset) : null
             };
             
             const res = await window.electronAPI.updateSchedule(payload);
@@ -589,7 +659,7 @@ const AdvisorPortal: React.FC = () => {
                 <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
                     <div className="space-y-6">
                         <div className="glass-card p-6 border-slate-800">
-                            <div className="flex justify-between items-center mb-8">
+                            <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-black text-white flex items-center">
                                     <Calendar className="w-6 h-6 mr-3 text-amber-500" />
                                     {t('weekly_schedule', 'Emploi du Temps Hebdomadaire')}
@@ -670,6 +740,37 @@ const AdvisorPortal: React.FC = () => {
                                         {t('schedule_class', 'PROGRAMMER COURS')}
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Week navigation bar */}
+                            <div className="flex items-center gap-3 mb-6 p-3 bg-slate-950/60 rounded-2xl border border-white/5">
+                                <button type="button" onClick={() => setSchedWeekOffset(o => o - 1)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-black text-sm">‹</button>
+                                <div className="flex-1 text-center">
+                                    <p className="text-sm font-black text-white">{getWeekLabel(schedWeekOffset)}</p>
+                                    <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${isWeekCustom ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                        {isWeekCustom ? t('adv_week_custom', 'Programme personnalisé') : t('adv_week_template', 'Template de base (récurrent)')}
+                                    </p>
+                                </div>
+                                <button type="button" onClick={() => setSchedWeekOffset(o => o + 1)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-black text-sm">›</button>
+                                {!isWeekCustom ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyTemplateToWeek}
+                                        disabled={isCopyingTemplate || !selectedClass}
+                                        className="px-4 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40"
+                                    >
+                                        {isCopyingTemplate ? '...' : t('adv_program_this_week', 'Programmer cette semaine')}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handlePublishWeekSchedule}
+                                        disabled={isPublishing}
+                                        className="px-4 py-2 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40"
+                                    >
+                                        {isPublishing ? '...' : t('adv_publish_and_notify', 'Publier & Notifier')}
+                                    </button>
+                                )}
                             </div>
 
                             {!selectedClass ? (

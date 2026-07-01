@@ -195,4 +195,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   submitAbsenceJustification: (data) => ipcRenderer.invoke('db:submitAbsenceJustification', data),
   getAbsenceJustifications: (params) => ipcRenderer.invoke('db:getAbsenceJustifications', params),
   reviewAbsenceJustification: (data) => ipcRenderer.invoke('db:reviewAbsenceJustification', data),
+
+  // Weekly Schedule Programming
+  getWeekSchedule: (params) => ipcRenderer.invoke('db:getWeekSchedule', params),
+  copyTemplateToWeek: (params) => ipcRenderer.invoke('db:copyTemplateToWeek', params),
+  publishWeekSchedule: (params) => ipcRenderer.invoke('db:publishWeekSchedule', params),
 });
