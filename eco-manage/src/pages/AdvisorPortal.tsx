@@ -620,13 +620,13 @@ const AdvisorPortal: React.FC = () => {
                                             allSlots.forEach(slot => {
                                                 const rowData = [slot.label];
                                                 if (slot.isBreak) {
-                                                    [1, 2, 3, 4, 5, 6].forEach(() => rowData.push('PAUSE'));
+                                                    [1, 2, 3, 4, 5, 6].forEach(() => rowData.push(t('adv_pause_upper', 'PAUSE')));
                                                 } else {
                                                     [1, 2, 3, 4, 5, 6].forEach(day => {
                                                         const sData = getScheduleForSlot(day, slot.start);
                                                         if (sData) {
                                                             if (sData.type === 'PAUSE') {
-                                                                rowData.push('PAUSE');
+                                                                rowData.push(t('adv_pause_upper', 'PAUSE'));
                                                             } else {
                                                                 const subjectName = getSubjectName(sData.subject_id);
                                                                 const teacherName = getTeacherName(sData.teacher_id);
@@ -857,7 +857,7 @@ const AdvisorPortal: React.FC = () => {
                                             return (
                                                 <tr key={subj.id} className="hover:bg-white/5 transition-colors">
                                                     <td className="px-6 py-4 font-black text-white uppercase text-sm tracking-tight">{subj.name}</td>
-                                                    <td className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">{subj.domain || 'Général'}</td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">{subj.domain || t('gr_general_domain', 'Général')}</td>
                                                     <td className="px-6 py-4 text-center text-xs font-bold text-white">{subj.coefficient}</td>
                                                     <td className="px-6 py-4">{statusBadge}</td>
                                                     <td className="px-6 py-4 text-right">
@@ -905,7 +905,7 @@ const AdvisorPortal: React.FC = () => {
                 const weekDates = getWeekDates(examWeekOffset);
                 const getExamForSlot = (date: string, start: string) => examSchedules.find(e => e.date === date && e.start_time?.trim() === start?.trim());
                 const statusColors: Record<string, string> = { 'PENDING_TEACHER': 'border-amber-500/30 text-amber-400', 'APPROVED': 'border-emerald-500/30 text-emerald-400', 'FORCED_APPROVED': 'border-blue-500/30 text-blue-400', 'PENDING_ADMIN': 'border-rose-500/30 text-rose-400', 'REJECTED': 'border-rose-500/30 text-rose-400' };
-                const statusLabelsMap: Record<string, string> = { 'PENDING_TEACHER': 'En attente', 'APPROVED': 'Accepté', 'FORCED_APPROVED': 'Forcé', 'PENDING_ADMIN': 'Refusé', 'REJECTED': 'Refusé' };
+                const statusLabelsMap: Record<string, string> = { 'PENDING_TEACHER': t('adv_status_pending', 'En attente'), 'APPROVED': t('adv_status_accepted', 'Accepté'), 'FORCED_APPROVED': t('adv_status_forced', 'Forcé'), 'PENDING_ADMIN': t('adv_status_refused', 'Refusé'), 'REJECTED': t('adv_status_refused', 'Refusé') };
 
                 return (
                 <div className="space-y-6 animate-in fade-in duration-300">
@@ -920,11 +920,11 @@ const AdvisorPortal: React.FC = () => {
                                 <button onClick={() => setExamWeekOffset(0)} className="px-3 py-2 bg-amber-500/10 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-wider border border-amber-500/20">{t('this_week', 'Cette semaine')}</button>
                                 <button onClick={() => setExamWeekOffset(examWeekOffset + 1)} className="p-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-all text-xs font-black">▶</button>
                                 <button onClick={() => {
-                                    if (!selectedClass) { showNotification("Veuillez sélectionner une classe.", "warning"); return; }
+                                    if (!selectedClass) { showNotification(t('adv_select_class_warning', 'Veuillez sélectionner une classe.'), "warning"); return; }
                                     const classObj = classes.find(c => c.id.toString() === selectedClass);
                                     const columns = [t('date', 'Date'), t('schedule_time', 'Horaires'), t('subject_primary_header', 'Matière'), t('teacher_supervisor', 'Enseignant/Surveillant')];
                                     const rows = examSchedules.map(exam => [exam.date, `${exam.start_time} - ${exam.end_time}`, getSubjectName(parseInt(exam.subject_id)), getTeacherName(parseInt(exam.teacher_id))]);
-                                    generateExamSchedulePdf({ school: currentSchool || { name: '' }, title: `Programme des Évaluations - ${classObj?.name}`, columns, rows });
+                                    generateExamSchedulePdf({ school: currentSchool || { name: '' }, title: t('adv_exam_schedule_pdf_title', 'Programme des Évaluations - {{className}}', { className: classObj?.name }), columns, rows });
                                 }} className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">{t('download_pdf', 'Télécharger PDF')}</button>
                             </div>
                         </div>
@@ -946,7 +946,7 @@ const AdvisorPortal: React.FC = () => {
                                             </div>
                                             {slot.isBreak ? (
                                                 <div className="col-span-6 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">{t('adv_pause_upper', 'PAUSE')}</span>
                                                 </div>
                                             ) : weekDates.map(wd => {
                                                 const exam = getExamForSlot(wd.date, slot.start);
@@ -968,10 +968,10 @@ const AdvisorPortal: React.FC = () => {
                                                 }
                                                 return (
                                                     <button key={wd.date} onClick={() => {
-                                                        if (!selectedClass) { showNotification("Veuillez sélectionner une classe.", "warning"); return; }
+                                                        if (!selectedClass) { showNotification(t('adv_select_class_warning', 'Veuillez sélectionner une classe.'), "warning"); return; }
                                                         setExamDate(wd.date); setExamStart(slot.start); setExamEnd(slot.end); setShowExamModal(true);
                                                     }} className="p-4 bg-slate-900/10 border border-dashed border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/5 rounded-xl text-[10px] font-bold text-slate-600 hover:text-amber-500 text-center flex flex-col items-center justify-center uppercase tracking-widest group transition-all">
-                                                        <span className="hidden group-hover:block opacity-100">+ PROG.</span>
+                                                        <span className="hidden group-hover:block opacity-100">+ {t('adv_prog_abbr', 'PROG.')}</span>
                                                     </button>
                                                 );
                                             })}
@@ -1050,7 +1050,7 @@ const AdvisorPortal: React.FC = () => {
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
                                 <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                                    {editingSchedule ? "Modifier le Cours" : "Programmer un Cours"}
+                                    {editingSchedule ? t('adv_edit_course_title', 'Modifier le Cours') : t('adv_schedule_course_title', 'Programmer un Cours')}
                                 </h3>
                                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">
                                     {editingSchedule ? t('edit_schedule_subtitle', "Modifier la programmation horaire") : t('add_schedule_subtitle', "Ajouter un nouveau cours à l'emploi du temps")}
@@ -1067,7 +1067,7 @@ const AdvisorPortal: React.FC = () => {
                         {/* Modal Body */}
                         <div className="p-6 overflow-y-auto space-y-4 flex-1">
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Jour de la semaine</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_day_of_week', 'Jour de la semaine')}</label>
                                 <select
                                     value={schedDay}
                                     onChange={(e) => setSchedDay(parseInt(e.target.value))}
@@ -1081,7 +1081,7 @@ const AdvisorPortal: React.FC = () => {
 
                             <div className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Début</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_start_time', 'Heure Début')}</label>
                                     <input
                                         type="text"
                                         placeholder="ex: 08:00"
@@ -1091,7 +1091,7 @@ const AdvisorPortal: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Fin</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_end_time', 'Heure Fin')}</label>
                                     <input
                                         type="text"
                                         placeholder="ex: 10:00"
@@ -1105,7 +1105,7 @@ const AdvisorPortal: React.FC = () => {
                             {schedType !== 'PAUSE' && (
                                 <>
                                     <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('subject_primary_header', 'Matière')}</label>
                                         <select
                                             value={schedSubject}
                                             onChange={(e) => {
@@ -1119,7 +1119,7 @@ const AdvisorPortal: React.FC = () => {
                                             }}
                                             className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                         >
-                                            <option value="">Sélectionner une matière</option>
+                                            <option value="">{t('adv_select_subject_opt', 'Sélectionner une matière')}</option>
                                             {classSubjects.map(s => (
                                                 <option key={s.id} value={s.id}>{s.name}</option>
                                             ))}
@@ -1127,13 +1127,13 @@ const AdvisorPortal: React.FC = () => {
                                     </div>
 
                                     <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Enseignant</label>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('gr_teacher_col', 'Enseignant')}</label>
                                         <select
                                             value={schedTeacher}
                                             onChange={(e) => setSchedTeacher(e.target.value)}
                                             className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                         >
-                                            <option value="">Sélectionner un enseignant</option>
+                                            <option value="">{t('adv_select_teacher_opt', 'Sélectionner un enseignant')}</option>
                                             {availableTeachers.filter(t => !schedSubject || teacherAssignments[parseInt(schedSubject)] === t.id).map(t => (
                                                 <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                             ))}
@@ -1143,16 +1143,16 @@ const AdvisorPortal: React.FC = () => {
                             )}
 
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Type de cours</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_course_type', 'Type de cours')}</label>
                                 <select
                                     value={schedType}
                                     onChange={(e) => setSchedType(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                 >
-                                    <option value="COURSE">COURS STANDARD</option>
-                                    <option value="EVALUATION">ÉVALUATION / EXAMEN</option>
-                                    <option value="HOLIDAY">CONGÉ / FERIÉ</option>
-                                    <option value="PAUSE">PAUSE (Personnalisée)</option>
+                                    <option value="COURSE">{t('adv_course_standard_opt', 'COURS STANDARD')}</option>
+                                    <option value="EVALUATION">{t('adv_evaluation_exam_opt', 'ÉVALUATION / EXAMEN')}</option>
+                                    <option value="HOLIDAY">{t('adv_holiday_opt', 'CONGÉ / FERIÉ')}</option>
+                                    <option value="PAUSE">{t('adv_pause_custom_opt', 'PAUSE (Personnalisée)')}</option>
                                 </select>
                             </div>
                         </div>
@@ -1164,7 +1164,7 @@ const AdvisorPortal: React.FC = () => {
                                     onClick={() => handleDeleteSchedule(editingSchedule.id)}
                                     className="bg-rose-600 hover:bg-rose-500 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                 >
-                                    Supprimer
+                                    {t('cust_delete_btn', 'Supprimer')}
                                 </button>
                             ) : (
                                 <div />
@@ -1174,13 +1174,13 @@ const AdvisorPortal: React.FC = () => {
                                     onClick={() => setShowScheduleModal(false)}
                                     className="bg-slate-800 text-white hover:bg-slate-700 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                 >
-                                    Annuler
+                                    {t('cancel', 'Annuler')}
                                 </button>
                                 <button
                                     onClick={handleSaveSchedule}
                                     className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg"
                                 >
-                                    Enregistrer
+                                    {t('save', 'Enregistrer')}
                                 </button>
                             </div>
                         </div>
@@ -1196,10 +1196,10 @@ const AdvisorPortal: React.FC = () => {
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
                                 <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                                    Programmer une Évaluation
+                                    {t('adv_schedule_evaluation_title', 'Programmer une Évaluation')}
                                 </h3>
                                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">
-                                    Classe: {classObj?.name}
+                                    {t('tick_class_label', 'Classe:')} {classObj?.name}
                                 </p>
                             </div>
                             <button
@@ -1213,13 +1213,13 @@ const AdvisorPortal: React.FC = () => {
                         {/* Modal Body */}
                         <div className="p-6 overflow-y-auto space-y-4 flex-1">
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Matière</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('subject_primary_header', 'Matière')}</label>
                                 <select
                                     value={examSubject}
                                     onChange={(e) => setExamSubject(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                 >
-                                    <option value="">Sélectionnez une matière</option>
+                                    <option value="">{t('adv_select_subject_opt2', 'Sélectionnez une matière')}</option>
                                     {classSubjects.map(sub => (
                                         <option key={sub.id} value={sub.id}>{sub.name}</option>
                                     ))}
@@ -1227,13 +1227,13 @@ const AdvisorPortal: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Enseignant Surveillant</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_supervisor_teacher', 'Enseignant Surveillant')}</label>
                                 <select
                                     value={examTeacher}
                                     onChange={(e) => setExamTeacher(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 text-white font-bold text-sm rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-amber-500"
                                 >
-                                    <option value="">Sélectionnez un surveillant</option>
+                                    <option value="">{t('adv_select_supervisor_opt', 'Sélectionnez un surveillant')}</option>
                                     {teachers.map(t => (
                                         <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                     ))}
@@ -1241,7 +1241,7 @@ const AdvisorPortal: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Date de l'évaluation</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_evaluation_date', "Date de l'évaluation")}</label>
                                 <input
                                     type="date"
                                     value={examDate}
@@ -1252,7 +1252,7 @@ const AdvisorPortal: React.FC = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Début</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_start_time', 'Heure Début')}</label>
                                     <input
                                         type="time"
                                         value={examStart}
@@ -1261,7 +1261,7 @@ const AdvisorPortal: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Heure Fin</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">{t('adv_end_time', 'Heure Fin')}</label>
                                     <input
                                         type="time"
                                         value={examEnd}
@@ -1278,7 +1278,7 @@ const AdvisorPortal: React.FC = () => {
                                 onClick={handleSaveExam}
                                 className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg"
                             >
-                                Enregistrer
+                                {t('save', 'Enregistrer')}
                             </button>
                         </div>
                     </div>

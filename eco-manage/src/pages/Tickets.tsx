@@ -96,7 +96,7 @@ const Tickets: React.FC = () => {
                   });
                   await window.electronAPI.createNotification({
                       role: 'PARENT',
-                      message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                      message: t('tick_new_message_notif', 'Nouveau message de {{sender}} : {{subject}}', { sender: user.fullName || user.username, subject: newTicketSubject }),
                       type: 'INFO',
                       school_id: user.schoolId
                   });
@@ -115,7 +115,7 @@ const Tickets: React.FC = () => {
                   });
                   await window.electronAPI.createNotification({
                       user_id: receiverId,
-                      message: `Message d'un parent (${user.fullName || user.username}) : ${newTicketSubject}`,
+                      message: t('tick_parent_message_notif', 'Message d\'un parent ({{sender}}) : {{subject}}', { sender: user.fullName || user.username, subject: newTicketSubject }),
                       type: 'INFO',
                       school_id: user.schoolId
                   });
@@ -186,13 +186,13 @@ const Tickets: React.FC = () => {
                   if (receiverId) {
                      await window.electronAPI.createNotification({
                          user_id: receiverId,
-                         message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                         message: t('tick_new_message_notif', 'Nouveau message de {{sender}} : {{subject}}', { sender: user.fullName || user.username, subject: newTicketSubject }),
                          type: 'INFO',
                          school_id: user.schoolId
                      });
                   } else if (receiverRole) {
                      await window.electronAPI.createNotification({
-                         message: `Nouveau message de ${user.fullName || user.username} : ${newTicketSubject}`,
+                         message: t('tick_new_message_notif', 'Nouveau message de {{sender}} : {{subject}}', { sender: user.fullName || user.username, subject: newTicketSubject }),
                          type: 'INFO',
                          school_id: user.schoolId
                      });
@@ -602,7 +602,7 @@ const Tickets: React.FC = () => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('tick_amount_requested', 'Montant demandé')}</label>
                           <input
                             type="number"
-                            placeholder="Ex: 50000"
+                            placeholder={t('tick_amount_placeholder', 'Ex: 50000')}
                             value={requestData.amount || ''}
                             onChange={(e) => setRequestData({...requestData, amount: e.target.value})}
                             className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none text-xs"

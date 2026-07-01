@@ -7,7 +7,7 @@ import { generateClassReportCards } from '../utils/reports';
 import { onDataChanged } from '../utils/dataSync';
 
 const AdminWorkflow: React.FC = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSgActing, setIsSgActing] = useState(false);
@@ -131,13 +131,12 @@ const AdminWorkflow: React.FC = () => {
             await window.electronAPI.createNotification({
                 school_id: user?.schoolId,
                 role: 'TEACHER',
-                message: `La période de saisie des notes est ouverte du ${period.start} au ${period.end}. Veuillez procéder au remplissage.`,
+                message: t('aw_notif_entry_period_open', 'La période de saisie des notes est ouverte du {{start}} au {{end}}. Veuillez procéder au remplissage.', { start: period.start, end: period.end }),
                 type: 'SYSTEM'
             });
         }
 
-        const isEn = i18n.language?.startsWith('en') ?? false;
-        alert(isEn ? 'Evaluation period updated successfully.' : "Période d'évaluation mise à jour avec succès.");
+        alert(t('aw_period_updated_success', "Période d'évaluation mise à jour avec succès."));
     }
   };
 
@@ -147,11 +146,10 @@ const AdminWorkflow: React.FC = () => {
         await window.electronAPI.setSetting({ key: 'sg_acting_director', value: newValue.toString() });
         setIsSgActing(newValue);
         window.dispatchEvent(new Event('sg_mode_changed'));
-        
-        const isEn = i18n.language?.startsWith('en') ?? false;
-        alert(isEn 
-            ? `SG Acting Mode ${newValue ? 'Enabled' : 'Disabled'}. The SG now has director privileges.` 
-            : `Mode SG Intérimaire ${newValue ? 'Activé' : 'Désactivé'}. Le SG a maintenant les privilèges du directeur.`);
+
+        alert(newValue
+            ? t('aw_sg_mode_enabled_alert', 'Mode SG Intérimaire Activé. Le SG a maintenant les privilèges du directeur.')
+            : t('aw_sg_mode_disabled_alert', 'Mode SG Intérimaire Désactivé. Le SG a maintenant les privilèges du directeur.'));
     }
   };
 
@@ -166,17 +164,16 @@ const AdminWorkflow: React.FC = () => {
                 await window.electronAPI.createNotification({
                     school_id: user?.schoolId,
                     role: 'SG',
-                    message: 'La validation globale des bulletins a été activée par la direction. Vous pouvez maintenant imprimer les bulletins des classes dont les notes sont verrouillées.',
+                    message: t('aw_notif_bulletins_validated', 'La validation globale des bulletins a été activée par la direction. Vous pouvez maintenant imprimer les bulletins des classes dont les notes sont verrouillées.'),
                     type: 'INFO'
                 });
             }
 
-            const isEn = i18n.language?.startsWith('en') ?? false;
-            alert(isEn
-                ? `Global report card validation ${newValue ? 'enabled' : 'disabled'}. Printing is now ${newValue ? 'authorized' : 'blocked'} for locked classes.`
-                : `Validation globale des bulletins ${newValue ? 'activée' : 'désactivée'}. L'impression est désormais ${newValue ? 'autorisée' : 'bloquée'} pour les classes verrouillées.`);
+            alert(newValue
+                ? t('aw_bulletins_validation_enabled_alert', "Validation globale des bulletins activée. L'impression est désormais autorisée pour les classes verrouillées.")
+                : t('aw_bulletins_validation_disabled_alert', "Validation globale des bulletins désactivée. L'impression est désormais bloquée pour les classes verrouillées."));
         } catch (err: any) {
-            alert("Erreur lors de la mise à jour du statut de validation : " + err.message);
+            alert(t('aw_validation_status_update_error', "Erreur lors de la mise à jour du statut de validation : ") + err.message);
         }
     }
   };
@@ -199,7 +196,7 @@ const AdminWorkflow: React.FC = () => {
         const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === classId?.toString());
 
         if (classStudents.length === 0) {
-            alert("Aucun élève dans cette classe.");
+            alert(t('aw_no_student_in_class', 'Aucun élève dans cette classe.'));
             return;
         }
 
@@ -218,8 +215,8 @@ const AdminWorkflow: React.FC = () => {
 
         // Calculate averages for rank calculation
         const studentsWithAverages = studentsData.map(sData => {
-            const validatedGrades = sData.grades.filter((g: any) => 
-                g.term?.toString() === getActiveTerm()?.toString() && 
+            const validatedGrades = sData.grades.filter((g: any) =>
+                g.term?.toString() === getActiveTerm()?.toString() &&
                 (g.validated === 1 || isDirector)
             );
             if (validatedGrades.length === 0) {
@@ -275,10 +272,10 @@ const AdminWorkflow: React.FC = () => {
             template: reportTemplate
         });
 
-        alert("Impression lancée avec succès (le fichier PDF a été généré).");
+        alert(t('aw_print_launched_success', 'Impression lancée avec succès (le fichier PDF a été généré).'));
     } catch (err: any) {
         console.error(err);
-        alert("Erreur lors de la génération: " + err.message);
+        alert(t('gr_report_generation_error', 'Erreur lors de la génération du bulletin : ') + err.message);
     } finally {
         setPrintingClassId(null);
     }
@@ -295,7 +292,7 @@ const AdminWorkflow: React.FC = () => {
         const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === classId?.toString());
 
         if (classStudents.length === 0) {
-            alert("Aucun élève dans cette classe.");
+            alert(t('aw_no_student_in_class', 'Aucun élève dans cette classe.'));
             return;
         }
 
@@ -398,10 +395,10 @@ const AdminWorkflow: React.FC = () => {
             isAnnual: true
         });
 
-        alert("Impression du bulletin ANNUEL lancée avec succès.");
+        alert(t('aw_annual_print_launched_success', 'Impression du bulletin ANNUEL lancée avec succès.'));
     } catch (err: any) {
         console.error(err);
-        alert("Erreur lors de la génération: " + err.message);
+        alert(t('gr_report_generation_error', 'Erreur lors de la génération du bulletin : ') + err.message);
     } finally {
         setPrintingAnnualClassId(null);
     }
@@ -424,7 +421,7 @@ const AdminWorkflow: React.FC = () => {
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-1 gap-4">
               <div className="col-span-2">
-                <label className="text-xs uppercase text-slate-500 font-bold">Période Active</label>
+                <label className="text-xs uppercase text-slate-500 font-bold">{t('aw_active_period', 'Période Active')}</label>
                 <select 
                     className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1 outline-none focus:border-amber-500"
                     value={period.activeId}
@@ -498,16 +495,16 @@ const AdminWorkflow: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 text-emerald-400">
                 <ShieldCheck className="w-6 h-6" />
-                <h2 className="text-xl font-semibold">Validation Globale des Bulletins</h2>
+                <h2 className="text-xl font-semibold">{t('aw_global_bulletin_validation', 'Validation Globale des Bulletins')}</h2>
             </div>
           </div>
           <p className="text-sm text-slate-400">
-            Autoriser la secrétaire à lancer l'impression des bulletins pour toutes les classes.
+            {t('aw_authorize_secretary_print', "Autoriser la secrétaire à lancer l'impression des bulletins pour toutes les classes.")}
           </p>
           <div className="flex items-center justify-between p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
             <div>
-                <span className="text-white font-bold block text-sm">Statut de validation</span>
-                <span className="text-[10px] text-slate-500 uppercase font-black">{t('currently')}: {bulletinsValidated ? 'VALIDÉ (Impression autorisée)' : 'NON VALIDÉ (Impression bloquée)'}</span>
+                <span className="text-white font-bold block text-sm">{t('aw_validation_status', 'Statut de validation')}</span>
+                <span className="text-[10px] text-slate-500 uppercase font-black">{t('currently')}: {bulletinsValidated ? t('aw_validated_print_authorized', 'VALIDÉ (Impression autorisée)') : t('aw_not_validated_print_blocked', 'NON VALIDÉ (Impression bloquée)')}</span>
             </div>
             <div
                 onClick={toggleBulletinsValidation}
@@ -531,14 +528,14 @@ const AdminWorkflow: React.FC = () => {
                 onClick={() => navigate('/grades')}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-500/20 transition-all"
               >
-                Aller valider les notes <ArrowRight className="w-4 h-4" />
+                {t('go_validate_grades', 'Aller valider les notes')} <ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
           <p className="text-xs text-slate-500">
             {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR' || (user?.role === 'SG' && isSgActing))
-              ? "Pour valider les notes d'une classe, rendez-vous dans la page Notes, sélectionnez la classe puis cliquez sur « VALIDER LES IMPRESSIONS »."
-              : "Statut de verrouillage des notes par classe pour la période active."}
+              ? t('validate_grades_instruction', 'Pour valider les notes d\'une classe, rendez-vous dans la page Notes, sélectionnez la classe puis cliquez sur « VALIDER LES IMPRESSIONS ».')
+              : t('validation_status_desc', 'Statut de verrouillage des notes par classe pour la période active.')}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {classes.map((cls) => {
@@ -551,11 +548,11 @@ const AdminWorkflow: React.FC = () => {
                   </div>
                   {isClassLocked ? (
                     <span className="flex items-center text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded border border-emerald-500/20 font-bold uppercase">
-                      <CheckCircle2 className="w-3 h-3 mr-1" /> VALIDÉ
+                      <CheckCircle2 className="w-3 h-3 mr-1" /> {t('class_validated', 'CLASSE VALIDÉE')}
                     </span>
                   ) : (
                     <span className="flex items-center text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded border border-amber-500/20 font-bold uppercase">
-                      <Clock className="w-3 h-3 mr-1" /> EN ATTENTE
+                      <Clock className="w-3 h-3 mr-1" /> {t('status_pending', 'EN ATTENTE')}
                     </span>
                   )}
                 </div>
@@ -576,9 +573,9 @@ const AdminWorkflow: React.FC = () => {
             <thead className="text-slate-500 text-xs uppercase">
               <tr>
                 <th className="pb-4">{t('class')}</th>
-                <th className="pb-4">Niveau / Section</th>
-                <th className="pb-4">Statut Validation</th>
-                <th className="pb-4">Action</th>
+                <th className="pb-4">{t('aw_level_section', 'Niveau / Section')}</th>
+                <th className="pb-4">{t('aw_validation_status_header', 'Statut Validation')}</th>
+                <th className="pb-4">{t('aw_action', 'Action')}</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
@@ -590,7 +587,7 @@ const AdminWorkflow: React.FC = () => {
                   <td className="py-4 text-xs font-semibold text-slate-400">{c.level} • {c.section}</td>
                   <td className="py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClassLockedRow ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                        {isClassLockedRow ? 'VALIDÉ' : 'EN ATTENTE'}
+                        {isClassLockedRow ? t('validated', 'VALIDÉ') : t('status_pending', 'EN ATTENTE')}
                     </span>
                   </td>
                   <td className="py-4">
@@ -599,20 +596,20 @@ const AdminWorkflow: React.FC = () => {
                         onClick={() => handlePrintClassReportCards(c.id)}
                         disabled={printingClassId === c.id || !isClassLockedRow}
                         className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!isClassLockedRow ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin du trimestre actuel"}
+                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : t('aw_term_report_card_title', 'Bulletin du trimestre actuel')}
                         >
                         <Printer className="w-4 h-4" />
-                        {printingClassId === c.id ? "Impression..." : t('start_printing')}
+                        {printingClassId === c.id ? t('aw_printing', 'Impression...') : t('start_printing')}
                         </button>
 
                         <button
                         onClick={() => handlePrintAnnualReportCards(c.id)}
                         disabled={printingAnnualClassId === c.id || !isClassLockedRow}
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!isClassLockedRow ? "Les notes de cette classe ne sont pas encore validées" : "Bulletin Annuel (Moyenne des trimestres)"}
+                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : t('aw_annual_report_card_title', 'Bulletin Annuel (Moyenne des trimestres)')}
                         >
                         <Printer className="w-4 h-4" />
-                        {printingAnnualClassId === c.id ? "Impression..." : "B. Annuel"}
+                        {printingAnnualClassId === c.id ? t('aw_printing', 'Impression...') : t('aw_annual_report_abbr', 'B. Annuel')}
                         </button>
                     </div>
                   </td>

@@ -62,11 +62,11 @@ const Subjects: React.FC = () => {
   };
 
   const handleCancelPendingSubject = async (id: number) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir annuler cette demande ?")) return;
+    if (!window.confirm(t('subj_confirm_cancel_request', 'Êtes-vous sûr de vouloir annuler cette demande ?'))) return;
     if (window.electronAPI) {
       try {
         await (window.electronAPI as any).cancelPendingSubject(id);
-        showNotification("Demande annulée avec succès", "success");
+        showNotification(t('subj_request_cancelled', 'Demande annulée avec succès'), "success");
         loadPendingSubjects();
       } catch (err: any) {
         showNotification(err.message, "error");
@@ -96,7 +96,7 @@ const Subjects: React.FC = () => {
           showNotification(res.message, "info");
           loadPendingSubjects();
         } else {
-          showNotification(`La matière "${addedName}" a été ajoutée avec succès !`, "success");
+          showNotification(t('subj_added_success', 'La matière "{{name}}" a été ajoutée avec succès !', { name: addedName }), "success");
         }
         loadData();
       } catch (err: any) {
@@ -111,7 +111,7 @@ const Subjects: React.FC = () => {
       try {
         const updatedName = editingSubject.name;
         await window.electronAPI.updateGlobalSubject(editingSubject);
-        showNotification(`Les modifications pour la matière "${updatedName}" ont été enregistrées.`, "success");
+        showNotification(t('subj_updated_success', 'Les modifications pour la matière "{{name}}" ont été enregistrées.', { name: updatedName }), "success");
         setEditingSubject(null);
         loadData();
       } catch (err: any) {
@@ -121,11 +121,11 @@ const Subjects: React.FC = () => {
   };
 
   const handleDeleteGlobalSubject = async (id: number, name: string) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer la matière "${name}" de votre répertoire ?`)) return;
+    if (!window.confirm(t('subj_confirm_delete', 'Voulez-vous vraiment supprimer la matière "{{name}}" de votre répertoire ?', { name }))) return;
     if (window.electronAPI) {
       try {
         await window.electronAPI.deleteGlobalSubject(id);
-        showNotification(`La matière "${name}" a été définitivement supprimée.`, "success");
+        showNotification(t('subj_deleted_success', 'La matière "{{name}}" a été définitivement supprimée.', { name }), "success");
         loadData();
       } catch (err: any) {
         showNotification(err.message, "error");
@@ -140,7 +140,7 @@ const Subjects: React.FC = () => {
     try {
       if (existing) {
         await window.electronAPI.removeSubjectFromClass({ classId: selectedClassId, subjectId });
-        showNotification("Matière retirée de la classe", "success");
+        showNotification(t('subj_removed_from_class', 'Matière retirée de la classe'), "success");
       } else {
         await window.electronAPI.assignSubjectToClass({
           classId: selectedClassId,
@@ -148,10 +148,10 @@ const Subjects: React.FC = () => {
           coefficient: 1,
           isOptional: false
         });
-        showNotification("Matière assignée à la classe", "success");
+        showNotification(t('subj_assigned_to_class', 'Matière assignée à la classe'), "success");
       }
     } catch (err: any) {
-      showNotification("Erreur: " + err.message, "error");
+      showNotification(t('subj_error_prefix', 'Erreur: ') + err.message, "error");
     }
     loadClassSubjects(selectedClassId);
   };
@@ -166,9 +166,9 @@ const Subjects: React.FC = () => {
           coefficient: coef,
           isOptional: s?.is_optional || false
       });
-      showNotification("Coefficient mis à jour", "success");
+      showNotification(t('subj_coefficient_updated', 'Coefficient mis à jour'), "success");
     } catch (err: any) {
-      showNotification("Erreur: " + err.message, "error");
+      showNotification(t('subj_error_prefix', 'Erreur: ') + err.message, "error");
     }
     loadClassSubjects(selectedClassId);
   };
@@ -183,9 +183,9 @@ const Subjects: React.FC = () => {
           coefficient: s?.coefficient || 1,
           isOptional: !s?.is_optional
       });
-      showNotification(s?.is_optional ? "Matière définie comme obligatoire" : "Matière définie comme optionnelle", "success");
+      showNotification(s?.is_optional ? t('subj_set_mandatory', 'Matière définie comme obligatoire') : t('subj_set_optional', 'Matière définie comme optionnelle'), "success");
     } catch (err: any) {
-      showNotification("Erreur: " + err.message, "error");
+      showNotification(t('subj_error_prefix', 'Erreur: ') + err.message, "error");
     }
     loadClassSubjects(selectedClassId);
   };
@@ -323,7 +323,7 @@ const Subjects: React.FC = () => {
                 <div className="flex-1 overflow-x-auto">
                     {pendingSubjects.length > 0 && (
                       <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
-                        <h3 className="text-xs font-black text-amber-500 mb-3 uppercase tracking-wider">Matières en attente d'activation</h3>
+                        <h3 className="text-xs font-black text-amber-500 mb-3 uppercase tracking-wider">{t('subj_pending_activation_title', 'Matières en attente d\'activation')}</h3>
                         <div className="space-y-3">
                           {pendingSubjects.map(ps => (
                             <div key={ps.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
@@ -335,7 +335,7 @@ const Subjects: React.FC = () => {
                                 <input
                                   type="text"
                                   maxLength={6}
-                                  placeholder="Code à 6 lettres"
+                                  placeholder={t('subj_code_6_letters_placeholder', 'Code à 6 lettres')}
                                   className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-500 font-mono text-center w-32 uppercase"
                                   id={`code-input-${ps.id}`}
                                 />
@@ -345,7 +345,7 @@ const Subjects: React.FC = () => {
                                         try {
                                           const res = await (window.electronAPI as any).resendSubjectCode(ps.id);
                                           if (res?.error) throw new Error(res.error);
-                                          showNotification("Une nouvelle demande de code a été envoyée au développeur.", "info");
+                                          showNotification(t('subj_resend_code_request_sent', 'Une nouvelle demande de code a été envoyée au développeur.'), "info");
                                           loadPendingSubjects();
                                         } catch (err: any) {
                                           showNotification(err.message, "error");
@@ -353,7 +353,7 @@ const Subjects: React.FC = () => {
                                       }}
                                       className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all"
                                     >
-                                      Renvoyer un code
+                                      {t('subj_resend_code', 'Renvoyer un code')}
                                     </button>
                                   ) : (
                                     <button
@@ -361,13 +361,13 @@ const Subjects: React.FC = () => {
                                         const inputEl = document.getElementById(`code-input-${ps.id}`) as HTMLInputElement;
                                         const code = inputEl?.value?.trim()?.toUpperCase();
                                         if (!code) {
-                                          showNotification("Veuillez saisir le code", "error");
+                                          showNotification(t('subj_enter_code_prompt', 'Veuillez saisir le code'), "error");
                                           return;
                                         }
                                         try {
                                           const res = await (window.electronAPI as any).validateSubjectCode({ pendingId: ps.id, code });
                                           if (res?.error) throw new Error(res.error);
-                                          showNotification("Matière validée et activée avec succès !", "success");
+                                          showNotification(t('subj_validated_activated', 'Matière validée et activée avec succès !'), "success");
                                           loadPendingSubjects();
                                           loadData();
                                         } catch (err: any) {
@@ -377,15 +377,15 @@ const Subjects: React.FC = () => {
                                       }}
                                       className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all"
                                     >
-                                      Activer
+                                      {t('subj_activate', 'Activer')}
                                     </button>
                                   )}
                                   <button
                                     onClick={() => handleCancelPendingSubject(ps.id)}
                                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-all"
-                                    title="Annuler la demande"
+                                    title={t('subj_cancel_request_tooltip', 'Annuler la demande')}
                                   >
-                                    Annuler
+                                    {t('cancel', 'Annuler')}
                                   </button>
                               </div>
                             </div>
@@ -395,34 +395,34 @@ const Subjects: React.FC = () => {
                     )}
 
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                      <h3 className="text-sm font-bold text-amber-500 uppercase">Matières Enregistrées</h3>
+                      <h3 className="text-sm font-bold text-amber-500 uppercase">{t('subj_registered_subjects', 'Matières Enregistrées')}</h3>
                       <div className="flex gap-2 w-full sm:w-auto">
                         <select
                           className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 flex-1"
                           value={filterLevel}
                           onChange={(e) => setFilterLevel(e.target.value)}
                         >
-                          <option value="">Tous Niveaux</option>
-                          <option value="PRIMAIRE">Primaire</option>
-                          <option value="MATERNELLE">Maternelle</option>
+                          <option value="">{t('subj_all_levels', 'Tous Niveaux')}</option>
+                          <option value="PRIMAIRE">{t('cycle_primary_label', 'Primaire')}</option>
+                          <option value="MATERNELLE">{t('cycle_nursery_label', 'Maternelle')}</option>
                         </select>
                         <select
                           className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 flex-1"
                           value={filterSection}
                           onChange={(e) => setFilterSection(e.target.value)}
                         >
-                          <option value="">Toutes Sections</option>
-                          <option value="FRANCOPHONE">Francophone</option>
-                          <option value="ANGLOPHONE">Anglophone</option>
+                          <option value="">{t('subj_all_sections', 'Toutes Sections')}</option>
+                          <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                          <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
                         </select>
                       </div>
                     </div>
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-900 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-800">
-                                <th className="px-4 py-3">Nom</th>
-                                <th className="px-4 py-3">Niveau / Section</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
+                                <th className="px-4 py-3">{t('subj_name_col', 'Nom')}</th>
+                                <th className="px-4 py-3">{t('subj_level_section_col', 'Niveau / Section')}</th>
+                                <th className="px-4 py-3 text-right">{t('actions', 'Actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50 text-slate-300">
@@ -446,7 +446,7 @@ const Subjects: React.FC = () => {
                             ))}
                             {globalSubjects.length === 0 && (
                                 <tr>
-                                    <td colSpan={3} className="px-4 py-8 text-center text-slate-500 text-xs italic">Aucune matière.</td>
+                                    <td colSpan={3} className="px-4 py-8 text-center text-slate-500 text-xs italic">{t('subj_no_subject', 'Aucune matière.')}</td>
                                 </tr>
                             )}
                         </tbody>
@@ -457,7 +457,7 @@ const Subjects: React.FC = () => {
                     <form onSubmit={editingSubject ? handleUpdateGlobalSubject : handleAddGlobalSubject} className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
                         <h3 className="text-sm font-bold text-white mb-4 uppercase flex items-center">
                             {editingSubject ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            {editingSubject ? 'Modifier Matière' : 'Nouvelle Matière'}
+                            {editingSubject ? t('subj_edit_title', 'Modifier Matière') : t('subj_new_title', 'Nouvelle Matière')}
                         </h3>
                         <div>
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('subject_name', 'Nom de la matière')}</label>
@@ -511,7 +511,7 @@ const Subjects: React.FC = () => {
                                     onClick={() => setEditingSubject(null)}
                                     className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all"
                                 >
-                                    Annuler
+                                    {t('cancel', 'Annuler')}
                                 </button>
                             )}
                             <button

@@ -91,7 +91,7 @@ const Students: React.FC = () => {
       let title = t('students_list', 'LISTE DES ÉLÈVES');
       if (selectedClass !== 'ALL') {
           const c = classes.find(c => c.id?.toString() === selectedClass?.toString());
-          if (c) title += ` - CLASSE ${c.name}`;
+          if (c) title += ` - ${t('class_header')} ${c.name}`;
       } else if (selectedCycle !== 'ALL' || selectedSection !== 'ALL') {
           title += ` - ${selectedCycle !== 'ALL' ? selectedCycle : ''} ${selectedSection !== 'ALL' ? selectedSection : ''}`.trim();
       }

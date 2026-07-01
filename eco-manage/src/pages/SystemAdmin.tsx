@@ -1182,9 +1182,9 @@ const SystemAdmin: React.FC = () => {
                           <div className="flex justify-between items-center mb-10">
                             <div>
                               <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase flex items-center gap-4">
-                                <Lock className="w-8 h-8 text-rose-500" /> Modules de l'Application
+                                <Lock className="w-8 h-8 text-rose-500" /> {t('sys_app_modules_title', "Modules de l'Application")}
                               </h3>
-                              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Désactivez silencieusement des modules pour cette école. L'utilisateur ne verra aucune trace de cette restriction.</p>
+                              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">{t('sys_app_modules_desc', "Désactivez silencieusement des modules pour cette école. L'utilisateur ne verra aucune trace de cette restriction.")}</p>
                             </div>
                           </div>
 

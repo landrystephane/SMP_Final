@@ -186,15 +186,15 @@ const Dashboard: React.FC = () => {
                                 allSlots.forEach(slot => {
                                     const rowData = [slot.label];
                                     if (slot.isBreak) {
-                                        [1, 2, 3, 4, 5, 6, 7].forEach(() => rowData.push('PAUSE'));
+                                        [1, 2, 3, 4, 5, 6, 7].forEach(() => rowData.push(t('adv_pause_upper', 'PAUSE')));
                                     } else {
                                         [1, 2, 3, 4, 5, 6, 7].forEach(day => {
                                             const sData = stats.schedules?.find((s: any) => s.day_of_week == day && s.start_time?.trim() === slot.start?.trim());
                                             if (sData) {
                                                 if (sData.type === 'PAUSE') {
-                                                    rowData.push('PAUSE');
+                                                    rowData.push(t('adv_pause_upper', 'PAUSE'));
                                                 } else {
-                                                    const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                    const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || t('class', 'Classe');
                                                     const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
                                                     rowData.push(`${className}\n${subjectName}`);
                                                 }
@@ -278,7 +278,7 @@ const Dashboard: React.FC = () => {
                                         </div>
                                             {slot.isBreak ? (
                                                 <div className="col-span-7 p-4 bg-slate-900/10 border-dashed border-slate-800 rounded-xl flex items-center justify-center border">
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">PAUSE</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">{t('adv_pause_upper', 'PAUSE')}</span>
                                                 </div>
                                             ) : (
                                                 DAYS_OF_WEEK_KEYS.map(day => {
@@ -299,9 +299,9 @@ const Dashboard: React.FC = () => {
                                                             );
                                                         }
 
-                                                        const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || 'Classe';
+                                                        const className = stats.classes?.find((c: any) => c.id == sData.class_id)?.name || t('class', 'Classe');
                                                         const subjectName = stats.subjects?.find((sub: any) => sub.id == sData.subject_id)?.name || '';
-                                                        
+
                                                         return (
                                                             <div key={day.key} className={`p-2 rounded-xl border text-center flex flex-col justify-center ${typeColor} h-[70px] overflow-hidden`} title={`${className} - ${subjectName || sData.type}`}>
                                                                 <div className="w-full">
@@ -315,7 +315,7 @@ const Dashboard: React.FC = () => {
                                                                     )}
                                                                 </div>
                                                                 <div className="text-[7px] font-black uppercase tracking-wider mt-1 opacity-50 truncate">
-                                                                    {sData.type || 'COURS'}
+                                                                    {sData.type || t('adv_course_upper', 'COURS')}
                                                                 </div>
                                                             </div>
                                                         );

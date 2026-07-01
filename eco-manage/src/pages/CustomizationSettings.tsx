@@ -1369,7 +1369,7 @@ const CustomizationSettings: React.FC = () => {
 
                             {/* Grade summary row */}
                             <div className="p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: `${primaryColor}10` }}>
-                                <span className="text-[7px] font-black uppercase tracking-wider text-slate-700">Moyenne Générale</span>
+                                <span className="text-[7px] font-black uppercase tracking-wider text-slate-700">{t('general_average_label', 'Moyenne Générale')}</span>
                                 <span className="text-xs font-black" style={{ color: primaryColor }}>15.75 <span className="text-[8px] text-slate-400">/ 20</span></span>
                             </div>
 

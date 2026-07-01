@@ -585,7 +585,7 @@ const DriverPortal: React.FC = () => {
                   <div className="space-y-4">
                       <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t('stop_name', "Nom de l'arrêt")}</label>
-                          <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder="ex: Carrefour Mvog-Mbi" />
+                          <input type="text" value={newPoint.name} onChange={e => setNewPoint({...newPoint, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white text-sm" placeholder={t('driv_stop_name_placeholder', 'ex: Carrefour Mvog-Mbi')} />
                       </div>
                       <div className="flex gap-3 pt-4">
                           <button onClick={() => setShowAddPoint(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-xs font-black text-white uppercase" disabled={isAdding}>{t('cancel', 'Annuler')}</button>

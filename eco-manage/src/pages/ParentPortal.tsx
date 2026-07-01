@@ -172,7 +172,7 @@ const ParentPortal: React.FC = () => {
             const { generatePaymentReceipt } = await import('../utils/reports');
             generatePaymentReceipt(payment, selectedChild, financials, activeSchool);
         } catch (e: any) {
-            alert(`Erreur d'impression: ${e.message}`);
+            alert(t('pp_print_error', `Erreur d'impression: {{message}}`, { message: e.message }));
         }
     };
 
@@ -226,7 +226,7 @@ const ParentPortal: React.FC = () => {
                         totalStudents
                     });
                 } else {
-                    alert("Une erreur est survenue lors du calcul du rang.");
+                    alert(t('pp_rank_calc_error', 'Une erreur est survenue lors du calcul du rang.'));
                 }
             } else {
                 // Fallback for demo
@@ -243,7 +243,7 @@ const ParentPortal: React.FC = () => {
                 });
             }
         } catch (e: any) {
-            alert(`Erreur d'impression du bulletin: ${e.message}`);
+            alert(t('pp_report_print_error', `Erreur d'impression du bulletin: {{message}}`, { message: e.message }));
         }
     };
 
@@ -259,19 +259,19 @@ const ParentPortal: React.FC = () => {
                     subject: ticketSubject,
                     message: ticketMessage
                 });
-                alert('Message envoyé avec succès à l\'enseignant.');
+                alert(t('pp_message_sent_success', 'Message envoyé avec succès à l\'enseignant.'));
                 setTicketSubject('');
                 setTicketMessage('');
             }
         } catch (err: any) {
-            alert("Erreur lors de l'envoi du message: " + err.message);
+            alert(t('pp_message_send_error', `Erreur lors de l'envoi du message: {{message}}`, { message: err.message }));
         }
     };
 
     if (loading && children.length === 0) return (
         <div className="h-[70vh] flex flex-col items-center justify-center space-y-4">
             <Activity className="w-12 h-12 text-amber-500 animate-pulse" />
-            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">Initialisation du Portail Parent...</p>
+            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">{t('pp_initializing', 'Initialisation du Portail Parent...')}</p>
         </div>
     );
 
@@ -280,9 +280,9 @@ const ParentPortal: React.FC = () => {
             <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto border border-white/5">
                 <User className="w-10 h-10 text-slate-700" />
             </div>
-            <h2 className="text-xl font-black text-white uppercase italic">Aucun élève associé</h2>
+            <h2 className="text-xl font-black text-white uppercase italic">{t('pp_no_student_linked', 'Aucun élève associé')}</h2>
             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">
-                Le compte parent est configuré automatiquement à l'enregistrement de l'élève. Veuillez vous assurer que le numéro de téléphone saisi correspond parfaitement.
+                {t('pp_no_student_linked_desc', 'Le compte parent est configuré automatiquement à l\'enregistrement de l\'élève. Veuillez vous assurer que le numéro de téléphone saisi correspond parfaitement.')}
             </p>
         </div>
     );
@@ -302,8 +302,8 @@ const ParentPortal: React.FC = () => {
                 <div className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-6 py-4 rounded-2xl flex items-center shadow-lg">
                     <AlertTriangle className="w-6 h-6 mr-4 flex-shrink-0" />
                     <div>
-                        <h4 className="font-black uppercase tracking-tight text-sm">Mode Aperçu (Démo)</h4>
-                        <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Vous visualisez l'interface telle qu'elle apparaîtra aux parents, avec des données fictives.</p>
+                        <h4 className="font-black uppercase tracking-tight text-sm">{t('pp_preview_mode_title', 'Mode Aperçu (Démo)')}</h4>
+                        <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">{t('pp_preview_mode_desc', 'Vous visualisez l\'interface telle qu\'elle apparaîtra aux parents, avec des données fictives.')}</p>
                     </div>
                 </div>
             )}
@@ -320,14 +320,14 @@ const ParentPortal: React.FC = () => {
                         <div>
                             <div className="flex items-center space-x-2">
                                 <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3" /> Espace Parent Sécurisé
+                                    <Sparkles className="w-3 h-3" /> {t('pp_secure_parent_space', 'Espace Parent Sécurisé')}
                                 </span>
                             </div>
                             <h1 className="text-3xl font-black text-white uppercase tracking-tight mt-2">
-                                Parent de {selectedChild.first_name} {selectedChild.last_name}
+                                {t('pp_parent_of', 'Parent de {{firstName}} {{lastName}}', { firstName: selectedChild.first_name, lastName: selectedChild.last_name })}
                             </h1>
                             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-                                Matricule : <span className="text-slate-300">{selectedChild.matricule}</span>
+                                {t('matricule', 'Matricule')} : <span className="text-slate-300">{selectedChild.matricule}</span>
                             </p>
                         </div>
                     </div>
@@ -364,40 +364,40 @@ const ParentPortal: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <Activity className="w-6 h-6" />
-                                <h2 className="text-xl font-black uppercase text-white tracking-tight">Performances & Notes</h2>
+                                <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_performance_grades', 'Performances & Notes')}</h2>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Calendar className="w-4 h-4 text-slate-500" />
-                                <select 
+                                <select
                                     className="bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                                     value={selectedTerm}
                                     onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
                                 >
-                                    {termStructure.length === 0 && <option value="">-- Aucune période configurée --</option>}
+                                    {termStructure.length === 0 && <option value="">{t('gr_no_period_configured', '-- Aucune période configurée --')}</option>}
                                     {termStructure.map(ts => (
                                         <option key={ts.term_id} value={ts.term_id}>{ts.name}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
-                        
+
                         <div className="p-6 bg-slate-950 rounded-2xl border border-white/5 space-y-4">
                             <div>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Moyenne Générale Trimestrielle</p>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('pp_term_general_average', 'Moyenne Générale Trimestrielle')}</p>
                                 <p className="text-4xl font-black text-emerald-500 mt-1">
                                     {validatedGrades.length > 0 ? average.toFixed(2) : '--'}
                                     <span className="text-xs text-slate-600"> / 20</span>
                                 </p>
                                 <p className="text-[10px] text-slate-500 mt-1 font-bold">
-                                    ({validatedGrades.length} matières validées sur le bulletin)
+                                    {t('pp_validated_subjects_count', '({{count}} matières validées sur le bulletin)', { count: validatedGrades.length })}
                                 </p>
                             </div>
-                            
-                            <button 
+
+                            <button
                                 onClick={printStudentReport}
                                 className="w-full py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all flex items-center justify-center shadow-lg active:scale-95"
                             >
-                                <ClipboardList className="w-4 h-4 mr-2" /> BULLETIN DE NOTES (PDF)
+                                <ClipboardList className="w-4 h-4 mr-2" /> {t('pp_report_card_pdf', 'BULLETIN DE NOTES (PDF)')}
                             </button>
                         </div>
                     </div>
@@ -406,17 +406,17 @@ const ParentPortal: React.FC = () => {
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center space-x-3 text-rose-500">
                             <AlertTriangle className="w-6 h-6" />
-                            <h2 className="text-xl font-black uppercase text-white tracking-tight">Bilan des Absences</h2>
+                            <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_absence_summary', 'Bilan des Absences')}</h2>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                        <th className="px-4 py-3">Date</th>
-                                        <th className="px-4 py-3">Cours</th>
-                                        <th className="px-4 py-3">Horaire</th>
-                                        <th className="px-4 py-3">Heures</th>
-                                        <th className="px-4 py-3">Statut</th>
+                                        <th className="px-4 py-3">{t('date', 'Date')}</th>
+                                        <th className="px-4 py-3">{t('course', 'Cours')}</th>
+                                        <th className="px-4 py-3">{t('schedule_time', 'Horaire')}</th>
+                                        <th className="px-4 py-3">{t('hours', 'Heures')}</th>
+                                        <th className="px-4 py-3">{t('status', 'Statut')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -442,7 +442,7 @@ const ParentPortal: React.FC = () => {
                                             </tr>
                                         ))}
                                         <tr className="bg-slate-950/50">
-                                            <td colSpan={3} className="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Cumul Total</td>
+                                            <td colSpan={3} className="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('cumulative_total', 'Cumul Total')}</td>
                                             <td className="px-4 py-3 text-rose-500 font-black text-sm">{stats.attendance.reduce((acc: number, a: any) => acc + (a.hours_absent || 0), 0)}h</td>
                                             <td></td>
                                         </tr>
@@ -450,7 +450,7 @@ const ParentPortal: React.FC = () => {
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
-                                                Aucune absence enregistrée.
+                                                {t('no_absences', 'Aucune absence enregistrée.')}
                                             </td>
                                         </tr>
                                     )}
@@ -463,21 +463,21 @@ const ParentPortal: React.FC = () => {
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <Coins className="w-6 h-6" />
-                            <h2 className="text-xl font-black uppercase text-white tracking-tight">Suivi Financier</h2>
+                            <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_financial_tracking', 'Suivi Financier')}</h2>
                         </div>
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">Scolarité Dûe</p>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('pp_tuition_due', 'Scolarité Dûe')}</p>
                                     <p className="text-xs font-black text-white mt-1">{financials.totalDue.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
                                 </div>
                                 <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">Total Payé</p>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('total_paid_label', 'Total Payé')}</p>
                                     <p className="text-xs font-black text-emerald-500 mt-1">{financials.totalPaid.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
                                 </div>
                                 <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">Reste à payer</p>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('remaining_to_pay', 'Reste à payer')}</p>
                                     <p className={`text-xs font-black mt-1 ${financials.balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{financials.balance.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
                                 </div>
                             </div>
@@ -486,15 +486,15 @@ const ParentPortal: React.FC = () => {
                                 <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center space-x-3">
                                     <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
                                     <div>
-                                        <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Moratoire Accordé</p>
-                                        <p className="text-[10px] text-slate-300 font-bold leading-normal mt-0.5">Cet élève bénéficie d'une autorisation spéciale d'échelonnement de paiement.</p>
+                                        <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{t('pp_moratoire_granted', 'Moratoire Accordé')}</p>
+                                        <p className="text-[10px] text-slate-300 font-bold leading-normal mt-0.5">{t('pp_moratoire_granted_desc', 'Cet élève bénéficie d\'une autorisation spéciale d\'échelonnement de paiement.')}</p>
                                     </div>
                                 </div>
                             )}
 
                             {/* Paid installment summary */}
                             <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-3">
-                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Résumé des Tranches</h3>
+                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('pp_installment_summary', 'Résumé des Tranches')}</h3>
                                 <div className="space-y-2">
                                     {financials.breakdown.installments.map((inst: any, idx: number) => (
                                         <div key={idx} className="flex justify-between items-center text-xs font-bold">
@@ -514,7 +514,7 @@ const ParentPortal: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 text-amber-500">
                                 <CreditCard className="w-6 h-6" />
-                                <h2 className="text-xl font-black uppercase text-white tracking-tight">Journal des Versements (Reçus)</h2>
+                                <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_payments_journal', 'Journal des Versements (Reçus)')}</h2>
                             </div>
                         </div>
 
@@ -522,11 +522,11 @@ const ParentPortal: React.FC = () => {
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-slate-950 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
-                                        <th className="px-6 py-4">Reçu N°</th>
-                                        <th className="px-6 py-4">Montant</th>
-                                        <th className="px-6 py-4">Motif</th>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4 text-right">Action</th>
+                                        <th className="px-6 py-4">{t('receipt_no', 'Reçu N°')}</th>
+                                        <th className="px-6 py-4">{t('amount', 'Montant')}</th>
+                                        <th className="px-6 py-4">{t('reason', 'Motif')}</th>
+                                        <th className="px-6 py-4">{t('date', 'Date')}</th>
+                                        <th className="px-6 py-4 text-right">{t('actions', 'Action')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -543,7 +543,7 @@ const ParentPortal: React.FC = () => {
                                                     <button 
                                                         onClick={() => handlePrintReceipt(p)}
                                                         className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-amber-500 hover:text-slate-950 border border-white/10 rounded-xl transition-all"
-                                                        title="Télécharger le reçu"
+                                                        title={t('pp_download_receipt', 'Télécharger le reçu')}
                                                     >
                                                         <Printer className="w-4 h-4" />
                                                     </button>
@@ -553,7 +553,7 @@ const ParentPortal: React.FC = () => {
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
-                                                Aucun versement enregistré.
+                                                {t('pp_no_payment_recorded', 'Aucun versement enregistré.')}
                                             </td>
                                         </tr>
                                     )}
@@ -566,7 +566,7 @@ const ParentPortal: React.FC = () => {
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] md:col-span-2">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <Bus className="w-6 h-6" />
-                            <h2 className="text-xl font-black uppercase text-white tracking-tight">Suivi Transport Scolaire</h2>
+                            <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_school_transport_tracking', 'Suivi Transport Scolaire')}</h2>
                         </div>
 
                         {selectedChild.has_transport === 1 ? (
@@ -577,16 +577,16 @@ const ParentPortal: React.FC = () => {
                                             <MapPin className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quartier de dépose</p>
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('pp_dropoff_neighborhood', 'Quartier de dépose')}</p>
                                             <p className="text-sm font-black text-white mt-1">{selectedChild.neighborhood || 'Bastos'}</p>
                                         </div>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => setIsBusMapOpen(true)}
                                     className="py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center justify-center"
                                 >
-                                    <MapPin className="w-4 h-4 mr-2" /> CARTE DU BUS EN DIRECT
+                                    <MapPin className="w-4 h-4 mr-2" /> {t('pp_live_bus_map', 'CARTE DU BUS EN DIRECT')}
                                 </button>
                             </div>
                         ) : (
@@ -594,14 +594,14 @@ const ParentPortal: React.FC = () => {
                                 <div className="flex items-start space-x-3 text-rose-400">
                                     <AlertTriangle className="w-6 h-6 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-xs font-black uppercase tracking-wider">Abonnement Transport Inactif</p>
+                                        <p className="text-xs font-black uppercase tracking-wider">{t('pp_transport_inactive_title', 'Abonnement Transport Inactif')}</p>
                                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-relaxed">
-                                            Cet élève n'a pas encore souscrit au forfait transport pour ce trimestre ou le versement n'a pas encore été validé par l'économe.
+                                            {t('pp_transport_inactive_desc', 'Cet élève n\'a pas encore souscrit au forfait transport pour ce trimestre ou le versement n\'a pas encore été validé par l\'économe.')}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider border-t border-white/5 pt-3">
-                                    💡 Dès validation du paiement transport par la comptabilité, le suivi GPS s'activera instantanément.
+                                    💡 {t('pp_transport_gps_activation_note', 'Dès validation du paiement transport par la comptabilité, le suivi GPS s\'activera instantanément.')}
                                 </div>
                             </div>
                         )}
@@ -612,7 +612,7 @@ const ParentPortal: React.FC = () => {
             {/* School communication feed */}
             <div className="space-y-4">
                 <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
-                    <Info className="w-6 h-6 text-amber-500" /> Messages et Communiqués
+                    <Info className="w-6 h-6 text-amber-500" /> {t('pp_messages_and_announcements', 'Messages et Communiqués')}
                 </h2>
                 {announcements.length > 0 ? (
                     announcements.map((ann) => (
@@ -620,12 +620,12 @@ const ParentPortal: React.FC = () => {
                             <Info className={`w-5 h-5 shrink-0 mt-1 ${ann.message_type === 'TICKET' ? 'text-blue-500' : 'text-amber-500'}`} />
                             <div className="flex-1">
                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
-                                    {new Date(ann.created_at).toLocaleDateString()} - De : {ann.sender_name}
+                                    {t('pp_announcement_from', '{{date}} - De : {{sender}}', { date: new Date(ann.created_at).toLocaleDateString(), sender: ann.sender_name })}
                                 </span>
                                 <h4 className="text-sm font-black text-white mt-1 uppercase">{ann.title}</h4>
                                 <p className="text-xs text-slate-300 font-bold mt-1 whitespace-pre-wrap">{ann.content}</p>
                                 {ann.message_type === 'TICKET' && ann.sender_id && (
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setTicketReceiver(ann.sender_id.toString());
                                             setTicketSubject(`RE: ${ann.title}`);
@@ -633,7 +633,7 @@ const ParentPortal: React.FC = () => {
                                         }}
                                         className="mt-3 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-xs font-black text-white uppercase tracking-widest rounded-lg transition-colors"
                                     >
-                                        Répondre
+                                        {t('pp_reply', 'Répondre')}
                                     </button>
                                 )}
                             </div>
@@ -641,7 +641,7 @@ const ParentPortal: React.FC = () => {
                     ))
                 ) : (
                     <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Aucun message de l'école</p>
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">{t('pp_no_school_message', 'Aucun message de l\'école')}</p>
                     </div>
                 )}
             </div>
@@ -649,18 +649,18 @@ const ParentPortal: React.FC = () => {
             {/* Ticket to teacher */}
             <div id="ticketForm" className="glass-card p-8 bg-slate-900 border border-white/5 rounded-[32px] space-y-6">
                 <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
-                    Contacter l'enseignant
+                    {t('pp_contact_teacher', 'Contacter l\'enseignant')}
                 </h2>
                 <form onSubmit={handleSendTicket} className="space-y-4">
                     <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Destinataire (Enseignant de l'élève)</label>
-                        <select 
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('pp_recipient_student_teacher', 'Destinataire (Enseignant de l\'élève)')}</label>
+                        <select
                             required
                             value={ticketReceiver}
                             onChange={(e) => setTicketReceiver(e.target.value)}
                             className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500"
                         >
-                            <option value="">-- Sélectionner l'enseignant --</option>
+                            <option value="">{t('pp_select_teacher_placeholder', '-- Sélectionner l\'enseignant --')}</option>
                             {(() => {
                                 const studentClass = classes.find(c => c.id === selectedChild.class_id);
                                 if (!studentClass) return null;
@@ -683,29 +683,29 @@ const ParentPortal: React.FC = () => {
                         </select>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Sujet</label>
-                        <input 
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('pp_subject', 'Sujet')}</label>
+                        <input
                             required
                             type="text"
                             value={ticketSubject}
                             onChange={(e) => setTicketSubject(e.target.value)}
-                            placeholder="Sujet de votre message..."
+                            placeholder={t('pp_message_subject_placeholder', 'Sujet de votre message...')}
                             className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500"
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Message</label>
-                        <textarea 
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('message_content', 'Message')}</label>
+                        <textarea
                             required
                             rows={4}
                             value={ticketMessage}
                             onChange={(e) => setTicketMessage(e.target.value)}
-                            placeholder="Rédigez votre message ici..."
+                            placeholder={t('pp_message_body_placeholder', 'Rédigez votre message ici...')}
                             className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 resize-none custom-scrollbar"
                         ></textarea>
                     </div>
                     <button type="submit" className="w-full py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-yellow-400 transition-all">
-                        Envoyer le message
+                        {t('pp_send_message', 'Envoyer le message')}
                     </button>
                 </form>
             </div>
@@ -716,16 +716,16 @@ const ParentPortal: React.FC = () => {
                     <div className="w-full max-w-2xl p-6 glass-card border border-white/10 rounded-3xl shadow-2xl relative animate-in zoom-in-95 duration-300 bg-slate-950">
                         <div className="flex justify-between items-center mb-4">
                             <div>
-                                <h3 className="text-xl font-black text-white uppercase tracking-tight">Suivi GPS Temps Réel</h3>
+                                <h3 className="text-xl font-black text-white uppercase tracking-tight">{t('pp_realtime_gps_tracking', 'Suivi GPS Temps Réel')}</h3>
                                 <p className="text-emerald-400 text-[10px] font-black uppercase tracking-widest mt-0.5 animate-pulse flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span> Connexion satellite active
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span> {t('pp_satellite_connection_active', 'Connexion satellite active')}
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setIsBusMapOpen(false)}
                                 className="px-3 py-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl text-xs font-bold transition-all"
                             >
-                                Fermer
+                                {t('close', 'Fermer')}
                             </button>
                         </div>
 
@@ -741,13 +741,13 @@ const ParentPortal: React.FC = () => {
                                 
                                 {/* Stops */}
                                 <circle cx="50" cy="150" r="8" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
-                                <text x="50" y="175" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">Départ École</text>
-                                
+                                <text x="50" y="175" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">{t('pp_school_departure', 'Départ École')}</text>
+
                                 <circle cx="210" cy="115" r="8" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
-                                <text x="210" y="95" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">Arrêt Omnisports</text>
+                                <text x="210" y="95" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">{t('pp_omnisport_stop', 'Arrêt Omnisports')}</text>
 
                                 <circle cx="330" cy="170" r="8" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
-                                <text x="330" y="195" fill="#f59e0b" fontSize="9" fontWeight="bold" textAnchor="middle">Votre Domicile ({selectedChild.neighborhood || 'Bastos'})</text>
+                                <text x="330" y="195" fill="#f59e0b" fontSize="9" fontWeight="bold" textAnchor="middle">{t('pp_your_home', 'Votre Domicile ({{neighborhood}})', { neighborhood: selectedChild.neighborhood || 'Bastos' })}</text>
                                 
                                 {/* Bus indicator (animated along the path) */}
                                 <g transform="translate(180, 110)">
@@ -759,19 +759,19 @@ const ParentPortal: React.FC = () => {
                             
                             {/* Live floating stats */}
                             <div className="absolute top-4 left-4 bg-slate-950/80 border border-white/10 p-3 rounded-xl backdrop-blur-md">
-                                <span className="text-[9px] text-slate-500 font-black uppercase block">Vitesse</span>
+                                <span className="text-[9px] text-slate-500 font-black uppercase block">{t('pp_speed', 'Vitesse')}</span>
                                 <span className="text-white font-black text-sm">48 km/h</span>
                             </div>
                             <div className="absolute top-4 right-4 bg-slate-950/80 border border-white/10 p-3 rounded-xl backdrop-blur-md">
-                                <span className="text-[9px] text-slate-500 font-black uppercase block">Arrivée estimée</span>
-                                <span className="text-amber-500 font-black text-sm">12 Mins</span>
+                                <span className="text-[9px] text-slate-500 font-black uppercase block">{t('eta_label', 'Estimation d\'arrivée')}</span>
+                                <span className="text-amber-500 font-black text-sm">{t('pp_minutes_count', '{{count}} Mins', { count: 12 })}</span>
                             </div>
                         </div>
 
                         {/* Driver & vehicle card */}
                         <div className="mt-6 p-4 bg-white/5 border border-white/5 rounded-2xl text-center">
-                            <span className="text-[9px] text-slate-500 font-black uppercase block">Informations du transport</span>
-                            <span className="text-slate-400 text-xs mt-2 block">Contactez l'école pour les détails du chauffeur et du véhicule.</span>
+                            <span className="text-[9px] text-slate-500 font-black uppercase block">{t('pp_transport_info', 'Informations du transport')}</span>
+                            <span className="text-slate-400 text-xs mt-2 block">{t('pp_contact_school_for_details', 'Contactez l\'école pour les détails du chauffeur et du véhicule.')}</span>
                         </div>
                     </div>
                 </div>

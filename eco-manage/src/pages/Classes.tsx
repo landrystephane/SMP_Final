@@ -371,29 +371,29 @@ const Classes: React.FC = () => {
                                 <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
                                     <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2 mb-1">
                                         <Copy className="w-3 h-3" />
-                                        Dupliquer à partir de (Optionnel)
+                                        {t('cls_duplicate_from_label', 'Dupliquer à partir de (Optionnel)')}
                                     </label>
                                     <select
                                         className="input-field w-full mt-1 border-amber-500/30"
                                         value={formData.baseClassId}
                                         onChange={(e) => setFormData({...formData, baseClassId: e.target.value})}
                                     >
-                                        <option value="">-- Ne rien copier (Classe vide) --</option>
+                                        <option value="">{t('cls_no_copy_option', '-- Ne rien copier (Classe vide) --')}</option>
                                         {classes.map(c => (
                                             <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
                                         ))}
                                     </select>
-                                    <p className="text-[10px] text-amber-500/70 mt-1">Copiera les matières, les coefficients et les frais de scolarité.</p>
+                                    <p className="text-[10px] text-amber-500/70 mt-1">{t('cls_duplicate_desc', 'Copiera les matières, les coefficients et les frais de scolarité.')}</p>
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nom de la classe</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_name_label', 'Nom de la classe')}</label>
                                     <input
                                         required
                                         type="text"
-                                        placeholder="Ex: SIL B"
+                                        placeholder={t('cls_name_placeholder', 'Ex: SIL B')}
                                         className="input-field w-full mt-1"
                                         value={formData.name}
                                         onChange={(e) => {
@@ -404,66 +404,66 @@ const Classes: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Code Unique</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_unique_code_label', 'Code Unique')}</label>
                                     <input
                                         required
                                         disabled
                                         type="text"
-                                        placeholder="Généré de façon intelligente"
+                                        placeholder={t('cls_code_generated_placeholder', 'Généré de façon intelligente')}
                                         className="input-field w-full mt-1 bg-slate-800 text-slate-400 cursor-not-allowed opacity-60 font-mono"
                                         value={formData.code}
                                     />
-                                    <p className="text-[9px] text-slate-500 mt-1 italic">Ce code court intelligent est utilisé pour générer les matricules.</p>
+                                    <p className="text-[9px] text-slate-500 mt-1 italic">{t('cls_code_desc', 'Ce code court intelligent est utilisé pour générer les matricules.')}</p>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Section</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_section_label', 'Section')}</label>
                                     <select
                                         className="input-field w-full mt-1"
                                         value={formData.section}
                                         onChange={(e) => setFormData({...formData, section: e.target.value})}
                                     >
-                                        <option value="FRANCOPHONE">Francophone</option>
-                                        <option value="ANGLOPHONE">Anglophone</option>
+                                        <option value="FRANCOPHONE">{t('cls_francophone_opt', 'Francophone')}</option>
+                                        <option value="ANGLOPHONE">{t('cls_anglophone_opt', 'Anglophone')}</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Niveau</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_level_label', 'Niveau')}</label>
                                     <select
                                         className="input-field w-full mt-1"
                                         value={formData.level}
                                         onChange={(e) => setFormData({...formData, level: e.target.value})}
                                     >
-                                        <option value="PRIMAIRE">Primaire</option>
-                                        <option value="MATERNELLE">Maternelle</option>
+                                        <option value="PRIMAIRE">{t('cls_primaire_opt', 'Primaire')}</option>
+                                        <option value="MATERNELLE">{t('cls_maternelle_opt', 'Maternelle')}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Titulaire de la classe</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_main_teacher_label', 'Titulaire de la classe')}</label>
                                     <select
                                         className="input-field w-full mt-1"
                                         value={formData.mainTeacherId}
                                         onChange={(e) => setFormData({...formData, mainTeacherId: e.target.value})}
                                     >
-                                        <option value="">-- Sélectionner un enseignant --</option>
+                                        <option value="">{t('cls_select_teacher_placeholder', '-- Sélectionner un enseignant --')}</option>
                                         {teachers.map(t => (
                                             <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assistant(e)</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_assistant_label', 'Assistant(e)')}</label>
                                     <select
                                         className="input-field w-full mt-1"
                                         value={formData.assistantTeacherId}
                                         onChange={(e) => setFormData({...formData, assistantTeacherId: e.target.value})}
                                     >
-                                        <option value="">-- Aucun assistant --</option>
+                                        <option value="">{t('cls_no_assistant_opt', '-- Aucun assistant --')}</option>
                                         {teachers.filter(t => t.id.toString() !== formData.mainTeacherId).map(t => (
                                             <option key={t.id} value={t.id}>{t.fullName || t.full_name}</option>
                                         ))}
@@ -472,13 +472,13 @@ const Classes: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Barème / Échelle de notation</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('cls_grading_scale_label', 'Barème / Échelle de notation')}</label>
                                 <select
                                     className="input-field w-full mt-1"
                                     value={formData.gradingScaleId}
                                     onChange={(e) => setFormData({...formData, gradingScaleId: e.target.value})}
                                 >
-                                    <option value="">-- Notation standard (Saisie sur 20 brute) --</option>
+                                    <option value="">{t('cls_standard_grading_opt', '-- Notation standard (Saisie sur 20 brute) --')}</option>
                                     {gradingScales.map(scale => (
                                         <option key={scale.id} value={scale.id}>
                                             {scale.name} ({scale.is_numerical ? t('numerical_conversion', 'Conversion numérique') : t('literal_entry', 'Saisie littérale')})
@@ -493,14 +493,14 @@ const Classes: React.FC = () => {
                                     onClick={() => setIsModalOpen(false)}
                                     className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
                                 >
-                                    Annuler
+                                    {t('cancel', 'Annuler')}
                                 </button>
                                 <button
                                     type="submit"
                                     className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
                                 >
                                     <Save className="w-5 h-5" />
-                                    Enregistrer
+                                    {t('save', 'Enregistrer')}
                                 </button>
                             </div>
                         </form>
@@ -516,9 +516,9 @@ const Classes: React.FC = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                     <Users className="w-6 h-6 text-amber-500" />
-                                    Affectation des Enseignants aux Matières
+                                    {t('cls_assign_teachers_title', 'Affectation des Enseignants aux Matières')}
                                 </h2>
-                                <p className="text-xs text-slate-400 mt-1">Classe : <span className="text-amber-500 font-bold">{selectedClassForAssign.name}</span></p>
+                                <p className="text-xs text-slate-400 mt-1">{t('cls_class_label', 'Classe :')} <span className="text-amber-500 font-bold">{selectedClassForAssign.name}</span></p>
                             </div>
                             <button onClick={() => setIsAssignModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
                                 <X className="w-5 h-5" />
@@ -527,7 +527,7 @@ const Classes: React.FC = () => {
 
                         <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 custom-scrollbar">
                             {classSubjects.length === 0 ? (
-                                <p className="text-center text-slate-500 py-8">Aucune matière n'est assignée à cette classe.</p>
+                                <p className="text-center text-slate-500 py-8">{t('cls_no_subject_assigned', 'Aucune matière n\'est assignée à cette classe.')}</p>
                             ) : (
                                 <div className="space-y-3">
                                     {classSubjects.map((sub: any) => (
@@ -548,7 +548,7 @@ const Classes: React.FC = () => {
                                                     }}
                                                     className="input-field w-full"
                                                 >
-                                                    <option value="">-- Non assigné --</option>
+                                                    <option value="">{t('cls_unassigned_opt', '-- Non assigné --')}</option>
                                                     {teachers.map(t => (
                                                         <option key={t.id} value={t.id}>{t.fullName}</option>
                                                     ))}
@@ -566,7 +566,7 @@ const Classes: React.FC = () => {
                                 onClick={() => setIsAssignModalOpen(false)}
                                 className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
                             >
-                                Annuler
+                                {t('cancel', 'Annuler')}
                             </button>
                             <button
                                 type="button"
@@ -574,7 +574,7 @@ const Classes: React.FC = () => {
                                 className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
                             >
                                 <Save className="w-5 h-5" />
-                                Enregistrer les Affectations
+                                {t('cls_save_assignments', 'Enregistrer les Affectations')}
                             </button>
                         </div>
                     </div>
