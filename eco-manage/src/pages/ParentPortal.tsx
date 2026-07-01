@@ -55,7 +55,7 @@ const ParentPortal: React.FC = () => {
                 const msgs = await window.electronAPI.getParentMessages ? await window.electronAPI.getParentMessages({ schoolId: user.schoolId, userId: user.id }) : [];
                 // Load base template schedules (fallback)
                 const scheds = await window.electronAPI.getSchedules(user.schoolId);
-                const subs = await window.electronAPI.getSubjects(user.schoolId);
+                const subs = await window.electronAPI.getSchoolSubjects(user.schoolId);
 
                 setTuitionFees(tf || []);
                 setInstallments(insts || []);
