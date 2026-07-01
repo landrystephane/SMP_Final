@@ -946,6 +946,18 @@ export const generateClassReportCards = (data: {
     const primary = primaryColor ? hexToRgb(primaryColor) : [30, 41, 59];
     const secondary = secondaryColor ? hexToRgb(secondaryColor) : [245, 158, 11];
 
+    // Pre-pass: compute class-level averages for the stats bar
+    const preAverages = studentsData.map(sd => {
+        if (isAnnual) return typeof sd.average === 'number' ? sd.average : 0;
+        const vg = ignoreValidation ? sd.grades : sd.grades.filter((g: any) => g.validated === 1);
+        const tp = vg.reduce((a: number, g: any) => a + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
+        const tc = vg.reduce((a: number, g: any) => a + (Number(g.coefficient) || 1), 0);
+        return tc > 0 ? tp / tc : 0;
+    }).sort((a: number, b: number) => b - a);
+    const classAvgVal = preAverages.length > 0 ? preAverages.reduce((a: number, b: number) => a + b, 0) / preAverages.length : undefined;
+    const firstAvg = preAverages[0];
+    const lastAvg = preAverages[preAverages.length - 1];
+
     const addWatermarkBulk = () => {
         if (template?.watermark_image) {
             try {
@@ -1136,220 +1148,299 @@ export const generateClassReportCards = (data: {
                 }
             });
         } else {
-            // Standard layout
-            let bulkStartY = 20;
+            // ── New Cameroonian bulletin layout ──────────────────────────────
+            const pageW = 210, pageH = 297, mL = 10, mR = 10, cW = 190;
+            let curY = 5;
+
+            // Header
             if (template?.header_image) {
-                try {
-                    doc.addImage(template.header_image, 'JPEG', 0, 0, 210, 45, undefined, 'FAST');
-                    bulkStartY = 50;
-                } catch(e) {}
-            }
-
-            if (!template?.header_image) {
-            doc.setFontSize(7);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(0, 0, 0);
-            doc.text('RÉPUBLIQUE DU CAMEROUN', 20, 10);
-            doc.text('Paix - Travail - Patrie', 20, 14);
-            doc.text(school.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", 20, 18);
-
-            doc.text('REPUBLIC OF CAMEROON', 190, 10, { align: 'right' });
-            doc.text('Peace - Work - Fatherland', 190, 14, { align: 'right' });
-            doc.text(school.header_english || "MINISTRY OF BASIC EDUCATION", 190, 18, { align: 'right' });
-
-            doc.setFontSize(12);
-            doc.setTextColor(primary[0], primary[1], primary[2]);
-            doc.text(school.name.toUpperCase(), 105, 30, { align: 'center' });
-            doc.setFontSize(8);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont('helvetica', 'normal');
-            doc.text(school.motto || '', 105, 35, { align: 'center' });
-            doc.text(school.address || '', 105, 39, { align: 'center' });
-            if (school.bp) doc.text(`BP: ${school.bp}`, 105, 43, { align: 'center' });
-
-            doc.setDrawColor(200, 200, 200);
-            doc.line(20, 48, 190, 48);
-            }
-
-            doc.setFontSize(16);
-            doc.setFont('helvetica', 'bold');
-            let evaluationPeriods: any[] = [];
-            try {
-                if (school.evaluation_periods) evaluationPeriods = JSON.parse(school.evaluation_periods);
-            } catch (e) {}
-            
-            let termTitle = isAnnual ? (isEn ? 'ANNUAL REPORT CARD' : 'BULLETIN ANNUEL') : '';
-            if (!isAnnual) {
-                if (typeof term === 'string') {
-                    termTitle = term.toUpperCase();
-                } else {
-                    const found = evaluationPeriods.find((ep: any) => ep.id === term);
-                    termTitle = found ? found.name.toUpperCase() : (isEn ? `TERM ${term}` : `PÉRIODE ${term}`);
-                }
-            }
-            doc.setTextColor(primary[0], primary[1], primary[2]);
-            doc.text(isEn ? 'REPORT CARD' : 'BULLETIN DE NOTES', 105, 58, { align: 'center' });
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.text(termTitle, 105, 65, { align: 'center' });
-
-            doc.setDrawColor(primary[0], primary[1], primary[2]);
-            doc.setFillColor(248, 250, 252);
-            doc.roundedRect(20, 72, 170, 35, 3, 3, 'FD');
-
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            doc.text(isEn ? 'FULL NAME:' : 'NOM ET PRÉNOM:', 25, 80);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${student.last_name} ${student.first_name}`, 80, 80);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text(isEn ? 'REG. NUMBER:' : 'MATRICULE:', 25, 87);
-            doc.setFont('helvetica', 'normal');
-            doc.text(student.matricule, 80, 87);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text(isEn ? 'CLASS:' : 'CLASSE:', 25, 94);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${classObj.name}${classObj.code ? ' (' + classObj.code + ')' : ''}`, 80, 94);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text(isEn ? 'SCHOOL YEAR:' : 'ANNÉE SCOLAIRE:', 120, 80);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${new Date().getFullYear() - 1}/${new Date().getFullYear()}`, 175, 80, { align: 'right' });
-
-            doc.setFont('helvetica', 'bold');
-            doc.text('SECTION:', 120, 87);
-            doc.setFont('helvetica', 'normal');
-            doc.text(classObj.section, 175, 87, { align: 'right' });
-
-            let subjectsMap: Record<string, any> = {};
-            if (isAnnual && validatedGrades) {
-                validatedGrades.forEach((g: any) => {
-                    if (!subjectsMap[g.subjectName]) {
-                        subjectsMap[g.subjectName] = { 
-                            name: g.subjectName, 
-                            coef: g.coefficient, 
-                            terms: {}, 
-                            totalScore: 0, 
-                            count: 0 
-                        };
-                    }
-                    subjectsMap[g.subjectName].terms[g.term] = g.score;
-                    subjectsMap[g.subjectName].totalScore += g.score;
-                    subjectsMap[g.subjectName].count++;
-                });
-            }
-
-            const tableHeaders = isAnnual 
-                ? [[isEn ? 'SUBJECT' : 'MATIÈRE', ...(termsArray || []).map((t: number) => `T${t}`), 'MOY/20', 'COEF', 'TOTAL', isEn ? 'APPRECIATION' : 'APPRÉCIATION']]
-                : (isNursery
-                    ? [[isEn ? 'SUBJECT / DOMAIN' : 'MATIÈRE / DOMAINE (SUBJECT / DOMAIN)', isEn ? 'RATING' : 'ÉVALUATION (RATING)', 'OBSERVATION']]
-                    : [[isEn ? 'SUBJECT' : 'MATIÈRE (SUBJECT)', 'NOTE/20', 'COEF', 'TOTAL', isEn ? 'APPRECIATION' : 'APPRÉCIATION']]);
-
-            const tableBody = isAnnual
-                ? Object.values(subjectsMap).map((sub: any) => {
-                    const avg = sub.totalScore / sub.count;
-                    const termsScores = (termsArray || []).map((t: number) => sub.terms[t] !== undefined ? sub.terms[t].toFixed(2) : '-');
-                    return [sub.name, ...termsScores, avg.toFixed(2), sub.coef, (avg * sub.coef).toFixed(2), getPrimaryAppreciation(avg)];
-                })
-                : validatedGrades.map((g: any) => {
-                    if (isNursery) {
-                        const app = getNurseryAppreciation(g.score);
-                        return [g.subjectName, app.label, app.remark];
-                    } else {
-                        return [g.subjectName, g.score.toFixed(2), g.coefficient, (g.score * g.coefficient).toFixed(2), getPrimaryAppreciation(g.score)];
-                    }
-                });
-
-            (doc as any).autoTable({
-                startY: 115,
-                head: tableHeaders,
-                body: tableBody,
-                theme: 'grid',
-                headStyles: { fillColor: primary, textColor: 255, fontSize: 8, fontStyle: 'bold' },
-                bodyStyles: { fontSize: 8 },
-                margin: { bottom: template?.footer_image ? 55 : 40 },
-                columnStyles: {
-                    0: { cellWidth: 70 },
-                    1: { halign: 'center' },
-                    2: { halign: 'center' },
-                    3: { halign: 'center' },
-                    4: { cellWidth: 40 }
-                }
-            });
-
-            let finalY = (doc as any).lastAutoTable.finalY + 10;
-            const bulkOverflow = template?.footer_image ? 200 : 230;
-            if (finalY > bulkOverflow) {
-                doc.addPage();
-                addWatermarkBulk();
-                finalY = 20;
-            }
-            doc.setDrawColor(primary[0], primary[1], primary[2]);
-            doc.rect(20, finalY, 170, 40);
-
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(primary[0], primary[1], primary[2]);
-            doc.text(isEn ? 'PERFORMANCE SUMMARY' : 'RÉSUMÉ DES PERFORMANCES', 25, finalY + 7);
-            doc.line(25, finalY + 9, 110, finalY + 9);
-
-            const totalAbsence = attendance.reduce((acc: number, cur: any) => acc + (cur.hours_absent || 0), 0);
-            doc.setFontSize(8);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont('helvetica', 'normal');
-            doc.text(isEn ? `Absences: ${totalAbsence} Hours` : `Absences: ${totalAbsence} Heures`, 25, finalY + 16);
-            doc.text(isEn ? `Conduct: ${calculateAttendanceObservations(totalAbsence)}` : `Conduite: ${calculateAttendanceObservations(totalAbsence)}`, 25, finalY + 23);
-
-            if (isAnnual && annualAvg !== null && annualAvg !== undefined) {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.text(isEn ? `ANNUAL AVG: ${annualAvg.toFixed(2)} / 20` : `MOY. ANNUELLE: ${annualAvg.toFixed(2)} / 20`, 120, finalY + 16);
-                doc.text(isEn ? `RANK: ${rank || '--'} / ${totalStudents || '--'}` : `RANG: ${rank || '--'} / ${totalStudents || '--'}`, 120, finalY + 23);
-                const decision = annualAvg >= 10 
-                    ? (isEn ? 'PROMOTED TO NEXT CLASS' : 'ADMIS(E) EN CLASSE SUPÉRIEURE') 
-                    : (isEn ? 'REPEATS THE CLASS' : 'REDOUBLE LA CLASSE');
-                doc.text(isEn ? `DECISION: ${decision}` : `DÉCISION: ${decision}`, 120, finalY + 30);
-            } else if (!isNursery && validatedGrades.length > 0) {
-                const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
-                const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
-                const average = totalPoints / (totalCoef || 1);
-
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.text(isEn ? `AVERAGE: ${average.toFixed(2)} / 20` : `MOYENNE: ${average.toFixed(2)} / 20`, 120, finalY + 16);
-                doc.text(isEn ? `RANK: ${rank || '--'} / ${totalStudents || '--'}` : `RANG: ${rank || '--'} / ${totalStudents || '--'}`, 120, finalY + 23);
-                const decision = average >= 10 
-                    ? (isEn ? 'SATISFACTORY WORK' : 'TRAVAIL SATISFAISANT') 
-                    : (isEn ? 'SUSTAINED EFFORTS REQUIRED' : 'EFFORTS SOUTENUS REQUIS');
-                doc.text(isEn ? `DECISION: ${decision}` : `DÉCISION: ${decision}`, 120, finalY + 30);
-            } else if (!isNursery) {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.text(isEn ? `AVERAGE: -- / 20` : `MOYENNE: -- / 20`, 120, finalY + 16);
-                doc.text(isEn ? `RANK: -- / ${totalStudents || '--'}` : `RANG: -- / ${totalStudents || '--'}`, 120, finalY + 23);
-                doc.text(isEn ? `DECISION: PENDING VALIDATION` : `DÉCISION: EN ATTENTE DE VALIDATION`, 120, finalY + 30);
-            }
-
-            if (template?.footer_image) {
-                try { doc.addImage(template.footer_image, 'JPEG', 0, 255, 210, 42, undefined, 'FAST'); } catch(e) {}
+                try { doc.addImage(template.header_image, 'JPEG', 0, 0, 210, 38, undefined, 'FAST'); curY = 41; } catch(e) {}
             } else {
-            const sigY = finalY + 55;
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(primary[0], primary[1], primary[2]);
-            const sigLeftStr = school.bulletin_sig_left || (isEn ? 'TEACHER' : "L'ENSEIGNANT (TEACHER)");
-            const sigMiddleStr = school.bulletin_sig_middle || (isEn ? 'PARENT / GUARDIAN' : 'PARENT / GUARDIAN');
-            const sigRightStr = school.bulletin_sig_right || (isEn ? 'HEADMASTER' : 'LE DIRECTEUR (HEADMASTER)');
-            doc.text(sigLeftStr, 25, sigY);
-            doc.text(sigMiddleStr, 85, sigY);
-            doc.text(sigRightStr, 140, sigY);
+                doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
+                doc.setFont('helvetica', 'bold');
+                doc.text('RÉPUBLIQUE DU CAMEROUN', mL, curY + 4);
+                doc.setFont('helvetica', 'italic');
+                doc.text('Paix - Travail - Patrie', mL, curY + 8);
+                doc.setFont('helvetica', 'normal');
+                doc.text(school.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", mL, curY + 12);
+                doc.setFont('helvetica', 'bold');
+                doc.text((school.name || '').toUpperCase(), mL, curY + 20);
+                doc.setFont('helvetica', 'normal');
+                if (school.address) doc.text(school.address, mL, curY + 24);
+
+                doc.setFont('helvetica', 'bold');
+                doc.text('REPUBLIC OF CAMEROON', pageW - mR, curY + 4, { align: 'right' });
+                doc.setFont('helvetica', 'italic');
+                doc.text('Peace - Work - Fatherland', pageW - mR, curY + 8, { align: 'right' });
+                doc.setFont('helvetica', 'normal');
+                doc.text(school.header_english || 'MINISTRY OF BASIC EDUCATION', pageW - mR, curY + 12, { align: 'right' });
+                doc.setFont('helvetica', 'bold');
+                doc.text((school.name || '').toUpperCase(), pageW - mR, curY + 20, { align: 'right' });
+                doc.setFont('helvetica', 'normal');
+                if (school.address) doc.text(school.address, pageW - mR, curY + 24, { align: 'right' });
+
+                if (school.logo) {
+                    try {
+                        const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                        doc.addImage(school.logo, ext, pageW / 2 - 10, curY + 1, 20, 20, undefined, 'FAST');
+                    } catch(e) {}
+                }
+                curY += 27;
+                if (school.motto) {
+                    doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+                    doc.text(school.motto, pageW / 2, curY, { align: 'center' });
+                    curY += 5;
+                }
             }
 
-            doc.setFontSize(7);
-            doc.setTextColor(120, 120, 120);
-            doc.setFont('helvetica', 'italic');
-            doc.text(`${i18n.t('generated_by_footer')} ${school?.name || ''} ${isEn ? 'on' : 'le'} ${new Date().toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} - ${i18n.t('official_doc_footer')}`, 105, 285, { align: 'center' });
+            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4);
+            doc.line(mL, curY, pageW - mR, curY);
+            curY += 3;
+
+            // Title
+            const termNum = typeof term === 'number' ? term : (parseInt(String(term).split('_')[0]) || 1);
+            const titleStr = isAnnual ? (isEn ? 'ANNUAL REPORT CARD' : 'BULLETIN ANNUEL') : `BULLETIN TRIMESTRIEL N°${termNum}`;
+            doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+            doc.setTextColor(primary[0], primary[1], primary[2]);
+            doc.text(titleStr, pageW / 2, curY + 5, { align: 'center' });
+            const monthYear = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+            doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
+            doc.text(monthYear.charAt(0).toUpperCase() + monthYear.slice(1), pageW - mR, curY + 5, { align: 'right' });
+            doc.setTextColor(0, 0, 0);
+            curY += 10;
+
+            // Student info grid (3 rows, bordered)
+            const rowH = 7, gridTotalH = rowH * 3;
+            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+            doc.rect(mL, curY, cW, gridTotalH);
+            doc.line(mL, curY + rowH, pageW - mR, curY + rowH);
+            doc.line(mL, curY + 2 * rowH, pageW - mR, curY + 2 * rowH);
+
+            const drawBulkInfoCell = (x: number, y: number, w: number, label: string, value: string, hasBorderRight: boolean) => {
+                if (hasBorderRight) doc.line(x + w, y, x + w, y + rowH);
+                doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
+                doc.text(label, x + 1.5, y + 4.5);
+                const lw = doc.getTextWidth(label);
+                doc.setFont('helvetica', 'normal');
+                doc.text(value || '--', x + 1.5 + lw, y + 4.5);
+            };
+
+            const syear = `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`;
+            const fullName = `${student.last_name || ''} ${student.first_name || ''}`.trim();
+            const dob = student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('fr-FR') : '--';
+            const sex = student.gender === 'M' ? 'Masculin' : student.gender === 'F' ? 'Féminin' : '--';
+
+            const r1c1 = 55;
+            drawBulkInfoCell(mL, curY, r1c1, 'Année Scolaire : ', syear, true);
+            drawBulkInfoCell(mL + r1c1, curY, cW - r1c1, 'Nom et Prénom : ', fullName, false);
+            const r2c1 = 36, r2c2 = 65;
+            drawBulkInfoCell(mL, curY + rowH, r2c1, 'Effectif : ', (totalStudents || '--').toString(), true);
+            drawBulkInfoCell(mL + r2c1, curY + rowH, r2c2, 'Date de Naissance : ', dob, true);
+            drawBulkInfoCell(mL + r2c1 + r2c2, curY + rowH, cW - r2c1 - r2c2, 'Sexe : ', sex, false);
+            const r3c1 = 50, r3c2 = 55;
+            drawBulkInfoCell(mL, curY + 2 * rowH, r3c1, 'Matricule : ', student.matricule || '--', true);
+            drawBulkInfoCell(mL + r3c1, curY + 2 * rowH, r3c2, 'Classe : ', classObj.name || '--', true);
+            drawBulkInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, cW - r3c1 - r3c2, 'Enseignant(e) : ', classObj.teacher_name || '--', false);
+            curY += gridTotalH + 3;
+
+            // Grades table
+            let grandTP = 0, grandTC = 0, grandMax = 0;
+            const tableBody: any[] = [];
+
+            if (isAnnual) {
+                // Annual: subject | T1 | T2 | ... | MOY | COEF | TOTAL | APPRÉCIATION
+                const subjectsMapAnn: Record<string, any> = {};
+                validatedGrades.forEach((g: any) => {
+                    if (!subjectsMapAnn[g.subjectName]) subjectsMapAnn[g.subjectName] = { name: g.subjectName, coef: g.coefficient, terms: {}, totalScore: 0, count: 0 };
+                    subjectsMapAnn[g.subjectName].terms[g.term] = g.score;
+                    subjectsMapAnn[g.subjectName].totalScore += g.score;
+                    subjectsMapAnn[g.subjectName].count++;
+                });
+                Object.values(subjectsMapAnn).forEach((sub: any) => {
+                    const avg = sub.count > 0 ? sub.totalScore / sub.count : 0;
+                    const coef = Number(sub.coef) || 1;
+                    grandTP += avg * coef; grandTC += coef; grandMax += 20 * coef;
+                    const termsScores = (termsArray || []).map((t: number) => sub.terms[t] !== undefined ? (sub.terms[t] as number).toFixed(2) : '-');
+                    tableBody.push([sub.name, ...termsScores, avg.toFixed(2), coef, (avg * coef).toFixed(2), getPrimaryAppreciation(avg)]);
+                });
+                if (tableBody.length > 0) {
+                    const annAvgCalc = grandTC > 0 ? grandTP / grandTC : 0;
+                    const sf = [228, 240, 255];
+                    tableBody.push([{ content: 'RANG', colSpan: 1, styles: { fontStyle: 'bold', halign: 'right', fillColor: sf } },
+                        ...(termsArray||[]).map(() => ({ content: '', styles: { fillColor: sf } })),
+                        { content: `${rank||'--'} / ${totalStudents||'--'}`, colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                        { content: '', styles: { fillColor: sf } }, { content: '', styles: { fillColor: sf } }]);
+                    tableBody.push([{ content: 'MOYENNE ANNUELLE', colSpan: 1, styles: { fontStyle: 'bold', halign: 'right', fillColor: sf } },
+                        ...(termsArray||[]).map(() => ({ content: '', styles: { fillColor: sf } })),
+                        { content: annAvgCalc.toFixed(2), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                        { content: grandTC.toString(), styles: { halign: 'center', fillColor: sf } },
+                        { content: grandTP.toFixed(2), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                        { content: getPrimaryAppreciation(annAvgCalc), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } }]);
+                }
+                (doc as any).autoTable({
+                    startY: curY,
+                    head: [[isEn ? 'SUBJECT' : 'MATIÈRE', ...(termsArray||[]).map((t: number) => `T${t}`), 'MOY/20', 'COEF', 'TOTAL', isEn ? 'APPRECIATION' : 'APPRÉCIATION']],
+                    body: tableBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: primary, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+                    bodyStyles: { fontSize: 8 },
+                    margin: { left: mL, right: mR },
+                    pageBreak: 'avoid'
+                });
+            } else {
+                // Trimestrial: domain-grouped with rowSpan
+                const groupedGrades: Record<string, any[]> = {};
+                validatedGrades.forEach((g: any) => {
+                    const domain = g.domain || (isEn ? 'GENERAL SUBJECTS' : 'MATIÈRES GÉNÉRALES');
+                    if (!groupedGrades[domain]) groupedGrades[domain] = [];
+                    groupedGrades[domain].push(g);
+                });
+
+                const totalRows = validatedGrades.length + 3 + 1;
+                let fs = 8, cp: any = { top: 2, right: 2, bottom: 2, left: 2 };
+                if (totalRows > 16) { fs = 7.5; cp = { top: 1.5, right: 2, bottom: 1.5, left: 2 }; }
+                if (totalRows > 22) { fs = 7;   cp = { top: 1.2, right: 1.5, bottom: 1.2, left: 1.5 }; }
+                if (totalRows > 28) { fs = 6.5; cp = { top: 0.8, right: 1, bottom: 0.8, left: 1 }; }
+                if (totalRows > 36) { fs = 6;   cp = { top: 0.5, right: 1, bottom: 0.5, left: 1 }; }
+                if (totalRows > 44) { fs = 5.5; cp = { top: 0.3, right: 0.8, bottom: 0.3, left: 0.8 }; }
+
+                if (validatedGrades.length === 0) {
+                    tableBody.push([{ content: 'AUCUNE NOTE VALIDÉE', colSpan: isNursery ? 6 : 7, styles: { halign: 'center', textColor: [200, 50, 50], fontStyle: 'bold' } }]);
+                } else {
+                    Object.entries(groupedGrades).forEach(([domain, subjects]) => {
+                        subjects.forEach((g: any, idx: number) => {
+                            const row: any[] = [];
+                            if (idx === 0) {
+                                row.push({ content: domain.toUpperCase(), rowSpan: subjects.length, styles: { fontStyle: 'bold', halign: 'center', valign: 'middle', fillColor: [235, 242, 252], textColor: primary } });
+                            }
+                            if (isNursery) {
+                                const app = getNurseryAppreciation(g.score);
+                                row.push(g.subjectName || g.name || '--');
+                                row.push({ content: app.label || '--', styles: { halign: 'center' } });
+                                row.push({ content: '', styles: { halign: 'center' } });
+                                row.push({ content: app.remark || '--', styles: { halign: 'center', fontSize: fs - 0.5 } });
+                                row.push('');
+                            } else {
+                                const score = Number(g.score) || 0, coef = Number(g.coefficient) || 1, total = score * coef;
+                                grandTP += total; grandTC += coef; grandMax += 20 * coef;
+                                row.push(g.subjectName || g.name || '--');
+                                row.push({ content: score.toFixed(2), styles: { halign: 'center' } });
+                                row.push({ content: coef.toString(), styles: { halign: 'center' } });
+                                row.push({ content: total.toFixed(2), styles: { halign: 'center' } });
+                                row.push({ content: getPrimaryAppreciation(score), styles: { halign: 'center', fontSize: fs - 0.5 } });
+                                row.push('');
+                            }
+                            tableBody.push(row);
+                        });
+                    });
+
+                    if (!isNursery) {
+                        const avg = grandTC > 0 ? grandTP / grandTC : 0;
+                        const sf = [228, 240, 255];
+                        tableBody.push([
+                            { content: 'TOTAL', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } },
+                            { content: grandTC.toString(), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                            { content: `${grandTP.toFixed(2)} / ${grandMax}`, styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } }
+                        ]);
+                        tableBody.push([
+                            { content: 'MOYENNE', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: sf } },
+                            { content: avg.toFixed(2), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } },
+                            { content: '/ 20', styles: { halign: 'center', fillColor: sf } },
+                            { content: getPrimaryAppreciation(avg), styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } }
+                        ]);
+                        tableBody.push([
+                            { content: 'RANG', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: sf } },
+                            { content: `${rank || '--'} / ${totalStudents || '--'}`, colSpan: 2, styles: { halign: 'center', fontStyle: 'bold', fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } },
+                            { content: '', styles: { fillColor: sf } }
+                        ]);
+                    }
+                }
+
+                const primaryCols = { 0: { cellWidth: 22 }, 1: { cellWidth: 50 }, 2: { halign: 'center', cellWidth: 18 }, 3: { halign: 'center', cellWidth: 12 }, 4: { halign: 'center', cellWidth: 18 }, 5: { halign: 'center', cellWidth: 28 }, 6: { cellWidth: 42 } };
+                const nurseryCols = { 0: { cellWidth: 25 }, 1: { cellWidth: 60 }, 2: { halign: 'center', cellWidth: 22 }, 3: { halign: 'center', cellWidth: 15 }, 4: { halign: 'center', cellWidth: 28 }, 5: { cellWidth: 40 } };
+
+                (doc as any).autoTable({
+                    startY: curY,
+                    head: [isNursery
+                        ? ['DOMAINE', 'ACTIVITÉS', 'ÉVALUATION', 'TOTAL', 'APPRÉCIATION', 'OBSERVATION']
+                        : ['DOMAINE', 'ACTIVITÉS / MATIÈRE', 'NOTE/20', 'COEF', 'TOTAL', 'APPRÉCIATION', 'OBSERVATION']],
+                    body: tableBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: primary, textColor: [255, 255, 255], fontSize: fs, fontStyle: 'bold', cellPadding: cp },
+                    bodyStyles: { fontSize: fs, cellPadding: cp },
+                    columnStyles: isNursery ? nurseryCols : primaryCols,
+                    margin: { left: mL, right: mR },
+                    pageBreak: 'avoid'
+                });
+            }
+
+            let finalY = (doc as any).lastAutoTable.finalY + 3;
+
+            // Stats bar (5 cells)
+            const totalAbsence = (attendance || []).reduce((acc: number, cur: any) => acc + (cur.hours_absent || 0), 0);
+            const statsBarW = cW / 5;
+            const statsH = 11;
+            const calcAvg = grandTC > 0 ? grandTP / grandTC : (isAnnual && typeof annualAvg === 'number' ? annualAvg : 0);
+            const decision = calcAvg >= 10 ? (isAnnual ? 'ADMIS(E) EN SUP.' : 'ADMIS(E)') : (calcAvg > 0 ? 'AVERTISSEMENT' : '--');
+
+            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+            doc.rect(mL, finalY, cW, statsH);
+            [
+                { label: 'Moy. du premier',   value: firstAvg !== undefined ? (firstAvg as number).toFixed(2) : '--' },
+                { label: 'Moy. de la classe', value: classAvgVal !== undefined ? (classAvgVal as number).toFixed(2) : '--' },
+                { label: 'Décision',          value: validatedGrades.length > 0 || isAnnual ? decision : '--' },
+                { label: 'Effectif',          value: (totalStudents || '--').toString() },
+                { label: 'Moy. du dernier',   value: lastAvg !== undefined ? (lastAvg as number).toFixed(2) : '--' }
+            ].forEach(({ label, value }, i) => {
+                if (i > 0) doc.line(mL + i * statsBarW, finalY, mL + i * statsBarW, finalY + statsH);
+                doc.setFontSize(5.8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
+                doc.text(label, mL + i * statsBarW + statsBarW / 2, finalY + 3.5, { align: 'center' });
+                doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+                doc.text(value, mL + i * statsBarW + statsBarW / 2, finalY + 8.5, { align: 'center' });
+            });
+            finalY += statsH + 3;
+
+            doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+            doc.text(`Absences : ${totalAbsence} h   —   Conduite : ${calculateAttendanceObservations(totalAbsence)}`, mL, finalY + 4);
+            finalY += 8;
+
+            // Signatures (3 columns, bordered)
+            if (template?.footer_image) {
+                try { doc.addImage(template.footer_image, 'JPEG', 0, pageH - 45, 210, 45, undefined, 'FAST'); } catch(e) {}
+            } else {
+                const sigH = 13, sig3W = cW / 3;
+                doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+                doc.rect(mL, finalY, cW, sigH);
+                doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
+                doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
+                [
+                    school.bulletin_sig_middle || 'VISA DU PARENT',
+                    school.bulletin_sig_left   || "VISA DE L'ENSEIGNANT(E)",
+                    school.bulletin_sig_right  || 'VISA DU DIRECTEUR'
+                ].forEach((label, i) => {
+                    doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(primary[0], primary[1], primary[2]);
+                    doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
+                });
+                finalY += sigH + 3;
+                doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+                doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
+                doc.setFont('helvetica', 'normal');
+                doc.text("A = Acquis     EC = En cours d'acquisition     NA = Non-Acquis", mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
+            }
+
+            doc.setFontSize(5.5); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'italic');
+            doc.text(
+                `Généré par ${school?.name || ''} le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+                pageW / 2, pageH - 3, { align: 'center' }
+            );
         }
     });
 
