@@ -703,6 +703,115 @@ function initDb() {
         }
     } catch(e) { console.error('allowed_modules migration error:', e.message); }
 
+    // Noutcha Bilingual School — official bulletin subjects seed
+    // Inserted once based on the real bulletin photos. Idempotent (check by name+level+section).
+    try {
+        const noutchaSeeded = db.prepare("SELECT value FROM settings WHERE key = 'noutcha_subjects_v1_seeded'").get();
+        if (!noutchaSeeded) {
+            console.log('[Migration] Seeding Noutcha official bulletin subjects...');
+
+            const officialSubjects = [
+                // ──────────────────────────────────────────────────────────────────
+                // MATERNELLE · FRANCOPHONE
+                // ──────────────────────────────────────────────────────────────────
+                { name: 'Expression orale',                          domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Chants et récits',                          domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Expression gestuelle',                      domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Lecture/écriture',                          domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Graphisme',                                 domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Langue nationale',                          domain: 'Langue et Communication',                    level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Éducation sensorielle et perceptive',       domain: 'Éveil scientifique et technologique',        level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Initiation aux mathématiques',              domain: 'Éveil scientifique et technologique',        level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'TIC',                                       domain: 'Éveil scientifique et technologique',        level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Sciences et technologie',                   domain: 'Éveil scientifique et technologique',        level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Vie courante',                              domain: 'Vie courante',                               level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Création artistique',                       domain: 'Création artistique et activités manuelles', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Activités manuelles',                       domain: 'Création artistique et activités manuelles', level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Activités de la motricité',                 domain: 'Motricité',                                  level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Conduite',                                  domain: 'Savoir être',                                level: 'MATERNELLE', section: 'FRANCOPHONE' },
+                { name: 'Propreté',                                  domain: 'Savoir être',                                level: 'MATERNELLE', section: 'FRANCOPHONE' },
+
+                // ──────────────────────────────────────────────────────────────────
+                // MATERNELLE · ANGLOPHONE
+                // ──────────────────────────────────────────────────────────────────
+                { name: 'Oral expression',                           domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Poetry and Rhyme',                         domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Sign language and gesture',                domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Reading',                                  domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Initiation to written language',           domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Pre-letter formation',                     domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'National language and culture',            domain: 'Literacy and Communication',                  level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Initiation to mathematics',                domain: 'Science and Technological Skill Development', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Sensory and Perceptive Education',         domain: 'Science and Technological Skill Development', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Sciences and Technology',                  domain: 'Science and Technological Skill Development', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'I.C.T.',                                   domain: 'Science and Technological Skill Development', level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Practical Life Activities',                domain: 'Practical Life Skills',                       level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Drawing, colouring',                       domain: 'Arts and Craft',                              level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Painting',                                 domain: 'Arts and Craft',                              level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Hand work/manual activities',             domain: 'Arts and Craft',                              level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Physical education and sport',            domain: 'Motor Skills',                                level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Conduct',                                  domain: 'Attitudes',                                   level: 'MATERNELLE', section: 'ANGLOPHONE' },
+                { name: 'Appearance',                               domain: 'Attitudes',                                   level: 'MATERNELLE', section: 'ANGLOPHONE' },
+
+                // ──────────────────────────────────────────────────────────────────
+                // PRIMAIRE · FRANCOPHONE
+                // ──────────────────────────────────────────────────────────────────
+                { name: 'Communiquer en Français',                              domain: 'Langues et Communication',  level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Communiquer en Anglais',                               domain: 'Langues et Communication',  level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Pratiquer une langue nationale',                       domain: 'Langues et Communication',  level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Communiquer en mathématiques',                         domain: 'Sciences et Technologie',   level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Utiliser les notions de base en sciences et technologies', domain: 'Sciences et Technologie', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Utiliser les concepts de base et outils TIC',          domain: 'Sciences et Technologie',   level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Pratiquer les valeurs citoyennes',                     domain: 'Développement Personnel',   level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Pratiquer les valeurs sociales',                       domain: 'Développement Personnel',   level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: "L'autonomie, l'esprit d'initiative et d'entrepreneuriat", domain: 'Développement Personnel', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Pratiquer les activités physiques et sportives',       domain: 'Développement Physique',    level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+                { name: 'Pratiquer les activités artistiques',                  domain: 'Culture et Arts',           level: 'PRIMAIRE', section: 'FRANCOPHONE' },
+
+                // ──────────────────────────────────────────────────────────────────
+                // PRIMAIRE · ANGLOPHONE
+                // ──────────────────────────────────────────────────────────────────
+                { name: 'Communicate in English language',                domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Communicate in French language',                 domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Communicate in at least one national language',  domain: 'Languages and Communication', level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Use basic notion in Mathematics',                domain: 'Sciences and Technology',     level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Use basic notion in Science and Technology',     domain: 'Sciences and Technology',     level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'I.C.T.',                                         domain: 'Sciences and Technology',     level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Practice social values',                         domain: 'Personal Development',        level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Vocational studies',                             domain: 'Personal Development',        level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Practice physical and sport activities',         domain: 'Physical Development',        level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+                { name: 'Practice artistic education',                    domain: 'Culture and Arts',            level: 'PRIMAIRE', section: 'ANGLOPHONE' },
+            ];
+
+            const checkSubj = db.prepare('SELECT id FROM subjects WHERE name = ? AND level = ? AND section = ?');
+            const insertSubj = db.prepare('INSERT INTO subjects (name, domain, level, section) VALUES (?, ?, ?, ?)');
+            const insertSchoolSubj = db.prepare('INSERT OR IGNORE INTO school_subjects (school_id, subject_id, is_active) VALUES (?, ?, 1)');
+            const allSchools = db.prepare("SELECT id FROM schools WHERE deleted_at IS NULL AND is_active = 1").all();
+
+            const seedTx = db.transaction(() => {
+                for (const s of officialSubjects) {
+                    let existing = checkSubj.get(s.name, s.level, s.section);
+                    if (!existing) {
+                        const res = insertSubj.run(s.name, s.domain, s.level, s.section);
+                        const newId = res.lastInsertRowid;
+                        for (const school of allSchools) {
+                            insertSchoolSubj.run(school.id, newId);
+                        }
+                    } else {
+                        // Subject exists — make sure it's linked to all schools
+                        for (const school of allSchools) {
+                            insertSchoolSubj.run(school.id, existing.id);
+                        }
+                    }
+                }
+            });
+            seedTx();
+
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('noutcha_subjects_v1_seeded', 'true')").run();
+            console.log(`[Migration] Noutcha bulletin subjects seeded (${officialSubjects.length} subjects)`);
+        }
+    } catch(e) { console.error('[Migration] Noutcha subjects seeding failed:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 
