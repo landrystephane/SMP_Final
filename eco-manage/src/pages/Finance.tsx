@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { notifyDataChanged } from '../utils/dataSync';
+import { generateFinancialStatement } from '../utils/reports';
 
 const Finance: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const isEn = i18n.language?.startsWith('en') ?? false;
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -745,7 +747,38 @@ const Finance: React.FC = () => {
                                             >
                                                 {t('pay')}
                                             </button>
-                                            <button className="p-2.5 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/5">
+                                            <button
+                                                title={isEn ? 'Financial Statement' : 'Relevé Financier'}
+                                                className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-indigo-500/20 rounded-xl border border-white/5"
+                                                onClick={async () => {
+                                                    try {
+                                                        const details = await window.electronAPI.getStudentDetails(s.id);
+                                                        const tf = tuitionFees.find((f: any) => f.classId === s.class_id);
+                                                        const ci = (installments || []).map((inst: any) => ({
+                                                            id: inst.id,
+                                                            name: inst.name,
+                                                            amountDue: (classInstallmentFees || []).find((cif: any) => cif.class_id === s.class_id && cif.installment_id === inst.id)?.amount || 0
+                                                        }));
+                                                        const sid = localStorage.getItem('impersonated_school_id') || user?.schoolId;
+                                                        const activeSchool = schools.find((sc: any) => sc.id?.toString() === sid?.toString()) || schools[0];
+                                                        generateFinancialStatement({
+                                                            student: details.student,
+                                                            payments: details.payments,
+                                                            tuitionConfig: {
+                                                                totalFee: tf?.totalFee || 0,
+                                                                registrationFee: tf?.registrationFee || 0,
+                                                                transportFee: tf?.transportFee || 0,
+                                                                examFee: tf?.examFee || 0
+                                                            },
+                                                            classInstallments: ci,
+                                                            school: activeSchool,
+                                                            currency
+                                                        });
+                                                    } catch {
+                                                        showNotification('error', isEn ? 'Failed to generate financial statement.' : 'Erreur lors de la génération du relevé financier.');
+                                                    }
+                                                }}
+                                            >
                                                 <FileText className="w-5 h-5" />
                                             </button>
                                         </td>

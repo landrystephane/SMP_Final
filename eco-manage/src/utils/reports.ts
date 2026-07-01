@@ -1695,3 +1695,379 @@ export const generateStudentsListReport = (data: { students: any[], classes: any
     const safeTitle = reportTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/_+/g, "_").replace(/_$/, "");
     doc.save(`${safeTitle}.pdf`);
 };
+
+export const generateFinancialStatement = (data: {
+    student: any;
+    payments: any[];
+    tuitionConfig: { totalFee: number; registrationFee: number; transportFee: number; examFee: number };
+    classInstallments: { id: number; name: string; amountDue: number }[];
+    school?: any;
+    currency?: string;
+}) => {
+    const { student, payments, tuitionConfig, classInstallments, school, currency = 'FCFA' } = data;
+    const doc = new jsPDF();
+    const isEn = i18n.language?.startsWith('en') ?? false;
+    const primary: [number, number, number] = school?.primary_color ? hexToRgb(school.primary_color) : [30, 41, 59];
+    const secondary: [number, number, number] = school?.secondary_color ? hexToRgb(school.secondary_color) : [245, 158, 11];
+    const fmtNum = (n: number) => Math.round(n).toLocaleString('en-US').replace(/,/g, ' ');
+    const fmtDate = (d: string) => {
+        if (!d) return '-';
+        try { return new Date(d).toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+        catch { return d; }
+    };
+
+    // === School header ===
+    let y = 8;
+    if (school) {
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('R\u00c9PUBLIQUE DU CAMEROUN', 20, y);
+        doc.text('REPUBLIC OF CAMEROON', 190, y, { align: 'right' });
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(5.5);
+        doc.text('Paix - Travail - Patrie', 20, y + 3.5);
+        doc.text('Peace - Work - Fatherland', 190, y + 3.5, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.text(school.header_french || "MINIST\u00c8RE DE L'\u00c9DUCATION DE BASE", 20, y + 7);
+        doc.text(school.header_english || "MINISTRY OF BASIC EDUCATION", 190, y + 7, { align: 'right' });
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.text(school.name.toUpperCase(), 105, y + 7, { align: 'center' });
+        doc.setFontSize(7);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('helvetica', 'normal');
+        const addrLine = `${school.address || ''}${school.bp ? ` - BP: ${school.bp}` : ''}`.trim();
+        if (addrLine) doc.text(addrLine, 105, y + 12, { align: 'center' });
+        y += 22;
+    }
+
+    // === Title ===
+    y += 3;
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(isEn ? 'COMPREHENSIVE FINANCIAL STATEMENT' : 'RELEV\u00c9 FINANCIER COMPLET', 105, y, { align: 'center' });
+    y += 5;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' });
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(130, 130, 130);
+    doc.text(`${isEn ? 'Generated on' : 'G\u00e9n\u00e9r\u00e9 le'} ${dateStr} ${isEn ? 'at' : '\u00e0'} ${timeStr}`, 105, y, { align: 'center' });
+    y += 5;
+    doc.setDrawColor(primary[0], primary[1], primary[2]);
+    doc.setLineWidth(0.5);
+    doc.line(15, y, 195, y);
+    y += 6;
+
+    // === Student info block ===
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(isEn ? 'STUDENT:' : '\u00c9L\u00c8VE:', 15, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${(student.last_name || '').toUpperCase()} ${student.first_name || ''}`, 48, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(isEn ? 'CLASS:' : 'CLASSE:', 120, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(student.className || '', 145, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.text(isEn ? 'REG. NO:' : 'MATRICULE:', 15, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(student.matricule || '', 48, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(isEn ? 'PARENT:' : 'PARENT:', 120, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(student.parent_name || '-', 145, y);
+    y += 5;
+    if (student.parent_contact) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(isEn ? 'CONTACT:' : 'CONTACT:', 120, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(student.parent_contact, 145, y);
+    }
+    y += 5;
+
+    // === Financial computations ===
+    const scholarship = student.scholarship_reduction || 0;
+    const netPension = Math.max(0, (tuitionConfig.totalFee || 0) - scholarship);
+    const inscriptionDue = tuitionConfig.registrationFee || 0;
+    const transportDue = student.has_transport ? (tuitionConfig.transportFee || 0) : 0;
+    const examDue = student.has_exam ? (tuitionConfig.examFee || 0) : 0;
+    const totalDue = netPension + inscriptionDue + transportDue + examDue;
+    const totalPaid = payments.reduce((a: number, p: any) => a + (p.amount || 0), 0);
+    const balance = totalDue - totalPaid;
+
+    // Installment allocation (sequential, same logic as Finance.tsx getStudentFinancials)
+    const combinedTuitionPaid = payments
+        .filter((p: any) => p.payment_type === 'Scolarit\u00e9' || p.payment_type === 'Inscription')
+        .reduce((a: number, p: any) => a + (p.amount || 0), 0);
+    let remaining = combinedTuitionPaid;
+    const inscPaid = Math.min(inscriptionDue, remaining);
+    remaining -= inscPaid;
+    const installmentRowData = classInstallments.map((inst: any) => {
+        const paid = Math.min(inst.amountDue, remaining);
+        remaining -= paid;
+        return { name: inst.name, due: inst.amountDue, paid, balance: inst.amountDue - paid };
+    });
+    const installmentBalances = [Math.max(0, inscriptionDue - inscPaid), ...installmentRowData.map((r: any) => r.balance)];
+
+    // === Status badge ===
+    const statusLabel = student.has_moratoire === 1
+        ? (isEn ? 'MORATOIRE GRANTED' : 'MORATOIRE ACCORD\u00c9')
+        : balance <= 0
+        ? (isEn ? 'FULLY SETTLED' : 'SOLD\u00c9')
+        : (isEn ? 'IN PROGRESS' : 'EN COURS');
+    const statusBg: [number, number, number] = student.has_moratoire === 1
+        ? [245, 158, 11]
+        : balance <= 0
+        ? [34, 197, 94]
+        : [239, 68, 68];
+    doc.setFillColor(statusBg[0], statusBg[1], statusBg[2]);
+    doc.roundedRect(15, y, 55, 8, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(statusLabel, 42.5, y + 5.5, { align: 'center' });
+    if (student.has_moratoire === 1) {
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text(isEn ? 'Payment spread authorized \u2014 late payments permitted' : 'Paiement \u00e9chelonn\u00e9 autoris\u00e9 \u2014 arri\u00e9r\u00e9s tol\u00e9r\u00e9s', 75, y + 5.5);
+    }
+    y += 12;
+
+    // === SECTION 1: Fee Summary ===
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, y, 195, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(isEn ? '1.  FEE SUMMARY' : '1.  R\u00c9CAPITULATIF DES FRAIS', 15, y);
+    y += 4;
+
+    const feeDetailRows: any[] = [
+        [isEn ? 'Gross tuition fee' : 'Frais de scolarit\u00e9 bruts', `${fmtNum(tuitionConfig.totalFee || 0)} ${currency}`, 'normal'],
+        ...(scholarship > 0 ? [[isEn ? 'Scholarship reduction' : 'R\u00e9duction de scolarit\u00e9', `- ${fmtNum(scholarship)} ${currency}`, 'reduction']] : []),
+        [isEn ? 'Net tuition fee' : 'Frais de scolarit\u00e9 nets', `${fmtNum(netPension)} ${currency}`, 'normal'],
+        [isEn ? 'Registration fee' : "Frais d'inscription", `${fmtNum(inscriptionDue)} ${currency}`, 'normal'],
+        ...(transportDue > 0 ? [[isEn ? 'Transport fee' : 'Frais de transport', `${fmtNum(transportDue)} ${currency}`, 'normal']] : []),
+        ...(examDue > 0 ? [[isEn ? 'Exam fee' : "Frais d'examen", `${fmtNum(examDue)} ${currency}`, 'normal']] : []),
+    ];
+
+    (doc as any).autoTable({
+        body: feeDetailRows.map(r => [r[0], r[1]]),
+        startY: y,
+        theme: 'plain',
+        columnStyles: { 0: { halign: 'left', cellWidth: 135 }, 1: { halign: 'right', cellWidth: 45 } },
+        bodyStyles: { textColor: [51, 65, 85], fontSize: 8.5 },
+        margin: { left: 15, right: 15 },
+        didParseCell: (data: any) => {
+            const tag = feeDetailRows[data.row.index]?.[2];
+            if (tag === 'reduction') data.cell.styles.textColor = [34, 197, 94];
+        }
+    });
+    y = (doc as any).lastAutoTable.finalY + 2;
+
+    // Totals block
+    (doc as any).autoTable({
+        body: [
+            [isEn ? 'TOTAL DUE' : 'TOTAL D\u00db', `${fmtNum(totalDue)} ${currency}`],
+            [isEn ? 'TOTAL PAID' : 'TOTAL VERS\u00c9', `${fmtNum(totalPaid)} ${currency}`],
+            [isEn ? 'OUTSTANDING BALANCE' : 'SOLDE RESTANT', `${fmtNum(Math.max(0, balance))} ${currency}`],
+        ],
+        startY: y,
+        theme: 'plain',
+        columnStyles: { 0: { halign: 'left', cellWidth: 135, fontStyle: 'bold' }, 1: { halign: 'right', cellWidth: 45, fontStyle: 'bold' } },
+        bodyStyles: { textColor: [30, 41, 59], fontSize: 9 },
+        margin: { left: 15, right: 15 },
+        didParseCell: (data: any) => {
+            if (data.row.index === 2) {
+                data.cell.styles.textColor = balance <= 0 ? [34, 197, 94] : [220, 38, 38];
+                data.cell.styles.fontSize = 10;
+            }
+        }
+    });
+    y = (doc as any).lastAutoTable.finalY + 5;
+
+    // === SECTION 2: Installment Breakdown ===
+    if (classInstallments.length > 0) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.line(15, y, 195, y);
+        y += 5;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.text(isEn ? '2.  BREAKDOWN BY INSTALLMENT' : '2.  R\u00c9PARTITION PAR TRANCHE', 15, y);
+        y += 4;
+
+        const instTableBody = [
+            [
+                isEn ? 'Registration' : 'Inscription',
+                `${fmtNum(inscriptionDue)} ${currency}`,
+                `${fmtNum(inscPaid)} ${currency}`,
+                `${fmtNum(Math.max(0, inscriptionDue - inscPaid))} ${currency}`
+            ],
+            ...installmentRowData.map((r: any) => [
+                r.name,
+                `${fmtNum(r.due)} ${currency}`,
+                `${fmtNum(r.paid)} ${currency}`,
+                `${fmtNum(Math.max(0, r.balance))} ${currency}`
+            ])
+        ];
+
+        (doc as any).autoTable({
+            head: [[
+                isEn ? 'Tranche' : 'Tranche',
+                isEn ? 'Amount Due' : 'Montant D\u00fb',
+                isEn ? 'Amount Paid' : 'Montant Vers\u00e9',
+                isEn ? 'Balance' : 'Solde'
+            ]],
+            body: instTableBody,
+            startY: y,
+            theme: 'grid',
+            headStyles: { fillColor: primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+            bodyStyles: { textColor: [51, 65, 85], fontSize: 8 },
+            columnStyles: {
+                0: { cellWidth: 70 },
+                1: { halign: 'right', cellWidth: 37 },
+                2: { halign: 'right', cellWidth: 37 },
+                3: { halign: 'right', cellWidth: 36 }
+            },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 15, right: 15 },
+            didParseCell: (data: any) => {
+                if (data.column.index === 3 && data.section === 'body') {
+                    const bal = installmentBalances[data.row.index] ?? 0;
+                    data.cell.styles.textColor = bal <= 0 ? [34, 197, 94] : [220, 38, 38];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+        y = (doc as any).lastAutoTable.finalY + 5;
+    }
+
+    // === SECTION 3: Full Payment History ===
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, y, 195, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    const sectionNum = classInstallments.length > 0 ? '3' : '2';
+    doc.text(`${sectionNum}.  ${isEn ? 'COMPLETE PAYMENT HISTORY' : 'HISTORIQUE COMPLET DES VERSEMENTS'}`, 15, y);
+    y += 4;
+
+    if (payments.length === 0) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(150, 150, 150);
+        doc.text(isEn ? 'No payment recorded yet.' : 'Aucun versement enregistr\u00e9 pour le moment.', 20, y + 5);
+        y += 12;
+    } else {
+        const sortedPayments = [...payments].sort((a: any, b: any) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
+        const historyRows = sortedPayments.map((p: any, idx: number) => {
+            const tranche = p.installmentName || (p.payment_type === 'Inscription' ? (isEn ? 'Registration' : 'Inscription') : '-');
+            return [
+                (idx + 1).toString(),
+                fmtDate(p.payment_date),
+                p.receipt_number || '-',
+                p.payment_type || '-',
+                tranche,
+                p.depositor_name || '-',
+                `${fmtNum(p.amount)} ${currency}`
+            ];
+        });
+        (doc as any).autoTable({
+            head: [['N\u00b0', isEn ? 'Date' : 'Date', isEn ? 'Receipt No.' : 'N\u00b0 Re\u00e7u', isEn ? 'Type' : 'Type', isEn ? 'Installment' : 'Tranche', isEn ? 'Depositor' : 'D\u00e9posant', isEn ? 'Amount' : 'Montant']],
+            body: historyRows,
+            startY: y,
+            theme: 'striped',
+            headStyles: { fillColor: primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+            bodyStyles: { textColor: [51, 65, 85], fontSize: 7.5 },
+            columnStyles: {
+                0: { cellWidth: 8, halign: 'center' },
+                1: { cellWidth: 22 },
+                2: { cellWidth: 28 },
+                3: { cellWidth: 22 },
+                4: { cellWidth: 30 },
+                5: { cellWidth: 35 },
+                6: { halign: 'right', cellWidth: 35 }
+            },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 15, right: 15 }
+        });
+        y = (doc as any).lastAutoTable.finalY + 5;
+    }
+
+    // === SECTION 4: Summary by payment type ===
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, y, 195, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    const secNum4 = classInstallments.length > 0 ? '4' : '3';
+    doc.text(`${secNum4}.  ${isEn ? 'SUMMARY BY PAYMENT TYPE' : 'R\u00c9CAPITULATIF PAR TYPE DE VERSEMENT'}`, 15, y);
+    y += 4;
+
+    const paymentTypes = ['Inscription', 'Scolarit\u00e9', 'Transport', 'Examen'];
+    const typeAmounts = paymentTypes.map(type => payments.filter((p: any) => p.payment_type === type).reduce((a: number, p: any) => a + (p.amount || 0), 0));
+    const typeSummaryRows = paymentTypes.map((type, i) => [
+        type,
+        `${fmtNum(typeAmounts[i])} ${currency}`,
+        typeAmounts[i] > 0 ? (isEn ? 'Paid' : 'Vers\u00e9') : '-'
+    ]);
+
+    (doc as any).autoTable({
+        head: [[isEn ? 'Payment Type' : 'Type de Versement', isEn ? 'Total Paid' : 'Total Vers\u00e9', isEn ? 'Status' : 'Statut']],
+        body: [
+            ...typeSummaryRows,
+            [isEn ? 'GRAND TOTAL' : 'TOTAL G\u00c9N\u00c9RAL', `${fmtNum(totalPaid)} ${currency}`, '']
+        ],
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: secondary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { textColor: [51, 65, 85], fontSize: 8.5 },
+        columnStyles: {
+            0: { cellWidth: 80 },
+            1: { halign: 'right', cellWidth: 70 },
+            2: { halign: 'center', cellWidth: 30 }
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 15, right: 15 },
+        didParseCell: (data: any) => {
+            if (data.row.index === paymentTypes.length && data.section === 'body') {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [241, 245, 249];
+                data.cell.styles.textColor = [30, 41, 59];
+            }
+        }
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // === Signature block ===
+    if (y > 260) { doc.addPage(); y = 20; }
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(isEn ? "Bursar / Cashier" : "L'\u00c9conome / Caisse", 25, y);
+    doc.text(isEn ? "School Director" : "Le Directeur / La Directrice", 130, y);
+    y += 14;
+    doc.setDrawColor(100, 100, 100);
+    doc.setLineWidth(0.3);
+    doc.line(25, y, 90, y);
+    doc.line(130, y, 195, y);
+
+    const safeName = `${student.last_name || 'Eleve'}_${student.first_name || ''}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_]/gi, "_").replace(/_+/g, "_").toUpperCase();
+    doc.save(`Releve_Financier_${safeName}_${now.toISOString().slice(0, 10)}.pdf`);
+};
