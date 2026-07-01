@@ -933,26 +933,23 @@ handlers['db:saveInstallmentDeadlines'] = async (arg1, arg2) => {
 
 handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, senderId }) => {
     const sid = getActiveSchoolId(schoolId);
-    
-    // 1. Get the target installment name and deadline
-    const installment = db.prepare('SELECT name FROM installments WHERE id = ?').get(installmentId);
-    const deadlineRecord = db.prepare('SELECT deadline_date FROM school_installment_deadlines WHERE school_id = ? AND installment_id = ?').get(sid, installmentId);
-    
-    if (!installment || !deadlineRecord || !deadlineRecord.deadline_date) {
-        return { success: false, error: 'Échéance non configurée pour cette tranche.' };
-    }
 
+    const installment = db.prepare('SELECT name FROM installments WHERE id = ?').get(installmentId);
+    if (!installment) return { success: false, error: 'Tranche introuvable.' };
+
+    const deadlineRecord = db.prepare('SELECT deadline_date FROM school_installment_deadlines WHERE school_id = ? AND installment_id = ?').get(sid, installmentId);
     const deadlineStr = deadlineRecord?.deadline_date || 'non définie';
 
+    // Find all active students with an outstanding balance (inscription + pension)
     const lateStudents = db.prepare(`
         SELECT s.id, s.first_name, s.last_name, s.parent_contact, c.name as class_name,
-               COALESCE(cif.amount, 0) as required_amount,
-               COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id = s.id AND (p.installment_id = ? OR (p.payment_type = 'Scolarité' AND p.installment_id IS NULL))), 0) as total_paid
+               COALESCE(tf.total_fee, 0) - COALESCE(s.scholarship_reduction, 0) + COALESCE(tf.registration_fee, 0) as total_due,
+               COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id = s.id), 0) as total_paid
         FROM students s
         JOIN classes c ON s.class_id = c.id
-        LEFT JOIN class_installment_fees cif ON s.class_id = cif.class_id AND cif.installment_id = ?
+        LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
         WHERE s.school_id = ? AND s.status = 'ACTIVE'
-    `).all(installmentId, installmentId, sid);
+    `).all(sid);
 
     let notifiedCount = 0;
     const notifStmt = db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'WARNING')");
@@ -960,17 +957,20 @@ handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, sender
 
     const tx = db.transaction(() => {
         for (const student of lateStudents) {
-            if (student.required_amount > 0 && student.total_paid < student.required_amount) {
-                const remaining = student.required_amount - student.total_paid;
-                const msg = `Rappel : Le paiement de la ${installment.name} pour ${student.first_name} ${student.last_name} (${student.class_name}) n'est pas encore complet. Reste à payer : ${remaining} FCFA. Échéance : ${deadlineStr}.`;
+            const remaining = Math.round(student.total_due - student.total_paid);
+            if (remaining > 0 && student.parent_contact) {
+                const msg = `⚠️ Rappel de paiement — ${installment.name}\n\nBonjour,\nNous vous rappelons que la scolarité de votre enfant ${student.first_name} ${student.last_name} (${student.class_name}) n'est pas entièrement réglée.\n\nMontant total restant dû : ${remaining.toLocaleString()} FCFA\nÉchéance de la ${installment.name} : ${deadlineStr}\n\nMerci de régulariser votre situation au plus tôt auprès de l'économat.`;
 
-                if (student.parent_contact) {
-                    const parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND school_id = ?").get(student.parent_contact, sid);
-                    if (parentUser) {
-                        notifStmt.run(sid, parentUser.id, msg);
-                        ticketStmt.run(senderId, parentUser.id, `Rappel ${installment.name}`, msg, sid);
-                        notifiedCount++;
-                    }
+                // Try to find parent user by username (phone number) with possible prefix variations
+                let parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND school_id = ?").get(student.parent_contact, sid);
+                if (!parentUser) {
+                    const digits = (student.parent_contact || '').replace(/^\+?237/, '').replace(/[^0-9]/g, '');
+                    if (digits) parentUser = db.prepare("SELECT id FROM users WHERE (username = ? OR username = ? OR username = ?) AND school_id = ?").get(digits, '237' + digits, '+237' + digits, sid);
+                }
+                if (parentUser) {
+                    notifStmt.run(sid, parentUser.id, msg);
+                    ticketStmt.run(senderId, parentUser.id, `Rappel — ${installment.name}`, msg, sid);
+                    notifiedCount++;
                 }
             }
         }
@@ -978,6 +978,97 @@ handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, sender
     tx();
 
     return { success: true, notifiedCount, message: `${notifiedCount} parent(s) notifié(s) pour la ${installment.name}.` };
+};
+
+handlers['db:submitAbsenceJustification'] = async ({ attendanceId, message, attachmentBase64 }) => {
+    const sid = getActiveSchoolId();
+    const currentUser = session.getStore()?.user;
+    if (!currentUser) throw new Error('Non authentifié.');
+
+    const att = db.prepare(`
+        SELECT a.*, s.first_name, s.last_name, s.class_id, s.school_id as student_school_id
+        FROM attendance a
+        JOIN students s ON a.student_id = s.id
+        WHERE a.id = ? AND s.school_id = ?
+    `).get(attendanceId, sid);
+    if (!att) throw new Error('Absence introuvable ou non autorisée.');
+
+    const teacherUserId = att.recorded_by;
+
+    const result = db.prepare(`
+        INSERT INTO absence_justifications (attendance_id, student_id, school_id, parent_user_id, teacher_user_id, parent_message, attachment_base64, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+    `).run(attendanceId, att.student_id, sid, currentUser.id, teacherUserId, message, attachmentBase64 || null);
+
+    if (teacherUserId) {
+        const parentName = db.prepare('SELECT full_name FROM users WHERE id = ?').get(currentUser.id)?.full_name || 'Un parent';
+        const absentDate = att.date ? new Date(att.date).toLocaleDateString('fr-FR') : att.date;
+        const notifMsg = `📋 JUSTIFICATION D'ABSENCE — ${parentName} a soumis une justification pour l'absence de ${att.first_name} ${att.last_name} le ${absentDate} (${att.hours_absent}h). Message : "${message.substring(0, 120)}${message.length > 120 ? '...' : ''}". Consultez l'onglet "Justifications" dans la page Présences.`;
+        db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')").run(sid, teacherUserId, notifMsg);
+    }
+
+    return { success: true, justificationId: result.lastInsertRowid };
+};
+
+handlers['db:getAbsenceJustifications'] = async ({ status } = {}) => {
+    const sid = getActiveSchoolId();
+    const currentUser = session.getStore()?.user;
+    if (!currentUser) return [];
+
+    let query = `
+        SELECT aj.*, s.first_name, s.last_name, s.matricule, c.name as class_name,
+               a.date as absence_date, a.hours_absent,
+               sub.name as subject_name,
+               u.full_name as parent_name
+        FROM absence_justifications aj
+        JOIN students s ON aj.student_id = s.id
+        JOIN classes c ON s.class_id = c.id
+        JOIN attendance a ON aj.attendance_id = a.id
+        LEFT JOIN schedules sch ON a.schedule_id = sch.id
+        LEFT JOIN subjects sub ON sch.subject_id = sub.id
+        LEFT JOIN users u ON aj.parent_user_id = u.id
+        WHERE aj.school_id = ? AND aj.teacher_user_id = ?
+    `;
+    const params = [sid, currentUser.id];
+
+    if (status && status !== 'ALL') {
+        query += ' AND aj.status = ?';
+        params.push(status);
+    }
+
+    query += ' ORDER BY aj.created_at DESC';
+    return db.prepare(query).all(...params);
+};
+
+handlers['db:reviewAbsenceJustification'] = async ({ justificationId, decision, teacherResponse }) => {
+    const sid = getActiveSchoolId();
+    const currentUser = session.getStore()?.user;
+    if (!currentUser) throw new Error('Non authentifié.');
+
+    const justif = db.prepare('SELECT * FROM absence_justifications WHERE id = ? AND school_id = ? AND teacher_user_id = ?').get(justificationId, sid, currentUser.id);
+    if (!justif) throw new Error('Justification introuvable ou non autorisée.');
+
+    const att = db.prepare('SELECT * FROM attendance WHERE id = ?').get(justif.attendance_id);
+    const student = db.prepare('SELECT first_name, last_name FROM students WHERE id = ?').get(justif.student_id);
+    const teacherName = db.prepare('SELECT full_name FROM users WHERE id = ?').get(currentUser.id)?.full_name || 'L\'enseignant';
+
+    const tx = db.transaction(() => {
+        db.prepare("UPDATE absence_justifications SET status = ?, teacher_response = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?").run(decision, teacherResponse || null, justificationId);
+
+        if (decision === 'APPROVED' && att) {
+            db.prepare("UPDATE attendance SET hours_absent = 0, status = 'JUSTIFIED', notes = ? WHERE id = ?").run(`Justifié le ${new Date().toLocaleDateString('fr-FR')} par ${teacherName}`, justif.attendance_id);
+        }
+
+        const absentDate = att?.date ? new Date(att.date).toLocaleDateString('fr-FR') : '';
+        const notifMsg = decision === 'APPROVED'
+            ? `✅ JUSTIFICATION ACCEPTÉE — La justification d'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été acceptée par ${teacherName}. L'absence (${att?.hours_absent || 0}h) a été retirée du dossier scolaire.${teacherResponse ? `\nMessage de l'enseignant : "${teacherResponse}"` : ''}`
+            : `❌ JUSTIFICATION REFUSÉE — La justification d'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été refusée par ${teacherName}.${teacherResponse ? `\nRaison : "${teacherResponse}"` : ''}\n\nVous pouvez soumettre une nouvelle justification.`;
+
+        db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, ?)").run(sid, justif.parent_user_id, notifMsg, decision === 'APPROVED' ? 'SUCCESS' : 'WARNING');
+    });
+    tx();
+
+    return { success: true };
 };
 
 handlers['db:getGlobalSubjects'] = async () => {

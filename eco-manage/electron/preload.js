@@ -190,4 +190,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   getServerIp: () => ipcRenderer.invoke('db:getServerIp'),
   showAlert: (msg, title) => ipcRenderer.sendSync('dialog:alert', msg, title),
+
+  // Absence Justifications
+  submitAbsenceJustification: (data) => ipcRenderer.invoke('db:submitAbsenceJustification', data),
+  getAbsenceJustifications: (params) => ipcRenderer.invoke('db:getAbsenceJustifications', params),
+  reviewAbsenceJustification: (data) => ipcRenderer.invoke('db:reviewAbsenceJustification', data),
 });

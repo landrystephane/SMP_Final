@@ -29,6 +29,14 @@ const ParentPortal: React.FC = () => {
     const [ticketSubject, setTicketSubject] = useState('');
     const [ticketMessage, setTicketMessage] = useState('');
     const [ticketReceiver, setTicketReceiver] = useState('');
+    // Timetable
+    const [schedules, setSchedules] = useState<any[]>([]);
+    const [subjects, setSubjects] = useState<any[]>([]);
+    // Absence justification
+    const [justifyingAbsence, setJustifyingAbsence] = useState<any | null>(null);
+    const [justifyMessage, setJustifyMessage] = useState('');
+    const [justifyAttachment, setJustifyAttachment] = useState<string | null>(null);
+    const [isSubmittingJustif, setIsSubmittingJustif] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
@@ -45,6 +53,8 @@ const ParentPortal: React.FC = () => {
                 const cls = await window.electronAPI.getClasses(user.schoolId);
                 const usrs = await window.electronAPI.getUsers(user.schoolId);
                 const msgs = await window.electronAPI.getParentMessages ? await window.electronAPI.getParentMessages({ schoolId: user.schoolId, userId: user.id }) : [];
+                const scheds = await window.electronAPI.getSchedules(user.schoolId);
+                const subs = await window.electronAPI.getSubjects(user.schoolId);
 
                 setTuitionFees(tf || []);
                 setInstallments(insts || []);
@@ -53,6 +63,8 @@ const ParentPortal: React.FC = () => {
                 setClasses(cls || []);
                 setUsers(usrs || []);
                 setAnnouncements(msgs || []);
+                setSchedules(scheds || []);
+                setSubjects(subs || []);
 
                 const mySchool = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString()) || schs[0];
                 if (mySchool && mySchool.term_structure) {
@@ -135,34 +147,40 @@ const ParentPortal: React.FC = () => {
     };
 
     const getStudentFinancials = (student: any) => {
-        if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
-        const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+        if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: { due: 0, paid: 0 }, installments: [] }, overpaid: 0 };
+        const classConfig = tuitionFees.find((f: any) => f.classId === student.class_id);
         const scholarship = student.scholarship_reduction || 0;
         const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
         const totalReg = classConfig?.registrationFee || 0;
         const totalDue = totalPension + totalReg;
 
-        const studentPayments = (stats?.payments || []).filter((p: any) => p.payment_type === 'Scolarité');
-        const totalPaid = studentPayments.reduce((acc: number, p: any) => acc + p.amount, 0);
+        // Include ALL payment types (Inscription + Scolarité + Transport + Examen)
+        const allPayments = stats?.payments || [];
+        const totalPaid = allPayments.reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
 
-        let remaining = totalPaid;
-        const breakdown: any = { registration: 0, installments: [] };
+        // Sequential allocation: inscription first, then installments
+        const regPaid = Math.min(totalReg, allPayments.filter((p: any) => p.payment_type === 'Inscription').reduce((a: number, p: any) => a + p.amount, 0));
+        let pensionRemaining = allPayments.filter((p: any) => p.payment_type === 'Scolarité').reduce((a: number, p: any) => a + p.amount, 0);
 
-        breakdown.registration = Math.min(totalReg, remaining);
-        remaining -= breakdown.registration;
-
-        const classInsts = (installments || []).map(inst => ({
+        const classInsts = (installments || []).map((inst: any) => ({
             ...inst,
-            amountDue: (classInstallmentFees || []).find(cif => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
+            amountDue: (classInstallmentFees || []).find((cif: any) => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
         }));
 
+        const instBreakdown: any[] = [];
         for (const inst of classInsts) {
-            const paidForThis = Math.min(inst.amountDue, remaining);
-            breakdown.installments.push({ ...inst, paid: paidForThis });
-            remaining -= paidForThis;
+            const paidForThis = Math.min(inst.amountDue, pensionRemaining);
+            instBreakdown.push({ ...inst, paid: paidForThis });
+            pensionRemaining -= paidForThis;
         }
 
-        return { totalDue, totalPaid, balance: totalDue - totalPaid, breakdown, overpaid: remaining };
+        return {
+            totalDue,
+            totalPaid,
+            balance: totalDue - totalPaid,
+            breakdown: { registration: { due: totalReg, paid: regPaid }, installments: instBreakdown },
+            overpaid: pensionRemaining
+        };
     };
 
     const handlePrintReceipt = async (payment: any) => {
@@ -174,6 +192,30 @@ const ParentPortal: React.FC = () => {
         } catch (e: any) {
             alert(t('pp_print_error', `Erreur d'impression: {{message}}`, { message: e.message }));
         }
+    };
+
+    const handleSubmitJustification = async () => {
+        if (!justifyingAbsence || !justifyMessage.trim()) return;
+        setIsSubmittingJustif(true);
+        try {
+            await (window.electronAPI as any).submitAbsenceJustification({
+                attendanceId: justifyingAbsence.id,
+                message: justifyMessage.trim(),
+                attachmentBase64: justifyAttachment || null
+            });
+            setJustifyingAbsence(null);
+            setJustifyMessage('');
+            setJustifyAttachment(null);
+            // Reload details to reflect updated status
+            if (selectedChild) {
+                const details = await window.electronAPI.getStudentDetails(selectedChild.id);
+                setStats(details);
+            }
+            alert(t('pp_justif_sent', 'Justification envoyée à l\'enseignant. Vous serez notifié(e) de la décision.'));
+        } catch (e: any) {
+            alert(e.message || t('pp_justif_error', 'Erreur lors de l\'envoi de la justification.'));
+        }
+        setIsSubmittingJustif(false);
     };
 
     const printStudentReport = async () => {
@@ -444,6 +486,7 @@ const ParentPortal: React.FC = () => {
                                         <th className="px-4 py-3">{t('schedule_time', 'Horaire')}</th>
                                         <th className="px-4 py-3">{t('hours', 'Heures')}</th>
                                         <th className="px-4 py-3">{t('status', 'Statut')}</th>
+                                        <th className="px-4 py-3 text-right">{t('action', 'Action')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -466,17 +509,27 @@ const ParentPortal: React.FC = () => {
                                                         {abs.status === 'ABSENT' ? t('not_justified', 'Non Justifiée') : abs.status === 'JUSTIFIED' ? t('justified', 'Justifiée') : t('late', 'Retard')}
                                                     </span>
                                                 </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {abs.status !== 'JUSTIFIED' && abs.hours_absent > 0 && (
+                                                        <button
+                                                            onClick={() => { setJustifyingAbsence(abs); setJustifyMessage(''); setJustifyAttachment(null); }}
+                                                            className="text-[9px] font-black px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-lg uppercase tracking-widest transition-all border border-indigo-500/20"
+                                                        >
+                                                            {t('pp_justify', 'Justifier')}
+                                                        </button>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                         <tr className="bg-slate-950/50">
                                             <td colSpan={3} className="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('cumulative_total', 'Cumul Total')}</td>
-                                            <td className="px-4 py-3 text-rose-500 font-black text-sm">{stats.attendance.reduce((acc: number, a: any) => acc + (a.hours_absent || 0), 0)}h</td>
-                                            <td></td>
+                                            <td className="px-4 py-3 text-rose-500 font-black text-sm">{stats.attendance.filter((a: any) => a.status !== 'JUSTIFIED').reduce((acc: number, a: any) => acc + (a.hours_absent || 0), 0)}h</td>
+                                            <td colSpan={2}></td>
                                         </tr>
                                         </>
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
+                                            <td colSpan={6} className="px-4 py-8 text-center text-slate-500 italic uppercase text-[10px] font-black tracking-widest">
                                                 {t('no_absences', 'Aucune absence enregistrée.')}
                                             </td>
                                         </tr>
@@ -487,52 +540,97 @@ const ParentPortal: React.FC = () => {
                     </div>}
 
                     {/* Financial tracking */}
-                    <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
+                    <div className="glass-card p-8 space-y-5 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center space-x-3 text-amber-500">
                             <Coins className="w-6 h-6" />
                             <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_financial_tracking', 'Suivi Financier')}</h2>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('pp_tuition_due', 'Scolarité Dûe')}</p>
-                                    <p className="text-xs font-black text-white mt-1">{financials.totalDue.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
-                                </div>
-                                <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('total_paid_label', 'Total Payé')}</p>
-                                    <p className="text-xs font-black text-emerald-500 mt-1">{financials.totalPaid.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
-                                </div>
-                                <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('remaining_to_pay', 'Reste à payer')}</p>
-                                    <p className={`text-xs font-black mt-1 ${financials.balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{financials.balance.toLocaleString()} <span className="text-[8px] text-slate-500">F</span></p>
-                                </div>
+                        {selectedChild.has_moratoire === 1 && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
+                                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                                <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">{t('pp_moratoire_granted', 'Moratoire accordé — paiement échelonné autorisé')}</p>
                             </div>
+                        )}
 
-                            {selectedChild.has_moratoire === 1 && (
-                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center space-x-3">
-                                    <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
-                                    <div>
-                                        <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{t('pp_moratoire_granted', 'Moratoire Accordé')}</p>
-                                        <p className="text-[10px] text-slate-300 font-bold leading-normal mt-0.5">{t('pp_moratoire_granted_desc', 'Cet élève bénéficie d\'une autorisation spéciale d\'échelonnement de paiement.')}</p>
-                                    </div>
-                                </div>
-                            )}
+                        {/* Summary row */}
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('pp_total_due', 'Total Dû')}</p>
+                                <p className="text-xs font-black text-white mt-1">{Math.round(financials.totalDue).toLocaleString()} <span className="text-[8px] text-slate-500">FCFA</span></p>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('total_paid_label', 'Total Versé')}</p>
+                                <p className="text-xs font-black text-emerald-500 mt-1">{Math.round(financials.totalPaid).toLocaleString()} <span className="text-[8px] text-slate-500">FCFA</span></p>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-center">
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-tight">{t('remaining_to_pay', 'Reste à Payer')}</p>
+                                <p className={`text-xs font-black mt-1 ${financials.balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{Math.max(0, Math.round(financials.balance)).toLocaleString()} <span className="text-[8px] text-slate-500">FCFA</span></p>
+                            </div>
+                        </div>
 
-                            {/* Paid installment summary */}
-                            <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-3">
-                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('pp_installment_summary', 'Résumé des Tranches')}</h3>
-                                <div className="space-y-2">
-                                    {financials.breakdown.installments.map((inst: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between items-center text-xs font-bold">
-                                            <span className="text-slate-400 uppercase tracking-wider">{inst.name}</span>
-                                            <span className={inst.paid >= inst.amountDue ? "text-emerald-500" : inst.paid > 0 ? "text-amber-500" : "text-slate-600"}>
-                                                {inst.paid >= inst.amountDue ? t('paid', "Payée") : inst.paid > 0 ? `${t('partial', 'Partiel')} (${inst.paid.toLocaleString()} F)` : t('not_paid', "Non payée")}
+                        {/* Detailed per-tranche table */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-950 text-[9px] font-black uppercase tracking-widest text-slate-500 border-b border-white/5">
+                                        <th className="px-4 py-3">{t('pp_tranche', 'Tranche')}</th>
+                                        <th className="px-4 py-3 text-right">{t('pp_amount_due', 'À Payer')}</th>
+                                        <th className="px-4 py-3 text-right">{t('pp_amount_paid', 'Payé')}</th>
+                                        <th className="px-4 py-3 text-right">{t('pp_balance', 'Reste')}</th>
+                                        <th className="px-4 py-3 text-center">{t('pp_status', 'Statut')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 text-xs font-bold">
+                                    {/* Inscription row */}
+                                    {(() => {
+                                        const { due, paid } = financials.breakdown.registration;
+                                        const bal = Math.max(0, due - paid);
+                                        return (
+                                            <tr className="hover:bg-white/3 transition-colors">
+                                                <td className="px-4 py-3 text-slate-300">{t('registration', 'Inscription')}</td>
+                                                <td className="px-4 py-3 text-right text-white">{Math.round(due).toLocaleString()} F</td>
+                                                <td className="px-4 py-3 text-right text-emerald-400">{Math.round(paid).toLocaleString()} F</td>
+                                                <td className={`px-4 py-3 text-right font-black ${bal > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{Math.round(bal).toLocaleString()} F</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-wide ${paid >= due && due > 0 ? 'bg-emerald-500/20 text-emerald-400' : bal > 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-700 text-slate-500'}`}>
+                                                        {paid >= due && due > 0 ? t('paid', 'Payée') : bal > 0 ? t('not_paid', 'Non payée') : '-'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })()}
+                                    {/* Installment rows */}
+                                    {financials.breakdown.installments.map((inst: any, idx: number) => {
+                                        const bal = Math.max(0, inst.amountDue - inst.paid);
+                                        const statusLabel = inst.paid >= inst.amountDue && inst.amountDue > 0 ? t('paid', 'Payée') : inst.paid > 0 ? t('partial', 'Partielle') : t('not_paid', 'Non payée');
+                                        const statusCls = inst.paid >= inst.amountDue && inst.amountDue > 0 ? 'bg-emerald-500/20 text-emerald-400' : inst.paid > 0 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400';
+                                        return (
+                                            <tr key={idx} className="hover:bg-white/3 transition-colors">
+                                                <td className="px-4 py-3 text-slate-300">{inst.name}</td>
+                                                <td className="px-4 py-3 text-right text-white">{Math.round(inst.amountDue).toLocaleString()} F</td>
+                                                <td className="px-4 py-3 text-right text-emerald-400">{Math.round(inst.paid).toLocaleString()} F</td>
+                                                <td className={`px-4 py-3 text-right font-black ${bal > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{Math.round(bal).toLocaleString()} F</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-wide ${statusCls}`}>{statusLabel}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {/* Total row */}
+                                    <tr className="bg-slate-950/80 border-t border-white/10">
+                                        <td className="px-4 py-3 font-black text-white uppercase tracking-widest text-[10px]">{t('total', 'TOTAL')}</td>
+                                        <td className="px-4 py-3 text-right font-black text-white">{Math.round(financials.totalDue).toLocaleString()} F</td>
+                                        <td className="px-4 py-3 text-right font-black text-emerald-400">{Math.round(financials.totalPaid).toLocaleString()} F</td>
+                                        <td className={`px-4 py-3 text-right font-black ${financials.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{Math.max(0, Math.round(financials.balance)).toLocaleString()} F</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-wide ${selectedChild.has_moratoire === 1 ? 'bg-amber-500/20 text-amber-400' : financials.balance <= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                {selectedChild.has_moratoire === 1 ? t('pp_moratoire', 'Moratoire') : financials.balance <= 0 ? t('pp_settled', 'Soldé') : t('pp_in_progress', 'En cours')}
                                             </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -636,6 +734,47 @@ const ParentPortal: React.FC = () => {
                 </div>
             )}
 
+            {/* Timetable */}
+            {(() => {
+                const childSchedules = schedules.filter((s: any) => s.class_id === selectedChild.class_id && s.type !== 'PAUSE');
+                if (childSchedules.length === 0) return null;
+                const days = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+                const daysFr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+                const daysEn = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                return (
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
+                            <Calendar className="w-6 h-6 text-blue-400" /> {t('pp_timetable', 'Emploi du Temps')}
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {days.map((day, di) => {
+                                const daySlots = childSchedules
+                                    .filter((s: any) => s.day_of_week === day)
+                                    .sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''));
+                                if (daySlots.length === 0) return null;
+                                return (
+                                    <div key={day} className="glass-card p-4 space-y-2 rounded-2xl border border-white/5 bg-slate-900/50">
+                                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest border-b border-white/5 pb-2">
+                                            {i18n.language.startsWith('en') ? daysEn[di] : daysFr[di]}
+                                        </p>
+                                        {daySlots.map((slot: any) => {
+                                            const sub = subjects.find((s: any) => s.id === slot.subject_id);
+                                            const isEval = slot.type === 'EVALUATION' || slot.type === 'EXAM';
+                                            return (
+                                                <div key={slot.id} className={`p-2 rounded-lg text-[10px] ${isEval ? 'bg-rose-500/10 border border-rose-500/20' : 'bg-slate-950/80'}`}>
+                                                    <p className={`font-black truncate ${isEval ? 'text-rose-400' : 'text-amber-400'}`}>{sub?.name || '-'}</p>
+                                                    <p className="text-slate-500">{slot.start_time} – {slot.end_time}</p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* School communication feed */}
             <div className="space-y-4">
                 <h2 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-2">
@@ -736,6 +875,76 @@ const ParentPortal: React.FC = () => {
                     </button>
                 </form>
             </div>
+
+            {/* Absence Justification Modal */}
+            {justifyingAbsence && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300 p-4">
+                    <div className="w-full max-w-lg glass-card border border-white/10 rounded-3xl shadow-2xl bg-slate-950 animate-in zoom-in-95 duration-300 overflow-hidden">
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-tight">{t('pp_justify_absence', 'Justifier une Absence')}</h3>
+                                <p className="text-slate-400 text-[10px] mt-0.5">
+                                    {justifyingAbsence.date} — {justifyingAbsence.subject_name || justifyingAbsence.subject || '-'} ({justifyingAbsence.hours_absent}h)
+                                </p>
+                            </div>
+                            <button onClick={() => setJustifyingAbsence(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all text-lg font-bold">×</button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{t('pp_justif_message', 'Message de justification')} *</label>
+                                <textarea
+                                    rows={4}
+                                    value={justifyMessage}
+                                    onChange={e => setJustifyMessage(e.target.value)}
+                                    placeholder={t('pp_justif_placeholder', 'Expliquez la raison de l\'absence...')}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-slate-900/80 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{t('pp_justif_attachment', 'Pièce justificative (optionnel)')}</label>
+                                <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    title={t('pp_justif_attachment', 'Pièce justificative (optionnel)')}
+                                    onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = ev => setJustifyAttachment(ev.target?.result as string);
+                                        reader.readAsDataURL(file);
+                                    }}
+                                    className="w-full text-[11px] text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 file:transition-all cursor-pointer"
+                                />
+                                {justifyAttachment && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        {justifyAttachment.startsWith('data:image') ? (
+                                            <img src={justifyAttachment} alt="preview" className="h-16 w-24 object-cover rounded-lg border border-white/10" />
+                                        ) : (
+                                            <span className="text-[10px] text-emerald-400 font-black uppercase">PDF joint</span>
+                                        )}
+                                        <button type="button" onClick={() => setJustifyAttachment(null)} className="text-rose-400 text-[10px] hover:text-rose-300 font-bold">Supprimer</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6 pt-0 flex gap-3">
+                            <button
+                                onClick={() => setJustifyingAbsence(null)}
+                                className="flex-1 py-3 bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                            >
+                                {t('cancel', 'Annuler')}
+                            </button>
+                            <button
+                                onClick={handleSubmitJustification}
+                                disabled={isSubmittingJustif || !justifyMessage.trim()}
+                                className="flex-1 py-3 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                            >
+                                {isSubmittingJustif ? t('pp_sending', 'Envoi...') : t('pp_send_justif', 'Envoyer la Justification')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Bus GPS Map Modal */}
             {isBusMapOpen && (

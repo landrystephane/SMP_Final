@@ -812,6 +812,33 @@ function initDb() {
         }
     } catch(e) { console.error('[Migration] Noutcha subjects seeding failed:', e.message); }
 
+    // Migration: absence_justifications table
+    try {
+        const ajCols = db.prepare("PRAGMA table_info(absence_justifications)").all();
+        if (ajCols.length === 0) {
+            db.prepare(`
+                CREATE TABLE IF NOT EXISTS absence_justifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    attendance_id INTEGER NOT NULL,
+                    student_id INTEGER NOT NULL,
+                    school_id INTEGER NOT NULL,
+                    parent_user_id INTEGER NOT NULL,
+                    teacher_user_id INTEGER,
+                    parent_message TEXT NOT NULL,
+                    attachment_base64 TEXT,
+                    status TEXT DEFAULT 'PENDING',
+                    teacher_response TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at DATETIME,
+                    FOREIGN KEY (attendance_id) REFERENCES attendance(id),
+                    FOREIGN KEY (student_id) REFERENCES students(id),
+                    FOREIGN KEY (school_id) REFERENCES schools(id)
+                )
+            `).run();
+            console.log('[Migration] absence_justifications table created');
+        }
+    } catch(e) { console.error('[Migration] absence_justifications:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

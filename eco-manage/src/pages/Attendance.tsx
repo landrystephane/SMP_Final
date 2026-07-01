@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, UserCheck, Clock, Save, AlertCircle, FileText, Search, Printer, CalendarDays } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, UserCheck, Clock, Save, AlertCircle, FileText, Search, Printer, CalendarDays, CheckCircle, XCircle, MessageSquare, ClipboardCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { generateAttendanceReport } from '../utils/reports';
@@ -21,7 +21,7 @@ const Attendance: React.FC = () => {
   const [subjectsMap, setSubjectsMap] = useState<Record<number, string>>({});
   
   // New States for Reports
-  const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT'>(() => {
+  const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT' | 'JUSTIFICATIONS'>(() => {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
           const u = JSON.parse(storedUser);
@@ -29,6 +29,12 @@ const Attendance: React.FC = () => {
       }
       return 'INPUT';
   });
+  const [justifications, setJustifications] = useState<any[]>([]);
+  const [justifFilter, setJustifFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [reviewingJustif, setReviewingJustif] = useState<any | null>(null);
+  const [reviewResponse, setReviewResponse] = useState('');
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [justifPendingCount, setJustifPendingCount] = useState(0);
   const [reportPeriod, setReportPeriod] = useState<'DAY' | 'WEEK' | 'MONTH'>('DAY');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportWeek, setReportWeek] = useState(''); // e.g. 2026-W22
@@ -254,6 +260,42 @@ const Attendance: React.FC = () => {
     loadStudents();
   }, [selectedClass, user]);
 
+  const loadJustifications = useCallback(async (filter = justifFilter) => {
+      if (!window.electronAPI || user?.role !== 'TEACHER') return;
+      try {
+          const list = await (window.electronAPI as any).getAbsenceJustifications({ status: filter === 'ALL' ? undefined : filter });
+          setJustifications(list || []);
+          const pending = (list || []).filter((j: any) => j.status === 'PENDING').length;
+          setJustifPendingCount(pending);
+      } catch (e) { setJustifications([]); }
+  }, [user, justifFilter]);
+
+  useEffect(() => {
+      if (activeTab === 'JUSTIFICATIONS') loadJustifications(justifFilter);
+  }, [activeTab, justifFilter]);
+
+  useEffect(() => {
+      if (user?.role === 'TEACHER') loadJustifications('PENDING');
+  }, [user]);
+
+  const handleReviewJustification = async (decision: 'APPROVED' | 'REJECTED') => {
+      if (!reviewingJustif) return;
+      setIsReviewing(true);
+      try {
+          await (window.electronAPI as any).reviewAbsenceJustification({
+              justificationId: reviewingJustif.id,
+              decision,
+              teacherResponse: reviewResponse || null
+          });
+          setReviewingJustif(null);
+          setReviewResponse('');
+          loadJustifications(justifFilter);
+      } catch (e: any) {
+          alert(e.message);
+      }
+      setIsReviewing(false);
+  };
+
   const handleRequestUnlock = async () => {
       if (!window.electronAPI || !user || !selectedClass || !currentDate) return;
       const classObj = classes.find(c => c.id.toString() === selectedClass);
@@ -451,6 +493,18 @@ const Attendance: React.FC = () => {
                 <FileText className="w-4 h-4 mr-2" />
                 {t('att_tab_reports', 'Rapports')}
             </button>
+            {user?.role === 'TEACHER' && (
+                <button
+                    onClick={() => setActiveTab('JUSTIFICATIONS')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'JUSTIFICATIONS' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                    <ClipboardCheck className="w-4 h-4" />
+                    {t('att_tab_justifications', 'Justifications')}
+                    {justifPendingCount > 0 && (
+                        <span className="ml-1 bg-rose-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{justifPendingCount}</span>
+                    )}
+                </button>
+            )}
         </div>
       </div>
 
@@ -769,6 +823,112 @@ const Attendance: React.FC = () => {
                       </button>
                   </div>
               </div>
+          </div>
+      )}
+
+      {/* ===== JUSTIFICATIONS TAB ===== */}
+      {activeTab === 'JUSTIFICATIONS' && user?.role === 'TEACHER' && (
+          <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                      {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const).map(f => (
+                          <button key={f} onClick={() => setJustifFilter(f)}
+                              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${justifFilter === f ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}>
+                              {f === 'PENDING' ? t('att_justif_pending', 'En attente') : f === 'APPROVED' ? t('att_justif_approved', 'Acceptées') : f === 'REJECTED' ? t('att_justif_refused', 'Refusées') : t('att_justif_all', 'Toutes')}
+                              {f === 'PENDING' && justifPendingCount > 0 && <span className="ml-2 bg-rose-500 text-white text-[8px] rounded-full px-1">{justifPendingCount}</span>}
+                          </button>
+                      ))}
+                  </div>
+              </div>
+
+              {justifications.length === 0 ? (
+                  <div className="glass-card p-16 text-center space-y-3">
+                      <ClipboardCheck className="w-12 h-12 text-slate-700 mx-auto" />
+                      <p className="text-slate-500 text-xs font-black uppercase tracking-widest">{t('att_justif_none', 'Aucune justification dans cette catégorie.')}</p>
+                  </div>
+              ) : (
+                  <div className="space-y-3">
+                      {justifications.map((j: any) => (
+                          <div key={j.id} className="glass-card p-5 flex flex-col md:flex-row justify-between gap-4">
+                              <div className="flex-1 space-y-1">
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${j.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400' : j.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                          {j.status === 'PENDING' ? t('att_justif_pending', 'En attente') : j.status === 'APPROVED' ? t('att_justif_approved', 'Acceptée') : t('att_justif_refused', 'Refusée')}
+                                      </span>
+                                      <span className="text-white font-black text-sm">{j.last_name} {j.first_name}</span>
+                                      <span className="text-slate-500 text-xs">{j.class_name}</span>
+                                  </div>
+                                  <p className="text-slate-400 text-xs">
+                                      {t('att_justif_absence_on', 'Absence du')} <span className="text-white font-bold">{j.absence_date ? new Date(j.absence_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR') : '-'}</span>
+                                      {j.hours_absent > 0 && <span className="ml-2 text-rose-400 font-bold">({j.hours_absent}h)</span>}
+                                      {j.subject_name && <span className="ml-2 text-amber-500">· {j.subject_name}</span>}
+                                  </p>
+                                  <p className="text-slate-400 text-xs">{t('att_justif_from', 'Par')} <span className="text-slate-300 font-bold">{j.parent_name}</span> · {new Date(j.created_at).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                                  <div className="mt-2 p-3 bg-slate-950 rounded-xl border border-white/5">
+                                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{t('att_justif_message', 'Message du parent')}</p>
+                                      <p className="text-slate-300 text-xs leading-relaxed">{j.parent_message}</p>
+                                  </div>
+                                  {j.attachment_base64 && (
+                                      <div className="mt-2">
+                                          <img src={j.attachment_base64} alt="Justificatif" className="max-h-40 rounded-xl border border-white/10 object-cover" />
+                                      </div>
+                                  )}
+                                  {j.status !== 'PENDING' && j.teacher_response && (
+                                      <div className="mt-2 p-3 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{t('att_justif_teacher_resp', 'Votre réponse')}</p>
+                                          <p className="text-slate-300 text-xs">{j.teacher_response}</p>
+                                      </div>
+                                  )}
+                              </div>
+                              {j.status === 'PENDING' && (
+                                  <div className="flex flex-col gap-2 min-w-[130px]">
+                                      <button onClick={() => { setReviewingJustif(j); setReviewResponse(''); }}
+                                          className="px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2">
+                                          <MessageSquare className="w-4 h-4" /> {t('att_justif_review', 'Répondre')}
+                                      </button>
+                                  </div>
+                              )}
+                          </div>
+                      ))}
+                  </div>
+              )}
+
+              {/* Review Modal */}
+              {reviewingJustif && (
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50">
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl space-y-5 mx-4">
+                          <h3 className="font-black text-white text-lg">{t('att_justif_review_title', 'Répondre à la justification')}</h3>
+                          <div className="p-4 bg-slate-950 rounded-xl space-y-1">
+                              <p className="text-xs font-black text-slate-400">{reviewingJustif.last_name} {reviewingJustif.first_name} — {reviewingJustif.absence_date ? new Date(reviewingJustif.absence_date).toLocaleDateString('fr-FR') : ''}</p>
+                              <p className="text-xs text-slate-300 mt-1">{reviewingJustif.parent_message}</p>
+                          </div>
+                          <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('att_justif_your_response', 'Votre réponse (optionnelle)')}</label>
+                              <textarea
+                                  value={reviewResponse}
+                                  onChange={e => setReviewResponse(e.target.value)}
+                                  rows={3}
+                                  placeholder={t('att_justif_response_placeholder', 'Saisissez votre commentaire...')}
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm outline-none resize-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                              <button onClick={() => handleReviewJustification('APPROVED')} disabled={isReviewing}
+                                  className="py-3 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                                  <CheckCircle className="w-5 h-5" /> {t('att_justif_accept', 'Accepter')}
+                              </button>
+                              <button onClick={() => handleReviewJustification('REJECTED')} disabled={isReviewing}
+                                  className="py-3 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                                  <XCircle className="w-5 h-5" /> {t('att_justif_refuse', 'Refuser')}
+                              </button>
+                          </div>
+                          <button onClick={() => { setReviewingJustif(null); setReviewResponse(''); }}
+                              className="w-full py-2 text-slate-500 hover:text-white text-xs font-black uppercase tracking-wider transition-colors">
+                              {t('cancel', 'Annuler')}
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
       )}
 

@@ -774,8 +774,8 @@ const Finance: React.FC = () => {
                                                             school: activeSchool,
                                                             currency
                                                         });
-                                                    } catch {
-                                                        showNotification('error', isEn ? 'Failed to generate financial statement.' : 'Erreur lors de la génération du relevé financier.');
+                                                    } catch (err: any) {
+                                                        showNotification(isEn ? 'Failed to generate financial statement.' : 'Erreur lors de la génération du relevé financier.', 'error');
                                                     }
                                                 }}
                                             >
