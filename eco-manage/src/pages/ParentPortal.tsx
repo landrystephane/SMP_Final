@@ -289,6 +289,11 @@ const ParentPortal: React.FC = () => {
 
     if (!selectedChild) return null;
 
+    const isNotRegistered = selectedChild.has_paid_registration === 0;
+    const isIrregular = selectedChild.has_paid_registration === 1
+        && selectedChild.has_moratoire === 0
+        && (selectedChild.pension_paid || 0) < (selectedChild.pension_due || 0);
+
     const financials = getStudentFinancials(selectedChild);
     const termGrades = stats?.grades?.filter((g: any) => g.term === selectedTerm) || [];
     const validatedGrades = termGrades.filter((g: any) => g.validated === 1);
@@ -353,13 +358,34 @@ const ParentPortal: React.FC = () => {
                 </div>
             </div>
 
+            {/* Non-inscrit banner */}
+            {isNotRegistered && (
+                <div className="bg-orange-500/10 border border-orange-500/30 px-6 py-5 rounded-2xl flex items-start gap-4">
+                    <AlertTriangle className="w-6 h-6 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-black uppercase tracking-tight text-sm text-orange-400">{t('pp_not_registered_title', 'Élève Non Inscrit')}</h4>
+                        <p className="text-[11px] font-bold text-orange-300/70 mt-1">{t('pp_not_registered_desc', "Les frais d'inscription n'ont pas encore été réglés. L'élève n'est pas considéré comme membre actif de l'établissement. Aucune information pédagogique n'est disponible.")}</p>
+                    </div>
+                </div>
+            )}
+            {/* Irrégularité banner */}
+            {!isNotRegistered && isIrregular && (
+                <div className="bg-rose-500/10 border border-rose-500/30 px-6 py-5 rounded-2xl flex items-start gap-4">
+                    <AlertTriangle className="w-6 h-6 text-rose-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-black uppercase tracking-tight text-sm text-rose-400">{t('pp_irregular_title', 'Situation Financière Irrégulière')}</h4>
+                        <p className="text-[11px] font-bold text-rose-300/70 mt-1">{t('pp_irregular_desc', "La pension scolaire n'a pas été entièrement réglée. Le bulletin de notes n'est pas disponible tant que la situation financière n'est pas régularisée.")}</p>
+                    </div>
+                </div>
+            )}
             {loading ? (
                 <div className="h-[30vh] flex flex-col items-center justify-center space-y-4">
                     <Activity className="w-10 h-10 text-amber-500 animate-spin" />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 grid-cols-1 gap-8">
-                    {/* Performance / Bulletins */}
+                    {/* Performance / Bulletins — masqué si non-inscrit ou irrégularité */}
+                    {!isNotRegistered && !isIrregular && (
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 text-amber-500">
@@ -401,9 +427,10 @@ const ParentPortal: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                    )}
 
-                    {/* Bilan des Absences */}
-                    <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
+                    {/* Bilan des Absences — masqué si non-inscrit */}
+                    {!isNotRegistered && <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">
                         <div className="flex items-center space-x-3 text-rose-500">
                             <AlertTriangle className="w-6 h-6" />
                             <h2 className="text-xl font-black uppercase text-white tracking-tight">{t('pp_absence_summary', 'Bilan des Absences')}</h2>
@@ -457,7 +484,7 @@ const ParentPortal: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </div>}
 
                     {/* Financial tracking */}
                     <div className="glass-card p-8 space-y-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px]">

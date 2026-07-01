@@ -512,6 +512,10 @@ const Grades: React.FC = () => {
   };
 
   const printStudentReport = async (student: any) => {
+    if (student.has_paid_registration === 0) {
+        showNotification(t('student_not_registered_no_action', "Cet élève n'est pas inscrit. Aucune action n'est possible tant que l'inscription n'est pas payée."), "error");
+        return;
+    }
     if (student.status === 'BLOCKED') {
         showNotification(t('student_blocked_no_action', "Cet élève est bloqué. Aucune action n'est possible (y compris l'impression)."), "error");
         return;
@@ -740,10 +744,17 @@ const Grades: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {students.map(student => (
-                    <tr key={student.id} className="hover:bg-white/5 group transition-colors">
+                  {students.map(student => {
+                    const isStudentNotRegistered = student.has_paid_registration === 0;
+                    const isStudentBlocked = student.status === 'BLOCKED';
+                    return (
+                    <tr key={student.id} className={`hover:bg-white/5 group transition-colors ${(isStudentNotRegistered || isStudentBlocked) ? 'opacity-50' : ''}`}>
                       <td className="px-6 py-4 sticky left-0 bg-slate-950 backdrop-blur-md group-hover:bg-slate-900 transition-colors z-10 border-r border-white/5">
-                        <div className="text-white font-black uppercase text-sm tracking-tight">{student.last_name}</div>
+                        <div className="text-white font-black uppercase text-sm tracking-tight flex items-center gap-2">
+                          {student.last_name}
+                          {isStudentNotRegistered && <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-orange-500/10 text-orange-400 border border-orange-500/20">{t('not_registered_badge', 'Non-Inscrit')}</span>}
+                          {isStudentBlocked && <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20">{t('blocked_badge', 'Bloqué')}</span>}
+                        </div>
                         <div className="text-[10px] text-slate-500 font-bold">{student.first_name}</div>
                       </td>
                       {subjects.map(subject => {
@@ -757,7 +768,7 @@ const Grades: React.FC = () => {
                             return (
                               <td key={subject.id} className="px-4 py-4">
                                 <select
-                                  disabled={isLocked || isPastDeadline || subject._readOnly}
+                                  disabled={isLocked || isPastDeadline || subject._readOnly || isStudentNotRegistered || isStudentBlocked}
                                   value={grades[`${student.id}-${subject.id}`] ?? ''}
                                   onChange={(e) => {
                                       const val = e.target.value;
@@ -786,7 +797,7 @@ const Grades: React.FC = () => {
                               <td key={subject.id} className="px-4 py-4">
                                 <input
                                   type="text"
-                                  disabled={isLocked || isPastDeadline || subject._readOnly}
+                                  disabled={isLocked || isPastDeadline || subject._readOnly || isStudentNotRegistered || isStudentBlocked}
                                   value={grades[`${student.id}-${subject.id}`] ?? ''}
                                   onChange={(e) => {
                                       const raw = e.target.value;
@@ -868,7 +879,7 @@ const Grades: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}
-                            disabled={!isLocked}
+                            disabled={!isLocked || isStudentNotRegistered || isStudentBlocked}
                             title={!isLocked ? t('gr_print_not_validated', "Les notes de la classe ne sont pas encore validées et verrouillées.") : ""}
                             className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
@@ -876,7 +887,7 @@ const Grades: React.FC = () => {
                           </button>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>

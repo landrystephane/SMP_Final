@@ -23,6 +23,7 @@ const Subjects: React.FC = () => {
     section: 'FRANCOPHONE'
   });
   const [requiresCode, setRequiresCode] = useState(false);
+  const [coefInputs, setCoefInputs] = useState<Record<number, string>>({});
 
   const { hasRole, user } = useAuth();
   const canManageRegistry = hasRole(['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG']);
@@ -284,8 +285,10 @@ const Subjects: React.FC = () => {
                                     type="text"
                                     inputMode="numeric"
                                     className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-xs text-amber-500 font-black"
-                                    value={classSub?.coefficient ?? ''}
-                                    onChange={(e) => { const v = e.target.value; if (v === '' || /^\d+$/.test(v)) updateCoefficient(s.id, v === '' ? 1 : parseInt(v)); }}
+                                    value={coefInputs[s.id] !== undefined ? coefInputs[s.id] : (classSub?.coefficient ?? '')}
+                                    onChange={(e) => { const v = e.target.value; if (v === '' || /^\d+$/.test(v)) setCoefInputs(prev => ({ ...prev, [s.id]: v })); }}
+                                    onBlur={() => { const v = coefInputs[s.id]; if (v !== undefined) { updateCoefficient(s.id, v === '' ? 1 : parseInt(v)); setCoefInputs(prev => { const next = { ...prev }; delete next[s.id]; return next; }); } }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                                 />
                             </div>
                             <button

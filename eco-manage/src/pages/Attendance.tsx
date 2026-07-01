@@ -605,12 +605,15 @@ const Attendance: React.FC = () => {
                             {students.map(student => {
                                 const h = absences[student.id] || 0;
                                 const isBlocked = student.status === 'BLOCKED';
+                                const isNotRegistered = student.has_paid_registration === 0;
+                                const isDisabled = isLocked || isBlocked || isNotRegistered;
                                 return (
-                                    <tr key={student.id} className={`hover:bg-slate-800/50 dark:hover:bg-white/5 transition-colors group ${isBlocked ? 'opacity-50' : ''}`}>
+                                    <tr key={student.id} className={`hover:bg-slate-800/50 dark:hover:bg-white/5 transition-colors group ${(isBlocked || isNotRegistered) ? 'opacity-50' : ''}`}>
                                         <td className="px-6 py-4">
                                             <div className="text-white font-bold uppercase text-sm flex items-center gap-2">
                                                 {student.last_name}
                                                 {isBlocked && <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20">{t('blocked_badge', 'Bloqué')}</span>}
+                                                {isNotRegistered && <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-orange-500/10 text-orange-400 border border-orange-500/20">{t('not_registered_badge', 'Non-Inscrit')}</span>}
                                             </div>
                                             <div className="text-[10px] text-slate-500 font-bold group-hover:text-slate-300 transition-colors">{student.first_name} • {student.matricule}</div>
                                         </td>
@@ -618,7 +621,7 @@ const Attendance: React.FC = () => {
                                             <div className="flex items-center justify-center space-x-3">
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.max(0, h - 1)})}
-                                                    disabled={isLocked || isBlocked}
+                                                    disabled={isDisabled}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-rose-500 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     -
@@ -626,7 +629,7 @@ const Attendance: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     value={h}
-                                                    disabled={isLocked || isBlocked}
+                                                    disabled={isDisabled}
                                                     onChange={(e) => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, Math.max(0, parseInt(e.target.value) || 0))})}
                                                     className="w-16 bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-white font-black focus:border-amber-500 outline-none disabled:opacity-50"
                                                     max={maxAllowedHours}
@@ -634,7 +637,7 @@ const Attendance: React.FC = () => {
                                                 />
                                                 <button
                                                     onClick={() => setAbsences({...absences, [student.id]: Math.min(maxAllowedHours, h + 1)})}
-                                                    disabled={isLocked || isBlocked}
+                                                    disabled={isDisabled}
                                                     className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 border border-slate-800 font-black hover:bg-amber-500 hover:text-slate-950 transition-all disabled:opacity-30 disabled:hover:bg-slate-950 disabled:hover:text-slate-400"
                                                 >
                                                     +

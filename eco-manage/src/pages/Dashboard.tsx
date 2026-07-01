@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download, RefreshCw } from 'lucide-react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +28,15 @@ const Dashboard: React.FC = () => {
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
   const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE' | 'EXAMS_PROGRAM'>('OVERVIEW');
   const [currency, setCurrency] = useState('FCFA');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
+
+  const handleManualRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setRefreshTrigger(prev => prev + 1);
+    setTimeout(() => setIsRefreshing(false), 800);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -103,10 +111,10 @@ const Dashboard: React.FC = () => {
     };
     loadCurrency();
 
-    // Auto-refresh stats every 10 seconds for real-time updates (fallback)
+    // Auto-refresh stats every 5 seconds for real-time updates
     const interval = setInterval(() => {
         if (isMounted) loadStats();
-    }, 10000);
+    }, 5000);
 
     // Instant refresh whenever any action mutates data elsewhere in the app
     const unsubscribe = onDataChanged(() => {
@@ -118,7 +126,7 @@ const Dashboard: React.FC = () => {
         clearInterval(interval);
         unsubscribe();
     };
-  }, [selectedSection, selectedCycle, user]);
+  }, [selectedSection, selectedCycle, user, refreshTrigger]);
 
   useEffect(() => {
     setSelectedDiagnosticClass('ALL');
@@ -671,9 +679,19 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-black text-white tracking-tight">{t('global_dashboard')}</h1>
-          <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('diagnostic_bilingual')}</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-black text-white tracking-tight">{t('global_dashboard')}</h1>
+            <p className="text-slate-400 mt-1 font-bold italic uppercase text-xs tracking-widest">{t('diagnostic_bilingual')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            title={t('refresh', 'Actualiser')}
+            className="p-2.5 rounded-xl bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-500' : ''}`} />
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-4">

@@ -340,8 +340,10 @@ handlers['db:toggleSchoolStatus'] = async ({ id, isActive }) => {
 handlers['db:getStudents'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
-    SELECT s.*, 
-           (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+    SELECT s.*,
+           (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration,
+           (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Scolarité') as pension_paid,
+           COALESCE(tf.total_fee, 0) - COALESCE(s.scholarship_reduction, 0) as pension_due
     FROM students s
     LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
     WHERE s.school_id = ? AND s.status != 'DELETED'
@@ -477,12 +479,17 @@ handlers['db:saveGrades'] = async (grades) => {
       if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     }
   }
-  // Check for blocked students
+  // Check for blocked or non-registered students
   if (grades && grades.length > 0) {
     const studentIds = [...new Set(grades.map(g => g.student_id))];
     for (const sId of studentIds) {
-      const st = db.prepare('SELECT status FROM students WHERE id = ?').get(sId);
+      const st = db.prepare(`
+        SELECT s.status,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+        FROM students s LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id WHERE s.id = ?
+      `).get(sId);
       if (st && st.status === 'BLOCKED') throw new Error(`L'élève est bloqué. Impossible d'enregistrer ses notes.`);
+      if (st && !st.has_paid_registration) throw new Error(`L'élève n'est pas inscrit. Impossible d'enregistrer ses notes tant que l'inscription n'est pas payée.`);
     }
   }
   const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
@@ -1541,7 +1548,15 @@ handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, rout
 
 handlers['db:getParentStudents'] = async (parentPhone) => {
     const sid = getActiveSchoolId();
-    return db.prepare('SELECT * FROM students WHERE parent_contact = ? AND school_id = ?').all(parentPhone, sid);
+    return db.prepare(`
+        SELECT s.*,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration,
+               (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Scolarité') as pension_paid,
+               COALESCE(tf.total_fee, 0) - COALESCE(s.scholarship_reduction, 0) as pension_due
+        FROM students s
+        LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+        WHERE s.parent_contact = ? AND s.school_id = ?
+    `).all(parentPhone, sid);
 };
 
 handlers['db:logTransport'] = async (log) => {
@@ -1753,9 +1768,14 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
         const studentIds = [...new Set(records.map(r => r.studentId))];
         const blockedIds = new Set();
         for (const sId of studentIds) {
-            const student = db.prepare('SELECT id, status FROM students WHERE id = ? AND school_id = ?').get(sId, sid);
+            const student = db.prepare(`
+                SELECT s.id, s.status,
+                       (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
+                FROM students s LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
+                WHERE s.id = ? AND s.school_id = ?
+            `).get(sId, sid);
             if (!student) throw new Error('Élève non autorisé pour cet établissement.');
-            if (student.status === 'BLOCKED') blockedIds.add(sId);
+            if (student.status === 'BLOCKED' || !student.has_paid_registration) blockedIds.add(sId);
         }
         if (blockedIds.size > 0) {
             blockedSkipped = blockedIds.size;
