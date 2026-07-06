@@ -221,9 +221,9 @@ export const generateReportCard = (data: any) => {
                 if (isNursery) {
                     const app = getNurseryAppreciation(g.score);
                     row.push(g.subjectName || g.name || '--');
-                    row.push({ content: app.label || '--', styles: { halign: 'center' } });
+                    row.push({ content: g.letter_score || app.label || '--', styles: { halign: 'center' } });
                     row.push({ content: '', styles: { halign: 'center' } });
-                    row.push({ content: app.remark || '--', styles: { halign: 'center', fontSize: fs - 0.5 } });
+                    row.push({ content: '', styles: { halign: 'center' } });
                     row.push('');
                 } else {
                     const score = Number(g.score) || 0;

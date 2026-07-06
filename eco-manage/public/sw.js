@@ -1,20 +1,41 @@
-const CACHE_NAME = 'eco-manage-v1';
+const CACHE_NAME = 'eco-manage-v2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first strategy for API calls
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const url = event.request.url;
+
+  // Network-first for API calls and HTML/JS/CSS (always get latest app code)
+  if (
+    url.includes('/api/') ||
+    url.endsWith('.html') ||
+    url.includes('/assets/') ||
+    url === self.location.origin + '/' ||
+    url === self.location.origin + '/index.html'
+  ) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response.status === 200 && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
     return;
   }
-  // Cache-first for static assets
+
+  // Cache-first for icons, fonts, images
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
