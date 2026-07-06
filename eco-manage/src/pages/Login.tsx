@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, KeyRound, Building2, ChevronLeft, CheckCircle2, Download } from 'lucide-react';
+import { LogIn, KeyRound, Building2, ChevronLeft, CheckCircle2, Download, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -18,6 +18,23 @@ const Login: React.FC = () => {
   const [schoolCode, setSchoolCode] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
   const [codeError, setCodeError] = useState('');
+  const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const checkPrompt = () => {
+      if ((window as any).__pwaInstallPrompt) setPwaPrompt((window as any).__pwaInstallPrompt);
+    };
+    checkPrompt();
+    window.addEventListener('beforeinstallprompt', checkPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', checkPrompt);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!pwaPrompt) return;
+    pwaPrompt.prompt();
+    await pwaPrompt.userChoice;
+    setPwaPrompt(null);
+  };
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
@@ -174,7 +191,16 @@ const Login: React.FC = () => {
             </form>
           </div>
         )}
-        <div className="text-center pt-2">
+        <div className="flex flex-col items-center gap-3 pt-2">
+          {pwaPrompt && (
+            <button
+              onClick={handleInstallPWA}
+              className="inline-flex items-center gap-2 text-xs text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              {t('install_app', 'Installer l\'application')}
+            </button>
+          )}
           <a
             href="https://ecomanageapp.com/downloads/eco-manage-setup.exe"
             download
