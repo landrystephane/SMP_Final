@@ -371,7 +371,7 @@ export const generateReportCard = (data: any) => {
             doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
             doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
             doc.setFont('helvetica', 'normal');
-            doc.text('A = Acquis     EC = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
+            doc.text('A = Acquis     ECA = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
         }
     }
 
