@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, KeyRound, Building2, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { LogIn, KeyRound, Building2, ChevronLeft, CheckCircle2, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -174,6 +174,16 @@ const Login: React.FC = () => {
             </form>
           </div>
         )}
+        <div className="text-center pt-2">
+          <a
+            href="https://ecomanageapp.com/downloads/eco-manage-setup.exe"
+            download
+            className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-amber-500 font-bold uppercase tracking-widest transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {t('download_windows_app', 'Télécharger l\'application Windows')}
+          </a>
+        </div>
       </div>
     </div>
   );
