@@ -76,29 +76,21 @@ export const generateReportCard = (data: any) => {
         doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
         const headerTopY = curY;
 
-        // Left: French state info + school name
+        // Left: French state info only
         doc.setFont('helvetica', 'bold');
         doc.text('RÉPUBLIQUE DU CAMEROUN', mL, headerTopY + 4);
         doc.setFont('helvetica', 'italic');
         doc.text('Paix - Travail - Patrie', mL, headerTopY + 8);
         doc.setFont('helvetica', 'normal');
         doc.text("MINISTÈRE DE L'ÉDUCATION DE BASE", mL, headerTopY + 12);
-        doc.setFont('helvetica', 'bold');
-        doc.text((school?.name || '').toUpperCase(), mL, headerTopY + 18);
-        doc.setFont('helvetica', 'normal');
-        if (school?.address) doc.text(school.address, mL, headerTopY + 22);
 
-        // Right: English state info + school name
+        // Right: English state info only
         doc.setFont('helvetica', 'bold');
         doc.text('REPUBLIC OF CAMEROON', pageW - mR, headerTopY + 4, { align: 'right' });
         doc.setFont('helvetica', 'italic');
         doc.text('Peace - Work - Fatherland', pageW - mR, headerTopY + 8, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         doc.text('MINISTRY OF BASIC EDUCATION', pageW - mR, headerTopY + 12, { align: 'right' });
-        doc.setFont('helvetica', 'bold');
-        doc.text((school?.name || '').toUpperCase(), pageW - mR, headerTopY + 18, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
-        if (school?.address) doc.text(school.address, pageW - mR, headerTopY + 22, { align: 'right' });
 
         // Center: Logo (bigger — 30x30)
         if (school?.logo) {
