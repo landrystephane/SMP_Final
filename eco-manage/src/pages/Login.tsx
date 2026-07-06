@@ -93,13 +93,15 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-      <div className="absolute top-6 right-6 z-50 w-48">
-        <LanguageSwitcher />
-      </div>
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full" />
 
       <div className="w-full max-w-md space-y-8 relative z-10">
+        <div className="flex justify-end mb-2">
+          <div className="w-44">
+            <LanguageSwitcher />
+          </div>
+        </div>
         <div className="text-center">
           <div className="inline-flex p-5 bg-amber-500 rounded-3xl shadow-2xl shadow-amber-500/20 mb-8 border-4 border-slate-950">
             <LogIn className="w-12 h-12 text-slate-950" />
