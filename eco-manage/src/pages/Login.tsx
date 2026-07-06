@@ -19,6 +19,9 @@ const Login: React.FC = () => {
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
   const [codeError, setCodeError] = useState('');
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isAlreadyInstalled = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
   useEffect(() => {
     const checkPrompt = () => {
@@ -192,20 +195,32 @@ const Login: React.FC = () => {
           </div>
         )}
         <div className="flex flex-col items-center gap-3 pt-2">
-          {pwaPrompt && (
-            <button
-              onClick={handleInstallPWA}
-              className="inline-flex items-center gap-2 text-xs text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors"
-            >
+          {!isAlreadyInstalled && pwaPrompt && (
+            <button onClick={handleInstallPWA}
+              className="inline-flex items-center gap-2 text-xs text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors">
               <Smartphone className="w-3.5 h-3.5" />
               {t('install_app', 'Installer l\'application')}
             </button>
           )}
-          <a
-            href="https://ecomanageapp.com/downloads/eco-manage-setup.exe"
-            download
-            className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-amber-500 font-bold uppercase tracking-widest transition-colors"
-          >
+          {!isAlreadyInstalled && isIOS && (
+            <div className="flex flex-col items-center gap-2">
+              <button onClick={() => setShowIOSGuide(v => !v)}
+                className="inline-flex items-center gap-2 text-xs text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors">
+                <Smartphone className="w-3.5 h-3.5" />
+                {t('install_app', 'Installer l\'application')}
+              </button>
+              {showIOSGuide && (
+                <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 text-xs text-slate-300 max-w-xs text-center space-y-1">
+                  <p className="font-black text-amber-500 uppercase tracking-wider mb-2">Installation sur iPhone</p>
+                  <p>1. Appuyez sur <span className="font-bold text-white">le bouton Partager</span> <span className="text-amber-500">⎙</span> en bas de Safari</p>
+                  <p>2. Faites défiler et appuyez sur <span className="font-bold text-white">"Sur l'écran d'accueil"</span></p>
+                  <p>3. Appuyez sur <span className="font-bold text-white">"Ajouter"</span></p>
+                </div>
+              )}
+            </div>
+          )}
+          <a href="https://ecomanageapp.com/downloads/eco-manage-setup.exe" download
+            className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-amber-500 font-bold uppercase tracking-widest transition-colors">
             <Download className="w-3.5 h-3.5" />
             {t('download_windows_app', 'Télécharger l\'application Windows')}
           </a>
