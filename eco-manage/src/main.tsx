@@ -9,10 +9,19 @@ import { initSaaSBridge } from './saasApiBridge'
 initSaaSBridge();
 dataService.init().catch(console.error);
 
-// Register Service Worker + PWA install prompt
+// Register Service Worker + auto-reload on new version
 if ('serviceWorker' in navigator && !window.electronAPI) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+    // When a new SW takes control, reload to get fresh JS
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   });
 }
 window.addEventListener('beforeinstallprompt', (e: any) => {
