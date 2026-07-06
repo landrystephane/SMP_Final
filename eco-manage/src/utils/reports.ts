@@ -74,46 +74,53 @@ export const generateReportCard = (data: any) => {
         } catch (e) {}
     } else {
         doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
+        const headerTopY = curY;
 
-        // Left: French
+        // Left: French state info + school name
         doc.setFont('helvetica', 'bold');
-        doc.text('RÉPUBLIQUE DU CAMEROUN', mL, curY + 4);
+        doc.text('RÉPUBLIQUE DU CAMEROUN', mL, headerTopY + 4);
         doc.setFont('helvetica', 'italic');
-        doc.text('Paix - Travail - Patrie', mL, curY + 8);
+        doc.text('Paix - Travail - Patrie', mL, headerTopY + 8);
         doc.setFont('helvetica', 'normal');
-        doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", mL, curY + 12);
+        doc.text("MINISTÈRE DE L'ÉDUCATION DE BASE", mL, headerTopY + 12);
         doc.setFont('helvetica', 'bold');
-        doc.text((school?.name || '').toUpperCase(), mL, curY + 20);
+        doc.text((school?.name || '').toUpperCase(), mL, headerTopY + 18);
         doc.setFont('helvetica', 'normal');
-        if (school?.address) doc.text(school.address, mL, curY + 24);
+        if (school?.address) doc.text(school.address, mL, headerTopY + 22);
 
-        // Right: English
+        // Right: English state info + school name
         doc.setFont('helvetica', 'bold');
-        doc.text('REPUBLIC OF CAMEROON', pageW - mR, curY + 4, { align: 'right' });
+        doc.text('REPUBLIC OF CAMEROON', pageW - mR, headerTopY + 4, { align: 'right' });
         doc.setFont('helvetica', 'italic');
-        doc.text('Peace - Work - Fatherland', pageW - mR, curY + 8, { align: 'right' });
+        doc.text('Peace - Work - Fatherland', pageW - mR, headerTopY + 8, { align: 'right' });
         doc.setFont('helvetica', 'normal');
-        doc.text(school?.header_english || 'MINISTRY OF BASIC EDUCATION', pageW - mR, curY + 12, { align: 'right' });
+        doc.text('MINISTRY OF BASIC EDUCATION', pageW - mR, headerTopY + 12, { align: 'right' });
         doc.setFont('helvetica', 'bold');
-        doc.text((school?.name || '').toUpperCase(), pageW - mR, curY + 20, { align: 'right' });
+        doc.text((school?.name || '').toUpperCase(), pageW - mR, headerTopY + 18, { align: 'right' });
         doc.setFont('helvetica', 'normal');
-        if (school?.address) doc.text(school.address, pageW - mR, curY + 24, { align: 'right' });
+        if (school?.address) doc.text(school.address, pageW - mR, headerTopY + 22, { align: 'right' });
 
-        // Center: Logo
+        // Center: Logo (bigger — 30x30)
         if (school?.logo) {
             try {
                 const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                doc.addImage(school.logo, ext, pageW / 2 - 10, curY + 1, 20, 20, undefined, 'FAST');
+                doc.addImage(school.logo, ext, pageW / 2 - 15, headerTopY, 30, 30, undefined, 'FAST');
             } catch (e) {}
         }
-        curY += 27;
+        curY = headerTopY + 32;
 
-        // Motto italic centered
-        if (school?.motto) {
-            doc.setFontSize(7); doc.setFont('helvetica', 'italic');
-            doc.text(school.motto, pageW / 2, curY, { align: 'center' });
-            curY += 5;
+        // School name + address + motto centered below logo
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+        doc.text((school?.name || '').toUpperCase(), pageW / 2, curY, { align: 'center' });
+        curY += 4;
+        if (school?.address) {
+            doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
+            doc.text(school.address, pageW / 2, curY, { align: 'center' });
+            curY += 4;
         }
+        doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+        doc.text(school?.motto || 'Paix - Travail - Patrie', pageW / 2, curY, { align: 'center' });
+        curY += 5;
     }
 
     // Separator line
@@ -171,7 +178,13 @@ export const generateReportCard = (data: any) => {
     const r3c1 = 50, r3c2 = 55;
     drawInfoCell(mL, curY + 2 * rowH, r3c1, 'Matricule : ', student.matricule || '--', true);
     drawInfoCell(mL + r3c1, curY + 2 * rowH, r3c2, 'Classe : ', classObj.name || '--', true);
-    drawInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, contentW - r3c1 - r3c2, 'Enseignant(e) : ', classObj.teacher_name || '--', false);
+    const teacherGender = classObj.teacher_gender;
+    const isEnSection = classObj.section === 'ANGLOPHONE';
+    const teacherPrefix = teacherGender
+        ? (isEnSection ? (teacherGender === 'M' ? 'Mr ' : 'Mrs ') : (teacherGender === 'M' ? 'M. ' : 'Mme '))
+        : (isEnSection ? '' : '');
+    const teacherDisplay = classObj.teacher_name ? `${teacherPrefix}${classObj.teacher_name}` : '--';
+    drawInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, contentW - r3c1 - r3c2, isEnSection ? 'Teacher : ' : 'Enseignant(e) : ', teacherDisplay, false);
 
     curY += gridTotalH + 3;
 
@@ -203,6 +216,7 @@ export const generateReportCard = (data: any) => {
         }]);
     } else {
         Object.entries(groupedGrades).forEach(([domain, subjects]) => {
+            let domainTP = 0, domainTC = 0, domainMax = 0;
             subjects.forEach((g: any, idx: number) => {
                 const row: any[] = [];
                 if (idx === 0) {
@@ -224,6 +238,7 @@ export const generateReportCard = (data: any) => {
                     const coef  = Number(g.coefficient) || 1;
                     const total = score * coef;
                     grandTP += total; grandTC += coef; grandMax += 20 * coef;
+                    domainTP += total; domainTC += coef; domainMax += 20 * coef;
                     row.push(g.subjectName || g.name || '--');
                     row.push({ content: score.toFixed(2), styles: { halign: 'center' } });
                     row.push({ content: coef.toString(), styles: { halign: 'center' } });
@@ -233,6 +248,18 @@ export const generateReportCard = (data: any) => {
                 }
                 tableBody.push(row);
             });
+            // Sous-total par domaine (primaire uniquement)
+            if (!isNursery && subjects.length > 1) {
+                const subFill = [220, 230, 245];
+                tableBody.push([
+                    { content: 'Sous-total', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: subFill, fontSize: fs - 0.5 } },
+                    { content: '', styles: { fillColor: subFill } },
+                    { content: domainTC.toString(), styles: { halign: 'center', fontStyle: 'bold', fillColor: subFill, fontSize: fs - 0.5 } },
+                    { content: `${domainTP.toFixed(2)} / ${domainMax}`, styles: { halign: 'center', fontStyle: 'bold', fillColor: subFill, fontSize: fs - 0.5 } },
+                    { content: '', styles: { fillColor: subFill } },
+                    { content: '', styles: { fillColor: subFill } }
+                ]);
+            }
         });
 
         if (!isNursery) {
@@ -251,7 +278,7 @@ export const generateReportCard = (data: any) => {
                 { content: avg.toFixed(2), styles: { halign: 'center', fontStyle: 'bold', fillColor: summaryFill } },
                 { content: '', styles: { fillColor: summaryFill } },
                 { content: '/ 20', styles: { halign: 'center', fillColor: summaryFill } },
-                { content: getPrimaryAppreciation(avg), styles: { halign: 'center', fontStyle: 'bold', fillColor: summaryFill } },
+                { content: isEn ? getPrimaryAppreciation(avg) : '', styles: { halign: 'center', fontStyle: 'bold', fillColor: summaryFill } },
                 { content: '', styles: { fillColor: summaryFill } }
             ]);
             tableBody.push([
@@ -313,6 +340,16 @@ export const generateReportCard = (data: any) => {
     doc.text(`Absences : ${totalAbs} h   —   Conduite : ${calculateAttendanceObservations(totalAbs)}`, mL, finalY + 4);
     finalY += 8;
 
+    // --- Observation globale ---
+    const obsH = 18;
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+    doc.rect(mL, finalY, contentW, obsH);
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text(isEn ? 'GENERAL OBSERVATION :' : 'OBSERVATION GÉNÉRALE :', mL + 2, finalY + 4);
+    doc.line(mL + 2, finalY + 7, pageW - mR - 2, finalY + 7);
+    doc.line(mL + 2, finalY + 12, pageW - mR - 2, finalY + 12);
+    finalY += obsH + 3;
+
     // --- Signatures (3 columns, bordered) ---
     if (template?.footer_image) {
         try {
@@ -336,11 +373,13 @@ export const generateReportCard = (data: any) => {
         });
         finalY += sigH + 3;
 
-        // --- Appreciation legend ---
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
-        doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.text('A = Acquis     EC = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
+        // --- Appreciation legend (maternelle uniquement) ---
+        if (isNursery) {
+            doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+            doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
+            doc.setFont('helvetica', 'normal');
+            doc.text('A = Acquis     EC = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
+        }
     }
 
     // --- System footer ---
