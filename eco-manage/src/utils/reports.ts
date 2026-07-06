@@ -373,8 +373,9 @@ export const generateReportCard = (data: any) => {
         });
         finalY += sigH + 3;
 
-        // --- Appreciation legend (maternelle uniquement) ---
-        if (isNursery) {
+        // --- Appreciation legend (classes utilisant le système A/EC/NA) ---
+        const usesLetterGrading = isNursery || validatedGrades.some((g: any) => g.letter_score);
+        if (usesLetterGrading) {
             doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
             doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
             doc.setFont('helvetica', 'normal');
