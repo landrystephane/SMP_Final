@@ -4,7 +4,7 @@ const path = require('path');
 const isDev = !app.isPackaged;
 
 // 🌍 L'adresse de votre serveur Cloud
-const CLOUD_URL = 'http://2.24.15.119';
+const CLOUD_URL = 'https://ecomanageapp.com';
 
 function createWindow() {
   const win = new BrowserWindow({

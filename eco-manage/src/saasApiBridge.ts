@@ -9,8 +9,8 @@ export const initSaaSBridge = () => {
     console.log("[SaaS Mode] Activation du Pont API Web...");
 
     // Sur le Cloud, l'API Express répond sous /api
-    // Si on est sur Mobile (Android/iOS via Capacitor), on force l'URL absolue du VPS
-    const API_BASE = Capacitor.isNativePlatform() ? 'http://2.24.15.119:8080/api' : '/api';
+    // Si on est sur Mobile (Android/iOS via Capacitor), on force l'URL absolue du domaine
+    const API_BASE = Capacitor.isNativePlatform() ? 'https://ecomanageapp.com/api' : '/api';
 
     // Fonction utilitaire pour faire des requêtes vers server.js
     const apiCall = async (endpoint: string, method: string = 'GET', body: any = null) => {
