@@ -29,6 +29,7 @@ import AnnualArchives from './pages/AnnualArchives';
 import Classes from './pages/Classes';
 import Messaging from './pages/Messaging';
 import HelpGuide from './components/HelpGuide';
+import OnboardingModal from './components/OnboardingModal';
 import './index.css';
 
 import { useTranslation } from 'react-i18next';
@@ -136,6 +137,7 @@ function App() {
             </Route>
           </Routes>
           <HelpGuide />
+          <OnboardingModal />
         </BrowserRouter>
       </AuthProvider>
     </NotificationProvider>
