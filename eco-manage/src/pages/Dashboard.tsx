@@ -677,7 +677,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Performance chart for advisor */}
-            {stats?.classStats?.some((c: any) => c.passRate > 0) && (
+            {stats?.classStats?.length > 0 && (
               <div className="glass-card p-6 border-none" style={{ backgroundImage: 'linear-gradient(to right, #f59e0b, #10b981)', backgroundSize: '100% 2px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
                 <div className="flex items-center justify-between mb-5 pt-1">
                   <h2 className="text-base font-black text-white flex items-center gap-3">
@@ -706,7 +706,7 @@ const Dashboard: React.FC = () => {
                     />
                     <Bar dataKey="passRate" name="Taux de réussite" radius={[6, 6, 0, 0]} maxBarSize={44}>
                       {stats.classStats.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.passRate >= 80 ? '#10b981' : entry.passRate >= 50 ? '#f59e0b' : '#ef4444'} fillOpacity={0.9} />
+                        <Cell key={`cell-${index}`} fill={entry.passRate >= 80 ? '#10b981' : entry.passRate >= 50 ? '#f59e0b' : entry.passRate > 0 ? '#ef4444' : '#1e293b'} fillOpacity={entry.passRate > 0 ? 0.9 : 0.4} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -938,8 +938,8 @@ const Dashboard: React.FC = () => {
       </div>
       )}
 
-      {/* Performance Bar Chart */}
-      {stats?.classStats?.some((c: any) => c.avg > 0) && (
+      {/* Performance Bar Chart — always visible when classes exist */}
+      {stats?.classStats?.length > 0 && (
         <div className="glass-card p-6 border-none" style={{ backgroundImage: 'linear-gradient(to right, #f59e0b, #10b981)', backgroundSize: '100% 2px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pt-1">
             <h2 className="text-base font-black text-white flex items-center gap-3">
@@ -948,15 +948,19 @@ const Dashboard: React.FC = () => {
                 Performance par classe — {selectedSection}
               </span>
             </h2>
-            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /><span className="text-slate-400">Moy ≥ 14</span></span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /><span className="text-slate-400">10–14</span></span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /><span className="text-slate-400">&lt; 10</span></span>
-            </div>
+            {stats.classStats.some((c: any) => c.avg > 0) ? (
+              <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /><span className="text-slate-400">Moy ≥ 14</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /><span className="text-slate-400">10–14</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /><span className="text-slate-400">&lt; 10</span></span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-800 px-3 py-1.5 rounded-xl">En attente de notes validées</span>
+            )}
           </div>
           <ResponsiveContainer width="100%" height={190}>
             <BarChart
-              data={stats.classStats.filter((c: any) => c.avg > 0)}
+              data={stats.classStats}
               margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
               barCategoryGap="30%"
             >
@@ -980,11 +984,11 @@ const Dashboard: React.FC = () => {
                 cursor={{ fill: 'rgba(255,255,255,0.03)' }}
               />
               <Bar dataKey="avg" name="Moyenne /20" radius={[6, 6, 0, 0]} maxBarSize={44}>
-                {stats.classStats.filter((c: any) => c.avg > 0).map((entry: any, index: number) => (
+                {stats.classStats.map((entry: any, index: number) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.avg >= 14 ? '#10b981' : entry.avg >= 10 ? '#f59e0b' : '#ef4444'}
-                    fillOpacity={0.9}
+                    fill={entry.avg >= 14 ? '#10b981' : entry.avg >= 10 ? '#f59e0b' : entry.avg > 0 ? '#ef4444' : '#1e293b'}
+                    fillOpacity={entry.avg > 0 ? 0.9 : 0.4}
                   />
                 ))}
               </Bar>
