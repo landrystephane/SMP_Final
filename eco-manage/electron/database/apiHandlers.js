@@ -173,7 +173,8 @@ handlers['db:addSchool'] = async (school) => {
     if ((session.getStore()?.user)?.role !== 'SUPERADMIN') throw new Error('Unauthorized');
     const { name, address, contact_email, contact_phone, bp, motto } = school;
     const accessCode = name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X') + Date.now().toString().slice(-4);
-    const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto, access_code) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto, accessCode);
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 16) + Date.now().toString().slice(-4);
+    const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto, access_code, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto, accessCode, slug);
     const newSchoolId = info.lastInsertRowid;
 
     const transaction = db.transaction(() => {
@@ -204,9 +205,10 @@ handlers['db:addSchool'] = async (school) => {
 };
 
 handlers['db:updateSchool'] = async (school) => {
-    const { id, name, address, contact_email, contact_phone, bp, motto } = school;
-    return db.prepare('UPDATE schools SET name = ?, address = ?, contact_email = ?, contact_phone = ?, bp = ?, motto = ? WHERE id = ?')
-        .run(name, address, contact_email, contact_phone, bp, motto, id);
+    const { id, name, address, contact_email, contact_phone, bp, motto, slug } = school;
+    const cleanSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) : null;
+    return db.prepare('UPDATE schools SET name = ?, address = ?, contact_email = ?, contact_phone = ?, bp = ?, motto = ?, slug = COALESCE(?, slug) WHERE id = ?')
+        .run(name, address, contact_email, contact_phone, bp, motto, cleanSlug, id);
 };
 
 handlers['db:deleteSchool'] = async ({ id, password }) => {

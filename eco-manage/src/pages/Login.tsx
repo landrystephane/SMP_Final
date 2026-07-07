@@ -25,6 +25,25 @@ const Login: React.FC = () => {
   const isSafariMac = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) && !isIOS;
   const isAlreadyInstalled = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
+  // Detect subdomain (e.g. vie.ecomanageapp.com → slug = "vie")
+  const hostname = window.location.hostname;
+  const hostParts = hostname.split('.');
+  const detectedSlug = hostParts.length >= 3 && hostParts[0] !== 'www' ? hostParts[0] : null;
+
+  useEffect(() => {
+    if (detectedSlug) {
+      fetch(`/api/school-by-slug/${detectedSlug}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.school) {
+            setSelectedSchool(data.school);
+            setStep('LOGIN');
+          }
+        })
+        .catch(() => {});
+    }
+  }, [detectedSlug]);
+
   useEffect(() => {
     const checkPrompt = () => {
       if ((window as any).__pwaInstallPrompt) setPwaPrompt((window as any).__pwaInstallPrompt);

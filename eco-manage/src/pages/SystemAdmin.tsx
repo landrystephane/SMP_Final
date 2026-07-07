@@ -580,6 +580,12 @@ const SystemAdmin: React.FC = () => {
                     <span className="text-amber-500 font-black tracking-widest bg-amber-500/10 px-3 py-1 rounded-lg">{s.access_code}</span>
                   </div>
                   )}
+                  {s.slug && (
+                  <div className="flex items-center gap-3 text-xs font-bold">
+                    <span className="text-slate-500">🌐 URL</span>
+                    <span className="text-emerald-400 font-black bg-emerald-500/10 px-3 py-1 rounded-lg">{s.slug}.ecomanageapp.com</span>
+                  </div>
+                  )}
                   <div className="pt-4 grid grid-cols-1 gap-3">
                     <button
                       onClick={() => openSchoolDetail(s)}

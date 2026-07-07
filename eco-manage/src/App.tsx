@@ -28,6 +28,7 @@ import CustomizationSettings from './pages/CustomizationSettings';
 import AnnualArchives from './pages/AnnualArchives';
 import Classes from './pages/Classes';
 import Messaging from './pages/Messaging';
+import HelpGuide from './components/HelpGuide';
 import './index.css';
 
 import { useTranslation } from 'react-i18next';
@@ -134,6 +135,7 @@ function App() {
               <Route path="messaging" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','BURSAR','TEACHER','ADVISOR','DRIVER','SUPERADMIN']} moduleKey="messaging"><Messaging /></RoleGuard>} />
             </Route>
           </Routes>
+          <HelpGuide />
         </BrowserRouter>
       </AuthProvider>
     </NotificationProvider>

@@ -660,6 +660,20 @@ function initDb() {
         }
     } catch(e) { console.error('Access code migration error:', e.message); }
 
+    // School subdomain slug
+    try {
+        const schoolColsSlug = db.prepare("PRAGMA table_info(schools)").all();
+        if (!schoolColsSlug.find(c => c.name === 'slug')) {
+            db.prepare("ALTER TABLE schools ADD COLUMN slug TEXT").run();
+            const existing = db.prepare("SELECT id, access_code, name FROM schools").all();
+            for (const s of existing) {
+                const base = (s.access_code || s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                db.prepare("UPDATE schools SET slug = ? WHERE id = ?").run(base, s.id);
+            }
+            console.log('[Migration] slug column added to schools');
+        }
+    } catch(e) { console.error('slug migration error:', e.message); }
+
     // Consolidate SECRETARY role into SG (Secretaire General now covers all Secretary permissions)
     try {
         db.prepare("UPDATE users SET role = 'SG' WHERE role = 'SECRETARY'").run();

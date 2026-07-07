@@ -47,7 +47,7 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    if (req.path === '/auth/login' || req.path === '/health' || req.path === '/verify-school-code' || req.path === '/auth/switchSchool') return next();
+    if (req.path === '/auth/login' || req.path === '/health' || req.path === '/verify-school-code' || req.path === '/auth/switchSchool' || req.path.startsWith('/school-by-slug/')) return next();
 
     const authHeader = req.headers.authorization;
     let user = null;
@@ -116,6 +116,20 @@ app.post('/api/verify-school-code', (req, res) => {
         }
     } catch(e) {
         res.json({ found: false });
+    }
+});
+
+// Public route: resolve school by subdomain slug
+app.get('/api/school-by-slug/:slug', (req, res) => {
+    try {
+        const slug = (req.params.slug || '').toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
+        if (!slug) return res.json({ school: null });
+        const school = db.prepare(
+            "SELECT id, name, address, logo, primary_color FROM schools WHERE LOWER(slug) = ? AND is_active = 1 AND deleted_at IS NULL"
+        ).get(slug);
+        res.json({ school: school || null });
+    } catch(e) {
+        res.json({ school: null });
     }
 });
 
