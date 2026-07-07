@@ -406,7 +406,8 @@ const Dashboard: React.FC = () => {
                 <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #fb923c, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
                         <UsersIcon className="text-amber-500 group-hover:text-slate-950 w-6 h-6" />
@@ -414,9 +415,11 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
+                  </div>
                 </div>
                 {/* Boys */}
-                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #60a5fa, #3b82f6)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500 transition-all">
                         <UsersIcon className="text-blue-500 group-hover:text-slate-950 w-6 h-6" />
@@ -424,9 +427,11 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('boys', 'Garçons')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.boys || 0}</p>
+                  </div>
                 </div>
                 {/* Girls */}
-                <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #f472b6, #ec4899)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-pink-500/10 rounded-2xl group-hover:bg-pink-500 transition-all">
                         <UsersIcon className="text-pink-500 group-hover:text-slate-950 w-6 h-6" />
@@ -434,6 +439,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('girls', 'Filles')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.girls || 0}</p>
+                  </div>
                 </div>
             </div>
 
@@ -488,7 +494,8 @@ const Dashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Recouvrements (Recettes) */}
-                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #34d399, #10b981)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-emerald-500/10 rounded-2xl">
                         <CreditCard className="text-emerald-500 w-6 h-6" />
@@ -496,10 +503,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_receipts')}</p>
                   <p className="text-2xl font-black text-white mt-1">{(stats?.totalRevenue || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
+                  </div>
                 </div>
 
                 {/* Total Décaissements (Dépenses) */}
-                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #fb7185, #ef4444)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-rose-500/10 rounded-2xl">
                         <Wallet className="text-rose-500 w-6 h-6" />
@@ -507,10 +516,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('total_disbursements')}</p>
                   <p className="text-2xl font-black text-white mt-1">{(stats?.totalExpenses || 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
+                  </div>
                 </div>
 
                 {/* Solde Actuel (Recettes - Dépenses) */}
-                <div className="glass-card p-6 border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all">
+                <div className="glass-card border-none group bg-amber-500/5 hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #fbbf24, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-amber-500/20 rounded-2xl">
                         <Activity className="text-amber-500 w-6 h-6" />
@@ -518,10 +529,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-amber-500/80 text-[10px] font-black uppercase tracking-widest">{t('cash_balance')}</p>
                   <p className="text-3xl font-black text-amber-500 mt-1">{((stats?.totalRevenue || 0) - (stats?.totalExpenses || 0)).toLocaleString()} <span className="text-xs opacity-50">{currency}</span></p>
+                  </div>
                 </div>
 
                 {/* Reste à Percevoir (Arriérés) */}
-                <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #60a5fa, #3b82f6)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-blue-500/10 rounded-2xl">
                         <UsersIcon className="text-blue-500 w-6 h-6" />
@@ -529,8 +542,48 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('arrears', 'Reste à Percevoir')}</p>
                   <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalTuitionPaid || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
+                  </div>
                 </div>
             </div>
+
+            {/* Recovery bar chart per class */}
+            {stats?.classStats?.length > 0 && (
+              <div className="glass-card p-6 border-none" style={{ backgroundImage: 'linear-gradient(to right, #10b981, #f59e0b)', backgroundSize: '100% 2px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                <div className="flex items-center justify-between mb-5 pt-1">
+                  <h2 className="text-base font-black text-white flex items-center gap-3">
+                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                      Recouvrement par classe
+                    </span>
+                  </h2>
+                  <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /><span className="text-slate-400">≥ 80%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /><span className="text-slate-400">50–80%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /><span className="text-slate-400">&lt; 50%</span></span>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={190}>
+                  <BarChart data={stats.classStats} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, fontSize: 11, fontWeight: 700, padding: '8px 14px' }}
+                      labelStyle={{ color: '#10b981', fontWeight: 900, marginBottom: 4 }}
+                      itemStyle={{ color: '#fff' }}
+                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                      formatter={(v: any) => [`${v}%`, 'Taux de recouvrement']}
+                    />
+                    <Bar dataKey={(d: any) => d.totalStudents > 0 ? Math.round((d.upToDateStudents / d.totalStudents) * 100) : 0} name="Taux de recouvrement" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                      {stats.classStats.map((entry: any, index: number) => {
+                        const rate = entry.totalStudents > 0 ? (entry.upToDateStudents / entry.totalStudents) * 100 : 0;
+                        return <Cell key={`cell-${index}`} fill={rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444'} fillOpacity={0.9} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <div className="glass-card p-6 border-none shadow-xl">
                 <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
@@ -586,7 +639,8 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card p-6 border-none group">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #fb923c, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-amber-500/10 rounded-2xl">
                         <UsersIcon className="text-amber-500 w-6 h-6" />
@@ -594,9 +648,11 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
+                  </div>
                 </div>
 
-                <div className="glass-card p-6 border-none group">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #fb7185, #ef4444)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-rose-500/10 rounded-2xl">
                         <AlertTriangle className="text-rose-500 w-6 h-6" />
@@ -604,9 +660,11 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('dash_global_absences')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.totalAbsences}</p>
+                  </div>
                 </div>
 
-                <div className="glass-card p-6 border-none group">
+                <div className="glass-card border-none group hover:translate-y-[-4px] transition-all" style={{ backgroundImage: 'linear-gradient(to right, #34d399, #10b981)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                  <div className="p-6 pt-7">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 bg-emerald-500/10 rounded-2xl">
                         <Activity className="text-emerald-500 w-6 h-6" />
@@ -614,8 +672,47 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('dash_overall_success_rate')}</p>
                   <p className="text-3xl font-black text-white mt-1">{stats.overallPassRate?.toFixed(1)}%</p>
+                  </div>
                 </div>
             </div>
+
+            {/* Performance chart for advisor */}
+            {stats?.classStats?.some((c: any) => c.passRate > 0) && (
+              <div className="glass-card p-6 border-none" style={{ backgroundImage: 'linear-gradient(to right, #f59e0b, #10b981)', backgroundSize: '100% 2px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                <div className="flex items-center justify-between mb-5 pt-1">
+                  <h2 className="text-base font-black text-white flex items-center gap-3">
+                    <TrendingUp className="w-5 h-5 text-amber-500" />
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                      Taux de réussite par classe
+                    </span>
+                  </h2>
+                  <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /><span className="text-slate-400">≥ 80%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /><span className="text-slate-400">50–80%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /><span className="text-slate-400">&lt; 50%</span></span>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={190}>
+                  <BarChart data={stats.classStats} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, fontSize: 11, fontWeight: 700, padding: '8px 14px' }}
+                      labelStyle={{ color: '#f59e0b', fontWeight: 900, marginBottom: 4 }}
+                      itemStyle={{ color: '#fff' }}
+                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                      formatter={(v: any) => [`${v}%`, 'Taux de réussite']}
+                    />
+                    <Bar dataKey="passRate" name="Taux de réussite" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                      {stats.classStats.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.passRate >= 80 ? '#10b981' : entry.passRate >= 50 ? '#f59e0b' : '#ef4444'} fillOpacity={0.9} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <div className="glass-card p-6 border-none shadow-xl">
                 <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
