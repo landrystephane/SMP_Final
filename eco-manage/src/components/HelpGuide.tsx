@@ -159,6 +159,9 @@ const HelpGuide: React.FC = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
+  // Don't render when not authenticated
+  if (!user) return null;
+
   const role = user?.role || 'TEACHER';
   const sections = GUIDES[role] || GUIDES['TEACHER'];
 
@@ -186,7 +189,7 @@ const HelpGuide: React.FC = () => {
                   {t('help_guide', 'Guide d\'utilisation')}
                 </h2>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+              <button type="button" onClick={() => setOpen(false)} title="Fermer" aria-label="Fermer" className="text-slate-400 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
