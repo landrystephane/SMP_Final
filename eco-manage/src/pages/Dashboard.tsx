@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download, RefreshCw } from 'lucide-react';
+import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download, RefreshCw, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -735,7 +736,8 @@ const Dashboard: React.FC = () => {
 
       {/* KPI Cards */}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${user?.role === 'SG' ? '3' : '4'} gap-6`}>
-        <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+        <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #fb923c, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+          <div className="p-6 pt-7">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
                 <UsersIcon className="text-amber-500 group-hover:text-slate-950 w-6 h-6" />
@@ -748,9 +750,11 @@ const Dashboard: React.FC = () => {
              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full">{stats.genderDist.boys} {t('boys')}</span>
              <span className="text-[10px] font-bold text-pink-500 bg-pink-500/10 px-2.5 py-1 rounded-full">{stats.genderDist.girls} {t('girls')}</span>
           </div>
+          </div>
         </div>
 
-        <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+        <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #34d399, #10b981)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+          <div className="p-6 pt-7">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-emerald-500/10 rounded-2xl group-hover:bg-emerald-500 transition-all">
                 <Activity className="text-emerald-500 group-hover:text-slate-950 w-6 h-6" />
@@ -764,10 +768,12 @@ const Dashboard: React.FC = () => {
           <p className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center uppercase">
               <ChevronRight className="w-3 h-3 rotate-[-90deg] mr-1" /> +0.0% {t('compared_to_t1')}
           </p>
+          </div>
         </div>
 
         {user?.role !== 'SG' && (
-        <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+        <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #fb7185, #ef4444)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+          <div className="p-6 pt-7">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-rose-500/10 rounded-2xl group-hover:bg-rose-500 transition-all">
                 <CreditCard className="text-rose-500 group-hover:text-slate-950 w-6 h-6" />
@@ -782,10 +788,12 @@ const Dashboard: React.FC = () => {
                 style={{ width: `${Math.min(100, ((stats?.totalRevenue || 0) / ((stats?.totalTuitionDue || 1) || 1)) * 100)}%` }}
              />
           </div>
+          </div>
         </div>
         )}
 
-        <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all cursor-pointer group">
+        <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #c084fc, #a855f7)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+          <div className="p-6 pt-7">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-purple-500/10 rounded-2xl group-hover:bg-purple-500 transition-all">
                 <School className="text-purple-500 group-hover:text-slate-950 w-6 h-6" />
@@ -795,6 +803,7 @@ const Dashboard: React.FC = () => {
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('classrooms')}</p>
           <p className="text-3xl font-black text-white mt-1">{stats?.classStats?.length || 0}</p>
           <p className="text-[10px] text-purple-400 font-bold mt-2 uppercase tracking-tight italic">100% {t('active_staff')}</p>
+          </div>
         </div>
       </div>
 
@@ -832,6 +841,61 @@ const Dashboard: React.FC = () => {
       </div>
       )}
 
+      {/* Performance Bar Chart */}
+      {stats?.classStats?.some((c: any) => c.avg > 0) && (
+        <div className="glass-card p-6 border-none" style={{ backgroundImage: 'linear-gradient(to right, #f59e0b, #10b981)', backgroundSize: '100% 2px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pt-1">
+            <h2 className="text-base font-black text-white flex items-center gap-3">
+              <TrendingUp className="w-5 h-5 text-amber-500" />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                Performance par classe — {selectedSection}
+              </span>
+            </h2>
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /><span className="text-slate-400">Moy ≥ 14</span></span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /><span className="text-slate-400">10–14</span></span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /><span className="text-slate-400">&lt; 10</span></span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={190}>
+            <BarChart
+              data={stats.classStats.filter((c: any) => c.avg > 0)}
+              margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
+              barCategoryGap="30%"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis
+                dataKey="level"
+                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                domain={[0, 20]}
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, fontSize: 11, fontWeight: 700, padding: '8px 14px' }}
+                labelStyle={{ color: '#f59e0b', fontWeight: 900, marginBottom: 4 }}
+                itemStyle={{ color: '#fff' }}
+                cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              />
+              <Bar dataKey="avg" name="Moyenne /20" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                {stats.classStats.filter((c: any) => c.avg > 0).map((entry: any, index: number) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.avg >= 14 ? '#10b981' : entry.avg >= 10 ? '#f59e0b' : '#ef4444'}
+                    fillOpacity={0.9}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between mb-2">
@@ -854,7 +918,7 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredClassStats && filteredClassStats.length > 0 ? (
                 filteredClassStats.map((item: any) => (
-                    <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all border-l-4 border-l-amber-500 bg-slate-900/60 group hover:bg-slate-900/80">
+                    <div key={item.level} className="glass-card p-5 border-none shadow-lg hover:shadow-2xl transition-all group hover:bg-slate-900/80" style={{ backgroundImage: `linear-gradient(to right, ${item.passRate >= 80 ? '#10b981' : item.passRate >= 50 ? '#f59e0b' : '#ef4444'}, transparent)`, backgroundSize: '3px 100%', backgroundPosition: 'left', backgroundRepeat: 'no-repeat' }}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <span className="text-white font-black text-xl tracking-tight">{item.level}</span>
@@ -890,9 +954,17 @@ const Dashboard: React.FC = () => {
                     </div>
                 ))
                 ) : (
-                    <div className="col-span-full py-16 text-center glass-card border-2 border-dashed border-slate-700">
-                        <School className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">{t('no_data')}</p>
+                    <div className="col-span-full py-16 text-center glass-card border-2 border-dashed border-slate-700/50 flex flex-col items-center gap-4">
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-3xl bg-slate-800 border border-slate-700 flex items-center justify-center">
+                            <School className="w-8 h-8 text-slate-600" />
+                          </div>
+                          <div className="absolute inset-0 bg-amber-500/10 rounded-3xl blur-xl" />
+                        </div>
+                        <div>
+                          <p className="text-slate-300 font-black uppercase tracking-widest text-xs">{t('no_data')}</p>
+                          <p className="text-slate-600 text-[10px] mt-1 font-bold">Aucune classe avec données pour cette sélection</p>
+                        </div>
                     </div>
                 )}
             </div>

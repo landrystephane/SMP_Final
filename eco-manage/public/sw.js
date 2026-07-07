@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eco-manage-v4';
+const CACHE_NAME = 'eco-manage-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

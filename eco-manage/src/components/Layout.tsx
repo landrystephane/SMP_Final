@@ -295,16 +295,18 @@ const Layout: React.FC = () => {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:flex-shrink-0`}
       >
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-10">
-            <div className="flex items-center space-x-4 min-w-0 flex-1">
-              <div className="p-3 bg-amber-500 rounded-2xl shadow-2xl shadow-amber-500/20">
-                  <GraduationCap className="w-8 h-8 text-slate-950" />
+        <div className="relative" style={{ backgroundImage: 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, transparent 100%)' }}>
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
+          <div className="p-7 pb-5">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              <div className="p-2.5 bg-amber-500 rounded-xl shadow-2xl shadow-amber-500/30 flex-shrink-0">
+                  <GraduationCap className="w-7 h-7 text-slate-950" />
               </div>
               <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-black text-white leading-none tracking-tight truncate" title={schoolName}>{schoolName}</h2>
-                  <p className="text-xs font-bold text-slate-300 mt-1 truncate" title={user?.fullName || user?.username}>{user?.fullName || user?.username}</p>
-                  <p className="text-[9px] text-amber-500 font-black uppercase tracking-widest mt-0.5 opacity-80">{t(`role_${user?.role}`)}</p>
+                  <h2 className="text-sm font-black text-white leading-none tracking-tight truncate" title={schoolName}>{schoolName}</h2>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1 truncate" title={user?.fullName || user?.username}>{user?.fullName || user?.username}</p>
+                  <span className="text-[9px] text-amber-500 font-black uppercase tracking-widest mt-1 inline-block bg-amber-500/10 px-2 py-0.5 rounded-full">{t(`role_${user?.role}`)}</span>
               </div>
             </div>
             <button
@@ -326,6 +328,7 @@ const Layout: React.FC = () => {
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
               )}
             </button>
+          </div>
           </div>
         </div>
 
