@@ -40,30 +40,57 @@ jobs:
             electron/preload.js \
             electron/api-server.js
 
-      - name: Deploy to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "deploy.tar.gz"
-          target: "/var/www/saas/"
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
 
-      - name: Extract and restart on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            cd /var/www/saas
-            mkdir -p /var/opt/eco-hub-data/backups
-            cp /var/opt/eco-hub-data/school.db /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
-            rm -rf dist/
-            tar -xzf deploy.tar.gz
-            rm deploy.tar.gz
-            npm install --legacy-peer-deps --production
-            pm2 restart eco-hub-saas
-            sleep 3
-            curl -sf http://localhost:8080/api/health || (echo "DEPLOY FAILED" && pm2 logs eco-hub-saas --lines 5 && exit 1)
-            echo "DEPLOY SUCCESS"
+      - name: SCP deploy package to VPS (3 retries)
+        run: |
+          for i in 1 2 3; do
+            echo "SCP attempt $i/3..."
+            sshpass -p "$VPS_PASSWORD" scp \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=10 \
+              deploy.tar.gz "${VPS_USER}@${VPS_HOST}:/var/www/saas/" && echo "SCP OK" && break
+            echo "Attempt $i failed. Waiting 20s before retry..."
+            sleep 20
+            if [ $i -eq 3 ]; then echo "All SCP attempts failed." && exit 1; fi
+          done
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+
+      - name: Extract and restart on VPS (3 retries)
+        run: |
+          for i in 1 2 3; do
+            echo "SSH attempt $i/3..."
+            sshpass -p "$VPS_PASSWORD" ssh \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=10 \
+              "${VPS_USER}@${VPS_HOST}" '
+                set -e
+                cd /var/www/saas
+                mkdir -p /var/opt/eco-hub-data/backups
+                cp /var/opt/eco-hub-data/school.db /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
+                rm -rf dist/
+                tar -xzf deploy.tar.gz
+                rm deploy.tar.gz
+                npm install --legacy-peer-deps --production
+                pm2 restart eco-hub-saas
+                sleep 3
+                curl -sf http://localhost:8080/api/health || (echo "HEALTH CHECK FAILED" && pm2 logs eco-hub-saas --lines 10 && exit 1)
+                echo "DEPLOY SUCCESS"
+              ' && echo "SSH OK" && break
+            echo "Attempt $i failed. Waiting 20s before retry..."
+            sleep 20
+            if [ $i -eq 3 ]; then echo "All SSH attempts failed." && exit 1; fi
+          done
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+
+      - name: Post Setup Node.js
+        run: echo "Deploy pipeline complete."
