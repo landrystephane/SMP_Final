@@ -47,7 +47,7 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    if (req.path === '/auth/login' || req.path === '/health' || req.path === '/verify-school-code' || req.path === '/auth/switchSchool' || req.path.startsWith('/school-by-slug/')) return next();
+    if (req.path === '/auth/login' || req.path === '/health' || req.path === '/verify-school-code' || req.path === '/auth/switchSchool' || req.path.startsWith('/school-by-slug/') || req.path === '/search-schools') return next();
 
     const authHeader = req.headers.authorization;
     let user = null;
@@ -116,6 +116,20 @@ app.post('/api/verify-school-code', (req, res) => {
         }
     } catch(e) {
         res.json({ found: false });
+    }
+});
+
+// Public route: search schools by name
+app.get('/api/search-schools', (req, res) => {
+    try {
+        const q = (req.query.q || '').trim();
+        if (q.length < 2) return res.json({ schools: [] });
+        const schools = db.prepare(
+            "SELECT id, name, address FROM schools WHERE LOWER(name) LIKE ? AND is_active = 1 AND deleted_at IS NULL LIMIT 8"
+        ).all(`%${q.toLowerCase()}%`);
+        res.json({ schools });
+    } catch(e) {
+        res.json({ schools: [] });
     }
 });
 

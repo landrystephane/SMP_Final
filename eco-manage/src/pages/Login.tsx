@@ -63,6 +63,9 @@ const Login: React.FC = () => {
   };
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -96,6 +99,24 @@ const Login: React.FC = () => {
       setCodeError(t('connection_error', 'Erreur de connexion au serveur'));
     }
     setIsVerifying(false);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCodeError('');
+    if (value.trim().length < 2) { setSearchResults([]); return; }
+    setIsSearching(true);
+    fetch(`/api/search-schools?q=${encodeURIComponent(value.trim())}`)
+      .then(r => r.json())
+      .then(data => { setSearchResults(data.schools || []); setIsSearching(false); })
+      .catch(() => setIsSearching(false));
+  };
+
+  const handleSelectSchool = (school: any) => {
+    setSelectedSchool(school);
+    setSearchQuery('');
+    setSearchResults([]);
+    setStep('LOGIN');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,38 +155,54 @@ const Login: React.FC = () => {
         {step === 'CODE' ? (
           <div className="glass-card p-10 border-slate-700/50 shadow-2xl space-y-6">
             <div className="text-center">
-              <KeyRound className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-              <h2 className="text-lg font-black text-white uppercase tracking-wider">{t('enter_access_code', 'Code d\'Accès')}</h2>
-              <p className="text-slate-500 text-xs mt-2">{t('enter_school_code_desc', 'Entrez le code d\'accès fourni par votre établissement')}</p>
+              <Building2 className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+              <h2 className="text-lg font-black text-white uppercase tracking-wider">{t('find_your_school', 'Trouvez votre école')}</h2>
+              <p className="text-slate-500 text-xs mt-2">{t('search_school_desc', 'Tapez le nom de votre établissement')}</p>
             </div>
 
-            <div>
+            <div className="relative">
               <input
                 type="text"
-                value={schoolCode}
-                onChange={(e) => { setSchoolCode(e.target.value.toUpperCase()); setCodeError(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && handleVerifyCode()}
-                placeholder={t('code_placeholder', 'Ex: HSE001')}
-                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-4 text-white text-center text-2xl font-black tracking-[0.3em] focus:border-amber-500 focus:ring-4 focus:ring-amber-500/5 outline-none transition-all uppercase"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder={t('search_school_placeholder', 'Ex: Lycée Bilingue...')}
+                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-4 text-white text-sm font-bold focus:border-amber-500 focus:ring-4 focus:ring-amber-500/5 outline-none transition-all"
                 autoFocus
-                maxLength={10}
               />
+              {isSearching && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                </div>
+              )}
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden z-50 shadow-2xl">
+                  {searchResults.map((school: any) => (
+                    <button
+                      key={school.id}
+                      type="button"
+                      onClick={() => handleSelectSchool(school)}
+                      className="w-full text-left px-4 py-3 hover:bg-amber-500/10 transition-colors border-b border-slate-800 last:border-0"
+                    >
+                      <div className="text-sm font-black text-white">{school.name}</div>
+                      {school.address && <div className="text-xs text-slate-500 mt-0.5">{school.address}</div>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">
+                  {t('no_school_found', 'Aucun établissement trouvé')}
+                </div>
+              )}
             </div>
 
             {codeError && (
               <p className="text-rose-400 text-xs font-bold text-center">{codeError}</p>
             )}
 
-            <button
-              onClick={handleVerifyCode}
-              disabled={isVerifying || schoolCode.trim().length < 3}
-              className="w-full bg-amber-500 text-slate-950 py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-amber-400 active:scale-[0.98] transition-all shadow-xl shadow-amber-500/10 flex items-center justify-center disabled:opacity-50"
-            >
-              {isVerifying ? <div className="w-5 h-5 border-3 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" /> : t('verify_code', 'Vérifier')}
-            </button>
-
             <div className="border-t border-slate-800 pt-4">
               <button
+                type="button"
                 onClick={() => { setIsSuperAdmin(true); setStep('LOGIN'); }}
                 className="w-full text-center text-[10px] text-slate-600 hover:text-amber-500 font-bold uppercase tracking-widest transition-colors"
               >
