@@ -1020,10 +1020,10 @@ const SystemAdmin: React.FC = () => {
                                 <div>
                                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">URL Accès École</p>
                                   <div className="flex items-center gap-2 bg-slate-900 rounded-xl px-3 py-2">
-                                    <span className="text-[11px] font-mono font-bold text-amber-400 break-all">ecomanageapp.com/login/{selectedSchool.slug}</span>
+                                    <span className="text-[11px] font-mono font-bold text-amber-400 break-all">{selectedSchool.slug}.ecomanageapp.com</span>
                                     <button
                                       type="button"
-                                      onClick={() => navigator.clipboard.writeText(`https://ecomanageapp.com/login/${selectedSchool.slug}`)}
+                                      onClick={() => navigator.clipboard.writeText(`https://${selectedSchool.slug}.ecomanageapp.com`)}
                                       className="ml-auto flex-shrink-0 text-slate-500 hover:text-amber-400 transition-colors"
                                       title="Copier"
                                     >
