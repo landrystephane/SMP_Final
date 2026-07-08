@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,70 +24,31 @@ jobs:
         working-directory: ./eco-manage
         run: npx vite build
 
-      - name: Prepare deployment package
-        working-directory: ./eco-manage
+      - name: Deploy files
         run: |
-          tar -czf ../deploy.tar.gz \
-            dist/ \
-            server.js \
-            package.json \
-            package-lock.json \
-            electron/database/apiHandlers.js \
-            electron/database/db.js \
-            electron/database/schema.sql \
-            electron/database/session.js \
-            electron/main.js \
-            electron/preload.js \
-            electron/api-server.js
+          set -e
 
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
+          # Backup database
+          mkdir -p /var/opt/eco-hub-data/backups
+          cp /var/opt/eco-hub-data/school.db \
+            /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
 
-      - name: SCP deploy package to VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
-        run: |
-          for i in 1 2 3; do
-            echo "SCP attempt $i/3..."
-            sshpass -p "$VPS_PASSWORD" scp \
-              -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=30 \
-              -o ServerAliveInterval=10 \
-              deploy.tar.gz "${VPS_USER}@${VPS_HOST}:/var/www/saas/" && echo "SCP OK" && break
-            echo "Attempt $i failed. Waiting 20s..."
-            sleep 20
-            if [ $i -eq 3 ]; then echo "All SCP attempts failed." && exit 1; fi
-          done
+          # Copy built assets and server files
+          rm -rf /var/www/saas/dist
+          cp -r eco-manage/dist            /var/www/saas/dist
+          cp    eco-manage/server.js       /var/www/saas/server.js
+          cp    eco-manage/package.json    /var/www/saas/package.json
+          cp    eco-manage/package-lock.json /var/www/saas/package-lock.json
+          cp -r eco-manage/electron        /var/www/saas/electron
 
-      - name: Extract and restart on VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
-        run: |
-          for i in 1 2 3; do
-            echo "SSH attempt $i/3..."
-            sshpass -p "$VPS_PASSWORD" ssh \
-              -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=30 \
-              -o ServerAliveInterval=10 \
-              "${VPS_USER}@${VPS_HOST}" '
-                set -e
-                cd /var/www/saas
-                mkdir -p /var/opt/eco-hub-data/backups
-                cp /var/opt/eco-hub-data/school.db /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
-                rm -rf dist/
-                tar -xzf deploy.tar.gz
-                rm deploy.tar.gz
-                npm install --legacy-peer-deps --production
-                pm2 restart eco-hub-saas
-                sleep 5
-                curl -sf http://localhost:8080/api/health || (echo "HEALTH CHECK FAILED" && pm2 logs eco-hub-saas --lines 20 && exit 1)
-                echo "DEPLOY SUCCESS"
-              ' && echo "SSH OK" && break
-            echo "Attempt $i failed. Waiting 20s..."
-            sleep 20
-            if [ $i -eq 3 ]; then echo "All SSH attempts failed." && exit 1; fi
-          done
+          # Install production dependencies
+          cd /var/www/saas
+          npm install --legacy-peer-deps --production
+
+          # Restart app and verify
+          sudo pm2 restart eco-hub-saas
+          sleep 5
+          curl -sf http://localhost:8080/api/health \
+            || (echo "HEALTH CHECK FAILED" && sudo pm2 logs eco-hub-saas --lines 20 && exit 1)
+
+          echo "DEPLOY SUCCESS"
