@@ -3167,12 +3167,13 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         bp,
         contact_email,
         contact_phone,
-        primary_color, 
-        secondary_color, 
-        receipt_sig_title, 
-        bulletin_sig_left, 
-        bulletin_sig_middle, 
-        bulletin_sig_right, 
+        slug,
+        primary_color,
+        secondary_color,
+        receipt_sig_title,
+        bulletin_sig_left,
+        bulletin_sig_middle,
+        bulletin_sig_right,
         header_french,
         header_english,
         bulletin_pdf_use_custom,
@@ -3186,6 +3187,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         evaluation_periods,
         term_structure
     } = settings;
+    const cleanSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) : undefined;
 
     let finalEvaluationPeriods = evaluation_periods;
     if (term_structure) {
@@ -3207,6 +3209,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
             bp = COALESCE(?, bp),
             contact_email = COALESCE(?, contact_email),
             contact_phone = COALESCE(?, contact_phone),
+            slug = COALESCE(?, slug),
             primary_color = COALESCE(?, primary_color),
             secondary_color = COALESCE(?, secondary_color),
             receipt_sig_title = COALESCE(?, receipt_sig_title),
@@ -3233,6 +3236,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         bp !== undefined ? bp : null,
         contact_email !== undefined ? contact_email : null,
         contact_phone !== undefined ? contact_phone : null,
+        cleanSlug !== undefined ? cleanSlug : null,
         primary_color !== undefined ? primary_color : null,
         secondary_color !== undefined ? secondary_color : null,
         receipt_sig_title !== undefined ? receipt_sig_title : null,
