@@ -40,40 +40,40 @@ jobs:
             electron/preload.js \
             electron/api-server.js
 
-      - name: Setup SSH key
-        env:
-          SSH_KEY_B64: ${{ secrets.SSH_KEY_B64 }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY_B64" | base64 --decode > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
 
       - name: SCP deploy package to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
           for i in 1 2 3; do
             echo "SCP attempt $i/3..."
-            scp -i ~/.ssh/deploy_key \
+            sshpass -p "$VPS_PASSWORD" scp \
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=30 \
               -o ServerAliveInterval=10 \
-              deploy.tar.gz "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/saas/" \
-              && echo "SCP OK" && break
-            echo "Attempt $i failed. Waiting 15s..."
-            sleep 15
+              deploy.tar.gz "${VPS_USER}@${VPS_HOST}:/var/www/saas/" && echo "SCP OK" && break
+            echo "Attempt $i failed. Waiting 20s..."
+            sleep 20
             if [ $i -eq 3 ]; then echo "All SCP attempts failed." && exit 1; fi
           done
 
       - name: Extract and restart on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
           for i in 1 2 3; do
             echo "SSH attempt $i/3..."
-            ssh -i ~/.ssh/deploy_key \
+            sshpass -p "$VPS_PASSWORD" ssh \
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=30 \
               -o ServerAliveInterval=10 \
-              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+              "${VPS_USER}@${VPS_HOST}" '
                 set -e
                 cd /var/www/saas
                 mkdir -p /var/opt/eco-hub-data/backups
@@ -87,11 +87,7 @@ jobs:
                 curl -sf http://localhost:8080/api/health || (echo "HEALTH CHECK FAILED" && pm2 logs eco-hub-saas --lines 20 && exit 1)
                 echo "DEPLOY SUCCESS"
               ' && echo "SSH OK" && break
-            echo "Attempt $i failed. Waiting 15s..."
-            sleep 15
+            echo "Attempt $i failed. Waiting 20s..."
+            sleep 20
             if [ $i -eq 3 ]; then echo "All SSH attempts failed." && exit 1; fi
           done
-
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
