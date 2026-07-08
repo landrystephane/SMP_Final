@@ -957,16 +957,16 @@ const SystemAdmin: React.FC = () => {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">URL (Slug)</label>
-                                <div className="flex items-center gap-0 w-full bg-slate-950 border border-white/5 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-amber-500">
-                                  <span className="text-[10px] text-slate-500 font-mono pl-3 pr-1 flex-shrink-0">ecomanageapp.com/</span>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">URL d'accès (Sous-domaine)</label>
+                                <div className="flex items-center w-full bg-slate-950 border border-white/5 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-amber-500">
                                   <input
                                     type="text"
-                                    className="flex-1 bg-transparent pr-3 py-2.5 text-xs font-bold text-amber-400 outline-none font-mono"
+                                    className="flex-1 bg-transparent pl-3 py-2.5 text-xs font-bold text-amber-400 outline-none font-mono"
                                     placeholder="mon-ecole"
                                     value={editSchoolSlug}
                                     onChange={(e) => setEditSchoolSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30))}
                                   />
+                                  <span className="text-[10px] text-slate-500 font-mono pr-3 flex-shrink-0">.ecomanageapp.com</span>
                                 </div>
                                 <p className="text-[9px] text-slate-600">Minuscules, chiffres et tirets uniquement. Max 30 caractères.</p>
                               </div>
