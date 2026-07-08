@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, KeyRound, Building2, ChevronLeft, CheckCircle2, Download, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -25,10 +25,12 @@ const Login: React.FC = () => {
   const isSafariMac = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) && !isIOS;
   const isAlreadyInstalled = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
-  // Detect subdomain (e.g. vie.ecomanageapp.com → slug = "vie")
+  // Detect school from subdomain (slug.ecomanageapp.com) OR path (/login/slug)
+  const { slug: routeSlug } = useParams<{ slug?: string }>();
   const hostname = window.location.hostname;
   const hostParts = hostname.split('.');
-  const detectedSlug = hostParts.length >= 3 && hostParts[0] !== 'www' ? hostParts[0] : null;
+  const subdomainSlug = hostParts.length >= 3 && hostParts[0] !== 'www' ? hostParts[0] : null;
+  const detectedSlug = subdomainSlug || routeSlug || null;
 
   useEffect(() => {
     if (detectedSlug) {

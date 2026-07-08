@@ -102,6 +102,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/login/:slug" element={<Login />} />
             <Route path="/activate" element={<MobileProvisioning />} />
             <Route
               path="/"
