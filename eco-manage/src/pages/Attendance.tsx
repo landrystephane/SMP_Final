@@ -374,7 +374,7 @@ const Attendance: React.FC = () => {
                   alert(err.message);
               }
           } else {
-              alert(t('attendance_saved_msg') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
+              alert(t('att_all_present_msg', 'Tous les élèves sont présents — aucune absence à enregistrer pour le ') + new Date(currentDate).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'));
           }
       } else {
           // Mobile / Web fallback

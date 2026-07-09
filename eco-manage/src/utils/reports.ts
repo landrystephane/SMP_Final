@@ -355,8 +355,8 @@ export const generateReportCard = (data: any) => {
         doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
         doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
         [
-            school?.bulletin_sig_middle || 'VISA DU PARENT',
-            school?.bulletin_sig_left   || "VISA DE L'ENSEIGNANT(E)",
+            school?.bulletin_sig_left   || 'VISA DU PARENT',
+            school?.bulletin_sig_middle || "VISA DE L'ENSEIGNANT(E)",
             school?.bulletin_sig_right  || 'VISA DU DIRECTEUR'
         ].forEach((label, i) => {
             doc.setFontSize(7); doc.setFont('helvetica', 'bold');
@@ -1472,8 +1472,8 @@ export const generateClassReportCards = (data: {
                 doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
                 doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
                 [
-                    school.bulletin_sig_middle || 'VISA DU PARENT',
-                    school.bulletin_sig_left   || "VISA DE L'ENSEIGNANT(E)",
+                    school.bulletin_sig_left   || 'VISA DU PARENT',
+                    school.bulletin_sig_middle || "VISA DE L'ENSEIGNANT(E)",
                     school.bulletin_sig_right  || 'VISA DU DIRECTEUR'
                 ].forEach((label, i) => {
                     doc.setFontSize(7); doc.setFont('helvetica', 'bold');

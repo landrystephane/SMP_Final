@@ -556,7 +556,7 @@ const Finance: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 font-black text-white">{p.amount.toLocaleString()} <span className="text-[10px] text-slate-500">{currency}</span></td>
                                     <td className="px-6 py-4">
-                                        <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/20">{t(p.payment_type.toLowerCase()) || p.payment_type}</span>
+                                        <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/20">{p.payment_type ? (t(p.payment_type.toLowerCase()) || p.payment_type) : '—'}</span>
                                     </td>
                                     <td className="px-6 py-4 text-[10px] text-slate-500 font-black uppercase tracking-widest">{new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                                     <td className="px-6 py-4 text-right">
@@ -662,8 +662,8 @@ const Finance: React.FC = () => {
                                 }}
                             >
                                 <option value="ALL">{t('fin_all_sections_opt', 'Toutes les sections')}</option>
-                                <option value="Francophone">{t('section_francophone_label', 'Francophone')}</option>
-                                <option value="Anglophone">{t('section_anglophone_label', 'Anglophone')}</option>
+                                <option value="FRANCOPHONE">{t('section_francophone_label', 'Francophone')}</option>
+                                <option value="ANGLOPHONE">{t('section_anglophone_label', 'Anglophone')}</option>
                             </select>
 
                             <select

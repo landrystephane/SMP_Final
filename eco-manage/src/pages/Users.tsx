@@ -408,7 +408,7 @@ const Users: React.FC = () => {
                                         onChange={(e) => setNewUser({...newUser, classId: e.target.value})}
                                     >
                                         <option value="">{t('no_assignment')}</option>
-                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level === 'PRIMAIRE' ? 'Prim.' : 'Mat.'} - {c.section === 'FRANCOPHONE' ? 'FR' : 'EN'})</option>)}
+                                        {classes.filter(c => c.section === newUser.section && c.level === (newUser.cycle || 'PRIMAIRE')).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -705,7 +705,7 @@ const Users: React.FC = () => {
                                           onChange={(e) => setEditUserForm({...editUserForm, classId: e.target.value})}
                                       >
                                           <option value="">{t('no_assignment')}</option>
-                                          {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level === 'PRIMAIRE' ? 'Prim.' : 'Mat.'} - {c.section === 'FRANCOPHONE' ? 'FR' : 'EN'})</option>)}
+                                          {classes.filter(c => c.section === editUserForm.section && c.level === (editUserForm.cycle || 'PRIMAIRE')).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                       </select>
                                   </div>
                                   <div className="space-y-2">
