@@ -3385,7 +3385,7 @@ handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, dead
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
     const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
-    return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
+    return db.prepare('INSERT OR REPLACE INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
 };
 
 handlers['db:getParentMessages'] = async ({ schoolId, userId }) => {

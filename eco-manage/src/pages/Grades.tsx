@@ -391,7 +391,7 @@ const Grades: React.FC = () => {
               if (u.role !== 'TEACHER') return false;
               try {
                   const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
-                  return assigned.includes(parseInt(selectedClass));
+                  return assigned.map(Number).includes(parseInt(selectedClass));
               } catch (e) {
                   return false;
               }
