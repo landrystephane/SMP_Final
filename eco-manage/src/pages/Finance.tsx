@@ -88,7 +88,7 @@ const Finance: React.FC = () => {
                 financials.totalPaid += amountPaid;
                 financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
                 const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
-                const pd = { ...paymentData, receipt_number: res.receiptNumber, payment_date: new Date().toISOString(), amount: amountPaid, payment_type: paymentData.type, depositor_name: paymentData.depositorName };
+                const pd = { ...paymentData, receipt_number: res.receiptNumber, payment_date: new Date().toISOString(), amount: amountPaid, payment_type: paymentData.type, depositor_name: paymentData.depositorName, installment_due: res.installmentDue ?? null, installment_paid_before: res.installmentPaidBefore ?? 0 };
                 // @ts-ignore
                 import('../utils/reports').then(m => m.generatePaymentReceipt(pd, s, financials, activeSchool));
             }
@@ -154,6 +154,8 @@ const Finance: React.FC = () => {
                         amount: receipt.amount,
                         payment_type: receipt.type,
                         installment_name: receipt.installmentName || null,
+                        installment_due: receipt.installmentDue ?? null,
+                        installment_paid_before: receipt.installmentPaidBefore ?? 0,
                         depositor_name: newPayment.depositorName,
                         student_id: parseInt(newPayment.studentId)
                     };

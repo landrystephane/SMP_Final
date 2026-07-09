@@ -462,16 +462,35 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.setFontSize(8);
         doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 110, titleY + 28);
 
+        // Montants spécifiques à la tranche si disponibles, sinon totaux généraux
+        const instDue: number | null = (payment as any).installment_due ?? null;
+        const instPaidBefore: number = (payment as any).installment_paid_before ?? 0;
+        const instPaidNow: number = payment.amount;
+        const instRemaining: number = instDue !== null ? Math.max(0, instDue - instPaidBefore - instPaidNow) : financials.balance;
+
+        const displayDue = instDue !== null ? instDue : financials.totalDue;
+        const displayRemaining = instDue !== null ? instRemaining : financials.balance;
+
         doc.setFontSize(7.5);
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'normal');
-        doc.text(isEn ? `Due: ${safeNum(financials.totalDue)}` : `Dû: ${safeNum(financials.totalDue)}`, 20, titleY + 35);
-        doc.text(isEn ? `Paid: ${safeNum(financials.totalPaid)}` : `Versé: ${safeNum(financials.totalPaid)}`, 80, titleY + 35);
-        doc.text(isEn ? `Balance: ${safeNum(financials.balance)} FCFA` : `Reste: ${safeNum(financials.balance)} FCFA`, 140, titleY + 35);
+        doc.text(isEn ? `Due: ${safeNum(displayDue)}` : `Dû: ${safeNum(displayDue)}`, 20, titleY + 35);
+        doc.text(isEn ? `Paid: ${safeNum(instPaidNow)}` : `Versé: ${safeNum(instPaidNow)}`, 80, titleY + 35);
+        doc.text(isEn ? `Balance: ${safeNum(displayRemaining)} FCFA` : `Reste: ${safeNum(displayRemaining)} FCFA`, 140, titleY + 35);
 
         const installmentLabel = payment.installment_name ? ` - ${payment.installment_name.toUpperCase()}` : '';
-        const paymentStatus = financials.balance <= 0 ? (isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL') : (isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`);
-        const statusColor = financials.balance <= 0 ? [34, 197, 94] : [245, 158, 11];
+        let paymentStatus: string;
+        let statusColor: number[];
+        if (financials.balance <= 0) {
+            paymentStatus = isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL';
+            statusColor = [34, 197, 94];
+        } else if (instDue !== null && instRemaining <= 0) {
+            paymentStatus = isEn ? `BALANCE${installmentLabel}` : `SOLDE${installmentLabel}`;
+            statusColor = [34, 197, 94];
+        } else {
+            paymentStatus = isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`;
+            statusColor = [245, 158, 11];
+        }
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);

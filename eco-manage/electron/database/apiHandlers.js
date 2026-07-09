@@ -732,7 +732,18 @@ handlers['db:addPayment'] = async (payment) => {
       if (type === 'Transport') {
           db.prepare('UPDATE students SET has_transport = 1 WHERE id = ?').run(studentId);
       }
-      return { success: true, receiptNumber };
+      let installmentDue = null;
+      let installmentPaidBefore = 0;
+      if (installmentId) {
+          const st = db.prepare('SELECT class_id FROM students WHERE id = ?').get(studentId);
+          if (st) {
+              const instFee = db.prepare('SELECT amount FROM class_installment_fees WHERE installment_id = ? AND class_id = ?').get(installmentId, st.class_id);
+              installmentDue = instFee?.amount ?? null;
+          }
+          const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND installment_id = ? AND id != ?').get(studentId, installmentId, result.lastInsertRowid);
+          installmentPaidBefore = prevPaid.paid;
+      }
+      return { success: true, receiptNumber, installmentDue, installmentPaidBefore };
   }
   return { success: false };
 
@@ -769,11 +780,11 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     const receipts = [];
 
     const tx = db.transaction(() => {
-        const createReceipt = (amount, type, installmentId = null) => {
+        const createReceipt = (amount, type, installmentId = null, extraData = {}) => {
             const receiptNumber = `RCP-${crypto.randomUUID().slice(0,8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
             db.prepare('INSERT INTO payments (student_id, amount, payment_type, received_by, receipt_number, installment_id, depositor_name) VALUES (?, ?, ?, ?, ?, ?, ?)').run(studentId, amount, type, userId, receiptNumber, installmentId, depositorName || '');
             if (type === 'Transport') db.prepare('UPDATE students SET has_transport = 1 WHERE id = ?').run(studentId);
-            receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null });
+            receipts.push({ receiptNumber, amount, type, installmentId, installmentName: installmentId ? installments.find(i => i.id === installmentId)?.name : null, ...extraData });
         };
 
         // 1. Inscription (montant exact obligatoire, pas d'avance)
@@ -821,7 +832,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
             const instDue = Math.max(0, instAmount - instPaid);
             if (instDue > 0) {
                 const pay = Math.min(remaining, instDue);
-                createReceipt(pay, 'Scolarité', inst.id);
+                createReceipt(pay, 'Scolarité', inst.id, { installmentDue: instAmount, installmentPaidBefore: instPaid });
                 remaining -= pay;
             }
         }
