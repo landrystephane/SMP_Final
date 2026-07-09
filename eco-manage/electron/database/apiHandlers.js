@@ -777,16 +777,23 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     const paidByType = (type) => existingPayments.filter(p => p.payment_type === type).reduce((sum, p) => sum + p.amount, 0);
     const paidByInstallment = (instId) => existingPayments.filter(p => p.installment_id === instId).reduce((sum, p) => sum + p.amount, 0);
 
-    // Check if student has paid everything
-    // Use total_fee directly (consistent with frontend display) — fallback if installments not yet configured
-    const totalPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0);
-    const regFeeCheck = feeConfig.registration_fee || 0;
-    const transFeeCheck = includeTransport ? (feeConfig.transport_fee || 0) : 0;
-    const examFeeCheck = includeExam ? (feeConfig.exam_fee || 0) : 0;
+    // Check remaining amounts per category (mirrors frontend getStudentFinancials)
+    const scholarship = student.scholarship_reduction || 0;
     const installmentTotal = installments.reduce((sum, i) => sum + (i.configured_amount || 0), 0);
-    const pensionDue = installmentTotal > 0 ? installmentTotal : (feeConfig.total_fee || 0);
-    const totalDue = regFeeCheck + transFeeCheck + examFeeCheck + pensionDue;
-    if (totalPaid >= totalDue && totalDue > 0) {
+    const pensionDue = Math.max(0, (installmentTotal > 0 ? installmentTotal : (feeConfig.total_fee || 0)) - scholarship);
+
+    const inscPaid   = paidByType('Inscription');
+    const scolarPaid = paidByType('Scolarité');
+    const transPaid  = paidByType('Transport');
+    const examPaid   = paidByType('Examen');
+
+    const tuitionTotalDue  = (feeConfig.registration_fee || 0) + pensionDue;
+    const tuitionTotalPaid = inscPaid + scolarPaid;
+    const tuitionRemaining = Math.max(0, tuitionTotalDue - tuitionTotalPaid);
+    const transRemaining   = includeTransport ? Math.max(0, (feeConfig.transport_fee || 0) - transPaid) : 0;
+    const examRemaining    = includeExam ? Math.max(0, (feeConfig.exam_fee || 0) - examPaid) : 0;
+
+    if (tuitionRemaining <= 0 && transRemaining <= 0 && examRemaining <= 0 && tuitionTotalDue > 0) {
         throw new Error("Cet élève a déjà soldé l'intégralité de sa scolarité. Aucun versement supplémentaire n'est autorisé.");
     }
 
