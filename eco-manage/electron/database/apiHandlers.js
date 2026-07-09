@@ -777,25 +777,6 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     const paidByType = (type) => existingPayments.filter(p => p.payment_type === type).reduce((sum, p) => sum + p.amount, 0);
     const paidByInstallment = (instId) => existingPayments.filter(p => p.installment_id === instId).reduce((sum, p) => sum + p.amount, 0);
 
-    // Check remaining amounts per category (mirrors frontend getStudentFinancials)
-    const scholarship = student.scholarship_reduction || 0;
-    const pensionDue = Math.max(0, (feeConfig.total_fee || 0) - scholarship);
-
-    const inscPaid   = paidByType('Inscription');
-    const scolarPaid = paidByType('Scolarité');
-    const transPaid  = paidByType('Transport');
-    const examPaid   = paidByType('Examen');
-
-    const tuitionTotalDue  = (feeConfig.registration_fee || 0) + pensionDue;
-    const tuitionTotalPaid = inscPaid + scolarPaid;
-    const tuitionRemaining = Math.max(0, tuitionTotalDue - tuitionTotalPaid);
-    const transRemaining   = includeTransport ? Math.max(0, (feeConfig.transport_fee || 0) - transPaid) : 0;
-    const examRemaining    = includeExam ? Math.max(0, (feeConfig.exam_fee || 0) - examPaid) : 0;
-
-    if (tuitionRemaining <= 0 && transRemaining <= 0 && examRemaining <= 0 && tuitionTotalDue > 0) {
-        throw new Error("Cet élève a déjà soldé l'intégralité de sa scolarité. Aucun versement supplémentaire n'est autorisé.");
-    }
-
     let remaining = parseFloat(totalAmount);
     const receipts = [];
 
@@ -822,11 +803,11 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
         // 2. Transport (si demandé)
         if (includeTransport && remaining > 0) {
             const transFee = feeConfig.transport_fee || 0;
-            const transPaid = paidByType('Transport');
-            const transDue = Math.max(0, transFee - transPaid);
+            const transPaidNow = paidByType('Transport');
+            const transDue = Math.max(0, transFee - transPaidNow);
             if (transDue > 0) {
                 const pay = Math.min(remaining, transDue);
-                createReceipt(pay, 'Transport', null, { installmentDue: transFee, installmentPaidBefore: transPaid });
+                createReceipt(pay, 'Transport', null, { installmentDue: transFee, installmentPaidBefore: transPaidNow });
                 remaining -= pay;
             }
         }
@@ -834,18 +815,23 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
         // 3. Examen (si demandé)
         if (includeExam && remaining > 0) {
             const examFee = feeConfig.exam_fee || 0;
-            const examPaid = paidByType('Examen');
-            const examDue = Math.max(0, examFee - examPaid);
+            const examPaidNow = paidByType('Examen');
+            const examDue = Math.max(0, examFee - examPaidNow);
             if (examDue > 0) {
                 const pay = Math.min(remaining, examDue);
-                createReceipt(pay, 'Examen', null, { installmentDue: examFee, installmentPaidBefore: examPaid });
+                createReceipt(pay, 'Examen', null, { installmentDue: examFee, installmentPaidBefore: examPaidNow });
                 remaining -= pay;
             }
         }
 
         // 4. Tranches de pension dans l'ordre
+        const scholarship = student.scholarship_reduction || 0;
+        const totalPensionDue = Math.max(0, (feeConfig.total_fee || 0) - scholarship);
+        const scolarPaidTotal = paidByType('Scolarité');
+        let scolarRemaining = Math.max(0, totalPensionDue - scolarPaidTotal);
+
         for (const inst of installments) {
-            if (remaining <= 0) break;
+            if (remaining <= 0 || scolarRemaining <= 0) break;
             const instAmount = inst.configured_amount || 0;
             if (instAmount <= 0) continue;
             const instPaid = paidByInstallment(inst.id);
@@ -854,13 +840,21 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
                 const pay = Math.min(remaining, instDue);
                 createReceipt(pay, 'Scolarité', inst.id, { installmentDue: instAmount, installmentPaidBefore: instPaid });
                 remaining -= pay;
+                scolarRemaining -= pay;
             }
         }
 
-        // 5. Si reste encore de l'argent (excédent), enregistrer comme pension générale
-        if (remaining > 0) {
-            createReceipt(remaining, 'Scolarité');
-            remaining = 0;
+        // 5. Si reste de la pension non couverte par des tranches (tranches non configurées ou excédent)
+        if (remaining > 0 && scolarRemaining > 0) {
+            const pay = Math.min(remaining, scolarRemaining);
+            const scolarPaidBefore = scolarPaidTotal;
+            createReceipt(pay, 'Scolarité', null, { installmentDue: totalPensionDue, installmentPaidBefore: scolarPaidBefore });
+            remaining -= pay;
+        }
+
+        // Si aucun reçu n'a été généré, c'est que tout est déjà soldé
+        if (receipts.length === 0) {
+            throw new Error("Cet élève a déjà soldé l'intégralité de sa scolarité. Aucun versement supplémentaire n'est autorisé.");
         }
     });
     tx();
