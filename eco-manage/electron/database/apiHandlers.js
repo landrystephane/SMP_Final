@@ -742,6 +742,18 @@ handlers['db:addPayment'] = async (payment) => {
           }
           const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND installment_id = ? AND id != ?').get(studentId, installmentId, result.lastInsertRowid);
           installmentPaidBefore = prevPaid.paid;
+      } else if (['Inscription', 'Transport', 'Examen'].includes(type)) {
+          const st = db.prepare('SELECT class_id FROM students WHERE id = ?').get(studentId);
+          if (st) {
+              const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(st.class_id);
+              if (feeConfig) {
+                  if (type === 'Inscription') installmentDue = feeConfig.registration_fee || 0;
+                  else if (type === 'Transport') installmentDue = feeConfig.transport_fee || 0;
+                  else if (type === 'Examen') installmentDue = feeConfig.exam_fee || 0;
+              }
+          }
+          const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND payment_type = ? AND id != ?').get(studentId, type, result.lastInsertRowid);
+          installmentPaidBefore = prevPaid.paid;
       }
       return { success: true, receiptNumber, installmentDue, installmentPaidBefore };
   }
@@ -795,7 +807,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
             if (remaining < regDue) {
                 throw new Error(`Le montant est insuffisant pour couvrir l'inscription (${regDue} FCFA requis). L'inscription doit être payée intégralement.`);
             }
-            createReceipt(regDue, 'Inscription');
+            createReceipt(regDue, 'Inscription', null, { installmentDue: regFee, installmentPaidBefore: regPaid });
             remaining -= regDue;
         }
 
@@ -806,7 +818,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
             const transDue = Math.max(0, transFee - transPaid);
             if (transDue > 0) {
                 const pay = Math.min(remaining, transDue);
-                createReceipt(pay, 'Transport');
+                createReceipt(pay, 'Transport', null, { installmentDue: transFee, installmentPaidBefore: transPaid });
                 remaining -= pay;
             }
         }
@@ -818,7 +830,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
             const examDue = Math.max(0, examFee - examPaid);
             if (examDue > 0) {
                 const pay = Math.min(remaining, examDue);
-                createReceipt(pay, 'Examen');
+                createReceipt(pay, 'Examen', null, { installmentDue: examFee, installmentPaidBefore: examPaid });
                 remaining -= pay;
             }
         }
