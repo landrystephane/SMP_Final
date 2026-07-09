@@ -854,7 +854,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
 
         // Si aucun reçu n'a été généré, c'est que tout est déjà soldé
         if (receipts.length === 0) {
-            throw new Error("Cet élève a déjà soldé l'intégralité de sa scolarité. Aucun versement supplémentaire n'est autorisé.");
+            throw new Error(`SOLDÉ [reg=${regDue},scol=${scolarRemaining},rem=${remaining},trans=${includeTransport},pension=${totalPensionDue},scolarPaid=${scolarPaidTotal}]`);
         }
     });
     tx();
