@@ -779,8 +779,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
 
     // Check remaining amounts per category (mirrors frontend getStudentFinancials)
     const scholarship = student.scholarship_reduction || 0;
-    const installmentTotal = installments.reduce((sum, i) => sum + (i.configured_amount || 0), 0);
-    const pensionDue = Math.max(0, (installmentTotal > 0 ? installmentTotal : (feeConfig.total_fee || 0)) - scholarship);
+    const pensionDue = Math.max(0, (feeConfig.total_fee || 0) - scholarship);
 
     const inscPaid   = paidByType('Inscription');
     const scolarPaid = paidByType('Scolarité');

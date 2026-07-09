@@ -143,9 +143,31 @@ const Finance: React.FC = () => {
 
                 // @ts-ignore
                 const reportsModule = await import('../utils/reports');
+
+                // Cumul par catégorie pour avoir la balance post-transaction correcte sur chaque reçu
+                const newTuitionPaid = res.receipts
+                    .filter((r: any) => r.type === 'Inscription' || r.type === 'Scolarité')
+                    .reduce((sum: number, r: any) => sum + r.amount, 0);
+                const newTransPaid = res.receipts
+                    .filter((r: any) => r.type === 'Transport')
+                    .reduce((sum: number, r: any) => sum + r.amount, 0);
+                const newExamPaid = res.receipts
+                    .filter((r: any) => r.type === 'Examen')
+                    .reduce((sum: number, r: any) => sum + r.amount, 0);
+
                 for (const receipt of res.receipts) {
                     const financials = getStudentFinancials(s, receipt.type);
-                    financials.totalPaid += receipt.amount;
+                    // Ajouter TOUS les nouveaux paiements de la même catégorie (pas seulement ce reçu)
+                    // pour que la balance reflète l'état réel après la transaction complète
+                    if (receipt.type === 'Inscription' || receipt.type === 'Scolarité') {
+                        financials.totalPaid += newTuitionPaid;
+                    } else if (receipt.type === 'Transport') {
+                        financials.totalPaid += newTransPaid;
+                    } else if (receipt.type === 'Examen') {
+                        financials.totalPaid += newExamPaid;
+                    } else {
+                        financials.totalPaid += receipt.amount;
+                    }
                     financials.balance = Math.max(0, financials.totalDue - financials.totalPaid);
 
                     const paymentData = {
