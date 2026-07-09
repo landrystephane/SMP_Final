@@ -523,7 +523,16 @@ handlers['db:saveGrades'] = async (grades) => {
           // 2. Vérification du verrou de saisie manuel (prioritaire sur la date)
           const editingAllowedSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_editing_allowed'));
           if (editingAllowedSetting && editingAllowedSetting.value === 'false') {
-            throw new Error('La saisie des notes est actuellement bloquée. Contactez la direction pour un déblocage.');
+            const overrideWhenLocked = db.prepare('SELECT deadline FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(g.teacher_id, g.class_id, g.term, g.month);
+            let hasValidOverrideWhenLocked = false;
+            if (overrideWhenLocked) {
+              const od = new Date(overrideWhenLocked.deadline);
+              od.setHours(23, 59, 59, 999);
+              if (new Date() <= od) hasValidOverrideWhenLocked = true;
+            }
+            if (!hasValidOverrideWhenLocked) {
+              throw new Error('La saisie des notes est actuellement bloquée. Contactez la direction pour un déblocage.');
+            }
           }
           // 3. Validation du délai de saisie (verrouillage automatique)
           const periodEndSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_end'));
