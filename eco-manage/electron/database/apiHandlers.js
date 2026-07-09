@@ -778,12 +778,14 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
     const paidByInstallment = (instId) => existingPayments.filter(p => p.installment_id === instId).reduce((sum, p) => sum + p.amount, 0);
 
     // Check if student has paid everything
+    // Use total_fee directly (consistent with frontend display) — fallback if installments not yet configured
     const totalPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0);
     const regFeeCheck = feeConfig.registration_fee || 0;
     const transFeeCheck = includeTransport ? (feeConfig.transport_fee || 0) : 0;
     const examFeeCheck = includeExam ? (feeConfig.exam_fee || 0) : 0;
     const installmentTotal = installments.reduce((sum, i) => sum + (i.configured_amount || 0), 0);
-    const totalDue = regFeeCheck + transFeeCheck + examFeeCheck + installmentTotal;
+    const pensionDue = installmentTotal > 0 ? installmentTotal : (feeConfig.total_fee || 0);
+    const totalDue = regFeeCheck + transFeeCheck + examFeeCheck + pensionDue;
     if (totalPaid >= totalDue && totalDue > 0) {
         throw new Error("Cet élève a déjà soldé l'intégralité de sa scolarité. Aucun versement supplémentaire n'est autorisé.");
     }
