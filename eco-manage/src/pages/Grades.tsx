@@ -387,7 +387,8 @@ const Grades: React.FC = () => {
       if (window.electronAPI && !isNaN(parseInt(overrideDays))) {
           const classObj = classes.find(c => c.id.toString() === selectedClass);
           const allUsers = await window.electronAPI.getUsers(user?.schoolId);
-          const teacher = allUsers.find((u: any) => {
+          // Trouver TOUS les enseignants assignés à cette classe (pas seulement le premier)
+          const teachers = allUsers.filter((u: any) => {
               if (u.role !== 'TEACHER') return false;
               try {
                   const assigned = typeof u.assignedClasses === 'string' ? JSON.parse(u.assignedClasses) : (u.assignedClasses || []);
@@ -397,8 +398,8 @@ const Grades: React.FC = () => {
               }
           });
 
-          if (!classObj || !teacher) {
-              showNotification(t('gr_no_titulaire_error', "Cette classe n'a pas de titulaire assigné, impossible d'accorder une dérogation."), "error");
+          if (!classObj || teachers.length === 0) {
+              showNotification(t('gr_no_titulaire_error', "Cette classe n'a pas d'enseignant assigné, impossible d'accorder une dérogation."), "error");
               setShowOverrideModal(false);
               return;
           }
@@ -408,26 +409,28 @@ const Grades: React.FC = () => {
           const formattedDate = newDeadline.toISOString().split('T')[0];
 
           try {
-              await window.electronAPI.addGradeOverride({
-                  teacherId: teacher.id,
-                  classId: parseInt(selectedClass),
-                  term: selectedTerm,
-                  month: selectedMonth,
-                  deadline: formattedDate,
-                  grantedBy: user?.id
-              });
+              // Accorder la dérogation à chaque enseignant de la classe
+              for (const teacher of teachers) {
+                  await window.electronAPI.addGradeOverride({
+                      teacherId: teacher.id,
+                      classId: parseInt(selectedClass),
+                      term: selectedTerm,
+                      month: selectedMonth,
+                      deadline: formattedDate,
+                      grantedBy: user?.id
+                  });
+                  await window.electronAPI.createNotification({
+                      school_id: user?.schoolId,
+                      user_id: teacher.id,
+                      message: t('gr_notif_override_granted', 'Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe {{className}} jusqu\'au {{date}}.', { className: classObj.name, date: formattedDate }),
+                      type: 'SYSTEM'
+                  });
+              }
           } catch (err) {
               showNotification(t('gr_override_apply_error', "Erreur lors de l'application de la dérogation."), "error");
               setShowOverrideModal(false);
               return;
           }
-
-          await window.electronAPI.createNotification({
-              school_id: user?.schoolId,
-              user_id: teacher.id,
-              message: t('gr_notif_override_granted', 'Une dérogation exceptionnelle de saisie des notes vous a été accordée pour la classe {{className}} jusqu\'au {{date}}.', { className: classObj.name, date: formattedDate }),
-              type: 'SYSTEM'
-          });
 
           showNotification(t('gr_override_granted_msg', 'Dérogation accordée jusqu\'au {{date}}.', { date: formattedDate }), "success");
           setShowOverrideModal(false);

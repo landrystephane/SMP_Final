@@ -523,7 +523,7 @@ handlers['db:saveGrades'] = async (grades) => {
           // 2. Vérification du verrou de saisie manuel (prioritaire sur la date)
           const editingAllowedSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('period_editing_allowed'));
           if (editingAllowedSetting && editingAllowedSetting.value === 'false') {
-            const overrideWhenLocked = db.prepare('SELECT deadline FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(g.teacher_id, g.class_id, g.term, g.month);
+            const overrideWhenLocked = db.prepare('SELECT deadline FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ? ORDER BY deadline DESC LIMIT 1').get(g.teacher_id, g.class_id, g.term, g.month);
             let hasValidOverrideWhenLocked = false;
             if (overrideWhenLocked) {
               const od = new Date(overrideWhenLocked.deadline);
@@ -540,7 +540,7 @@ handlers['db:saveGrades'] = async (grades) => {
             const endDate = new Date(periodEndSetting.value);
             endDate.setHours(23, 59, 59, 999);
             if (new Date() > endDate) {
-              const override = db.prepare('SELECT deadline FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(g.teacher_id, g.class_id, g.term, g.month);
+              const override = db.prepare('SELECT deadline FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ? ORDER BY deadline DESC LIMIT 1').get(g.teacher_id, g.class_id, g.term, g.month);
               let hasValidOverride = false;
               if (override) {
                 const overrideDate = new Date(override.deadline);
@@ -863,7 +863,7 @@ handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositor
 
         // Si aucun reçu n'a été généré, c'est que tout est déjà soldé
         if (receipts.length === 0) {
-            throw new Error(`SOLDÉ [reg=${regDue},scol=${scolarRemaining},rem=${remaining},trans=${includeTransport},pension=${totalPensionDue},scolarPaid=${scolarPaidTotal}]`);
+            throw new Error('Cet élève a déjà soldé l\'intégralité de sa scolarité. Aucun versement supplémentaire n\'est autorisé.');
         }
     });
     tx();
@@ -3385,7 +3385,8 @@ handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) =
     if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
-    return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').get(tId, cId, term, month);
+    // ORDER BY deadline DESC: retourne la dérogation la plus récente (deadline la plus lointaine)
+    return db.prepare('SELECT * FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ? ORDER BY deadline DESC LIMIT 1').get(tId, cId, term, month);
 };
 
 handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, deadline, grantedBy }) => {
@@ -3394,7 +3395,9 @@ handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, dead
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
     const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
-    return db.prepare('INSERT OR REPLACE INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
+    // Supprimer les anciennes dérogations pour ce prof/classe/période avant d'insérer la nouvelle
+    db.prepare('DELETE FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').run(tId, cId, term, month);
+    return db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)').run(tId, cId, term, month, deadline, gBy);
 };
 
 handlers['db:getParentMessages'] = async ({ schoolId, userId }) => {
