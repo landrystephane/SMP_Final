@@ -54,8 +54,27 @@ const TuitionConfig: React.FC = () => {
     loadData();
   }, [user]);
 
+  const getInstallmentSum = (classId: number, overrideCif?: any[]) => {
+      const cif = overrideCif ?? classInstallmentFees;
+      return installments.reduce((sum, inst) => {
+          const entry = cif.find((c: any) => c.class_id === classId && c.installment_id === inst.id);
+          return sum + (entry?.amount || 0);
+      }, 0);
+  };
+
   const saveTimerRef = React.useRef<any>(null);
   const handleUpdateBase = async (classId: number, fee: number, reg: number, trans: number, exam: number) => {
+    if (installments.length > 0 && fee > 0) {
+        const instSum = getInstallmentSum(classId);
+        if (instSum !== fee) {
+            const className = fees.find(f => f.classId === classId)?.className || '';
+            showNotification(
+                `${className} — La somme des tranches (${instSum.toLocaleString()} FCFA) doit être égale à la pension totale (${fee.toLocaleString()} FCFA). Différence : ${(fee - instSum).toLocaleString()} FCFA.`,
+                "error"
+            );
+            return;
+        }
+    }
     if (window.electronAPI) {
       try {
         await window.electronAPI.updateTuitionFee({ classId, totalFee: fee, registrationFee: reg, transportFee: trans, examFee: exam });
@@ -69,11 +88,21 @@ const TuitionConfig: React.FC = () => {
 
   const installTimerRef = React.useRef<any>(null);
   const handleUpdateInstallmentFee = async (classId: number, installmentId: number, amount: number) => {
+      const updatedCif = [...classInstallmentFees.filter((c: any) => !(c.class_id === classId && c.installment_id === installmentId)), { class_id: classId, installment_id: installmentId, amount }];
       if (window.electronAPI) {
           try {
               await window.electronAPI.updateClassInstallmentFee({ classId, installmentId, amount });
               if (installTimerRef.current) clearTimeout(installTimerRef.current);
-              installTimerRef.current = setTimeout(() => showNotification(t('tc_installment_updated', 'Tranche mise à jour'), "success"), 1500);
+              const classTotal = fees.find(f => f.classId === classId)?.totalFee || 0;
+              const instSum = getInstallmentSum(classId, updatedCif);
+              if (installments.length > 0 && classTotal > 0 && instSum !== classTotal) {
+                  installTimerRef.current = setTimeout(() => showNotification(
+                      `Somme des tranches : ${instSum.toLocaleString()} / ${classTotal.toLocaleString()} FCFA — ${instSum < classTotal ? (classTotal - instSum).toLocaleString() + ' FCFA manquants' : (instSum - classTotal).toLocaleString() + ' FCFA en excès'}`,
+                      "warning"
+                  ), 800);
+              } else if (installments.length > 0 && classTotal > 0 && instSum === classTotal) {
+                  installTimerRef.current = setTimeout(() => showNotification(t('tc_installment_updated', 'Tranche mise à jour'), "success"), 800);
+              }
           } catch (err: any) {
               showNotification(t('fin_generic_error', 'Erreur: {{error}}', { error: err.message }), "error");
           }
@@ -336,23 +365,44 @@ const TuitionConfig: React.FC = () => {
                                     value={fee === 0 ? '' : fee}
                                     onChange={(e) => {
                                         const amount = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                        handleUpdateInstallmentFee(f.classId, inst.id, amount);
                                         const updatedCif = [...classInstallmentFees.filter(c => !(c.class_id === f.classId && c.installment_id === inst.id)), { class_id: f.classId, installment_id: inst.id, amount }];
                                         setClassInstallmentFees(updatedCif);
+                                        handleUpdateInstallmentFee(f.classId, inst.id, amount);
                                     }}
                                     onBlur={() => {}}
                                 />
                             </td>
                         );
                     })}
+                    {installments.length > 0 && (() => {
+                        const instSum = getInstallmentSum(f.classId);
+                        const pension = f.totalFee || 0;
+                        const isOk = pension > 0 && instSum === pension;
+                        const isEmpty = instSum === 0 && pension === 0;
+                        return (
+                            <td className="px-6 py-6">
+                                <div className={`text-center text-[10px] font-black rounded-xl px-3 py-2 whitespace-nowrap ${isEmpty ? 'bg-slate-800 text-slate-500' : isOk ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/15 text-rose-400 border border-rose-500/20'}`}>
+                                    {isEmpty ? '—' : isOk ? `✓ ${instSum.toLocaleString()} FCFA` : `${instSum.toLocaleString()} / ${pension.toLocaleString()}`}
+                                </div>
+                            </td>
+                        );
+                    })()}
                     <td className="px-10 py-6 text-right">
-                    <button
-                        onClick={() => handleUpdateBase(f.classId, f.totalFee, f.registrationFee, f.transportFee, f.examFee)}
-                        className="p-4 bg-amber-500 text-slate-950 hover:bg-amber-400 rounded-2xl transition-all shadow-xl shadow-amber-500/10 active:scale-95 flex items-center justify-center"
-                        title={t('apply_changes', 'Appliquer les changements')}
-                    >
-                        <Save className="w-5 h-5" />
-                    </button>
+                    {(() => {
+                        const instSum = getInstallmentSum(f.classId);
+                        const pension = f.totalFee || 0;
+                        const blocked = installments.length > 0 && pension > 0 && instSum !== pension;
+                        return (
+                            <button
+                                type="button"
+                                onClick={() => handleUpdateBase(f.classId, f.totalFee, f.registrationFee, f.transportFee, f.examFee)}
+                                className={`p-4 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center ${blocked ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/10'}`}
+                                title={blocked ? `Somme des tranches (${instSum.toLocaleString()}) ≠ Pension (${pension.toLocaleString()})` : t('apply_changes', 'Appliquer les changements')}
+                            >
+                                <Save className="w-5 h-5" />
+                            </button>
+                        );
+                    })()}
                     </td>
                 </tr>
                 ))}
