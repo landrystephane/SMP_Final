@@ -35,6 +35,7 @@ jobs:
 
           # Copy built assets and server files
           rm -rf /var/www/saas/dist
+          rm -rf /var/www/saas/electron
           cp -r eco-manage/dist            /var/www/saas/dist
           cp    eco-manage/server.js       /var/www/saas/server.js
           cp    eco-manage/package.json    /var/www/saas/package.json

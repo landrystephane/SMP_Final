@@ -156,7 +156,6 @@ const Finance: React.FC = () => {
                     .reduce((sum: number, r: any) => sum + r.amount, 0);
 
                 for (const receipt of res.receipts) {
-                    console.log('[RECU DEBUG] receipt brut:', JSON.stringify(receipt));
                     const financials = getStudentFinancials(s, receipt.type);
                     // Ajouter TOUS les nouveaux paiements de la même catégorie (pas seulement ce reçu)
                     // pour que la balance reflète l'état réel après la transaction complète
@@ -182,7 +181,6 @@ const Finance: React.FC = () => {
                         depositor_name: newPayment.depositorName,
                         student_id: parseInt(newPayment.studentId)
                     };
-                    console.log('[RECU DEBUG] paymentData.installment_due:', paymentData.installment_due, '| financials.totalDue:', financials.totalDue);
                     reportsModule.generatePaymentReceipt(paymentData, s, financials, activeSchool);
                 }
 
