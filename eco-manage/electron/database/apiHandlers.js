@@ -62,6 +62,12 @@ handlers['auth:login'] = async ({ username, password }) => {
   if (!user) return null;
   user.full_name = user.fullName;
 
+  // Block login if user is deactivated
+  const userActive = db.prepare('SELECT is_active FROM users WHERE id = ?').get(user.id);
+  if (userActive && userActive.is_active === 0) {
+      throw new Error("Votre compte a été désactivé. Veuillez contacter l'administrateur de votre établissement.");
+  }
+
   // Block login if school is deleted or suspended (skip for SUPERADMIN and PARENT)
   // Parents are global and can have children in multiple schools, we handle their access per-child
   if (user.role !== 'SUPERADMIN' && user.role !== 'PARENT') {
@@ -270,6 +276,7 @@ const permanentlyDeleteSchool = (id) => {
                 'DELETE FROM announcements WHERE school_id = ?',
                 'DELETE FROM notifications WHERE school_id = ?',
                 'DELETE FROM archives WHERE school_id = ?',
+                'DELETE FROM school_year_archives WHERE school_id = ?',
                 'DELETE FROM report_templates WHERE school_id = ?',
                 'DELETE FROM expenses WHERE school_id = ?',
                 'DELETE FROM saas_subscriptions WHERE school_id = ?',
