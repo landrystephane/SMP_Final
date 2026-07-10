@@ -307,37 +307,35 @@ const Finance: React.FC = () => {
 
   const getStudentFinancials = (student: any, feeType: string = 'Scolarité') => {
       if (!student) return { totalDue: 0, totalPaid: 0, balance: 0, breakdown: { registration: 0, installments: [] }, overpaid: 0 };
-      
-      const activeSchool = schools.find(s => s.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0] || {};
-      
-      let totalDue = 0;
-      const isTuitionOrReg = feeType === 'Scolarité' || feeType === 'Inscription';
 
-      if (isTuitionOrReg) {
-          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
-          const scholarship = student.scholarship_reduction || 0;
-          const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
-          const totalReg = classConfig?.registrationFee || 0;
-          totalDue = totalPension + totalReg;
-      } else if (feeType === 'Transport') {
-          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
-          totalDue = classConfig?.transportFee || 0;
-      } else if (feeType === 'Examen') {
-          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
-          totalDue = classConfig?.examFee || 0;
+      const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+
+      // Inscription : frais d'inscription uniquement (pas la pension)
+      if (feeType === 'Inscription') {
+          const totalDue = classConfig?.registrationFee || 0;
+          const inscPaid = payments
+              .filter(p => p.student_id === student.id && p.payment_type === 'Inscription')
+              .reduce((acc, p) => acc + p.amount, 0);
+          return { totalDue, totalPaid: inscPaid, balance: Math.max(0, totalDue - inscPaid), breakdown: { registration: totalDue, installments: [] }, overpaid: 0 };
       }
 
-      const studentPayments = payments.filter(p => p.student_id === student.id && (
-          (isTuitionOrReg && (p.payment_type === 'Scolarité' || p.payment_type === 'Inscription')) ||
-          (!isTuitionOrReg && p.payment_type === feeType)
-      ));
-      const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
-      let remaining = totalPaid;
+      let totalDue = 0;
       const breakdown: any = { registration: 0, installments: [] };
 
       if (feeType === 'Scolarité') {
-          const classConfig = tuitionFees.find(f => f.classId === student.class_id);
+          const scholarship = student.scholarship_reduction || 0;
+          const totalPension = Math.max(0, (classConfig?.totalFee || 0) - scholarship);
           const totalReg = classConfig?.registrationFee || 0;
+          // totalDue inclut pension + inscription pour la vue globale scolarité
+          totalDue = totalPension + totalReg;
+
+          const studentPayments = payments.filter(p =>
+              p.student_id === student.id &&
+              (p.payment_type === 'Scolarité' || p.payment_type === 'Inscription')
+          );
+          const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
+          let remaining = totalPaid;
+
           breakdown.registration = Math.min(totalReg, remaining);
           remaining -= breakdown.registration;
 
@@ -345,15 +343,24 @@ const Finance: React.FC = () => {
               ...inst,
               amountDue: (classInstallmentFees || []).find(cif => cif.class_id === student.class_id && cif.installment_id === inst.id)?.amount || 0
           }));
-
           for (const inst of classInsts) {
               const paidForThis = Math.min(inst.amountDue, remaining);
               breakdown.installments.push({ ...inst, paid: paidForThis });
               remaining -= paidForThis;
           }
+
+          return { totalDue, totalPaid, balance: totalDue - totalPaid, breakdown, overpaid: remaining };
       }
 
-      return { totalDue, totalPaid, balance: totalDue - totalPaid, breakdown, overpaid: remaining };
+      if (feeType === 'Transport') {
+          totalDue = classConfig?.transportFee || 0;
+      } else if (feeType === 'Examen') {
+          totalDue = classConfig?.examFee || 0;
+      }
+
+      const studentPayments = payments.filter(p => p.student_id === student.id && p.payment_type === feeType);
+      const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);
+      return { totalDue, totalPaid, balance: Math.max(0, totalDue - totalPaid), breakdown, overpaid: 0 };
   };
 
   const [searchResults, setSearchResults] = useState<any[]>([]);

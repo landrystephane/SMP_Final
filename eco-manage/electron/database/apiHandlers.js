@@ -807,6 +807,17 @@ handlers['db:getPaymentInstallmentInfo'] = async (paymentId) => {
         }
         const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND installment_id = ? AND id != ?').get(p.student_id, p.installment_id, paymentId);
         installmentPaidBefore = prevPaid.paid;
+    } else if (p.payment_type === 'Scolarité') {
+        // Paiement scolarité sans tranche (ancien format) : on retourne le total pension
+        const st = db.prepare('SELECT class_id, scholarship_reduction FROM students WHERE id = ?').get(p.student_id);
+        if (st) {
+            const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(st.class_id);
+            if (feeConfig) {
+                installmentDue = Math.max(0, (feeConfig.total_fee || 0) - (st.scholarship_reduction || 0));
+            }
+        }
+        const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND payment_type = "Scolarité" AND id != ?').get(p.student_id, paymentId);
+        installmentPaidBefore = prevPaid.paid;
     } else if (['Inscription', 'Transport', 'Examen'].includes(p.payment_type)) {
         const st = db.prepare('SELECT class_id FROM students WHERE id = ?').get(p.student_id);
         if (st) {

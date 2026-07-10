@@ -462,16 +462,29 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.setFontSize(8);
         doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 110, titleY + 28);
 
-        // Montants spécifiques à la tranche si disponibles, sinon totaux généraux
+        // Montants spécifiques à la tranche/motif si disponibles, sinon fallback par type
         const instDue: number | null = (payment as any).installment_due ?? null;
         const instPaidBefore: number = (payment as any).installment_paid_before ?? 0;
         const instPaidNow: number = payment.amount;
-        // "Versé" = total cumulatif payé pour ce motif (avant + maintenant)
-        const instPaidTotal: number = instDue !== null ? instPaidBefore + instPaidNow : financials.totalPaid;
-        const instRemaining: number = instDue !== null ? Math.max(0, instDue - instPaidTotal) : financials.balance;
 
-        const displayDue = instDue !== null ? instDue : financials.totalDue;
-        const displayRemaining = instDue !== null ? instRemaining : financials.balance;
+        let displayDue: number;
+        let instPaidTotal: number;
+        let displayRemaining: number;
+
+        if (instDue !== null) {
+            // Données précises disponibles (smartPayment ou reprint enrichi)
+            instPaidTotal = instPaidBefore + instPaidNow;
+            displayDue = instDue;
+            displayRemaining = Math.max(0, instDue - instPaidTotal);
+        } else {
+            // Fallback : utiliser les totaux propres au type (getStudentFinancials déjà filtré par type)
+            // Pour Inscription : financials.totalDue = frais inscription seulement
+            // Pour Scolarité : financials.totalDue = pension + inscription (vue globale)
+            // Pour Transport/Examen : financials.totalDue = frais spécifique
+            instPaidTotal = financials.totalPaid;
+            displayDue = financials.totalDue;
+            displayRemaining = Math.max(0, financials.balance);
+        }
 
         doc.setFontSize(7.5);
         doc.setTextColor(0, 0, 0);
@@ -486,8 +499,9 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         if (financials.balance <= 0) {
             paymentStatus = isEn ? 'FULL PAYMENT' : 'RÈGLEMENT TOTAL';
             statusColor = [34, 197, 94];
-        } else if (instDue !== null && instRemaining <= 0) {
-            paymentStatus = isEn ? `BALANCE${installmentLabel}` : `SOLDE${installmentLabel}`;
+        } else if (displayRemaining <= 0) {
+            // Ce motif/tranche est soldé même si d'autres restent à payer
+            paymentStatus = isEn ? `BALANCE${installmentLabel}` : `SOLDÉ${installmentLabel}`;
             statusColor = [34, 197, 94];
         } else {
             paymentStatus = isEn ? `ADVANCE${installmentLabel}` : `AVANCE${installmentLabel}`;
