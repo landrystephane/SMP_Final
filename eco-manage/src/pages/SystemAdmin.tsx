@@ -133,20 +133,13 @@ const SystemAdmin: React.FC = () => {
           return;
       }
 
-      let cleanPhone = newSchool.contact_phone.replace(/[\s\-\(\)\+]/g, '');
-      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
-          cleanPhone = cleanPhone.slice(3);
-      }
-      if (cleanPhone && !/^(2|6)\d{8}$/.test(cleanPhone)) {
+      if (newSchool.contact_phone && !isValidPhoneNumber(newSchool.contact_phone)) {
           alert(t('sys_alert_phone_invalid'));
           return;
       }
 
       if (window.electronAPI) {
-          await window.electronAPI.addSchool({
-              ...newSchool,
-              contact_phone: cleanPhone
-          });
+          await window.electronAPI.addSchool({ ...newSchool });
           setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '', requires_subject_code: 1, allow_founder_term_edit: 0, term_structure: '3_TERMS_2_SEQS' });
           setIsAdding(false);
           loadSchools();
@@ -277,11 +270,7 @@ const SystemAdmin: React.FC = () => {
   const handleSaveMetadata = async () => {
       if (!selectedSchool || !window.electronAPI) return;
 
-      let cleanPhone = editSchoolPhone.replace(/[\s\-\(\)\+]/g, '');
-      if (cleanPhone.startsWith('237') && cleanPhone.length > 9) {
-          cleanPhone = cleanPhone.slice(3);
-      }
-      if (cleanPhone && !/^(2|6)\d{8}$/.test(cleanPhone)) {
+      if (editSchoolPhone && !isValidPhoneNumber(editSchoolPhone)) {
           alert(t('sys_alert_phone_invalid'));
           return;
       }
@@ -294,7 +283,7 @@ const SystemAdmin: React.FC = () => {
               address: editSchoolAddress,
               bp: editSchoolBp,
               contact_email: editSchoolEmail,
-              contact_phone: cleanPhone,
+              contact_phone: editSchoolPhone,
               slug: editSchoolSlug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) || undefined,
               primary_color: selectedSchool.primary_color || '#1e293b',
               secondary_color: selectedSchool.secondary_color || '#f59e0b',
@@ -328,7 +317,7 @@ const SystemAdmin: React.FC = () => {
               address: editSchoolAddress,
               bp: editSchoolBp,
               contact_email: editSchoolEmail,
-              contact_phone: cleanPhone,
+              contact_phone: editSchoolPhone,
               slug: editSchoolSlug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) || selectedSchool.slug,
               requires_subject_code: editSchoolRequiresCode,
               allow_founder_term_edit: editSchoolAllowTermEdit
