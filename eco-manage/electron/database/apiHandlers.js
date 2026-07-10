@@ -47,12 +47,20 @@ handlers['db:logFrontendError'] = async (errorDetails) => {
 };
 
 handlers['auth:restoreSession'] = async (user) => {
-    if (user) {
-        user.full_name = user.fullName;
-    }
-    // session is readonly here
-    return true;
+    if (!user) return null;
+    user.full_name = user.fullName;
 
+    // Re-validate user account is still active
+    const dbUser = db.prepare('SELECT is_active FROM users WHERE id = ?').get(user.id);
+    if (!dbUser || dbUser.is_active === 0) return null;
+
+    // Re-validate school status (skip for SUPERADMIN and PARENT)
+    if (user.role !== 'SUPERADMIN' && user.role !== 'PARENT' && user.schoolId) {
+        const school = db.prepare('SELECT deleted_at, is_active FROM schools WHERE id = ?').get(user.schoolId);
+        if (!school || school.deleted_at !== null || school.is_active === 0) return null;
+    }
+
+    return true;
 };
 
 handlers['auth:login'] = async ({ username, password }) => {
@@ -2238,6 +2246,11 @@ handlers['db:deleteUser'] = async (id) => {
   // Assistant teacher can be safely removed from their class
   db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ?').run(id);
 
+  // Clean up dangling references left by this user
+  try { db.prepare('DELETE FROM class_teacher_subjects WHERE teacher_id = ?').run(id); } catch(e) {}
+  try { db.prepare('DELETE FROM grade_overrides WHERE teacher_id = ?').run(id); } catch(e) {}
+  try { db.prepare('DELETE FROM notifications WHERE user_id = ?').run(id); } catch(e) {}
+
   return db.prepare('DELETE FROM users WHERE id = ? AND school_id = ?').run(id, sid);
 };
 
@@ -2672,6 +2685,8 @@ handlers['db:deleteStudent'] = async (id) => {
         db.prepare('DELETE FROM grades WHERE student_id = ?').run(id);
         db.prepare('DELETE FROM attendance WHERE student_id = ?').run(id);
         db.prepare('DELETE FROM payments WHERE student_id = ?').run(id);
+        try { db.prepare('DELETE FROM transport_attendance WHERE student_id = ?').run(id); } catch(e) {}
+        try { db.prepare('DELETE FROM absence_justifications WHERE student_id = ?').run(id); } catch(e) {}
         db.prepare('DELETE FROM students WHERE id = ? AND school_id = ?').run(id, sid);
     });
     tx();

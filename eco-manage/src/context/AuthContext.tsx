@@ -40,7 +40,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (user && window.electronAPI) {
       window.electronAPI.restoreSession(user)
-        .then(() => {
+        .then((result: any) => {
+          if (!result) {
+            // School suspended/deleted or user blocked — force logout
+            setUser(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('saas_token');
+            setIsRestoringSession(false);
+            return;
+          }
           setIsRestoringSession(false);
           window.electronAPI.getSchools().then((schools: any) => {
               const currentSchool = schools.find((s: any) => Number(s.id) === Number(user.schoolId)) || schools[0];
