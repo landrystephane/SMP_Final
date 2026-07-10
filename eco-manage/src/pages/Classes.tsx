@@ -241,7 +241,7 @@ const Classes: React.FC = () => {
             const assignmentArray = Object.entries(assignments).map(([subjId, teachId]) => ({
                 subject_id: parseInt(subjId),
                 teacher_id: teachId
-            })).filter(a => a.teacher_id !== null && !isNaN(a.teacher_id));
+            })).filter(a => a.teacher_id !== null && a.teacher_id !== '' && !isNaN(Number(a.teacher_id)));
 
             const res = await (window.electronAPI as any).saveClassTeacherAssignments({
                 classId: selectedClassForAssign.id,

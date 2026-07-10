@@ -81,9 +81,9 @@ const Students: React.FC = () => {
     const matchClass = selectedClass === 'ALL' || s.class_id?.toString() === selectedClass?.toString();
     const classObj = classes.find(c => c.id === s.class_id);
     const matchCycle = selectedCycle === 'ALL' || (classObj && classObj.level === selectedCycle);
-    const matchSearch = s.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.matricule.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = (s.last_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (s.first_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (s.matricule || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchSection && matchClass && matchCycle && matchSearch;
   });
 

@@ -197,7 +197,7 @@ const ParentPortal: React.FC = () => {
     const handlePrintReceipt = async (payment: any) => {
         try {
             const financials = getStudentFinancials(selectedChild);
-            const activeSchool = schools.find(sch => sch.id === user?.schoolId) || schools[0] || { name: '' };
+            const activeSchool = schools.find(sch => sch.id?.toString() === user?.schoolId?.toString()) || schools[0] || { name: '' };
             const { generatePaymentReceipt } = await import('../utils/reports');
             generatePaymentReceipt(payment, selectedChild, financials, activeSchool);
         } catch (e: any) {
@@ -796,7 +796,7 @@ const ParentPortal: React.FC = () => {
                                         <div key={p.id} className="bg-slate-900/60 border border-white/5 rounded-xl p-4 flex items-center gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[10px] font-mono text-amber-500">#{p.receipt_number}</p>
-                                                <p className="text-xs font-black text-white">{p.amount.toLocaleString()} FCFA</p>
+                                                <p className="text-xs font-black text-white">{(p.amount || 0).toLocaleString()} FCFA</p>
                                                 <p className="text-[9px] text-slate-500">{p.payment_type} · {new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}</p>
                                             </div>
                                             <button
@@ -829,7 +829,7 @@ const ParentPortal: React.FC = () => {
                                                 stats.payments.map((p: any) => (
                                                     <tr key={p.id} className="hover:bg-white/5 transition-colors text-xs font-bold">
                                                         <td className="px-4 py-3 font-mono text-amber-500">#{p.receipt_number}</td>
-                                                        <td className="px-4 py-3 text-white">{p.amount.toLocaleString()} FCFA</td>
+                                                        <td className="px-4 py-3 text-white">{(p.amount || 0).toLocaleString()} FCFA</td>
                                                         <td className="px-4 py-3">
                                                             <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 px-2 py-1 rounded-full uppercase tracking-widest border border-amber-500/20">{p.payment_type}</span>
                                                         </td>

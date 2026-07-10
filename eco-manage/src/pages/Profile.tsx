@@ -44,7 +44,7 @@ const Profile: React.FC = () => {
       <div className="glass-card p-8 space-y-8">
         <div className="flex items-center space-x-4">
             <div className="w-16 h-16 rounded-full bg-slate-gold-gold flex items-center justify-center text-slate-900 text-2xl font-black">
-                {user?.fullName.charAt(0)}
+                {user?.fullName?.charAt(0)}
             </div>
             <div>
                 <h2 className="text-xl font-bold text-white">{user?.fullName}</h2>

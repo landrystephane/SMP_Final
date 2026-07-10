@@ -41,13 +41,13 @@ const DriverPortal: React.FC = () => {
 
   const loadRouteData = async () => {
     if (window.electronAPI) {
-      const routes = await window.electronAPI.getBusRoutes(user?.schoolId);
+      const routes = (await window.electronAPI.getBusRoutes(user?.schoolId)) || [];
       const myRoute = routes.find((r: any) => r.driver_id === user?.id);
       setActiveRoute(myRoute || null);
 
       if (myRoute) {
         const routeStudents = await window.electronAPI.getRouteStudents(myRoute.id);
-        setStudents(routeStudents);
+        setStudents(routeStudents || []);
 
         const routePoints = await window.electronAPI.getTransportPoints(myRoute.id);
         if (routePoints && routePoints.length > 0) {
@@ -392,7 +392,7 @@ const DriverPortal: React.FC = () => {
                             <div key={s.id} className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between hover:bg-white/5 transition-all gap-4">
                                 <div className="flex items-center space-x-5">
                                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/20">
-                                        {s.last_name[0]}
+                                                        {s.last_name?.[0]}
                                     </div>
                                     <div>
                                         <p className="text-white font-black uppercase text-sm tracking-tight">{s.last_name} {s.first_name}</p>
@@ -405,7 +405,7 @@ const DriverPortal: React.FC = () => {
                                 <div className="flex items-center gap-3 w-full md:w-auto">
                                     <select 
                                         className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-xs font-black text-white flex-1 md:flex-none outline-none"
-                                        onChange={(e) => handleAssignStudent(s.id, parseInt(e.target.value))}
+                                        onChange={(e) => { const pid = parseInt(e.target.value, 10); if (!isNaN(pid)) handleAssignStudent(s.id, pid); }}
                                         value=""
                                     >
                                         <option value="" disabled>{t('assign_to_stop', 'Assigner à un arrêt...')}</option>
@@ -447,7 +447,7 @@ const DriverPortal: React.FC = () => {
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner ${
                                     attendance[s.id] ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-600 border border-white/5'
                                 }`}>
-                                    {s.last_name[0]}
+                                    {s.last_name?.[0]}
                                 </div>
                                 <div>
                                     <p className="text-white font-black uppercase text-base tracking-tight">{s.last_name} {s.first_name}</p>

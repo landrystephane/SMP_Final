@@ -248,7 +248,7 @@ const SystemAdmin: React.FC = () => {
 
       if (window.electronAPI) {
           const activeSubs = await window.electronAPI.getSchoolSubjects(school.id);
-          setSchoolSubjects(activeSubs.filter((s: any) => s.is_active).map((s: any) => s.id));
+          setSchoolSubjects((activeSubs || []).filter((s: any) => s.is_active).map((s: any) => s.id));
 
           const users = await window.electronAPI.getUsers(school.id);
           setSchoolUsers(users || []);
@@ -554,7 +554,7 @@ const SystemAdmin: React.FC = () => {
                 <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
                   <div className="flex items-center gap-5">
                     <div className="w-14 h-14 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-2xl font-black shadow-lg transform group-hover:scale-105 transition-all">
-                      {s.name.charAt(0)}
+                      {(s.name || '?').charAt(0)}
                     </div>
                     <div>
                       <h3 className="text-xl font-black text-white uppercase tracking-tight">{s.name}</h3>
@@ -785,7 +785,7 @@ const SystemAdmin: React.FC = () => {
                       <div className="p-8 bg-slate-950/50 border-b border-white/5 flex items-start justify-between">
                         <div className="flex items-center gap-5">
                           <div className="w-14 h-14 rounded-2xl bg-rose-950 border border-rose-800 text-rose-400 flex items-center justify-center text-2xl font-black shadow-lg">
-                            {s.name.charAt(0)}
+                            {(s.name || '?').charAt(0)}
                           </div>
                           <div>
                             <h3 className="text-xl font-black text-white uppercase tracking-tight">{s.name}</h3>
@@ -841,7 +841,7 @@ const SystemAdmin: React.FC = () => {
                   <div className="flex justify-between items-start mb-16">
                       <div className="flex items-center gap-8">
                         <div className="w-24 h-24 rounded-3xl bg-amber-500 text-slate-950 flex items-center justify-center text-4xl font-black shadow-2xl">
-                          {selectedSchool.name.charAt(0)}
+                          {(selectedSchool.name || '?').charAt(0)}
                         </div>
                         <div>
                           <h2 className="text-6xl font-black text-white tracking-tighter uppercase italic">{selectedSchool.name}</h2>

@@ -49,7 +49,7 @@ const AdminWorkflow: React.FC = () => {
 
   const loadPeriodSettings = async () => {
     if (window.electronAPI) {
-        const allSet = await window.electronAPI.getSettings();
+        const allSet = (await window.electronAPI.getSettings()) || [];
           const locks = allSet.filter((s: any) => s.setting_key.startsWith('class_locked_') && s.setting_value === 'true').map((s: any) => s.setting_key);
           setLockedClasses(locks);
           const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';

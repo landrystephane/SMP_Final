@@ -461,7 +461,7 @@ handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
-    return db.prepare('UPDATE students SET bus_route_id = ? WHERE id = ?').run(routeId, studentId);
+    return db.prepare('UPDATE students SET bus_route_id = ? WHERE id = ? AND school_id = ?').run(routeId, studentId, sid);
 };
 
 handlers['db:getGrades'] = async ({ classId, term, month }) => {
@@ -494,7 +494,7 @@ handlers['db:saveGrades'] = async (grades) => {
       if (st && !st.has_paid_registration) throw new Error(`L'élève n'est pas inscrit. Impossible d'enregistrer ses notes tant que l'inscription n'est pas payée.`);
     }
   }
-  const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND term = ? AND month = ?');
+  const checkLock = db.prepare('SELECT locked FROM grades WHERE student_id = ? AND subject_id = ? AND class_id = ? AND term = ? AND month = ?');
   const upsert = db.prepare(`
     INSERT INTO grades (student_id, subject_id, class_id, term, month, score, letter_score, teacher_id, locked, validated)
       VALUES (@student_id, @subject_id, @class_id, @term, @month, @score, @letter_score, @teacher_id, 1, 0)
@@ -559,7 +559,7 @@ handlers['db:saveGrades'] = async (grades) => {
         }
       }
 
-      const existing = checkLock.get(g.student_id, g.subject_id, g.term, g.month);
+      const existing = checkLock.get(g.student_id, g.subject_id, g.class_id, g.term, g.month);
       if (existing && existing.locked === 1) throw new Error(`Note déjà verrouillée pour cet élève.`);
 
       // 3. Mode A auto-conversion
@@ -724,9 +724,16 @@ handlers['db:addPayment'] = async (payment) => {
               if (type === 'Inscription') expected = feeConfig.registration_fee || 0;
               if (type === 'Transport') expected = feeConfig.transport_fee || 0;
               if (type === 'Examen') expected = feeConfig.exam_fee || 0;
-              
+
               if (parseFloat(amount) !== expected) {
                   throw new Error(`Paiement refusé : Le montant exact pour ${type} est de ${expected} FCFA.`);
+              }
+              // Empêcher le double paiement
+              const alreadyPaid = db.prepare(
+                  'SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND payment_type = ?'
+              ).get(studentId, type).paid;
+              if (expected > 0 && alreadyPaid >= expected) {
+                  throw new Error(`${type} déjà soldé pour cet élève. Aucun versement supplémentaire n'est autorisé.`);
               }
           }
       }
@@ -1006,7 +1013,7 @@ handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, sender
     const lateStudents = db.prepare(`
         SELECT s.id, s.first_name, s.last_name, s.parent_contact, c.name as class_name,
                COALESCE(tf.total_fee, 0) - COALESCE(s.scholarship_reduction, 0) + COALESCE(tf.registration_fee, 0) as total_due,
-               COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id = s.id), 0) as total_paid
+               COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id = s.id AND p.payment_type IN ('Scolarité', 'Inscription')), 0) as total_paid
         FROM students s
         JOIN classes c ON s.class_id = c.id
         LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
@@ -1712,6 +1719,12 @@ handlers['db:addTransportPoint'] = async ({ routeId, name, latitude, longitude, 
 };
 
 handlers['db:deleteTransportPoint'] = async (pointId) => {
+    const sid = getActiveSchoolId();
+    const pt = db.prepare('SELECT route_id FROM transport_points WHERE id = ?').get(pointId);
+    if (pt) {
+        const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(pt.route_id, sid);
+        if (!route) throw new Error('Point de transport non autorisé pour cet établissement.');
+    }
     db.prepare('UPDATE students SET transport_point_id = NULL WHERE transport_point_id = ?').run(pointId);
     return db.prepare('DELETE FROM transport_points WHERE id = ?').run(pointId);
 };
@@ -1758,8 +1771,11 @@ handlers['db:getTransportEligibleStudents'] = async (schoolId) => {
 };
 
 handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, routeId }) => {
-    // 1. Assign in DB
-    db.prepare('UPDATE students SET bus_route_id = ?, transport_point_id = ? WHERE id = ?').run(routeId, pointId, studentId);
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
+    // 1. Assign in DB (school_id vérifié via route ci-dessus, mais on scope aussi la mise à jour de l'élève)
+    db.prepare('UPDATE students SET bus_route_id = ?, transport_point_id = ? WHERE id = ? AND school_id = ?').run(routeId, pointId, studentId, sid);
     
     // 2. Fetch point details
     const point = db.prepare('SELECT name, latitude, longitude, estimated_time_from_start FROM transport_points WHERE id = ?').get(pointId);
@@ -1803,8 +1819,11 @@ handlers['db:logTransport'] = async (log) => {
 };
 
 handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, status, recordedBy }) => {
+    const sid = getActiveSchoolId();
+    const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
+    if (!route) throw new Error('Route non autorisée pour cet établissement.');
     const existing = db.prepare(`
-        SELECT id FROM transport_attendance 
+        SELECT id FROM transport_attendance
         WHERE student_id = ? AND route_id = ? AND date = date('now') AND direction = ?
     `).get(studentId, routeId, direction);
 
@@ -2680,26 +2699,28 @@ handlers['db:updateStudent'] = async (student) => {
 };
 
 handlers['db:getReportTemplate'] = async (schoolId) => {
-  if (!schoolId) return null;
-  return db.prepare('SELECT * FROM report_templates WHERE school_id = ?').get(schoolId);
+  const sid = getActiveSchoolId(schoolId);
+  if (!sid) return null;
+  return db.prepare('SELECT * FROM report_templates WHERE school_id = ?').get(sid);
 };
 
 handlers['db:saveReportTemplate'] = async (data) => {
   const { schoolId, headerImage, watermarkImage, footerImage, primaryColor, secondaryColor } = data;
-  if (!schoolId) return { success: false, error: 'No school ID' };
-  
-  const existing = db.prepare('SELECT id FROM report_templates WHERE school_id = ?').get(schoolId);
+  const sid = getActiveSchoolId(schoolId);
+  if (!sid) return { success: false, error: 'No school ID' };
+
+  const existing = db.prepare('SELECT id FROM report_templates WHERE school_id = ?').get(sid);
   if (existing) {
     db.prepare(`
-      UPDATE report_templates SET 
+      UPDATE report_templates SET
         header_image = ?, watermark_image = ?, footer_image = ?, primary_color = ?, secondary_color = ?
       WHERE school_id = ?
-    `).run(headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b', schoolId);
+    `).run(headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b', sid);
   } else {
     db.prepare(`
       INSERT INTO report_templates (school_id, header_image, watermark_image, footer_image, primary_color, secondary_color)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(schoolId, headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
+    `).run(sid, headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
   }
   return { success: true };
 
@@ -2919,7 +2940,7 @@ handlers['db:getBursarDashboardStats'] = async (params) => {
   const schoolId = getActiveSchoolId(params ? params.schoolId : null);
   
   const students = db.prepare(`
-    SELECT s.id, s.class_id, s.scholarship_reduction, c.name as class_name, c.level as class_level,
+    SELECT s.id, s.class_id, s.scholarship_reduction, s.has_transport, c.name as class_name, c.level as class_level,
            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration
     FROM students s
     JOIN classes c ON s.class_id = c.id
@@ -2928,16 +2949,17 @@ handlers['db:getBursarDashboardStats'] = async (params) => {
   `).all(schoolId);
 
   const tuitionFees = db.prepare(`
-    SELECT t.* 
+    SELECT t.*
     FROM tuition_fees t
     JOIN classes c ON t.class_id = c.id
     WHERE c.school_id = ?
   `).all(schoolId);
+  // Inclure Examen et Transport pour que 'paid' couvre tous les types inclus dans 'due'
   const tuitionPayments = db.prepare(`
-    SELECT p.student_id, SUM(p.amount) as total_paid 
+    SELECT p.student_id, SUM(p.amount) as total_paid
     FROM payments p
     JOIN students s ON p.student_id = s.id
-    WHERE p.payment_type IN ('Scolarité', 'Inscription') AND s.school_id = ?
+    WHERE p.payment_type IN ('Scolarité', 'Inscription', 'Transport', 'Examen') AND s.school_id = ?
     GROUP BY p.student_id
   `).all(schoolId);
 
@@ -3321,7 +3343,7 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
     const snapshotUsers = db.prepare("SELECT id,username,full_name,role,is_active,created_at FROM users WHERE school_id = ? AND role != 'SUPER_ADMIN'").all(sid);
     const snapshotPayments = db.prepare('SELECT p.*,s.matricule,s.first_name,s.last_name FROM payments p JOIN students s ON p.student_id=s.id WHERE s.school_id = ? ORDER BY p.payment_date').all(sid);
     const snapshotExpenses = (() => { try { return db.prepare('SELECT * FROM expenses WHERE school_id = ? ORDER BY created_at').all(sid); } catch(e) { return []; } })();
-    const snapshotGrades = db.prepare('SELECT g.*,s.matricule,s.first_name,s.last_name FROM grades g JOIN students s ON g.student_id=s.id WHERE s.school_id = ? ORDER BY g.created_at').all(sid);
+    const snapshotGrades = db.prepare('SELECT g.*,s.matricule,s.first_name,s.last_name,sub.name as subject_name FROM grades g JOIN students s ON g.student_id=s.id LEFT JOIN subjects sub ON g.subject_id=sub.id WHERE s.school_id = ? ORDER BY g.created_at').all(sid);
     const snapshotAttendance = db.prepare('SELECT a.*,s.matricule,s.first_name,s.last_name FROM attendance a JOIN students s ON a.student_id=s.id WHERE s.school_id = ? ORDER BY a.date').all(sid);
     const snapshotSchedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND week_start_date IS NULL').all(sid);
     const snapshotWeeklySchedules = db.prepare('SELECT * FROM schedules WHERE school_id = ? AND week_start_date IS NOT NULL').all(sid);
@@ -3356,7 +3378,7 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
     let backupsDir;
     if (process.versions && process.versions.electron) {
         const { app } = require('electron');
-        backupsDir = path.join(app.getAppPath(), 'backups');
+        backupsDir = path.join(app.getPath('userData'), 'backups');
     } else {
         const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
         backupsDir = path.join(dataDir, 'backups');
@@ -3701,6 +3723,9 @@ handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, r
     const teacher = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
     const cls = db.prepare('SELECT name FROM classes WHERE id = ?').get(data.classId);
     message = `L'enseignant ${teacher?.full_name || 'Inconnu'} demande une extension de délai pour la saisie des notes de la classe ${cls?.name || 'Inconnue'} (Séquence: ${data.sequence}, Trimestre: ${data.term}). Raison: ${data.message || ''}`;
+    // Stocker teacherId dans request_data pour pouvoir créer l'override correctement à la résolution
+    data.teacherId = actualSenderId;
+    reqDataStr = JSON.stringify(data);
   } else if (requestType === 'CASH_WITHDRAWAL') {
     const data = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
     const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(actualSenderId);
@@ -3797,22 +3822,25 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
         const hrs = parseInt(durationHours, 10) || 24;
         deadlineDate.setHours(deadlineDate.getHours() + hrs);
         const deadlineStr = deadlineDate.toISOString().replace('T', ' ').substring(0, 19);
+        // notif.user_id est NULL (notifications système) — utiliser data.teacherId enregistré à la création
+        const teacherIdForOverride = data.teacherId || data.teacher_id;
+        if (!teacherIdForOverride) throw new Error('teacherId manquant dans request_data. Impossible de créer la dérogation.');
 
         const existing = db.prepare('SELECT id FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?')
-          .get(notif.user_id, data.classId, data.term, data.sequence);
-        
+          .get(teacherIdForOverride, data.classId, data.term, data.sequence);
+
         if (existing) {
           db.prepare('UPDATE grade_overrides SET deadline = ?, granted_by = ? WHERE id = ?')
             .run(deadlineStr, grantedById, existing.id);
         } else {
           db.prepare('INSERT INTO grade_overrides (teacher_id, class_id, term, month, deadline, granted_by) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(notif.user_id, data.classId, data.term, data.sequence, deadlineStr, grantedById);
+            .run(teacherIdForOverride, data.classId, data.term, data.sequence, deadlineStr, grantedById);
         }
 
         db.prepare(`
           INSERT INTO notifications (school_id, user_id, message, type)
           VALUES (?, ?, ?, 'SYSTEM')
-        `).run(notif.school_id, notif.user_id, `Votre demande d'extension pour la classe a été approuvée pour une durée de ${hrs} heures.`);
+        `).run(notif.school_id, teacherIdForOverride, `Votre demande d'extension pour la classe a été approuvée pour une durée de ${hrs} heures.`);
       } else if (notif.request_type === 'CASH_WITHDRAWAL') {
         let bursarUserId = null;
         if (data.expenseId) {

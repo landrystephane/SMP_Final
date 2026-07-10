@@ -329,9 +329,9 @@ const TuitionConfig: React.FC = () => {
                         <input
                             type="text"
                             inputMode="numeric"
-                            disabled={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6')}
+                            disabled={!(f.className || '').toUpperCase().replace(/\s+/g, '').includes('CM2') && !(f.className || '').toUpperCase().replace(/\s+/g, '').includes('CLASS6')}
                             className="w-full max-w-[140px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-rose-500 outline-none focus:ring-2 focus:ring-rose-500/20 transition-all shadow-inner disabled:opacity-30 disabled:cursor-not-allowed"
-                            value={!f.className.toUpperCase().replace(/\s+/g, '').includes('CM2') && !f.className.toUpperCase().replace(/\s+/g, '').includes('CLASS6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
+                            value={!(f.className || '').toUpperCase().replace(/\s+/g, '').includes('CM2') && !(f.className || '').toUpperCase().replace(/\s+/g, '').includes('CLASS6') ? '' : (f.examFee === 0 ? '' : f.examFee)}
                             onChange={(e) => {
                                 const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                 const newFees = fees.map(item => item.classId === f.classId ? { ...item, examFee: val } : item);

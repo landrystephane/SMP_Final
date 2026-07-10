@@ -136,7 +136,7 @@ const Statistics: React.FC = () => {
           <div className="glass-card p-8 bg-slate-900/40 border-none relative overflow-hidden group">
               <TrendingUp className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 group-hover:text-emerald-500/10 transition-all" />
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{t('cycle_average', 'Moyenne du Cycle')}</p>
-              <h3 className="text-4xl font-black text-white">{(stats.classStats.reduce((acc: number, c: any) => acc + c.avg, 0) / (stats.classStats.length || 1)).toFixed(2)}</h3>
+              <h3 className="text-4xl font-black text-white">{((stats.classStats || []).reduce((acc: number, c: any) => acc + c.avg, 0) / ((stats.classStats || []).length || 1)).toFixed(2)}</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-slate-500">
                   {t('out_of_20', 'Sur 20 points')}
               </div>
@@ -144,7 +144,7 @@ const Statistics: React.FC = () => {
           <div className="glass-card p-8 bg-slate-900/40 border-none relative overflow-hidden group">
               <CheckCircle className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 group-hover:text-blue-500/10 transition-all" />
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{t('success_rate', 'Taux de Réussite')}</p>
-              <h3 className="text-4xl font-black text-white">{(stats.classStats.reduce((acc: number, c: any) => acc + c.passRate, 0) / (stats.classStats.length || 1)).toFixed(1)}%</h3>
+              <h3 className="text-4xl font-black text-white">{((stats.classStats || []).reduce((acc: number, c: any) => acc + c.passRate, 0) / ((stats.classStats || []).length || 1)).toFixed(1)}%</h3>
               <div className="mt-4 flex items-center text-[10px] font-bold text-emerald-500">
                   {t('threshold', 'Seuil')}: 10/20
               </div>
@@ -172,7 +172,7 @@ const Statistics: React.FC = () => {
                   </div>
 
                   <div className="space-y-8">
-                      {stats.classStats.map((c: any) => (
+                      {(stats.classStats || []).map((c: any) => (
                           <div key={c.level} className="space-y-3">
                               <div className="flex justify-between items-end">
                                   <span className="text-sm font-black text-white uppercase tracking-wider">{c.level}</span>
@@ -335,7 +335,7 @@ const Statistics: React.FC = () => {
                   <div className="space-y-6">
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                           <span>{t('recovery_objective', 'Objectif de Recouvrement')}</span>
-                          <span className="text-white">{stats.totalTuitionDue.toLocaleString()} {currency}</span>
+                          <span className="text-white">{(stats.totalTuitionDue || 0).toLocaleString()} {currency}</span>
                       </div>
                       <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
                           <div
@@ -345,7 +345,7 @@ const Statistics: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                           <span>{t('total_recovered', 'Total Recouvré')}</span>
-                          <span className="text-emerald-500">{stats.totalRevenue.toLocaleString()} {currency}</span>
+                          <span className="text-emerald-500">{(stats.totalRevenue || 0).toLocaleString()} {currency}</span>
                       </div>
                   </div>
               </div>

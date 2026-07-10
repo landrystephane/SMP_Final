@@ -15,7 +15,7 @@ const SyncCenter: React.FC = () => {
     const checkUnsynced = async () => {
         const grades = await dataService.getUnsyncedGrades();
         const attendance = await dataService.getUnsyncedAttendance();
-        setUnsyncedCount(grades.length + attendance.length);
+        setUnsyncedCount((grades || []).length + (attendance || []).length);
     };
     checkUnsynced();
     const interval = setInterval(checkUnsynced, 5000);

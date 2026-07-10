@@ -99,8 +99,8 @@ const AnnualArchives: React.FC = () => {
         const stud = students.find(s => s.id === p.student_id) || { last_name: '', first_name: '', matricule: '' };
         const fullName = `${stud.last_name} ${stud.first_name}`.toLowerCase();
         const matchesSearch = fullName.includes(searchQuery.toLowerCase()) || 
-                              p.receipt_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              stud.matricule.toLowerCase().includes(searchQuery.toLowerCase());
+                              (p.receipt_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (stud.matricule || '').toLowerCase().includes(searchQuery.toLowerCase());
         const matchesType = filterType === 'ALL' || p.payment_type === filterType;
         return matchesSearch && matchesType;
     });
@@ -220,7 +220,7 @@ const AnnualArchives: React.FC = () => {
                                                         </span>
                                                     </td>
                                                      <td className="py-4 text-slate-500 text-[10px]">{new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}</td>
-                                                    <td className="py-4 text-right font-black text-white text-xs">{p.amount.toLocaleString()}</td>
+                                                    <td className="py-4 text-right font-black text-white text-xs">{(p.amount || 0).toLocaleString()}</td>
                                                 </tr>
                                             );
                                         })

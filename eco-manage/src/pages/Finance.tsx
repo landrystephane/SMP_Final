@@ -328,7 +328,7 @@ const Finance: React.FC = () => {
       }
 
       const studentPayments = payments.filter(p => p.student_id === student.id && (
-          (isTuitionOrReg && (p.payment_type === 'Scolarité' || p.payment_type === 'Inscription' || !p.payment_type)) ||
+          (isTuitionOrReg && (p.payment_type === 'Scolarité' || p.payment_type === 'Inscription')) ||
           (!isTuitionOrReg && p.payment_type === feeType)
       ));
       const totalPaid = studentPayments.reduce((acc, p) => acc + p.amount, 0);

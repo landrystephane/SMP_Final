@@ -854,8 +854,8 @@ const formatRankEn = (n: number): string => {
 // Computes the rank (1-based, standard competition ranking - ties share the same rank)
 // of each student within a list, sorted descending by average.
 export const computeClassRanks = (students: { avg: number }[]): number[] => {
-    const sortedAverages = [...students.map(s => s.avg)].sort((a, b) => b - a);
-    return students.map(s => sortedAverages.indexOf(s.avg) + 1);
+    const sortedAverages = [...students.map(s => s.avg)].filter(a => !isNaN(a)).sort((a, b) => b - a);
+    return students.map(s => isNaN(s.avg) ? 0 : sortedAverages.indexOf(s.avg) + 1);
 };
 
 export const generateHonorCertificate = (studentName: string, className: string, average: number, school?: any, options?: { rank?: number; totalStudents?: number; template?: any }) => {
@@ -997,14 +997,37 @@ export const generateClassReportCards = (data: {
     const primary = primaryColor ? hexToRgb(primaryColor) : [30, 41, 59];
     const secondary = secondaryColor ? hexToRgb(secondaryColor) : [245, 158, 11];
 
-    // Pre-pass: compute class-level averages for the stats bar
+    // Pre-pass: compute class-level averages for the stats bar (with sequence weighting)
+    let preTermSequences: any[] = [];
+    try {
+        if (school.term_structure && term) {
+            const ts = JSON.parse(school.term_structure);
+            const currentTerm = ts.find((t: any) => t.term_id?.toString() === term?.toString());
+            if (currentTerm?.sequences) preTermSequences = currentTerm.sequences;
+        }
+    } catch(e) {}
+
     const preAverages = studentsData.map(sd => {
-        if (isAnnual) return typeof sd.average === 'number' ? sd.average : 0;
+        if (isAnnual) return typeof sd.average === 'number' ? sd.average : null;
         const vg = ignoreValidation ? sd.grades : sd.grades.filter((g: any) => g.validated === 1);
-        const tp = vg.reduce((a: number, g: any) => a + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
-        const tc = vg.reduce((a: number, g: any) => a + (Number(g.coefficient) || 1), 0);
-        return tc > 0 ? tp / tc : 0;
-    }).sort((a: number, b: number) => b - a);
+        // Regrouper par matière et appliquer les poids de séquences (cohérent avec le rendu individuel)
+        const subMap: Record<number, { weightedSum: number; totalWeight: number; coef: number }> = {};
+        vg.forEach((g: any) => {
+            const subId = g.subject_id;
+            if (!subMap[subId]) subMap[subId] = { weightedSum: 0, totalWeight: 0, coef: Number(g.coefficient) || 1 };
+            if (g.score !== null && g.score !== undefined) {
+                const seqCfg = preTermSequences.find((s: any) => s.id?.toString() === g.month?.toString());
+                const w = seqCfg?.weight !== undefined ? Number(seqCfg.weight) : 1;
+                subMap[subId].weightedSum += Number(g.score) * w;
+                subMap[subId].totalWeight += w;
+            }
+        });
+        let tp = 0, tc = 0;
+        Object.values(subMap).forEach((sub: any) => {
+            if (sub.totalWeight > 0) { tp += (sub.weightedSum / sub.totalWeight) * sub.coef; tc += sub.coef; }
+        });
+        return tc > 0 ? tp / tc : null;
+    }).filter((a): a is number => a !== null).sort((a: number, b: number) => b - a);
     const classAvgVal = preAverages.length > 0 ? preAverages.reduce((a: number, b: number) => a + b, 0) / preAverages.length : undefined;
     const firstAvg = preAverages[0];
     const lastAvg = preAverages[preAverages.length - 1];
@@ -1112,8 +1135,8 @@ export const generateClassReportCards = (data: {
             drawText(calculateAttendanceObservations(totalAbsence), 'conduct', 25, 202, 9);
 
             if (!isNursery && validatedGrades.length > 0) {
-                const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + (g.score * g.coefficient), 0);
-                const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + g.coefficient, 0);
+                const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
+                const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + (Number(g.coefficient) || 1), 0);
                 const average = totalPoints / (totalCoef || 1);
 
                 drawText(average.toFixed(2), 'average', 120, 195, 10, true);
@@ -1176,7 +1199,7 @@ export const generateClassReportCards = (data: {
                         const app = getNurseryAppreciation(g.score);
                         return [g.subjectName, app.label, app.remark];
                     } else {
-                        return [g.subjectName, g.score.toFixed(2), g.coefficient, (g.score * g.coefficient).toFixed(2), getPrimaryAppreciation(g.score)];
+                        return [g.subjectName, (Number(g.score)||0).toFixed(2), Number(g.coefficient)||1, ((Number(g.score)||0) * (Number(g.coefficient)||1)).toFixed(2), getPrimaryAppreciation(g.score)];
                     }
                 });
 

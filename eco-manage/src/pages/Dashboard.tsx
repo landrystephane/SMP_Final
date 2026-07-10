@@ -771,8 +771,8 @@ const Dashboard: React.FC = () => {
   );
 
   const filteredClassStats = selectedDiagnosticClass === 'ALL'
-    ? stats.classStats
-    : stats.classStats.filter((c: any) => c.level === selectedDiagnosticClass);
+    ? (stats.classStats || [])
+    : (stats.classStats || []).filter((c: any) => c.level === selectedDiagnosticClass);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -844,8 +844,8 @@ const Dashboard: React.FC = () => {
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
           <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
           <div className="flex gap-2 mt-4">
-             <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full">{stats.genderDist.boys} {t('boys')}</span>
-             <span className="text-[10px] font-bold text-pink-500 bg-pink-500/10 px-2.5 py-1 rounded-full">{stats.genderDist.girls} {t('girls')}</span>
+             <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full">{stats.genderDist?.boys ?? 0} {t('boys')}</span>
+             <span className="text-[10px] font-bold text-pink-500 bg-pink-500/10 px-2.5 py-1 rounded-full">{stats.genderDist?.girls ?? 0} {t('girls')}</span>
           </div>
           </div>
         </div>

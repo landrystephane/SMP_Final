@@ -47,7 +47,7 @@ const Subjects: React.FC = () => {
   const loadClassSubjects = async (classId: number) => {
     if (window.electronAPI) {
       const data = await window.electronAPI.getClassSubjects(classId);
-      setClassSubjects(data);
+      setClassSubjects(data || []);
     }
   };
 

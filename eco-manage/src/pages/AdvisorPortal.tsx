@@ -84,6 +84,7 @@ const AdvisorPortal: React.FC = () => {
 
     const loadData = async () => {
         if (window.electronAPI && user) {
+          try {
             const [c, r, studs, allUsers, schs] = await Promise.all([
                 window.electronAPI.getClasses(user.schoolId),
                 window.electronAPI.getBusRoutes(user.schoolId),
@@ -91,10 +92,10 @@ const AdvisorPortal: React.FC = () => {
                 window.electronAPI.getUsers(user.schoolId),
                 window.electronAPI.getSchools()
             ]);
-            setClasses(c);
-            setRoutes(r);
-            setStudents(studs.filter((s: any) => s.has_paid_registration === 1));
-            setTeachers(allUsers.filter((u: any) => u.role?.trim().toUpperCase() === 'TEACHER'));
+            setClasses(c || []);
+            setRoutes(r || []);
+            setStudents((studs || []).filter((s: any) => s.has_paid_registration === 1));
+            setTeachers((allUsers || []).filter((u: any) => u.role?.trim().toUpperCase() === 'TEACHER'));
             if (c && c.length > 0) {
                 setSelectedClass(c[0].id.toString());
             }
@@ -121,6 +122,9 @@ const AdvisorPortal: React.FC = () => {
             } else {
                 setTermStructure([]);
             }
+          } catch (e) {
+            console.error('AdvisorPortal loadData error:', e);
+          }
         }
     };
 
@@ -131,7 +135,7 @@ const AdvisorPortal: React.FC = () => {
                 term: selectedTerm,
                 month: selectedSequence
             });
-            setSubjectStatuses(data);
+            setSubjectStatuses(data || []);
         }
     };
 

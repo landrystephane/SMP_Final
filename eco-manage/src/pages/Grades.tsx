@@ -271,7 +271,10 @@ const Grades: React.FC = () => {
     }
     const formattedGrades = Object.entries(grades)
         .filter(([key]) => {
-            const [, subjectId] = key.split('-');
+            const [studentId, subjectId] = key.split('-');
+            // Exclure les élèves non-inscrits et bloqués : le backend rejetterait toute la batch pour eux
+            const student = students.find((s: any) => s.id === parseInt(studentId));
+            if (!student || student.has_paid_registration === 0 || student.status === 'BLOCKED') return false;
             return subjects.some(s => s.id === parseInt(subjectId) && !s._readOnly);
         })
         .map(([key, scoreOrLetter]) => {
