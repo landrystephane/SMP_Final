@@ -429,6 +429,7 @@ const Users: React.FC = () => {
                         </div>
                     )}
 
+                    {!['FOUNDER', 'DIRECTOR'].includes(newUser.role) && (
                     <div className="space-y-2 pt-2 border-t border-white/5">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">{t('usr_module_access_label', 'Accès aux modules (laisser vide = accès complet selon le rôle)')}</label>
                         <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-white/5">
@@ -447,6 +448,7 @@ const Users: React.FC = () => {
                             ))}
                         </div>
                     </div>
+                    )}
 
                     <button className="btn-primary w-full py-5 mt-4">
                         <CheckCircle className="w-5 h-5 mr-3" />
@@ -729,6 +731,7 @@ const Users: React.FC = () => {
                           </div>
                       )}
 
+                      {!['FOUNDER', 'DIRECTOR'].includes(editingUser?.role) && (
                       <div className="space-y-2 pt-2 border-t border-white/5">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">{t('usr_module_access_label', 'Accès aux modules (laisser vide = accès complet selon le rôle)')}</label>
                           <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-white/5">
@@ -747,6 +750,7 @@ const Users: React.FC = () => {
                               ))}
                           </div>
                       </div>
+                      )}
 
                       <div className="pt-6 flex justify-end space-x-3">
                           <button type="button" onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-500 uppercase tracking-widest">{t('cancel')}</button>

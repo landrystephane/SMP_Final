@@ -337,7 +337,7 @@ const Layout: React.FC = () => {
               if (user?.role === 'SUPERADMIN' && item.hideForSuperAdmin) return false;
               if (item.key === 'mobile_access' && (window as any).electronAPI?.isWebMode) return false;
               if (user?.role !== 'SUPERADMIN' && disabledModules.includes(item.key)) return false;
-              if (user?.role !== 'SUPERADMIN' && myAllowedModules && myAllowedModules.length > 0 && !myAllowedModules.includes(item.key) && item.key !== 'dashboard' && item.key !== 'profile') return false;
+              if (!['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(user?.role || '') && myAllowedModules && myAllowedModules.length > 0 && !myAllowedModules.includes(item.key) && item.key !== 'dashboard' && item.key !== 'profile') return false;
               return hasRole(item.roles as any);
           }).map((item) => (
             <NavLink

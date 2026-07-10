@@ -2287,9 +2287,13 @@ handlers['db:updateUser'] = async (userToUpdate) => {
   const finalCivility = civility || existing.civility;
   const finalSection = section || existing.section;
   const finalGender = gender || existing.gender;
-  const finalAllowedModules = allowedModules !== undefined
-    ? ((allowedModules && allowedModules.length > 0) ? JSON.stringify(allowedModules) : null)
-    : existing.allowed_modules;
+  // FOUNDER and DIRECTOR always have full access — never restrict their modules
+  const targetRole = finalRole || existing.role;
+  const finalAllowedModules = ['FOUNDER', 'DIRECTOR'].includes(targetRole)
+    ? null
+    : allowedModules !== undefined
+      ? ((allowedModules && allowedModules.length > 0) ? JSON.stringify(allowedModules) : null)
+      : existing.allowed_modules;
 
   const updateSchoolId = currentUser?.role === 'SUPERADMIN' ? existing.school_id : sid;
   const transaction = db.transaction(() => {

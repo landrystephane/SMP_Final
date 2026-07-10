@@ -139,10 +139,15 @@ const SystemAdmin: React.FC = () => {
       }
 
       if (window.electronAPI) {
-          await window.electronAPI.addSchool({ ...newSchool });
-          setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '', requires_subject_code: 1, allow_founder_term_edit: 0, term_structure: '3_TERMS_2_SEQS' });
-          setIsAdding(false);
-          loadSchools();
+          try {
+              await window.electronAPI.addSchool({ ...newSchool });
+              setNewSchool({ name: '', address: '', contact_email: '', contact_phone: '', bp: '', motto: '', requires_subject_code: 1, allow_founder_term_edit: 0, term_structure: '3_TERMS_2_SEQS' });
+              setIsAdding(false);
+              loadSchools();
+              showNotification(`Établissement "${newSchool.name}" déployé avec succès !`, 'success');
+          } catch (err: any) {
+              showNotification(err.message || 'Erreur lors du déploiement', 'error');
+          }
       }
   };
 

@@ -5,6 +5,8 @@ export interface AppModule {
 
 export const AVAILABLE_MODULES: AppModule[] = [
   { key: 'students', label: 'Gestion des Élèves' },
+  { key: 'subjects', label: 'Matières' },
+  { key: 'classes', label: 'Classes' },
   { key: 'grades', label: 'Saisie des Notes' },
   { key: 'pedagogy_advisor', label: 'Conseiller Pédagogique' },
   { key: 'finance', label: 'Gestion Financière' },
@@ -19,4 +21,5 @@ export const AVAILABLE_MODULES: AppModule[] = [
   { key: 'messaging', label: 'Messagerie Interne' },
   { key: 'customization', label: 'Personnalisation' },
   { key: 'archives', label: 'Archives Annuelles' },
+  { key: 'sync', label: 'Synchronisation' },
 ];
