@@ -466,7 +466,9 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         const instDue: number | null = (payment as any).installment_due ?? null;
         const instPaidBefore: number = (payment as any).installment_paid_before ?? 0;
         const instPaidNow: number = payment.amount;
-        const instRemaining: number = instDue !== null ? Math.max(0, instDue - instPaidBefore - instPaidNow) : financials.balance;
+        // "Versé" = total cumulatif payé pour ce motif (avant + maintenant)
+        const instPaidTotal: number = instDue !== null ? instPaidBefore + instPaidNow : financials.totalPaid;
+        const instRemaining: number = instDue !== null ? Math.max(0, instDue - instPaidTotal) : financials.balance;
 
         const displayDue = instDue !== null ? instDue : financials.totalDue;
         const displayRemaining = instDue !== null ? instRemaining : financials.balance;
@@ -475,7 +477,7 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'normal');
         doc.text(isEn ? `Due: ${safeNum(displayDue)}` : `Dû: ${safeNum(displayDue)}`, 20, titleY + 35);
-        doc.text(isEn ? `Paid: ${safeNum(instPaidNow)}` : `Versé: ${safeNum(instPaidNow)}`, 80, titleY + 35);
+        doc.text(isEn ? `Paid: ${safeNum(instPaidTotal)}` : `Versé: ${safeNum(instPaidTotal)}`, 80, titleY + 35);
         doc.text(isEn ? `Balance: ${safeNum(displayRemaining)} FCFA` : `Reste: ${safeNum(displayRemaining)} FCFA`, 140, titleY + 35);
 
         const installmentLabel = payment.installment_name ? ` - ${payment.installment_name.toUpperCase()}` : '';

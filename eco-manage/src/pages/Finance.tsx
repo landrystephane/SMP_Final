@@ -561,13 +561,20 @@ const Finance: React.FC = () => {
                                     <td className="px-6 py-4 text-[10px] text-slate-500 font-black uppercase tracking-widest">{new Date(p.payment_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                                     <td className="px-6 py-4 text-right">
                                         <button
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const s = students.find(stud => stud.id === p.student_id);
                                                 const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id }, p.payment_type);
                                                 const user = JSON.parse(localStorage.getItem('user') || '{}');
                                                 const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
+                                                // Enrichir avec les infos de la tranche pour un reçu correct
+                                                let enrichedP = { ...p };
+                                                try {
+                                                    const info = await (window.electronAPI as any).getPaymentInstallmentInfo(p.id);
+                                                    enrichedP.installment_due = info.installmentDue ?? null;
+                                                    enrichedP.installment_paid_before = info.installmentPaidBefore ?? 0;
+                                                } catch(e) {}
                                                 // @ts-ignore
-                                                import('../utils/reports').then(m => m.generatePaymentReceipt(p, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials, activeSchool));
+                                                import('../utils/reports').then(m => m.generatePaymentReceipt(enrichedP, s || { last_name: p.last_name, first_name: p.first_name, matricule: 'N/A' }, financials, activeSchool));
                                             }}
                                             className="p-2.5 text-slate-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-xl transition-all"
                                             title={t('reprint_receipt')}

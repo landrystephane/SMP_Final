@@ -792,6 +792,38 @@ handlers['db:addPayment'] = async (payment) => {
 
 };
 
+handlers['db:getPaymentInstallmentInfo'] = async (paymentId) => {
+    const p = db.prepare('SELECT id, student_id, payment_type, installment_id, amount FROM payments WHERE id = ?').get(paymentId);
+    if (!p) return { installmentDue: null, installmentPaidBefore: 0 };
+
+    let installmentDue = null;
+    let installmentPaidBefore = 0;
+
+    if (p.installment_id) {
+        const st = db.prepare('SELECT class_id FROM students WHERE id = ?').get(p.student_id);
+        if (st) {
+            const instFee = db.prepare('SELECT amount FROM class_installment_fees WHERE installment_id = ? AND class_id = ?').get(p.installment_id, st.class_id);
+            installmentDue = instFee?.amount ?? null;
+        }
+        const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND installment_id = ? AND id != ?').get(p.student_id, p.installment_id, paymentId);
+        installmentPaidBefore = prevPaid.paid;
+    } else if (['Inscription', 'Transport', 'Examen'].includes(p.payment_type)) {
+        const st = db.prepare('SELECT class_id FROM students WHERE id = ?').get(p.student_id);
+        if (st) {
+            const feeConfig = db.prepare('SELECT * FROM tuition_fees WHERE class_id = ?').get(st.class_id);
+            if (feeConfig) {
+                if (p.payment_type === 'Inscription') installmentDue = feeConfig.registration_fee || 0;
+                else if (p.payment_type === 'Transport') installmentDue = feeConfig.transport_fee || 0;
+                else if (p.payment_type === 'Examen') installmentDue = feeConfig.exam_fee || 0;
+            }
+        }
+        const prevPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE student_id = ? AND payment_type = ? AND id != ?').get(p.student_id, p.payment_type, paymentId);
+        installmentPaidBefore = prevPaid.paid;
+    }
+
+    return { installmentDue, installmentPaidBefore };
+};
+
 handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositorName, includeTransport, includeExam }) => {
     if (!totalAmount || parseFloat(totalAmount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
     const sid = getActiveSchoolId();
