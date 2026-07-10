@@ -463,6 +463,7 @@ export const generatePaymentReceipt = (payment: any, student: any, financials: a
         doc.text(isEn ? `PURPOSE: ${purposeLabel}` : `MOTIF: ${purposeLabel}`, 110, titleY + 28);
 
         // Montants spécifiques à la tranche/motif si disponibles, sinon fallback par type
+        console.log('[RECU DEBUG reports] payment.installment_due =', (payment as any).installment_due, '| payment.amount =', payment.amount, '| type =', payment.payment_type);
         const instDue: number | null = (payment as any).installment_due ?? null;
         const instPaidBefore: number = (payment as any).installment_paid_before ?? 0;
         const instPaidNow: number = payment.amount;
