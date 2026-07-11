@@ -575,7 +575,9 @@ handlers['db:saveGrades'] = async (grades) => {
       }
 
       const existing = checkLock.get(g.student_id, g.subject_id, g.class_id, g.term, g.month);
-      if (existing && existing.locked === 1) throw new Error(`Note déjà verrouillée pour cet élève.`);
+      // Note déjà verrouillée : on l'ignore silencieusement (l'upsert WHERE locked=0 la laisse intact)
+      // Permet d'ajouter des notes pour de nouvelles matières sans bloquer les anciennes
+      if (existing && existing.locked === 1) continue;
 
       // 3. Mode A auto-conversion
       const classInfo = db.prepare('SELECT grading_scale_id FROM classes WHERE id = ?').get(g.class_id);
