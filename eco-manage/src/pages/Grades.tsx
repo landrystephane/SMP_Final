@@ -526,6 +526,11 @@ const Grades: React.FC = () => {
         showNotification(t('student_blocked_no_action', "Cet élève est bloqué. Aucune action n'est possible (y compris l'impression)."), "error");
         return;
     }
+    // Secrétaire : l'impression est conditionnée à la validation globale des bulletins par le fondateur
+    if (user?.role === 'SG' && !bulletinsValidated) {
+        showNotification(t('gr_print_blocked_global', "Impression bloquée. Le fondateur/directeur doit d'abord activer la Validation Globale des Bulletins."), "error");
+        return;
+    }
     if (window.electronAPI) {
         try {
             const classObj = classes.find(c => c.id.toString() === selectedClass);
@@ -893,8 +898,8 @@ const Grades: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => printStudentReport(student)}
-                            disabled={!isLocked || isStudentNotRegistered || isStudentBlocked}
-                            title={!isLocked ? t('gr_print_not_validated', "Les notes de la classe ne sont pas encore validées et verrouillées.") : ""}
+                            disabled={!isLocked || isStudentNotRegistered || isStudentBlocked || (user?.role === 'SG' && !bulletinsValidated)}
+                            title={!isLocked ? t('gr_print_not_validated', "Les notes de la classe ne sont pas encore validées et verrouillées.") : (user?.role === 'SG' && !bulletinsValidated ? t('gr_print_blocked_global', "Impression bloquée — validation globale requise par le fondateur.") : "")}
                             className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-amber-500 transition-all border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                               <FileText className="w-5 h-5" />

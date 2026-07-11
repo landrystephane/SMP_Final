@@ -177,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkActingStatus();
     
     window.addEventListener('sg_mode_changed', checkActingStatus);
-    const interval = setInterval(checkActingStatus, 30000);
+    const interval = setInterval(checkActingStatus, 8000);
     
     return () => {
         window.removeEventListener('sg_mode_changed', checkActingStatus);
