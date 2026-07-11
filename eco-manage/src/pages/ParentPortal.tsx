@@ -23,6 +23,7 @@ const ParentPortal: React.FC = () => {
     const [tuitionFees, setTuitionFees] = useState<any[]>([]);
     const [installments, setInstallments] = useState<any[]>([]);
     const [classInstallmentFees, setClassInstallmentFees] = useState<any[]>([]);
+    const [installmentDeadlines, setInstallmentDeadlines] = useState<any[]>([]);
     const [schools, setSchools] = useState<any[]>([]);
     const [classes, setClasses] = useState<any[]>([]);
     const [users, setUsers] = useState<any[]>([]);
@@ -32,6 +33,7 @@ const ParentPortal: React.FC = () => {
     const [ticketReceiver, setTicketReceiver] = useState('');
     // Timetable
     const [schedules, setSchedules] = useState<any[]>([]);
+    const [evaluationSchedules, setEvaluationSchedules] = useState<any[]>([]);
     const [subjects, setSubjects] = useState<any[]>([]);
     // Absence justification
     const [justifyingAbsence, setJustifyingAbsence] = useState<any | null>(null);
@@ -50,21 +52,25 @@ const ParentPortal: React.FC = () => {
                 const tf = await window.electronAPI.getTuitionFees(user.schoolId);
                 const insts = await window.electronAPI.getInstallments();
                 const cif = await window.electronAPI.getClassInstallmentFees(user.schoolId);
+                const dls = await (window.electronAPI as any).getInstallmentDeadlines(user.schoolId);
                 const schs = await window.electronAPI.getSchools();
                 const cls = await window.electronAPI.getClasses(user.schoolId);
                 const usrs = await window.electronAPI.getUsers(user.schoolId);
                 const msgs = await window.electronAPI.getParentMessages ? await window.electronAPI.getParentMessages({ schoolId: user.schoolId, userId: user.id }) : [];
                 const scheds = await window.electronAPI.getSchedules(user.schoolId);
+                const evalScheds = await (window.electronAPI as any).getEvaluationSchedules(user.schoolId);
                 const subs = await window.electronAPI.getSchoolSubjects(user.schoolId);
 
                 setTuitionFees(tf || []);
                 setInstallments(insts || []);
                 setClassInstallmentFees(cif || []);
+                setInstallmentDeadlines(dls || []);
                 setSchools(schs || []);
                 setClasses(cls || []);
                 setUsers(usrs || []);
                 setAnnouncements(msgs || []);
                 setSchedules(scheds || []);
+                setEvaluationSchedules(evalScheds || []);
                 setSubjects(subs || []);
 
                 const mySchool = schs.find((s: any) => s.id?.toString() === user.schoolId?.toString()) || schs[0];
@@ -343,12 +349,26 @@ const ParentPortal: React.FC = () => {
     if (!selectedChild) return null;
 
     const isNotRegistered = selectedChild.has_paid_registration === 0;
-    // Irrégulier uniquement si aucune pension n'a été versée ET pas de moratoire accordé.
-    // Un élève ayant payé au moins une tranche est considéré en règle (le solde restant s'affiche quand même).
-    const isIrregular = selectedChild.has_paid_registration === 1
-        && selectedChild.has_moratoire === 0
-        && (selectedChild.pension_paid || 0) === 0
-        && (selectedChild.pension_due || 0) > 0;
+    // Irrégulier si une date d'échéance est dépassée et que la tranche correspondante n'est pas entièrement payée.
+    // Un moratoire accordé lève le blocage.
+    const isIrregular = (() => {
+        if (selectedChild.has_moratoire === 1) return false;
+        if (selectedChild.has_paid_registration !== 1) return false;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const passedDeadlines = installmentDeadlines.filter((d: any) => new Date(d.deadline_date) < today);
+        if (passedDeadlines.length === 0) return false;
+        return passedDeadlines.some((deadline: any) => {
+            const classFee = classInstallmentFees.find((f: any) =>
+                f.installment_id === deadline.installment_id &&
+                f.class_id === selectedChild.class_id
+            );
+            if (!classFee || !classFee.amount) return false;
+            const paidForInstallment = (stats?.payments || [])
+                .filter((p: any) => p.installment_id === deadline.installment_id)
+                .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+            return paidForInstallment < classFee.amount;
+        });
+    })();
 
     const financials = getStudentFinancials(selectedChild);
     const termGrades = stats?.grades?.filter((g: any) => g.term === selectedTerm) || [];
@@ -656,6 +676,62 @@ const ParentPortal: React.FC = () => {
                                         })}
                                     </div>
                                 )}
+
+                                {/* Évaluations programmées */}
+                                {(() => {
+                                    const childEvals = evaluationSchedules
+                                        .filter((e: any) => e.class_id === selectedChild.class_id && ['APPROVED', 'FORCED_APPROVED', 'PENDING_TEACHER', 'PENDING_ADMIN'].includes(e.status || 'APPROVED'))
+                                        .sort((a: any, b: any) => (a.date || '').localeCompare(b.date || '') || (a.start_time || '').localeCompare(b.start_time || ''));
+                                    if (childEvals.length === 0) return null;
+                                    const fmtDate = (d: string) => {
+                                        try { return new Date(d).toLocaleDateString(i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR', { weekday: 'short', day: '2-digit', month: 'short' }); }
+                                        catch { return d; }
+                                    };
+                                    const today2 = new Date(); today2.setHours(0, 0, 0, 0);
+                                    const upcoming = childEvals.filter((e: any) => new Date(e.date) >= today2);
+                                    const past = childEvals.filter((e: any) => new Date(e.date) < today2);
+                                    const renderEval = (e: any) => {
+                                        const sub = subjects.find((s: any) => s.id === e.subject_id);
+                                        const isPast = new Date(e.date) < today2;
+                                        return (
+                                            <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isPast ? 'bg-slate-900/30 border-white/5 opacity-60' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                                <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${isPast ? 'bg-slate-800' : 'bg-rose-500/15'}`}>
+                                                    <span className={`text-[10px] font-black uppercase ${isPast ? 'text-slate-500' : 'text-rose-400'}`}>
+                                                        {e.date ? new Date(e.date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR', { month: 'short' }).toUpperCase() : '--'}
+                                                    </span>
+                                                    <span className={`text-base font-black leading-none ${isPast ? 'text-slate-400' : 'text-rose-300'}`}>
+                                                        {e.date ? new Date(e.date).getDate() : '--'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-xs font-black truncate ${isPast ? 'text-slate-400' : 'text-white'}`}>{sub?.name || e.subject_name || t('pp_unknown_subject', 'Matière inconnue')}</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold">{fmtDate(e.date)} · {e.start_time || '--'} – {e.end_time || '--'}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    };
+                                    return (
+                                        <div className="mt-4 space-y-3">
+                                            <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-2">
+                                                <span className="w-4 h-[1px] bg-rose-500/40 inline-block" />
+                                                {t('pp_eval_schedule', 'Évaluations programmées')}
+                                                <span className="w-4 h-[1px] bg-rose-500/40 inline-block" />
+                                            </p>
+                                            {upcoming.length > 0 && <div className="space-y-2">{upcoming.map(renderEval)}</div>}
+                                            {past.length > 0 && (
+                                                <details className="group">
+                                                    <summary className="text-[9px] font-black text-slate-600 uppercase tracking-widest cursor-pointer hover:text-slate-400 transition-colors list-none flex items-center gap-1">
+                                                        <span>{t('pp_past_evals', 'Évaluations passées')} ({past.length})</span>
+                                                    </summary>
+                                                    <div className="space-y-2 mt-2">{past.map(renderEval)}</div>
+                                                </details>
+                                            )}
+                                            {upcoming.length === 0 && past.length === 0 && (
+                                                <p className="text-center text-slate-500 text-xs font-black uppercase tracking-widest py-4">{t('pp_no_evals', 'Aucune évaluation programmée.')}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         );
                     })()}

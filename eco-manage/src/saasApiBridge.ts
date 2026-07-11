@@ -33,18 +33,28 @@ export const initSaaSBridge = () => {
             const finalUrl = `${API_BASE}${endpoint}${cacheBuster}`;
             
             const response = await fetch(finalUrl, config);
-            const data = await response.json();
-            
+
             if (response.status === 401) {
                 localStorage.removeItem('saas_token');
                 localStorage.removeItem('user');
                 window.location.href = '/login';
                 throw new Error('Session expirée');
             }
+
+            // Lire la réponse comme texte d'abord pour éviter un crash JSON si le serveur retourne du HTML
+            const text = await response.text();
+            let data: any;
+            try {
+                data = JSON.parse(text);
+            } catch(_) {
+                // Le serveur a retourné du HTML (probablement indisponible ou en cours de redémarrage)
+                throw new Error(`Serveur indisponible (${response.status}). Veuillez réessayer dans quelques secondes.`);
+            }
+
             if (!response.ok) {
                 throw new Error(data.error || 'Erreur réseau API');
             }
-            
+
             // On s'assure de renvoyer le même format que l'ancien IPC Electron
             return data;
         } catch (error: any) {

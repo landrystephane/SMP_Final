@@ -1136,8 +1136,9 @@ handlers['db:submitAbsenceJustification'] = async ({ attendanceId, message, atta
     if (teacherUserId) {
         const parentName = db.prepare('SELECT full_name FROM users WHERE id = ?').get(currentUser.id)?.full_name || 'Un parent';
         const absentDate = att.date ? new Date(att.date).toLocaleDateString('fr-FR') : att.date;
-        const notifMsg = `📋 JUSTIFICATION D'ABSENCE — ${parentName} a soumis une justification pour l'absence de ${att.first_name} ${att.last_name} le ${absentDate} (${att.hours_absent}h). Message : "${message.substring(0, 120)}${message.length > 120 ? '...' : ''}". Consultez l'onglet "Justifications" dans la page Présences.`;
-        db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'INFO')").run(sid, teacherUserId, notifMsg);
+        const notifMsg = `Justification d'absence — ${parentName} pour ${att.first_name} ${att.last_name} le ${absentDate} (${att.hours_absent}h) : "${message.substring(0, 120)}${message.length > 120 ? '...' : ''}"`;
+        const requestData = JSON.stringify({ justificationId: result.lastInsertRowid, attendanceId, studentName: `${att.first_name} ${att.last_name}`, date: att.date, parentMessage: message });
+        db.prepare("INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data) VALUES (?, ?, ?, 'ACTION_REQUIRED', 'ABSENCE_JUSTIFICATION', ?)").run(sid, teacherUserId, notifMsg, requestData);
     }
 
     return { success: true, justificationId: result.lastInsertRowid };
@@ -1173,7 +1174,7 @@ handlers['db:getAbsenceJustifications'] = async ({ status } = {}) => {
     return db.prepare(query).all(...params);
 };
 
-handlers['db:reviewAbsenceJustification'] = async ({ justificationId, decision, teacherResponse }) => {
+handlers['db:reviewAbsenceJustification'] = async ({ justificationId, decision, teacherResponse, notificationId }) => {
     const sid = getActiveSchoolId();
     const currentUser = session.getStore()?.user;
     if (!currentUser) throw new Error('Non authentifié.');
@@ -1192,10 +1193,17 @@ handlers['db:reviewAbsenceJustification'] = async ({ justificationId, decision, 
             db.prepare("UPDATE attendance SET hours_absent = 0, status = 'JUSTIFIED', notes = ? WHERE id = ?").run(`Justifié le ${new Date().toLocaleDateString('fr-FR')} par ${teacherName}`, justif.attendance_id);
         }
 
+        // Supprimer la notification ACTION_REQUIRED de l'enseignant (traitée)
+        if (notificationId) {
+            db.prepare("DELETE FROM notifications WHERE id = ? AND school_id = ?").run(notificationId, sid);
+        } else {
+            db.prepare("DELETE FROM notifications WHERE school_id = ? AND user_id = ? AND request_type = 'ABSENCE_JUSTIFICATION' AND json_extract(request_data, '$.justificationId') = ?").run(sid, currentUser.id, justificationId);
+        }
+
         const absentDate = att?.date ? new Date(att.date).toLocaleDateString('fr-FR') : '';
         const notifMsg = decision === 'APPROVED'
-            ? `✅ JUSTIFICATION ACCEPTÉE — La justification d'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été acceptée par ${teacherName}. L'absence (${att?.hours_absent || 0}h) a été retirée du dossier scolaire.${teacherResponse ? `\nMessage de l'enseignant : "${teacherResponse}"` : ''}`
-            : `❌ JUSTIFICATION REFUSÉE — La justification d'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été refusée par ${teacherName}.${teacherResponse ? `\nRaison : "${teacherResponse}"` : ''}\n\nVous pouvez soumettre une nouvelle justification.`;
+            ? `Justification acceptée — L'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été justifiée par ${teacherName}.${teacherResponse ? ` Message : "${teacherResponse}"` : ''}`
+            : `Justification refusée — La justification d'absence de ${student?.first_name} ${student?.last_name} du ${absentDate} a été refusée.${teacherResponse ? ` Raison : "${teacherResponse}"` : ''}`;
 
         db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, ?)").run(sid, justif.parent_user_id, notifMsg, decision === 'APPROVED' ? 'SUCCESS' : 'WARNING');
     });
@@ -2659,6 +2667,43 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
           if (!existing) {
             db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'WARNING')")
               .run(sid, userId, `Rappel : la période de saisie des notes se termine le ${periodEnd.value}. Il vous reste ${daysLeft} jour(s).`);
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  // Rappels d'échéance de paiement pour les parents
+  if (userRole === 'PARENT' && userId && sid) {
+    try {
+      const alertDays = db.prepare("SELECT value FROM settings WHERE key = ?").get(`s${sid}_alert_deadline_days`);
+      const threshold = alertDays ? parseInt(alertDays.value) : 7;
+      const deadlines = db.prepare('SELECT dl.*, i.name as installment_name FROM school_installment_deadlines dl JOIN installments i ON dl.installment_id = i.id WHERE dl.school_id = ?').all(sid);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().slice(0, 10);
+      // Trouver les enfants de ce parent
+      const parentUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+      if (parentUser) {
+        const parentStudents = db.prepare("SELECT s.id, s.first_name, s.last_name, s.class_id FROM students s WHERE s.school_id = ? AND (s.parent_contact = ? OR s.parent_email = ?)").all(sid, parentUser.username, parentUser.username);
+        for (const dl of deadlines) {
+          if (!dl.deadline_date) continue;
+          const deadline = new Date(dl.deadline_date); deadline.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+          if (daysLeft < 0 || daysLeft > threshold) continue;
+          for (const st of parentStudents) {
+            const classFee = db.prepare('SELECT amount FROM class_installment_fees WHERE class_id = ? AND installment_id = ?').get(st.class_id, dl.installment_id);
+            if (!classFee || !classFee.amount) continue;
+            const paid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE student_id = ? AND installment_id = ?').get(st.id, dl.installment_id);
+            if ((paid?.total || 0) >= classFee.amount) continue;
+            // Vérifier qu'on n'a pas déjà notifié aujourd'hui pour cet élève + cette tranche
+            const existing = db.prepare("SELECT id FROM notifications WHERE user_id = ? AND school_id = ? AND message LIKE ? AND DATE(created_at) = ?")
+              .get(userId, sid, `%${st.last_name}%${dl.installment_name}%`, todayStr);
+            if (!existing) {
+              const msg = daysLeft === 0
+                ? `Rappel : la tranche ${dl.installment_name} pour ${st.first_name} ${st.last_name} est due aujourd'hui.`
+                : `Rappel : la tranche ${dl.installment_name} pour ${st.first_name} ${st.last_name} est due dans ${daysLeft} jour(s) (${dl.deadline_date}).`;
+              db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'WARNING')").run(sid, userId, msg);
+            }
           }
         }
       }

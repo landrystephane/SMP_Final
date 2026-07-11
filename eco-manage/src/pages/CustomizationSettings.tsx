@@ -1110,7 +1110,7 @@ const CustomizationSettings: React.FC = () => {
                                 <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
                                     {headerImage ? (
                                         <div className="space-y-4">
-                                            <img src={headerImage} alt="Header" className="max-h-32 mx-auto rounded-lg shadow-lg" />
+                                            <img src={headerImage} alt="Header" className="w-full object-contain max-h-32 rounded-lg shadow-lg" />
                                             <button type="button" onClick={() => setHeaderImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_header')}</button>
                                         </div>
                                     ) : (

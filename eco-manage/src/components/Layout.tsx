@@ -123,6 +123,22 @@ const Layout: React.FC = () => {
               action === 'APPROVED' ? t('lay_expense_approved_short') : t('lay_expense_rejected_short'),
               action === 'APPROVED' ? "success" : "info"
           );
+      } else if (n.request_type === 'ABSENCE_JUSTIFICATION') {
+          const reqData = JSON.parse(n.request_data || '{}');
+          let teacherResponse: string | null = null;
+          if (action === 'REJECTED') {
+              teacherResponse = window.prompt(t('lay_justif_rejection_reason', 'Motif du refus (optionnel)') || 'Motif du refus (optionnel)');
+          }
+          await (window.electronAPI as any).reviewAbsenceJustification({
+              justificationId: reqData.justificationId,
+              decision: action,
+              teacherResponse: teacherResponse || null,
+              notificationId: notifId
+          });
+          showNotification(
+              action === 'APPROVED' ? t('lay_justif_approved', 'Justification acceptée — absence retirée du dossier') : t('lay_justif_rejected', 'Justification refusée'),
+              action === 'APPROVED' ? "success" : "info"
+          );
       } else {
           const duration = durations[notifId] || 24;
           await (window.electronAPI as any).resolveSystemRequest({

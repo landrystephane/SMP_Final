@@ -22,7 +22,20 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(bodyParser.json());
+// Limite augmentée pour supporter les images base64 (logos, filigranes, etc.)
+app.use(bodyParser.json({ limit: '20mb' }));
+app.use(bodyParser.urlencoded({ limit: '20mb', extended: true }));
+
+// Retourner du JSON pour les erreurs de parsing du body (413, syntaxe invalide...)
+app.use((err, req, res, next) => {
+    if (err.type === 'entity.too.large') {
+        return res.status(413).json({ error: 'Corps de la requête trop volumineux (max 20 Mo).' });
+    }
+    if (err.type === 'entity.parse.failed') {
+        return res.status(400).json({ error: 'JSON invalide dans la requête.' });
+    }
+    next(err);
+});
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -279,6 +292,13 @@ app.post('/api/saas/validate-payment', (req, res) => {
     }
 });
 
+
+// Gestionnaire d'erreur global pour toutes les routes /api (retourne toujours du JSON)
+app.use('/api', (err, req, res, next) => {
+    console.error('[API Uncaught Error]', err?.message || err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: err?.message || 'Erreur interne du serveur' });
+});
 
 // ==========================================
 // SERVEUR FRONTEND (React)

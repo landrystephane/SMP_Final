@@ -59,7 +59,7 @@ export const generateReportCard = (data: any) => {
     if (template?.watermark_image) {
         try {
             doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-            doc.addImage(template.watermark_image, 'PNG', 35, 80, 140, 140, undefined, 'FAST');
+            doc.addImage(template.watermark_image, template.watermark_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 35, 80, 140, 140, undefined, 'NONE');
             doc.setGState(new (doc as any).GState({ opacity: 1 }));
         } catch (e) {}
     }
@@ -69,8 +69,19 @@ export const generateReportCard = (data: any) => {
     // --- Header ---
     if (template?.header_image) {
         try {
-            doc.addImage(template.header_image, 'JPEG', 0, 0, 210, 38, undefined, 'FAST');
-            curY = 41;
+            const hImgFmt = template.header_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            // Calcul de la hauteur en préservant le ratio si on peut lire les dimensions
+            let hImgH = 35;
+            try {
+                const props = (doc as any).getImageProperties(template.header_image);
+                if (props && props.width && props.height) {
+                    hImgH = Math.round((props.height / props.width) * 210 * 10) / 10;
+                    if (hImgH < 20) hImgH = 20;
+                    if (hImgH > 60) hImgH = 60;
+                }
+            } catch(_) {}
+            doc.addImage(template.header_image, hImgFmt, 0, 0, 210, hImgH, undefined, 'NONE');
+            curY = hImgH + 3;
         } catch (e) {}
     } else {
         doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
@@ -353,7 +364,7 @@ export const generateReportCard = (data: any) => {
     // --- Signatures (3 columns, bordered) ---
     if (template?.footer_image) {
         try {
-            doc.addImage(template.footer_image, 'JPEG', 0, pageH - 45, 210, 45, undefined, 'FAST');
+            doc.addImage(template.footer_image, template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 0, pageH - 45, 210, 45, undefined, 'NONE');
         } catch (e) {}
     } else {
         const sigH = 13;
@@ -1252,7 +1263,12 @@ export const generateClassReportCards = (data: {
 
             // Header
             if (template?.header_image) {
-                try { doc.addImage(template.header_image, 'JPEG', 0, 0, 210, 38, undefined, 'FAST'); curY = 41; } catch(e) {}
+                try {
+                    const hImgFmt2 = template.header_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                    let hImgH2 = 35;
+                    try { const p = (doc as any).getImageProperties(template.header_image); if (p?.width && p?.height) { hImgH2 = Math.min(60, Math.max(20, Math.round((p.height / p.width) * 210 * 10) / 10)); } } catch(_) {}
+                    doc.addImage(template.header_image, hImgFmt2, 0, 0, 210, hImgH2, undefined, 'NONE'); curY = hImgH2 + 3;
+                } catch(e) {}
             } else {
                 doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
                 doc.setFont('helvetica', 'bold');
@@ -1518,7 +1534,7 @@ export const generateClassReportCards = (data: {
 
             // Signatures (3 columns, bordered)
             if (template?.footer_image) {
-                try { doc.addImage(template.footer_image, 'JPEG', 0, pageH - 45, 210, 45, undefined, 'FAST'); } catch(e) {}
+                try { doc.addImage(template.footer_image, template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 0, pageH - 45, 210, 45, undefined, 'NONE'); } catch(e) {}
             } else {
                 const sigH = 13, sig3W = cW / 3;
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
