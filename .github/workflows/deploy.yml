@@ -28,6 +28,9 @@ jobs:
         run: |
           set -e
 
+          # Fix ownership in case root created files during a previous manual fix
+          sudo chown -R deploy:deploy /var/www/saas
+
           # Backup database
           mkdir -p /var/opt/eco-hub-data/backups
           cp /var/opt/eco-hub-data/school.db \
