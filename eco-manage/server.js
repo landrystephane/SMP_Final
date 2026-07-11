@@ -21,6 +21,9 @@ initDb();
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Derrière nginx/proxy : faire confiance au X-Forwarded-For pour le rate limiter
+app.set('trust proxy', 1);
+
 app.use(cors());
 // Limite augmentée pour supporter les images base64 (logos, filigranes, etc.)
 app.use(bodyParser.json({ limit: '20mb' }));
@@ -43,6 +46,7 @@ const loginLimiter = rateLimit({
     message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false }
 });
 
 const apiLimiter = rateLimit({
@@ -51,6 +55,7 @@ const apiLimiter = rateLimit({
     message: { error: 'Trop de requêtes. Veuillez patienter.' },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false }
 });
 
 app.use('/api', apiLimiter);
