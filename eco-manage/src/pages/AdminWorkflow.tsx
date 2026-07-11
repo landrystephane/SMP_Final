@@ -24,7 +24,7 @@ const AdminWorkflow: React.FC = () => {
     start: '2026-04-20',
     end: '2026-05-15',
     active: true,
-    editingAllowed: true
+    editingAllowed: false
   });
 
   const loadData = async () => {
@@ -56,15 +56,15 @@ const AdminWorkflow: React.FC = () => {
         const endFromDb = await window.electronAPI.getSetting('period_end');
         const start = startFromDb || '2026-04-20';
         const end = endFromDb || '2026-05-15';
-        // !== 'false' so null (never set) defaults to allowed=true
-        let editingAllowed = (await window.electronAPI.getSetting('period_editing_allowed')) !== 'false';
-        if (endFromDb) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            if (new Date(endFromDb) < today) {
-                editingAllowed = false;
-            }
+        // Use the visible end date (DB or default) to decide lock state
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const periodExpired = end ? new Date(end) < today : false;
+        // === 'true' so null (never explicitly set) defaults to false (locked until explicitly opened)
+        let editingAllowed = (await window.electronAPI.getSetting('period_editing_allowed')) === 'true';
+        if (periodExpired) {
+            editingAllowed = false;
         }
-        // Always persist lock state so teachers can read it; only persist dates if they exist in DB
+        // Always persist lock state so teachers can read it; only persist dates if they came from DB
         await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: editingAllowed ? 'true' : 'false' });
         if (startFromDb) await window.electronAPI.setSetting({ key: 'period_start', value: startFromDb });
         if (endFromDb) await window.electronAPI.setSetting({ key: 'period_end', value: endFromDb });
