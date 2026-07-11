@@ -152,7 +152,7 @@ export const generateReportCard = (data: any) => {
 
     const syear = `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`;
     const fullName = `${student.last_name || ''} ${student.first_name || ''}`.trim();
-    const dob = student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('fr-FR') : '--';
+    const dob = (student.birth_date || student.date_of_birth) ? new Date(student.birth_date || student.date_of_birth).toLocaleDateString('fr-FR') : '--';
     const sex = student.gender === 'M' ? 'Masculin' : student.gender === 'F' ? 'Féminin' : '--';
 
     // Row 1: Année Scolaire | Nom et Prénom
@@ -1317,7 +1317,7 @@ export const generateClassReportCards = (data: {
 
             const syear = `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`;
             const fullName = `${student.last_name || ''} ${student.first_name || ''}`.trim();
-            const dob = student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('fr-FR') : '--';
+            const dob = (student.birth_date || student.date_of_birth) ? new Date(student.birth_date || student.date_of_birth).toLocaleDateString('fr-FR') : '--';
             const sex = student.gender === 'M' ? 'Masculin' : student.gender === 'F' ? 'Féminin' : '--';
 
             const r1c1 = 55;

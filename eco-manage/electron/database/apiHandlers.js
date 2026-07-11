@@ -1430,7 +1430,12 @@ handlers['db:removeSubjectFromClass'] = async ({ classId, subjectId }) => {
 
 handlers['db:getClasses'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
-  return db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
+  return db.prepare(`
+    SELECT c.*, u.full_name AS teacher_name, u.gender AS teacher_gender
+    FROM classes c
+    LEFT JOIN users u ON c.main_teacher_id = u.id
+    WHERE c.school_id = ?
+  `).all(sid);
 };
 
 handlers['db:addClass'] = async (classData) => {
