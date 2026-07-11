@@ -225,6 +225,13 @@ const Attendance: React.FC = () => {
       loadExistingAttendance();
   }, [selectedClass, currentDate, user, selectedSchedule]);
 
+  // Poll every 8s when locked so the page auto-unlocks after admin approval
+  useEffect(() => {
+      if (!isLocked || !selectedClass || !currentDate) return;
+      const id = setInterval(loadExistingAttendance, 8000);
+      return () => clearInterval(id);
+  }, [isLocked, selectedClass, currentDate, selectedSchedule]);
+
   useEffect(() => {
     const loadClasses = async () => {
       if (window.electronAPI) {

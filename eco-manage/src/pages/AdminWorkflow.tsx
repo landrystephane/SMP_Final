@@ -52,16 +52,22 @@ const AdminWorkflow: React.FC = () => {
         const allSet = (await window.electronAPI.getSettings()) || [];
           const locks = allSet.filter((s: any) => s.setting_key.startsWith('class_locked_') && s.setting_value === 'true').map((s: any) => s.setting_key);
           setLockedClasses(locks);
-          const start = await window.electronAPI.getSetting('period_start') || '2026-04-20';
-        const end = await window.electronAPI.getSetting('period_end') || '2026-05-15';
-        let editingAllowed = await window.electronAPI.getSetting('period_editing_allowed') === 'true';
-        if (editingAllowed && end) {
+          const startFromDb = await window.electronAPI.getSetting('period_start');
+        const endFromDb = await window.electronAPI.getSetting('period_end');
+        const start = startFromDb || '2026-04-20';
+        const end = endFromDb || '2026-05-15';
+        // !== 'false' so null (never set) defaults to allowed=true
+        let editingAllowed = (await window.electronAPI.getSetting('period_editing_allowed')) !== 'false';
+        if (endFromDb) {
             const today = new Date(); today.setHours(0, 0, 0, 0);
-            if (new Date(end) < today) {
+            if (new Date(endFromDb) < today) {
                 editingAllowed = false;
-                await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: 'false' });
             }
         }
+        // Always persist lock state so teachers can read it; only persist dates if they exist in DB
+        await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: editingAllowed ? 'true' : 'false' });
+        if (startFromDb) await window.electronAPI.setSetting({ key: 'period_start', value: startFromDb });
+        if (endFromDb) await window.electronAPI.setSetting({ key: 'period_end', value: endFromDb });
         const activeTerm = await window.electronAPI.getSetting('active_term') || '1';
         const activeSequence = await window.electronAPI.getSetting('active_sequence') || '';
         const activeId = activeSequence ? `${activeTerm}_${activeSequence}` : activeTerm;
