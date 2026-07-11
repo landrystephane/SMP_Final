@@ -170,11 +170,19 @@ export const generateReportCard = (data: any) => {
     const r3c1 = 50, r3c2 = 55;
     drawInfoCell(mL, curY + 2 * rowH, r3c1, 'Matricule : ', student.matricule || '--', true);
     drawInfoCell(mL + r3c1, curY + 2 * rowH, r3c2, 'Classe : ', classObj.name || '--', true);
-    const teacherGender = classObj.teacher_gender;
     const isEnSection = classObj.section === 'ANGLOPHONE';
-    const teacherPrefix = teacherGender
-        ? (isEnSection ? (teacherGender === 'M' ? 'Mr ' : 'Mrs ') : (teacherGender === 'M' ? 'M. ' : 'Mme '))
-        : (isEnSection ? '' : '');
+    const teacherCivility = classObj.teacher_civility;
+    const teacherGender = classObj.teacher_gender;
+    let teacherPrefix = '';
+    if (teacherCivility) {
+        teacherPrefix = teacherCivility.trim().endsWith('.') || teacherCivility.trim().length <= 4
+            ? teacherCivility.trim() + ' '
+            : teacherCivility.trim() + ' ';
+    } else if (teacherGender) {
+        teacherPrefix = isEnSection
+            ? (teacherGender === 'M' ? 'Mr ' : 'Mrs ')
+            : (teacherGender === 'M' ? 'M. ' : 'Mme ');
+    }
     const teacherDisplay = classObj.teacher_name ? `${teacherPrefix}${classObj.teacher_name}` : '--';
     drawInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, contentW - r3c1 - r3c2, isEnSection ? 'Teacher : ' : 'Enseignant(e) : ', teacherDisplay, false);
 
@@ -1330,7 +1338,14 @@ export const generateClassReportCards = (data: {
             const r3c1 = 50, r3c2 = 55;
             drawBulkInfoCell(mL, curY + 2 * rowH, r3c1, 'Matricule : ', student.matricule || '--', true);
             drawBulkInfoCell(mL + r3c1, curY + 2 * rowH, r3c2, 'Classe : ', classObj.name || '--', true);
-            drawBulkInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, cW - r3c1 - r3c2, 'Enseignant(e) : ', classObj.teacher_name || '--', false);
+            const bulkIsEn = classObj.section === 'ANGLOPHONE';
+            const bulkTCivility = classObj.teacher_civility;
+            const bulkTGender = classObj.teacher_gender;
+            let bulkTPrefix = '';
+            if (bulkTCivility) { bulkTPrefix = bulkTCivility.trim() + ' '; }
+            else if (bulkTGender) { bulkTPrefix = bulkIsEn ? (bulkTGender === 'M' ? 'Mr ' : 'Mrs ') : (bulkTGender === 'M' ? 'M. ' : 'Mme '); }
+            const bulkTeacherLabel = bulkIsEn ? 'Teacher : ' : 'Enseignant(e) : ';
+            drawBulkInfoCell(mL + r3c1 + r3c2, curY + 2 * rowH, cW - r3c1 - r3c2, bulkTeacherLabel, classObj.teacher_name ? `${bulkTPrefix}${classObj.teacher_name}` : '--', false);
             curY += gridTotalH + 3;
 
             // Grades table
