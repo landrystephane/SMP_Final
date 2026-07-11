@@ -343,9 +343,12 @@ const ParentPortal: React.FC = () => {
     if (!selectedChild) return null;
 
     const isNotRegistered = selectedChild.has_paid_registration === 0;
+    // Irrégulier uniquement si aucune pension n'a été versée ET pas de moratoire accordé.
+    // Un élève ayant payé au moins une tranche est considéré en règle (le solde restant s'affiche quand même).
     const isIrregular = selectedChild.has_paid_registration === 1
         && selectedChild.has_moratoire === 0
-        && (selectedChild.pension_paid || 0) < (selectedChild.pension_due || 0);
+        && (selectedChild.pension_paid || 0) === 0
+        && (selectedChild.pension_due || 0) > 0;
 
     const financials = getStudentFinancials(selectedChild);
     const termGrades = stats?.grades?.filter((g: any) => g.term === selectedTerm) || [];

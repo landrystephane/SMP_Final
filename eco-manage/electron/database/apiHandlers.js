@@ -2514,14 +2514,24 @@ handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) 
 };
 
 handlers['db:createNotification'] = async (notification) => {
-  const { user_id, message, type, school_id, request_type, request_data } = notification;
+  const { user_id, message, type, school_id, request_type, request_data, role } = notification;
   const sid = getActiveSchoolId(school_id);
 
   if (user_id) {
       return db.prepare('INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?)')
         .run(sid, user_id, message, type || 'INFO', request_type || null, request_data || null);
+  } else if (role) {
+      // Envoyer à tous les utilisateurs actifs de ce rôle dans l'école
+      const targets = db.prepare('SELECT id FROM users WHERE school_id = ? AND role = ? AND is_active = 1').all(sid, role);
+      const stmt = db.prepare('INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?)');
+      db.transaction(() => {
+          for (const u of targets) {
+              stmt.run(sid, u.id, message, type || 'INFO', request_type || null, request_data || null);
+          }
+      })();
+      return { success: true, count: targets.length };
   } else {
-      // If no user_id, it's a global/admin notification
+      // Notification globale école (sans destinataire précis)
       return db.prepare('INSERT INTO notifications (school_id, message, type, request_type, request_data) VALUES (?, ?, ?, ?, ?)')
         .run(sid, message, type || 'INFO', request_type || null, request_data || null);
   }
@@ -2632,6 +2642,29 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
     userRole = user?.role;
   }
 
+  // Rappel automatique de fin de période de saisie pour les enseignants
+  if (userRole === 'TEACHER' && userId && sid) {
+    try {
+      const periodEnd = db.prepare("SELECT value FROM settings WHERE key = ?").get(`s${sid}_period_end`);
+      const periodAllowed = db.prepare("SELECT value FROM settings WHERE key = ?").get(`s${sid}_period_editing_allowed`);
+      const alertDays = db.prepare("SELECT value FROM settings WHERE key = ?").get(`s${sid}_alert_grade_deadline_days`);
+      if (periodEnd && periodEnd.value && periodAllowed && periodAllowed.value === 'true') {
+        const endDate = new Date(periodEnd.value);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+        const threshold = alertDays ? parseInt(alertDays.value) : 3;
+        if (daysLeft >= 0 && daysLeft <= threshold) {
+          const todayStr = today.toISOString().slice(0, 10);
+          const existing = db.prepare("SELECT id FROM notifications WHERE user_id = ? AND school_id = ? AND message LIKE '%fin de saisie%' AND DATE(created_at) = ?").get(userId, sid, todayStr);
+          if (!existing) {
+            db.prepare("INSERT INTO notifications (school_id, user_id, message, type) VALUES (?, ?, ?, 'WARNING')")
+              .run(sid, userId, `Rappel : la période de saisie des notes se termine le ${periodEnd.value}. Il vous reste ${daysLeft} jour(s).`);
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
   if (userRole === 'SUPERADMIN') {
     return db.prepare(`
       SELECT * FROM notifications 
@@ -2639,15 +2672,17 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
       ORDER BY created_at DESC LIMIT 50
     `).all(sid, userId);
   } else if (userRole === 'FOUNDER' || userRole === 'DIRECTOR' || userRole === 'SG' || userRole === 'ADVISOR') {
+    // Ne montrer les ACTION_REQUIRED que si : pas de destinataire précis (globales) ou dirigées vers cet utilisateur
+    // Exclure les notifications ACTION_REQUIRED ciblant un autre utilisateur (ex: enseignant qui doit accepter une surveillance)
     return db.prepare(`
-      SELECT * FROM notifications 
+      SELECT * FROM notifications
       WHERE school_id = ? AND (
-        (type = 'ACTION_REQUIRED' AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION')) 
-        OR user_id = ? 
-        OR (user_id IS NULL AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION'))
+        (type = 'ACTION_REQUIRED' AND (user_id IS NULL OR user_id = ?) AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION'))
+        OR user_id = ?
+        OR (user_id IS NULL AND type != 'ACTION_REQUIRED' AND (request_type IS NULL OR request_type != 'SUBJECT_ACTIVATION'))
       )
       ORDER BY created_at DESC LIMIT 50
-    `).all(sid, userId);
+    `).all(sid, userId, userId);
   } else {
     return db.prepare(`
       SELECT * FROM notifications 
