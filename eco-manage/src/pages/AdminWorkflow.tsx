@@ -127,17 +127,24 @@ const AdminWorkflow: React.FC = () => {
 
   const handleUpdatePeriod = async () => {
     if (window.electronAPI) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const newEndDate = period.end ? new Date(period.end) : null;
+        // Sauvegarder une période future active → toujours activer la saisie
+        // (si 'false' en DB c'est un auto-lock de l'ancienne période, pas un choix manuel)
+        const finalEditingAllowed = (newEndDate && newEndDate >= today) ? true : period.editingAllowed;
+
         await window.electronAPI.setSetting({ key: 'period_start', value: period.start });
         await window.electronAPI.setSetting({ key: 'period_end', value: period.end });
-        await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: period.editingAllowed.toString() });
-        
+        await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: finalEditingAllowed.toString() });
+        setPeriod(prev => ({ ...prev, editingAllowed: finalEditingAllowed }));
+
         const parts = period.activeId.toString().split('_');
         const activeTerm = parts[0];
         const activeSequence = parts[1] || '';
         await window.electronAPI.setSetting({ key: 'active_term', value: activeTerm });
         await window.electronAPI.setSetting({ key: 'active_sequence', value: activeSequence });
-        
-        if (period.editingAllowed) {
+
+        if (finalEditingAllowed) {
             await window.electronAPI.createNotification({
                 school_id: user?.schoolId,
                 role: 'TEACHER',
