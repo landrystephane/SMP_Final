@@ -56,14 +56,11 @@ const AdminWorkflow: React.FC = () => {
         const endFromDb = await window.electronAPI.getSetting('period_end');
         const start = startFromDb || '2026-04-20';
         const end = endFromDb || '2026-05-15';
-        // Use the visible end date (DB or default) to decide lock state
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const periodExpired = end ? new Date(end) < today : false;
-        // === 'true' so null (never explicitly set) defaults to false (locked until explicitly opened)
-        let editingAllowed = (await window.electronAPI.getSetting('period_editing_allowed')) === 'true';
-        if (periodExpired) {
-            editingAllowed = false;
-        }
+        // Période expirée → toujours false ; période active → null/absent = true (ouvert par défaut)
+        const rawAllowed = await window.electronAPI.getSetting('period_editing_allowed');
+        let editingAllowed = periodExpired ? false : rawAllowed !== 'false';
         // Always persist lock state so teachers can read it; only persist dates if they came from DB
         await window.electronAPI.setSetting({ key: 'period_editing_allowed', value: editingAllowed ? 'true' : 'false' });
         if (startFromDb) await window.electronAPI.setSetting({ key: 'period_start', value: startFromDb });
@@ -451,7 +448,12 @@ const AdminWorkflow: React.FC = () => {
               </div>
               <div>
                 <label className="text-xs uppercase text-slate-500 font-bold">{t('end')}</label>
-                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.end} onChange={(e) => setPeriod(prev => ({...prev, end: e.target.value}))} />
+                <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white mt-1" value={period.end} onChange={(e) => {
+                    const newEnd = e.target.value;
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const isOpen = newEnd && new Date(newEnd) >= today;
+                    setPeriod(prev => ({ ...prev, end: newEnd, editingAllowed: !!isOpen }));
+                }} />
               </div>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
