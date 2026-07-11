@@ -621,9 +621,9 @@ const AdminWorkflow: React.FC = () => {
                     <div className="flex gap-2">
                         <button
                         onClick={() => handlePrintClassReportCards(c.id)}
-                        disabled={printingClassId === c.id || !isClassLockedRow}
+                        disabled={printingClassId === c.id || !isClassLockedRow || (user?.role === 'SG' && !bulletinsValidated)}
                         className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-xl font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : t('aw_term_report_card_title', 'Bulletin du trimestre actuel')}
+                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : (user?.role === 'SG' && !bulletinsValidated) ? t('gr_print_blocked_global', "Impression bloquée. Le fondateur/directeur doit d'abord activer la Validation Globale des Bulletins.") : t('aw_term_report_card_title', 'Bulletin du trimestre actuel')}
                         >
                         <Printer className="w-4 h-4" />
                         {printingClassId === c.id ? t('aw_printing', 'Impression...') : t('start_printing')}
@@ -631,9 +631,9 @@ const AdminWorkflow: React.FC = () => {
 
                         <button
                         onClick={() => handlePrintAnnualReportCards(c.id)}
-                        disabled={printingAnnualClassId === c.id || !isClassLockedRow}
+                        disabled={printingAnnualClassId === c.id || !isClassLockedRow || (user?.role === 'SG' && !bulletinsValidated)}
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-all shadow-md text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : t('aw_annual_report_card_title', 'Bulletin Annuel (Moyenne des trimestres)')}
+                        title={!isClassLockedRow ? t('gr_print_not_validated', 'Les notes de la classe ne sont pas encore validées et verrouillées.') : (user?.role === 'SG' && !bulletinsValidated) ? t('gr_print_blocked_global', "Impression bloquée. Le fondateur/directeur doit d'abord activer la Validation Globale des Bulletins.") : t('aw_annual_report_card_title', 'Bulletin Annuel (Moyenne des trimestres)')}
                         >
                         <Printer className="w-4 h-4" />
                         {printingAnnualClassId === c.id ? t('aw_printing', 'Impression...') : t('aw_annual_report_abbr', 'B. Annuel')}

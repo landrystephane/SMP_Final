@@ -628,7 +628,11 @@ handlers['db:unlockGrades'] = async ({ classId, term, month }) => {
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
-  return db.prepare('UPDATE grades SET locked = 0, validated = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
+  const result = db.prepare('UPDATE grades SET locked = 0, validated = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
+  // Réinitialiser le verrou de classe pour qu'AdminWorkflow reflète le bon statut
+  const settingKey = `class_locked_${parseInt(classId, 10)}_${parseInt(term, 10)}_${month}`;
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, 'false') ON CONFLICT(key) DO UPDATE SET value = 'false'").run(settingKey);
+  return result;
 };
 
 handlers['db:getClassSubjectsValidationStatus'] = async ({ classId, term, month }) => {

@@ -89,7 +89,7 @@ const RoleGuard: React.FC<{ roles: string[]; moduleKey?: string; children: React
   if (!user || (!roles.includes(user.role) && !(user.role === 'SG' && sgActing))) {
     return <Navigate to="/" replace />;
   }
-  if (isModuleDisabled) {
+  if (isModuleDisabled && !roles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
