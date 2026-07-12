@@ -107,7 +107,7 @@ export const generateReportCard = (data: any) => {
         if (school?.logo) {
             try {
                 const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                doc.addImage(school.logo, ext, pageW / 2 - 15, headerTopY, 30, 30, undefined, 'FAST');
+                doc.addImage(school.logo, ext, pageW / 2 - 15, headerTopY, 30, 30, undefined, 'NONE');
             } catch (e) {}
         }
         curY = headerTopY + 32;

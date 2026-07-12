@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert, X, Plus, Trash2, Save } from 'lucide-react';
+import { Palette, FileText, CheckCircle2, Layout, Sliders, Type, Edit3, ShieldAlert, X, Plus, Trash2, Save, ImageIcon, DollarSign, BookOpen, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
+
+type Tab = 'identite' | 'documents' | 'pedagogie' | 'finance' | 'baremes' | 'apercu';
 
 const CustomizationSettings: React.FC = () => {
     const { t } = useTranslation();
@@ -13,6 +15,7 @@ const CustomizationSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [activeTab, setActiveTab] = useState<Tab>('identite');
 
     // Settings fields
     const [schoolName, setSchoolName] = useState('');
@@ -90,7 +93,6 @@ const CustomizationSettings: React.FC = () => {
                     setSchoolBp(mySchool.bp || '');
                     setHonorRollThreshold(mySchool.honor_roll_threshold || 15.0);
 
-                    // Signatures pour les bulletins et reçus
                     setReceiptSigTitle(mySchool.receipt_sig_title || "Signature de l'Économe");
                     setBulletinSigLeft(mySchool.bulletin_sig_left || "L'ENSEIGNANT (TEACHER)");
                     setBulletinSigMiddle(mySchool.bulletin_sig_middle || "PARENT / GUARDIAN");
@@ -108,9 +110,7 @@ const CustomizationSettings: React.FC = () => {
                             { label: '13:00 - 15:00', start: '13:00', end: '15:00', isBreak: false },
                             { label: '15:00 - 17:00', start: '15:00', end: '17:00', isBreak: false }
                         ]);
-                    } catch(e) {
-                        setTimetableSlots([]);
-                    }
+                    } catch(e) { setTimetableSlots([]); }
 
                     setAllowFounderTermEdit(mySchool.allow_founder_term_edit || 0);
                     try {
@@ -119,9 +119,7 @@ const CustomizationSettings: React.FC = () => {
                             { id: 2, name: '2E TRIMESTRE' },
                             { id: 3, name: '3E TRIMESTRE' }
                         ]);
-                    } catch(e) {
-                        setEvaluationPeriods([]);
-                    }
+                    } catch(e) { setEvaluationPeriods([]); }
 
                     try {
                         setTermStructure(mySchool.term_structure ? JSON.parse(mySchool.term_structure) : [
@@ -129,11 +127,9 @@ const CustomizationSettings: React.FC = () => {
                             { term_id: 2, name: '2E TRIMESTRE', sequences: [{ id: 3, name: 'Séquence 3' }, { id: 4, name: 'Séquence 4' }] },
                             { term_id: 3, name: '3E TRIMESTRE', sequences: [{ id: 5, name: 'Séquence 5' }, { id: 6, name: 'Séquence 6' }] }
                         ]);
-                    } catch(e) {
-                        setTermStructure([]);
-                    }
+                    } catch(e) { setTermStructure([]); }
+
                     const template = window.electronAPI.getReportTemplate ? await window.electronAPI.getReportTemplate(mySchool.id) : null;
-                    
                     if (template) {
                         setHeaderImage(template.header_image || '');
                         setWatermarkImage(template.watermark_image || '');
@@ -141,7 +137,7 @@ const CustomizationSettings: React.FC = () => {
                         setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
                         setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
                     }
-                    
+
                     const insts = window.electronAPI.getInstallments ? await window.electronAPI.getInstallments() : [];
                     setInstallments(insts || []);
                     const deadls = window.electronAPI.getInstallmentDeadlines ? await window.electronAPI.getInstallmentDeadlines(mySchool.id) : [];
@@ -150,10 +146,7 @@ const CustomizationSettings: React.FC = () => {
                     try {
                         const scales = await (window.electronAPI as any).getGradingScales(mySchool.id);
                         setGradingScales(scales || []);
-                    } catch(e: any) {
-                        console.error('Failed to load grading scales', e);
-                        setGradingScales([]);
-                    }
+                    } catch(e: any) { setGradingScales([]); }
 
                     setBulletinUseCustom(mySchool.bulletin_pdf_use_custom || 0);
                     setBulletinTemplate(mySchool.bulletin_pdf_template || '');
@@ -171,7 +164,6 @@ const CustomizationSettings: React.FC = () => {
                     if (add) setAlertDeadlineDays(parseInt(add));
                     const agd = await window.electronAPI.getSetting('alert_grade_deadline_days');
                     if (agd) setAlertGradeDeadlineDays(parseInt(agd));
-
                     const currencySetting = await window.electronAPI.getSetting('currency');
                     if (currencySetting) setCurrency(currencySetting);
                 }
@@ -183,43 +175,28 @@ const CustomizationSettings: React.FC = () => {
         }
     };
 
-    useEffect(() => {
-        loadSettings();
-    }, [user]);
+    useEffect(() => { loadSettings(); }, [user]);
 
     const handleAddScaleOption = () => {
         setEditingScale({
             ...editingScale,
-            options: [
-                ...editingScale.options,
-                { symbol: '', min_range: 0, max_range: 20, numeric_equivalent: 10, description: '' }
-            ]
+            options: [...editingScale.options, { symbol: '', min_range: 0, max_range: 20, numeric_equivalent: 10, description: '' }]
         });
     };
 
     const handleRemoveScaleOption = (index: number) => {
-        setEditingScale({
-            ...editingScale,
-            options: editingScale.options.filter((_: any, i: number) => i !== index)
-        });
+        setEditingScale({ ...editingScale, options: editingScale.options.filter((_: any, i: number) => i !== index) });
     };
 
     const handleOptionChange = (index: number, field: string, value: any) => {
         const updatedOptions = [...editingScale.options];
-        updatedOptions[index] = {
-            ...updatedOptions[index],
-            [field]: value
-        };
-        setEditingScale({
-            ...editingScale,
-            options: updatedOptions
-        });
+        updatedOptions[index] = { ...updatedOptions[index], [field]: value };
+        setEditingScale({ ...editingScale, options: updatedOptions });
     };
 
     const handleSaveScale = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!window.electronAPI || !activeSchool) return;
-
         try {
             const res = await (window.electronAPI as any).saveGradingScale({
                 id: editingScale.id,
@@ -235,7 +212,6 @@ const CustomizationSettings: React.FC = () => {
                     numeric_equivalent: parseFloat(opt.numeric_equivalent) || 0
                 }))
             });
-
             if (res.error) throw new Error(res.error);
             showNotification(editingScale.id ? t('cust_scale_updated_success') : t('cust_scale_created_success'), "success");
             setIsEditingScale(false);
@@ -248,7 +224,6 @@ const CustomizationSettings: React.FC = () => {
     const handleDeleteScale = async (scaleId: number) => {
         if (!window.confirm(t('cust_confirm_delete_scale'))) return;
         if (!window.electronAPI) return;
-
         try {
             const res = await (window.electronAPI as any).deleteGradingScale(scaleId);
             if (res.error) throw new Error(res.error);
@@ -265,7 +240,6 @@ const CustomizationSettings: React.FC = () => {
         if (!activeSchool || !window.electronAPI) return;
         setSaving(true);
         setSuccess(false);
-
         try {
             const res = await window.electronAPI.updateSchoolSettings({
                 id: activeSchool.id,
@@ -299,9 +273,8 @@ const CustomizationSettings: React.FC = () => {
                 primaryColor,
                 secondaryColor
             });
-            if (res && res.error) {
-                throw new Error(res.error);
-            }
+
+            if (res && res.error) throw new Error(res.error);
 
             if (window.electronAPI.saveInstallmentDeadlines) {
                 await window.electronAPI.saveInstallmentDeadlines(activeSchool.id, installmentDeadlines);
@@ -334,928 +307,325 @@ const CustomizationSettings: React.FC = () => {
         }
         const reader = new FileReader();
         reader.onload = (event) => {
-            if (event.target?.result) {
-                setter(event.target.result as string);
-            }
+            if (event.target?.result) setter(event.target.result as string);
         };
         reader.readAsDataURL(file);
     };
 
     if (loading) return (
-        <div className="h-[50vh] flex flex-col items-center justify-center space-y-4">
+        <div className="h-[60vh] flex flex-col items-center justify-center space-y-4">
             <Palette className="w-12 h-12 text-amber-500 animate-pulse" />
-            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">{t('cust_loading_templates', 'Chargement des templates personnalisables...')}</p>
+            <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">{t('cust_loading_templates', 'Chargement...')}</p>
+        </div>
+    );
+
+    const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+        { id: 'identite', label: 'Identité', icon: <Sliders className="w-3.5 h-3.5" /> },
+        { id: 'documents', label: 'Documents', icon: <ImageIcon className="w-3.5 h-3.5" /> },
+        { id: 'pedagogie', label: 'Pédagogie', icon: <BookOpen className="w-3.5 h-3.5" /> },
+        { id: 'finance', label: 'Finance', icon: <DollarSign className="w-3.5 h-3.5" /> },
+        { id: 'baremes', label: 'Barèmes', icon: <Edit3 className="w-3.5 h-3.5" /> },
+        { id: 'apercu', label: 'Aperçu', icon: <Eye className="w-3.5 h-3.5" /> },
+    ];
+
+    const inputCls = "w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-slate-600";
+    const cardCls = "bg-slate-900/60 border border-white/5 rounded-2xl p-5 space-y-5";
+    const labelCls = "text-[10px] font-black text-slate-400 uppercase tracking-wider block";
+    const sectionTitle = (icon: React.ReactNode, label: string) => (
+        <div className="flex items-center gap-2.5 border-b border-white/5 pb-3 mb-5">
+            <span className="text-amber-500">{icon}</span>
+            <h2 className="text-sm font-black uppercase text-white tracking-wide">{label}</h2>
         </div>
     );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-            {/* Header Title */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/50 p-8 rounded-[32px] border border-white/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-                <div className="flex items-center space-x-5">
-                    <div className="w-16 h-16 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg">
-                        <Palette className="w-8 h-8" />
+        <form onSubmit={handleSave} className="space-y-0 animate-in fade-in duration-300">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/60 border border-white/5 rounded-2xl p-5 mb-4 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-12 h-12 shrink-0 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg">
+                        <Palette className="w-6 h-6" />
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">{t('cust_title', 'Personnalisation des Documents')}</h1>
-                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-                            {t('cust_subtitle', 'Configurez la charte graphique et les signatures de votre établissement')} ({activeSchool?.name})
-                        </p>
+                    <div className="min-w-0">
+                        <h1 className="text-lg font-black text-white uppercase tracking-tight truncate">{t('cust_title', 'Personnalisation')}</h1>
+                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest truncate">{activeSchool?.name}</p>
                     </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                    {success && (
+                        <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Enregistré
+                        </span>
+                    )}
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-amber-500 text-slate-950 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-amber-400 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                        <Save className="w-3.5 h-3.5" />
+                        {saving ? 'Sauvegarde...' : t('cust_save_config', 'Enregistrer')}
+                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                {/* Form settings */}
-                <form onSubmit={handleSave} className="xl:col-span-2 space-y-8">
-                    {/* School Identity Information Card */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
-                            <Sliders className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_school_identity', 'Identité de l\'Établissement')}</h2>
-                        </div>
+            {/* Tab navigation */}
+            <div className="flex gap-1 overflow-x-auto pb-1 mb-4 scrollbar-hide">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
+                            activeTab === tab.id
+                                ? 'bg-amber-500 text-slate-950 shadow-lg'
+                                : 'text-slate-400 bg-white/5 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        {tab.icon}
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_name', 'Nom de l\'École')}</label>
-                                <input
-                                    type="text"
-                                    value={schoolName}
-                                    onChange={(e) => setSchoolName(e.target.value)}
-                                    placeholder={t('cust_official_name_placeholder')}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+            {/* ── TAB: IDENTITÉ ── */}
+            {activeTab === 'identite' && (
+                <div className="space-y-4">
+                    <div className={cardCls}>
+                        {sectionTitle(<Sliders className="w-4 h-4" />, t('cust_school_identity', "Identité de l'Établissement"))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_school_name', "Nom de l'École")}</label>
+                                <input type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)}
+                                    placeholder={t('cust_official_name_placeholder')} className={inputCls} />
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_school_motto_label')}</label>
-                                <input
-                                    type="text"
-                                    value={schoolMotto}
-                                    onChange={(e) => setSchoolMotto(e.target.value)}
-                                    placeholder={t('cust_school_motto_placeholder')}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_school_motto_label')}</label>
+                                <input type="text" value={schoolMotto} onChange={e => setSchoolMotto(e.target.value)}
+                                    placeholder={t('cust_school_motto_placeholder')} className={inputCls} />
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_physical_address', 'Adresse Physique')}</label>
-                                <input
-                                    type="text"
-                                    value={schoolAddress}
-                                    onChange={(e) => setSchoolAddress(e.target.value)}
-                                    placeholder={t('cust_address_placeholder')}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_physical_address', 'Adresse Physique')}</label>
+                                <input type="text" value={schoolAddress} onChange={e => setSchoolAddress(e.target.value)}
+                                    placeholder={t('cust_address_placeholder')} className={inputCls} />
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_bp', 'Boîte Postale (B.P.)')}</label>
-                                <input
-                                    type="text"
-                                    value={schoolBp}
-                                    onChange={(e) => setSchoolBp(e.target.value)}
-                                    placeholder={t('cust_bp_placeholder')}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_bp', 'Boîte Postale')}</label>
+                                <input type="text" value={schoolBp} onChange={e => setSchoolBp(e.target.value)}
+                                    placeholder={t('cust_bp_placeholder')} className={inputCls} />
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_currency_label')}</label>
-                                <input
-                                    type="text"
-                                    value={currency}
-                                    onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                                    placeholder="Ex: FCFA, USD, EUR"
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_currency_label')}</label>
+                                <input type="text" value={currency} onChange={e => setCurrency(e.target.value.toUpperCase())}
+                                    placeholder="Ex: FCFA, USD, EUR" className={inputCls} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Visual Colors card */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
-                            <Palette className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_color_palette', 'Palette Graphique de l\'École')}</h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Primary color */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_primary_color', 'Couleur Primaire (Cadres et En-têtes)')}</label>
-                                <div className="flex items-center space-x-3 bg-slate-950 p-3.5 rounded-2xl border border-white/5">
-                                    <input
-                                        type="color"
-                                        value={primaryColor}
-                                        onChange={(e) => setPrimaryColor(e.target.value)}
-                                        className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={primaryColor}
-                                        onChange={(e) => setPrimaryColor(e.target.value)}
-                                        className="bg-transparent text-sm font-bold text-white uppercase tracking-wider outline-none w-full"
-                                    />
+                    <div className={cardCls}>
+                        {sectionTitle(<Palette className="w-4 h-4" />, t('cust_color_palette', 'Palette Graphique'))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_primary_color', 'Couleur Primaire')}</label>
+                                <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-2xl border border-white/5">
+                                    <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                                        className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border-none shrink-0" />
+                                    <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                                        className="bg-transparent text-sm font-bold text-white uppercase tracking-wider outline-none w-full" />
+                                    <div className="w-7 h-7 rounded-lg shrink-0 border border-white/10" style={{ backgroundColor: primaryColor }} />
                                 </div>
                             </div>
-
-                            {/* Secondary color */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_secondary_color', 'Couleur Secondaire (Accents et Textes clés)')}</label>
-                                <div className="flex items-center space-x-3 bg-slate-950 p-3.5 rounded-2xl border border-white/5">
-                                    <input
-                                        type="color"
-                                        value={secondaryColor}
-                                        onChange={(e) => setSecondaryColor(e.target.value)}
-                                        className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={secondaryColor}
-                                        onChange={(e) => setSecondaryColor(e.target.value)}
-                                        className="bg-transparent text-sm font-bold text-white uppercase tracking-wider outline-none w-full"
-                                    />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_secondary_color', 'Couleur Secondaire')}</label>
+                                <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-2xl border border-white/5">
+                                    <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)}
+                                        className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border-none shrink-0" />
+                                    <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)}
+                                        className="bg-transparent text-sm font-bold text-white uppercase tracking-wider outline-none w-full" />
+                                    <div className="w-7 h-7 rounded-lg shrink-0 border border-white/10" style={{ backgroundColor: secondaryColor }} />
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
 
-                    {/* Pedagogy & Timetable Settings */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
-                            <Layout className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pedagogy_settings')}</h2>
-                        </div>
+            {/* ── TAB: DOCUMENTS ── */}
+            {activeTab === 'documents' && (
+                <div className="space-y-4">
+                    {/* Images PDF */}
+                    <div className={cardCls}>
+                        {sectionTitle(<ImageIcon className="w-4 h-4" />, t('cust_pdf_template_title', 'Visuels du Bulletin PDF'))}
+                        <p className="text-xs text-slate-500 font-bold -mt-3 mb-2">{t('cust_hybrid_template_desc', 'Images haute résolution recommandées. Format : largeur image > 2000px pour un rendu net.')}</p>
 
-                        <div className="space-y-8">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_threshold')}</label>
-                                <input
-                                    type="number"
-                                    min="10"
-                                    max="20"
-                                    step="0.5"
-                                    value={honorRollThreshold}
-                                    onChange={(e) => setHonorRollThreshold(parseFloat(e.target.value))}
-                                    className="w-full md:w-1/3 bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
-                            </div>
-
-                            {/* Honor Roll Certificate customization (reuses primary/secondary colors above) */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_honor_title_text', 'Titre du Certificat (Tableau d\'Honneur)')}</label>
-                                <input
-                                    type="text"
-                                    value={honorTitleText}
-                                    onChange={(e) => setHonorTitleText(e.target.value)}
-                                    placeholder="TABLEAU D'HONNEUR"
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
-                                <p className="text-[10px] text-slate-500">{t('cust_honor_title_text_hint', "Le certificat utilise déjà la couleur primaire (bordure/nom) et la couleur secondaire (titre) définies ci-dessus.")}</p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_eval_periods_structure')}</label>
-                                    {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const newId = termStructure.length > 0 ? Math.max(...termStructure.map(t => t.term_id)) + 1 : 1;
-                                                setTermStructure([...termStructure, { term_id: newId, name: `Période ${newId}`, sequences: [] }]);
-                                            }}
-                                            className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
-                                        >
-                                            {t('cust_add_period')}
-                                        </button>
-                                    )}
-                                </div>
-
-                                {!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                    <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-500 text-xs font-bold flex items-start gap-2">
-                                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span>{t('cust_term_structure_readonly_warning')}</span>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    {termStructure.map((term, tIdx) => (
-                                        <div key={term.term_id} className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-slate-500 font-bold text-xs bg-white/5 px-3 py-1.5 rounded-lg">ID: {term.term_id}</span>
-                                                <input 
-                                                    type="text" 
-                                                    value={term.name} 
-                                                    disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
-                                                    onChange={(e) => {
-                                                        const newStruct = [...termStructure];
-                                                        newStruct[tIdx].name = e.target.value;
-                                                        setTermStructure(newStruct);
-                                                    }}
-                                                    placeholder={t('cust_term_name_placeholder')}
-                                                    className="flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-black text-white outline-none focus:border-amber-500 uppercase disabled:opacity-60"
-                                                />
-                                                {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newStruct = termStructure.filter((_, i) => i !== tIdx);
-                                                            setTermStructure(newStruct);
-                                                        }}
-                                                        className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
-                                                    >
-                                                        <ShieldAlert className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            <div className="pl-6 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('cust_associated_sequences')}</span>
-                                                    {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const allSeqIds = termStructure.flatMap(t => t.sequences.map((s: any) => s.id));
-                                                                const nextSeqId = allSeqIds.length > 0 ? Math.max(...allSeqIds) + 1 : 1;
-                                                                const newStruct = [...termStructure];
-                                                                newStruct[tIdx].sequences.push({ id: nextSeqId, name: `Séquence ${nextSeqId}`, weight: 1 });
-                                                                setTermStructure(newStruct);
-                                                            }}
-                                                            className="text-[8px] font-black text-amber-500 hover:underline uppercase tracking-wider"
-                                                        >
-                                                            {t('cust_add_sequence')}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                {term.sequences.map((seq: any, sIdx: number) => (
-                                                    <div key={seq.id} className="flex gap-3 items-center bg-slate-900/40 px-4 py-2.5 rounded-xl border border-white/5">
-                                                        <span className="text-slate-600 font-bold text-[10px]">SEQ {seq.id}</span>
-                                                        <input 
-                                                            type="text" 
-                                                            value={seq.name}
-                                                            disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
-                                                            onChange={(e) => {
-                                                                const newStruct = [...termStructure];
-                                                                newStruct[tIdx].sequences[sIdx].name = e.target.value;
-                                                                setTermStructure(newStruct);
-                                                            }}
-                                                            placeholder={t('cust_sequence_name_placeholder')}
-                                                            className="flex-1 bg-transparent border-b border-white/5 px-2 py-0.5 text-xs font-semibold text-slate-300 outline-none focus:border-amber-500 disabled:opacity-60"
-                                                        />
-                                                        <div className="flex items-center gap-1.5 border-l border-white/10 pl-3">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase">{t('cust_weight_label')}</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0.1"
-                                                                step="0.1"
-                                                                disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
-                                                                value={seq.weight !== undefined ? seq.weight : 1}
-                                                                onChange={(e) => {
-                                                                    const newStruct = [...termStructure];
-                                                                    newStruct[tIdx].sequences[sIdx].weight = parseFloat(e.target.value) || 1;
-                                                                    setTermStructure(newStruct);
-                                                                }}
-                                                                className="w-12 bg-slate-800 border border-white/10 rounded px-1.5 py-0.5 text-xs font-bold text-center text-white outline-none focus:border-amber-500 disabled:opacity-60"
-                                                            />
-                                                        </div>
-                                                        {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newStruct = [...termStructure];
-                                                                    newStruct[tIdx].sequences = term.sequences.filter((_: any, i: number) => i !== sIdx);
-                                                                    setTermStructure(newStruct);
-                                                                }}
-                                                                className="text-rose-500 hover:text-rose-400 p-1"
-                                                            >
-                                                                <X className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                {term.sequences.length === 0 && (
-                                                    <p className="text-[10px] text-slate-600 italic">{t('cust_no_sequence_in_period')}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {termStructure.length === 0 && (
-                                        <p className="text-center text-rose-500 text-sm font-bold italic py-4">{t('cust_no_eval_period_defined')}</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_installment_deadlines')}</label>
-                                <div className="space-y-3">
-                                    {installments.map(inst => {
-                                        const deadline = installmentDeadlines.find(d => d.installment_id === inst.id)?.deadline_date || '';
-                                        return (
-                                            <div key={inst.id} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
-                                                <span className="text-slate-500 font-bold text-xs w-32 bg-white/5 rounded-lg py-2 px-3">{inst.name}</span>
-                                                <input 
-                                                    type="date" 
-                                                    value={deadline}
-                                                    onChange={(e) => {
-                                                        const newDeadlines = [...installmentDeadlines];
-                                                        const existing = newDeadlines.find(d => d.installment_id === inst.id);
-                                                        if (existing) {
-                                                            existing.deadline_date = e.target.value;
-                                                        } else {
-                                                            newDeadlines.push({ installment_id: inst.id, deadline_date: e.target.value });
-                                                        }
-                                                        setInstallmentDeadlines(newDeadlines);
-                                                    }}
-                                                    className="w-full md:flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500"
-                                                />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_timetable_slots')}</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTimetableSlots([...timetableSlots, { label: 'Nouveau', start: '00:00', end: '00:00', isBreak: false }])}
-                                        className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all"
-                                    >
-                                        {t('cust_add_time_slot')}
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                                    {timetableSlots.map((slot, index) => (
-                                        <div key={index} className="flex flex-col md:flex-row gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
-                                            <input 
-                                                type="text" 
-                                                value={slot.label} 
-                                                onChange={(e) => {
-                                                    const newSlots = [...timetableSlots];
-                                                    newSlots[index].label = e.target.value;
-                                                    setTimetableSlots(newSlots);
-                                                }}
-                                                placeholder={t('cust_slot_label_placeholder')}
-                                                className="w-full md:w-1/3 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500"
-                                            />
-                                            <div className="flex items-center gap-2 w-full md:w-auto">
-                                                <input 
-                                                    type="time" 
-                                                    value={slot.start}
-                                                    onChange={(e) => {
-                                                        const newSlots = [...timetableSlots];
-                                                        newSlots[index].start = e.target.value;
-                                                        setTimetableSlots(newSlots);
-                                                    }}
-                                                    className="bg-transparent border-b border-white/10 px-2 py-1 text-sm text-slate-300 outline-none focus:border-amber-500"
-                                                />
-                                                <span className="text-slate-500">-</span>
-                                                <input 
-                                                    type="time" 
-                                                    value={slot.end}
-                                                    onChange={(e) => {
-                                                        const newSlots = [...timetableSlots];
-                                                        newSlots[index].end = e.target.value;
-                                                        setTimetableSlots(newSlots);
-                                                    }}
-                                                    className="bg-transparent border-b border-white/10 px-2 py-1 text-sm text-slate-300 outline-none focus:border-amber-500"
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between w-full md:w-auto md:ml-auto gap-4">
-                                                <label className="flex items-center gap-2 cursor-pointer">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={slot.isBreak}
-                                                        onChange={(e) => {
-                                                            const newSlots = [...timetableSlots];
-                                                            newSlots[index].isBreak = e.target.checked;
-                                                            setTimetableSlots(newSlots);
-                                                        }}
-                                                        className="w-4 h-4 rounded accent-amber-500"
-                                                    />
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('cust_is_break_label')}</span>
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newSlots = timetableSlots.filter((_, i) => i !== index);
-                                                        setTimetableSlots(newSlots);
-                                                    }}
-                                                    className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl transition-all"
-                                                >
-                                                    <ShieldAlert className="w-4 h-4" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                { label: t('cust_header_image_label', 'En-tête (bandeau haut)'), state: headerImage, setter: setHeaderImage, key: 'header' },
+                                { label: t('cust_watermark_label', 'Filigrane (fond)'), state: watermarkImage, setter: setWatermarkImage, key: 'watermark' },
+                                { label: t('cust_footer_image_label', 'Pied de page'), state: footerImage, setter: setFooterImage, key: 'footer' },
+                            ].map(({ label, state, setter, key }) => (
+                                <div key={key} className="space-y-2">
+                                    <label className={labelCls}>{label}</label>
+                                    <div className="border-2 border-dashed border-white/10 rounded-2xl p-4 text-center hover:border-amber-500/40 transition-all relative min-h-[120px] flex flex-col items-center justify-center">
+                                        {state ? (
+                                            <div className="w-full space-y-3">
+                                                <img src={state} alt={label} className="w-full object-contain max-h-24 rounded-lg" />
+                                                <button type="button" onClick={() => setter('')}
+                                                    className="w-full px-3 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-all">
+                                                    Supprimer
                                                 </button>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {timetableSlots.length === 0 && (
-                                        <p className="text-center text-slate-500 text-sm font-bold italic py-4">{t('cust_no_time_slot_defined')}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Échelles et Barèmes de Notation */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                            <div className="flex items-center space-x-3 text-amber-500">
-                                <Palette className="w-5 h-5" />
-                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_grading_scales_title')}</h2>
-                            </div>
-                            {!isEditingScale && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setEditingScale({
-                                            id: null,
-                                            name: '',
-                                            is_numerical: 1,
-                                            min_value: 0,
-                                            max_value: 20,
-                                            options: []
-                                        });
-                                        setIsEditingScale(true);
-                                    }}
-                                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-955 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    {t('cust_new_scale_btn')}
-                                </button>
-                            )}
-                        </div>
-
-                        {!isEditingScale ? (
-                            <div className="space-y-4">
-                                <p className="text-xs text-slate-400 leading-relaxed font-bold">
-                                    {t('cust_grading_scales_desc')}
-                                </p>
-                                {gradingScales.length === 0 ? (
-                                    <p className="text-center text-slate-500 text-xs font-bold py-6 italic">{t('cust_no_custom_scale')}</p>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {gradingScales.map((scale: any) => (
-                                            <div 
-                                                key={scale.id} 
-                                                onClick={() => {
-                                                    setEditingScale(scale);
-                                                    setIsEditingScale(true);
-                                                }}
-                                                className="p-5 bg-white/5 border border-white/5 hover:border-amber-500/30 rounded-2xl cursor-pointer transition-all hover:bg-white/[0.08]"
-                                            >
-                                                <h4 className="text-sm font-black text-white">{scale.name}</h4>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                    {t('cust_scale_type_label')} {scale.is_numerical ? t('grade_conversion') : t('literal_grade')}
-                                                </p>
-                                                {scale.is_numerical ? (
-                                                    <p className="text-[10px] text-amber-500 font-black mt-1">
-                                                        {t('cust_raw_range_label', { min: scale.min_value, max: scale.max_value })}
-                                                    </p>
-                                                ) : null}
-                                                <div className="flex flex-wrap gap-1 mt-3">
-                                                    {(scale.options || []).map((o: any, idx: number) => (
-                                                        <span key={idx} className="bg-slate-800 border border-white/5 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded" title={o.description}>
-                                                            {o.symbol} {scale.is_numerical ? `[${o.min_range}-${o.max_range}]` : `(=${o.numeric_equivalent})`}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <ImageIcon className="w-6 h-6 text-slate-600 mx-auto" />
+                                                <p className="text-[10px] font-bold text-slate-500">Cliquer pour importer</p>
+                                                <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setter)}
+                                                    className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="space-y-6 animate-in fade-in duration-200">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_scale_name_label')}</label>
-                                        <input
-                                            required
-                                            type="text"
-                                            value={editingScale.name}
-                                            onChange={(e) => setEditingScale({ ...editingScale, name: e.target.value })}
-                                            placeholder={t('cust_scale_name_placeholder')}
-                                            className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_scale_model_label')}</label>
-                                            <select
-                                                value={editingScale.is_numerical}
-                                                onChange={(e) => setEditingScale({ ...editingScale, is_numerical: parseInt(e.target.value) })}
-                                                className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                            >
-                                                <option value={1}>{t('cust_scale_numerical_opt')}</option>
-                                                <option value={0}>{t('cust_scale_literal_opt')}</option>
-                                            </select>
-                                        </div>
-
-                                        {parseInt(editingScale.is_numerical) === 1 && (
-                                            <>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_min_grade_label')}</label>
-                                                    <input
-                                                        type="number"
-                                                        step="0.1"
-                                                        value={editingScale.min_value}
-                                                        onChange={(e) => setEditingScale({ ...editingScale, min_value: e.target.value })}
-                                                        className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_max_grade_label')}</label>
-                                                    <input
-                                                        type="number"
-                                                        step="0.1"
-                                                        value={editingScale.max_value}
-                                                        onChange={(e) => setEditingScale({ ...editingScale, max_value: e.target.value })}
-                                                        className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                                    />
-                                                </div>
-                                            </>
                                         )}
                                     </div>
                                 </div>
-
-                                <div className="space-y-4 border-t border-white/5 pt-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-black uppercase text-white tracking-widest">{t('cust_scale_options_title')}</h3>
-                                        <button
-                                            type="button"
-                                            onClick={handleAddScaleOption}
-                                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border border-white/5"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" />
-                                            {t('cust_add_grade_btn')}
-                                        </button>
-                                    </div>
-
-                                    {editingScale.options.length === 0 ? (
-                                        <p className="text-center text-slate-500 text-xs font-bold py-4 italic">{t('cust_no_mention_added')}</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {editingScale.options.map((opt: any, idx: number) => (
-                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-950/50 border border-white/5 rounded-2xl items-center relative">
-                                                    <div>
-                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_symbol_label')}</label>
-                                                        <input
-                                                            required
-                                                            type="text"
-                                                            value={opt.symbol}
-                                                            onChange={(e) => handleOptionChange(idx, 'symbol', e.target.value.toUpperCase())}
-                                                            className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
-                                                        />
-                                                    </div>
-
-                                                    {parseInt(editingScale.is_numerical) === 1 ? (
-                                                        <>
-                                                            <div>
-                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_min_range_label')}</label>
-                                                                <input
-                                                                    required
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    value={opt.min_range}
-                                                                    onChange={(e) => handleOptionChange(idx, 'min_range', e.target.value)}
-                                                                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_max_range_label')}</label>
-                                                                <input
-                                                                    required
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    value={opt.max_range}
-                                                                    onChange={(e) => handleOptionChange(idx, 'max_range', e.target.value)}
-                                                                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
-                                                                />
-                                                            </div>
-                                                        </>
-                                                    ) : null}
-
-                                                    <div className={parseInt(editingScale.is_numerical) === 1 ? 'md:col-span-1' : 'md:col-span-2'}>
-                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">
-                                                            {parseInt(editingScale.is_numerical) === 1 ? t('cust_equivalent_avg_label') : t('cust_numeric_value_label')}
-                                                        </label>
-                                                        <input
-                                                            required
-                                                            type="number"
-                                                            step="0.1"
-                                                            value={opt.numeric_equivalent}
-                                                            onChange={(e) => handleOptionChange(idx, 'numeric_equivalent', e.target.value)}
-                                                            className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex items-center space-x-2 pt-4 md:pt-0">
-                                                        <div className="flex-1">
-                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_description_optional_label')}</label>
-                                                            <input
-                                                                type="text"
-                                                                value={opt.description}
-                                                                onChange={(e) => handleOptionChange(idx, 'description', e.target.value)}
-                                                                className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500"
-                                                            />
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveScaleOption(idx)}
-                                                            className="text-rose-500 hover:text-rose-400 bg-rose-500/10 p-2 rounded-xl mt-5"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex gap-4 border-t border-white/5 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsEditingScale(false)}
-                                        className="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition-colors"
-                                    >
-                                        {t('cust_back_cancel_btn')}
-                                    </button>
-
-                                    {editingScale.id && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteScale(editingScale.id)}
-                                            className="px-5 py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl font-bold hover:bg-rose-500/30 transition-colors"
-                                        >
-                                            {t('cust_delete_btn')}
-                                        </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveScale}
-                                        className="flex-1 py-3 bg-amber-500 text-slate-900 rounded-2xl font-bold hover:bg-amber-400 transition-colors flex justify-center items-center gap-2"
-                                    >
-                                        <Save className="w-5 h-5" />
-                                        {t('cust_save_btn')}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Official Headers */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
-                            <Type className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_ministerial_headers', 'En-têtes Ministériels / Subdivisions')}</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_french', 'Sous-titre En-tête (Français)')}</label>
-                                <input
-                                    type="text"
-                                    value={headerFrench}
-                                    onChange={(e) => setHeaderFrench(e.target.value)}
-                                    placeholder="Ex: MINISTÈRE DE L'ÉDUCATION DE BASE"
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                    {/* En-têtes ministériels */}
+                    <div className={cardCls}>
+                        {sectionTitle(<Type className="w-4 h-4" />, t('cust_ministerial_headers', 'En-têtes Ministériels'))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_header_french', 'Sous-titre Français')}</label>
+                                <input type="text" value={headerFrench} onChange={e => setHeaderFrench(e.target.value)}
+                                    placeholder="Ex: MINISTÈRE DE L'ÉDUCATION DE BASE" className={inputCls} />
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_english', 'Sous-titre En-tête (Anglais)')}</label>
-                                <input
-                                    type="text"
-                                    value={headerEnglish}
-                                    onChange={(e) => setHeaderEnglish(e.target.value)}
-                                    placeholder="Ex: MINISTRY OF BASIC EDUCATION"
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_header_english', 'Sous-titre Anglais')}</label>
+                                <input type="text" value={headerEnglish} onChange={e => setHeaderEnglish(e.target.value)}
+                                    placeholder="Ex: MINISTRY OF BASIC EDUCATION" className={inputCls} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Signatures block */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center space-x-3 text-amber-500 border-b border-white/5 pb-4">
-                            <Edit3 className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_signatories', 'Intitulés des Signataires Officiels')}</h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_left', 'Bloc Gauche (Bulletin)')}</label>
-                                <input
-                                    type="text"
-                                    value={bulletinSigLeft}
-                                    onChange={(e) => setBulletinSigLeft(e.target.value)}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3.5 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                    {/* Signatures */}
+                    <div className={cardCls}>
+                        {sectionTitle(<Edit3 className="w-4 h-4" />, t('cust_signatories', 'Signataires Officiels'))}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_sig_left', 'Bloc Gauche (Bulletin)')}</label>
+                                <input type="text" value={bulletinSigLeft} onChange={e => setBulletinSigLeft(e.target.value)} className={inputCls} />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_middle', 'Bloc Milieu (Bulletin)')}</label>
-                                <input
-                                    type="text"
-                                    value={bulletinSigMiddle}
-                                    onChange={(e) => setBulletinSigMiddle(e.target.value)}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3.5 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_sig_middle', 'Bloc Milieu (Bulletin)')}</label>
+                                <input type="text" value={bulletinSigMiddle} onChange={e => setBulletinSigMiddle(e.target.value)} className={inputCls} />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_right', 'Bloc Droit (Bulletin)')}</label>
-                                <input
-                                    type="text"
-                                    value={bulletinSigRight}
-                                    onChange={(e) => setBulletinSigRight(e.target.value)}
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3.5 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                                />
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_sig_right', 'Bloc Droit (Bulletin)')}</label>
+                                <input type="text" value={bulletinSigRight} onChange={e => setBulletinSigRight(e.target.value)} className={inputCls} />
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_sig_receipt', 'Signature sur les Reçus de Caisse')}</label>
-                            <input
-                                type="text"
-                                value={receiptSigTitle}
-                                onChange={(e) => setReceiptSigTitle(e.target.value)}
-                                className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                            />
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>{t('cust_sig_receipt', 'Signature sur les Reçus')}</label>
+                            <input type="text" value={receiptSigTitle} onChange={e => setReceiptSigTitle(e.target.value)} className={inputCls} />
                         </div>
                     </div>
 
-                    {/* Hybrid Report Template Configuration */}
-                    <div className="glass-card p-8 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] space-y-6 shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                            <div className="flex items-center space-x-3 text-amber-500">
-                                <Sliders className="w-5 h-5" />
-                                <h2 className="text-lg font-black uppercase text-white tracking-wide">{t('cust_pdf_template_title', 'Bulletin Personnalisé (Gabarit Hybride)')}</h2>
+                    {/* Tableau d'honneur */}
+                    <div className={cardCls}>
+                        {sectionTitle(<CheckCircle2 className="w-4 h-4" />, "Tableau d'Honneur")}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_honor_threshold', 'Seuil minimum (/ 20)')}</label>
+                                <input type="number" min="10" max="20" step="0.5" value={honorRollThreshold}
+                                    onChange={e => setHonorRollThreshold(parseFloat(e.target.value))} className={inputCls} />
                             </div>
-                        </div>
-
-                        <div className="space-y-8 animate-in fade-in duration-300">
-                            <div className="space-y-2 text-slate-400 text-xs font-bold">
-                                <p>{t('cust_hybrid_template_desc')}</p>
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_honor_title_text', 'Titre du Certificat')}</label>
+                                <input type="text" value={honorTitleText} onChange={e => setHonorTitleText(e.target.value)}
+                                    placeholder="TABLEAU D'HONNEUR" className={inputCls} />
                             </div>
-
-                            {/* Header Image Uploader */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_header_image_label')}</label>
-                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
-                                    {headerImage ? (
-                                        <div className="space-y-4">
-                                            <img src={headerImage} alt="Header" className="w-full object-contain max-h-32 rounded-lg shadow-lg" />
-                                            <button type="button" onClick={() => setHeaderImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_header')}</button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_wide_header_image')}</p>
-                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setHeaderImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
-                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Watermark Image Uploader */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_watermark_label')}</label>
-                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
-                                    {watermarkImage ? (
-                                        <div className="space-y-4">
-                                            <img src={watermarkImage} alt="Watermark" className="max-h-32 mx-auto rounded-lg shadow-lg opacity-50" />
-                                            <button type="button" onClick={() => setWatermarkImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_watermark')}</button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_watermark_image')}</p>
-                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setWatermarkImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
-                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Footer Image Uploader */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('cust_footer_image_label')}</label>
-                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-amber-500/50 transition-all relative">
-                                    {footerImage ? (
-                                        <div className="space-y-4">
-                                            <img src={footerImage} alt="Footer" className="max-h-32 mx-auto rounded-lg shadow-lg" />
-                                            <button type="button" onClick={() => setFooterImage('')} className="px-4 py-2 bg-rose-500/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500 hover:text-white transition-all">{t('cust_remove_footer')}</button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-400">{t('cust_select_footer_image')}</p>
-                                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setFooterImage)} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
-                                            <span className="inline-block bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest mt-2 hover:bg-white/10">{t('cust_browse', 'Parcourir')}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
                         </div>
                     </div>
 
-                    {/* Custom Bulletin Template */}
-                    <div className="glass-card p-6 space-y-6 border-slate-800">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 text-blue-400">
-                                <FileText className="w-6 h-6" />
-                                <h3 className="text-lg font-black uppercase tracking-tight">{t('custom_bulletin_title')}</h3>
+                    {/* Gabarit personnalisé complet */}
+                    <div className={cardCls}>
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+                            <div className="flex items-center gap-2.5">
+                                <FileText className="w-4 h-4 text-blue-400" />
+                                <h2 className="text-sm font-black uppercase text-white tracking-wide">{t('custom_bulletin_title', 'Gabarit Bulletin Personnalisé')}</h2>
                             </div>
-                            <div
-                                onClick={() => setBulletinUseCustom(bulletinUseCustom === 1 ? 0 : 1)}
-                                className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${bulletinUseCustom === 1 ? 'bg-blue-500' : 'bg-slate-700'}`}
-                            >
-                                <div className={`w-5 h-5 bg-white rounded-full transition-transform ${bulletinUseCustom === 1 ? 'translate-x-7' : ''}`} />
+                            <div onClick={() => setBulletinUseCustom(bulletinUseCustom === 1 ? 0 : 1)}
+                                className={`w-12 h-6 rounded-full p-0.5 cursor-pointer transition-all flex items-center ${bulletinUseCustom === 1 ? 'bg-blue-500 justify-end' : 'bg-slate-700 justify-start'}`}>
+                                <div className="w-5 h-5 bg-white rounded-full shadow" />
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500">{t('custom_bulletin_desc')}</p>
+                        <p className="text-xs text-slate-500 font-bold">{t('custom_bulletin_desc', 'Activez pour utiliser un gabarit d\'image en arrière-plan avec positionnement des données.')}</p>
 
                         {bulletinUseCustom === 1 && (
-                            <div className="space-y-6">
+                            <div className="space-y-5 mt-4">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('upload_blank_bulletin')}</label>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => handleImageUpload(e, setBulletinTemplate)}
-                                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-500/20 file:text-blue-400 file:font-bold file:text-xs file:cursor-pointer"
-                                    />
+                                    <label className={labelCls}>{t('upload_blank_bulletin', 'Image du gabarit vierge')}</label>
+                                    <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setBulletinTemplate)}
+                                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-500/20 file:text-blue-400 file:font-bold file:text-xs file:cursor-pointer" />
                                     {bulletinTemplate && (
-                                        <div className="mt-2 border border-slate-800 rounded-xl overflow-hidden max-h-[300px]">
-                                            <img src={bulletinTemplate} alt={t('preview_bulletin')} className="w-full object-contain" />
+                                        <div className="mt-2 border border-white/5 rounded-xl overflow-hidden max-h-[200px]">
+                                            <img src={bulletinTemplate} alt="Preview" className="w-full object-contain" />
                                         </div>
                                     )}
                                 </div>
 
                                 <div>
-                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4">{t('field_coordinates')}</h4>
-                                    <p className="text-[10px] text-slate-500 mb-4">{t('field_coordinates_desc')}</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-3">{t('field_coordinates', 'Coordonnées des champs (mm)')}</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {[
-                                            { key: 'studentName', label: t('field_student_name', 'Nom de l\'élève') },
-                                            { key: 'matricule', label: t('field_matricule', 'Matricule') },
-                                            { key: 'class', label: t('field_class', 'Classe') },
-                                            { key: 'year', label: t('field_year', 'Année scolaire') },
-                                            { key: 'section', label: t('field_section', 'Section') },
-                                            { key: 'absences', label: t('field_absences', 'Absences') },
-                                            { key: 'conduct', label: t('field_conduct', 'Conduite') },
-                                            { key: 'average', label: t('field_average', 'Moyenne') },
-                                            { key: 'rank', label: t('field_rank', 'Rang') },
-                                            { key: 'decision', label: t('field_decision', 'Décision') },
+                                            { key: 'studentName', label: 'Nom élève' },
+                                            { key: 'matricule', label: 'Matricule' },
+                                            { key: 'class', label: 'Classe' },
+                                            { key: 'year', label: 'Année scolaire' },
+                                            { key: 'section', label: 'Section' },
+                                            { key: 'absences', label: 'Absences' },
+                                            { key: 'conduct', label: 'Conduite' },
+                                            { key: 'average', label: 'Moyenne' },
+                                            { key: 'rank', label: 'Rang' },
+                                            { key: 'decision', label: 'Décision' },
                                         ].map(field => (
-                                            <div key={field.key} className="bg-slate-900/50 p-3 rounded-xl border border-slate-800 space-y-2">
-                                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{field.label}</label>
+                                            <div key={field.key} className="bg-slate-950 p-3 rounded-xl border border-white/5 space-y-2">
+                                                <label className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{field.label}</label>
                                                 <div className="flex gap-2">
                                                     <div className="flex-1">
                                                         <span className="text-[9px] text-slate-600 font-bold">X</span>
                                                         <input type="number" value={bulletinMapping[field.key]?.x || 0}
-                                                            onChange={(e) => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), x: parseInt(e.target.value) || 0}})}
-                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                                        />
+                                                            onChange={e => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), x: parseInt(e.target.value) || 0}})}
+                                                            className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                     </div>
                                                     <div className="flex-1">
                                                         <span className="text-[9px] text-slate-600 font-bold">Y</span>
                                                         <input type="number" value={bulletinMapping[field.key]?.y || 0}
-                                                            onChange={(e) => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), y: parseInt(e.target.value) || 0}})}
-                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                                        />
+                                                            onChange={e => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), y: parseInt(e.target.value) || 0}})}
+                                                            className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
-                                        <div className="bg-slate-900/50 p-3 rounded-xl border border-blue-500/20 space-y-2 md:col-span-2 lg:col-span-3">
-                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('field_table')}</label>
-                                            <div className="flex gap-4">
+                                        <div className="bg-slate-950 p-3 rounded-xl border border-blue-500/20 space-y-2 sm:col-span-2 lg:col-span-1">
+                                            <label className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Tableau des notes</label>
+                                            <div className="flex gap-2">
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">X</span>
                                                     <input type="number" value={bulletinMapping.table?.x || 20}
-                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), x: parseInt(e.target.value) || 20}})}
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                                    />
+                                                        onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), x: parseInt(e.target.value) || 20}})}
+                                                        className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">Y</span>
                                                     <input type="number" value={bulletinMapping.table?.y || 115}
-                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), y: parseInt(e.target.value) || 115}})}
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                                    />
+                                                        onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), y: parseInt(e.target.value) || 115}})}
+                                                        className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <span className="text-[9px] text-slate-600 font-bold">{t('field_width')}</span>
+                                                    <span className="text-[9px] text-slate-600 font-bold">Largeur</span>
                                                     <input type="number" value={bulletinMapping.table?.width || 170}
-                                                        onChange={(e) => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), width: parseInt(e.target.value) || 170}})}
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                                    />
+                                                        onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), width: parseInt(e.target.value) || 170}})}
+                                                        className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1264,88 +634,389 @@ const CustomizationSettings: React.FC = () => {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
 
-                    {/* Financial Alerts Configuration */}
-                    <div className="glass-card p-6 space-y-6 border-slate-800">
-                        <div className="flex items-center space-x-3 text-rose-400">
-                            <ShieldAlert className="w-6 h-6" />
-                            <h3 className="text-lg font-black uppercase tracking-tight">{t('financial_alerts_config')}</h3>
+            {/* ── TAB: PÉDAGOGIE ── */}
+            {activeTab === 'pedagogie' && (
+                <div className="space-y-4">
+                    {/* Structure des trimestres */}
+                    <div className={cardCls}>
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+                            <div className="flex items-center gap-2.5">
+                                <BookOpen className="w-4 h-4 text-amber-500" />
+                                <h2 className="text-sm font-black uppercase text-white tracking-wide">{t('cust_eval_periods_structure', 'Structure des Périodes')}</h2>
+                            </div>
+                            {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                <button type="button"
+                                    onClick={() => {
+                                        const newId = termStructure.length > 0 ? Math.max(...termStructure.map(t => t.term_id)) + 1 : 1;
+                                        setTermStructure([...termStructure, { term_id: newId, name: `Période ${newId}`, sequences: [] }]);
+                                    }}
+                                    className="px-3 py-1.5 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-wider rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center gap-1">
+                                    <Plus className="w-3 h-3" /> {t('cust_add_period', 'Ajouter période')}
+                                </button>
+                            )}
                         </div>
-                        <p className="text-xs text-slate-500">{t('financial_alerts_config_desc')}</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('unpaid_threshold')}</label>
-                                <p className="text-[10px] text-slate-600 italic">{t('unpaid_threshold_desc')}</p>
-                                <input
-                                    type="number" min="10" max="100" step="5"
-                                    value={alertUnpaidThreshold}
-                                    onChange={(e) => setAlertUnpaidThreshold(parseInt(e.target.value) || 50)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
-                                />
-                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_unpaid_alert', { value: alertUnpaidThreshold })}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('expense_ratio_threshold')}</label>
-                                <p className="text-[10px] text-slate-600 italic">{t('expense_ratio_threshold_desc')}</p>
-                                <input
-                                    type="number" min="10" max="100" step="5"
-                                    value={alertExpenseRatio}
-                                    onChange={(e) => setAlertExpenseRatio(parseInt(e.target.value) || 50)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
-                                />
-                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_expense_alert', { value: alertExpenseRatio })}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('deadline_alert_days')}</label>
-                                <p className="text-[10px] text-slate-600 italic">{t('cust_deadline_days_desc')}</p>
-                                <input type="number" min="1" max="30" value={alertDeadlineDays}
-                                    onChange={(e) => setAlertDeadlineDays(parseInt(e.target.value) || 7)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
-                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_deadline_alert', { value: alertDeadlineDays })}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t('grade_deadline_alert_days')}</label>
-                                <p className="text-[10px] text-slate-600 italic">{t('cust_grade_deadline_days_desc')}</p>
-                                <input type="number" min="1" max="15" value={alertGradeDeadlineDays}
-                                    onChange={(e) => setAlertGradeDeadlineDays(parseInt(e.target.value) || 3)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:ring-2 focus:ring-amber-500" />
-                                <p className="text-[10px] text-amber-500 font-bold">{t('cust_current_grade_deadline_alert', { value: alertGradeDeadlineDays })}</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Actions bar */}
-                    <div className="flex justify-end items-center gap-4">
-                        {success && (
-                            <span className="text-emerald-500 text-xs font-black uppercase tracking-widest flex items-center gap-2 animate-bounce">
-                                <CheckCircle2 className="w-4 h-4" /> {t('cust_changes_applied', 'Changements Appliqués !')}
-                            </span>
+                        {!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                            <div className="p-4 bg-rose-500/10 border-l-4 border-rose-500 rounded-xl text-rose-400 text-xs font-bold flex items-start gap-2 mb-4">
+                                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>{t('cust_term_structure_readonly_warning', 'La modification de la structure est réservée au Fondateur.')}</span>
+                            </div>
                         )}
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="bg-amber-500 text-slate-950 px-10 py-4.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                            {saving ? t('cust_saving', 'Sauvegarde...') : t('cust_save_config', 'Enregistrer la Configuration')}
-                        </button>
-                    </div>
-                </form>
 
-                {/* Real-time Dynamic Mockup Preview */}
-                <div className="space-y-8">
-                    <div className="sticky top-8 space-y-6">
-                        <div className="flex items-center space-x-2 text-slate-400 font-black text-xs uppercase tracking-widest">
-                            <Layout className="w-4 h-4 text-amber-500" />
-                            <span>{t('cust_live_preview', 'Aperçu du Rendu Direct')}</span>
+                        <div className="space-y-3">
+                            {termStructure.map((term, tIdx) => (
+                                <div key={term.term_id} className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-slate-500 font-bold text-[10px] bg-white/5 px-2.5 py-1 rounded-lg shrink-0">T{term.term_id}</span>
+                                        <input type="text" value={term.name}
+                                            disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                            onChange={e => { const s = [...termStructure]; s[tIdx].name = e.target.value; setTermStructure(s); }}
+                                            className="flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-black text-white outline-none focus:border-amber-500 uppercase disabled:opacity-50 min-w-0" />
+                                        {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                            <button type="button" onClick={() => setTermStructure(termStructure.filter((_, i) => i !== tIdx))}
+                                                className="text-rose-400 bg-rose-500/10 p-1.5 rounded-lg hover:bg-rose-500/20 transition-all shrink-0">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="pl-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('cust_associated_sequences', 'Séquences')}</span>
+                                            {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                                <button type="button" onClick={() => {
+                                                    const allSeqIds = termStructure.flatMap(t => t.sequences.map((s: any) => s.id));
+                                                    const nextSeqId = allSeqIds.length > 0 ? Math.max(...allSeqIds) + 1 : 1;
+                                                    const s = [...termStructure];
+                                                    s[tIdx].sequences.push({ id: nextSeqId, name: `Séquence ${nextSeqId}`, weight: 1 });
+                                                    setTermStructure(s);
+                                                }} className="text-[9px] font-black text-amber-500 hover:underline uppercase tracking-wider">
+                                                    + {t('cust_add_sequence', 'Ajouter')}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {term.sequences.length === 0 && (
+                                            <p className="text-[10px] text-slate-600 italic">{t('cust_no_sequence_in_period', 'Aucune séquence')}</p>
+                                        )}
+                                        {term.sequences.map((seq: any, sIdx: number) => (
+                                            <div key={seq.id} className="flex flex-wrap gap-2 items-center bg-white/5 px-3 py-2 rounded-xl border border-white/5">
+                                                <span className="text-slate-600 font-bold text-[10px] shrink-0">#{seq.id}</span>
+                                                <input type="text" value={seq.name}
+                                                    disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                                    onChange={e => { const s = [...termStructure]; s[tIdx].sequences[sIdx].name = e.target.value; setTermStructure(s); }}
+                                                    className="flex-1 min-w-[80px] bg-transparent border-b border-white/5 px-1 py-0.5 text-xs font-semibold text-slate-300 outline-none focus:border-amber-500 disabled:opacity-50" />
+                                                <div className="flex items-center gap-1.5 border-l border-white/10 pl-2 shrink-0">
+                                                    <span className="text-[9px] font-black text-slate-500">Coeff.</span>
+                                                    <input type="number" min="0.1" step="0.1"
+                                                        disabled={!(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN')}
+                                                        value={seq.weight !== undefined ? seq.weight : 1}
+                                                        onChange={e => { const s = [...termStructure]; s[tIdx].sequences[sIdx].weight = parseFloat(e.target.value) || 1; setTermStructure(s); }}
+                                                        className="w-12 bg-slate-800 border border-white/10 rounded px-1.5 py-0.5 text-xs font-bold text-center text-white outline-none focus:border-amber-500 disabled:opacity-50" />
+                                                </div>
+                                                {(allowFounderTermEdit === 1 || user?.role === 'SUPERADMIN') && (
+                                                    <button type="button" onClick={() => { const s = [...termStructure]; s[tIdx].sequences = term.sequences.filter((_: any, i: number) => i !== sIdx); setTermStructure(s); }}
+                                                        className="text-rose-400 p-0.5 hover:text-rose-300 shrink-0">
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            {termStructure.length === 0 && (
+                                <p className="text-center text-rose-400 text-sm font-bold italic py-4">{t('cust_no_eval_period_defined', 'Aucune période définie')}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Créneaux emploi du temps */}
+                    <div className={cardCls}>
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+                            <div className="flex items-center gap-2.5">
+                                <Layout className="w-4 h-4 text-amber-500" />
+                                <h2 className="text-sm font-black uppercase text-white tracking-wide">{t('cust_timetable_slots', 'Créneaux Emploi du Temps')}</h2>
+                            </div>
+                            <button type="button"
+                                onClick={() => setTimetableSlots([...timetableSlots, { label: 'Nouveau', start: '00:00', end: '00:00', isBreak: false }])}
+                                className="px-3 py-1.5 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-wider rounded-lg hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center gap-1">
+                                <Plus className="w-3 h-3" /> {t('cust_add_time_slot', 'Ajouter')}
+                            </button>
                         </div>
 
-                        {/* Bulletin Mockup Card */}
-                        <div className="bg-white p-6 rounded-[24px] shadow-2xl border border-slate-200 text-slate-900 space-y-4">
-                            <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
-                                {t('cust_official_report', 'Bulletin Scolaire Officiel')}
-                            </span>
+                        <div className="space-y-2">
+                            {timetableSlots.length === 0 && (
+                                <p className="text-center text-slate-500 text-sm font-bold italic py-4">{t('cust_no_time_slot_defined', 'Aucun créneau défini')}</p>
+                            )}
+                            {timetableSlots.map((slot, index) => (
+                                <div key={index} className="flex flex-wrap gap-2 items-center bg-slate-950 p-3 rounded-2xl border border-white/5">
+                                    <input type="text" value={slot.label}
+                                        onChange={e => { const s = [...timetableSlots]; s[index].label = e.target.value; setTimetableSlots(s); }}
+                                        placeholder={t('cust_slot_label_placeholder', 'Libellé')}
+                                        className="min-w-[100px] flex-1 bg-transparent border-b border-white/10 px-2 py-1 text-sm font-bold text-white outline-none focus:border-amber-500" />
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <input type="time" value={slot.start}
+                                            onChange={e => { const s = [...timetableSlots]; s[index].start = e.target.value; setTimetableSlots(s); }}
+                                            className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-slate-300 outline-none focus:border-amber-500 w-[5.5rem]" />
+                                        <span className="text-slate-600 shrink-0">–</span>
+                                        <input type="time" value={slot.end}
+                                            onChange={e => { const s = [...timetableSlots]; s[index].end = e.target.value; setTimetableSlots(s); }}
+                                            className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-slate-300 outline-none focus:border-amber-500 w-[5.5rem]" />
+                                    </div>
+                                    <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                                        <input type="checkbox" checked={slot.isBreak}
+                                            onChange={e => { const s = [...timetableSlots]; s[index].isBreak = e.target.checked; setTimetableSlots(s); }}
+                                            className="w-3.5 h-3.5 rounded accent-amber-500" />
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('cust_is_break_label', 'Récréation')}</span>
+                                    </label>
+                                    <button type="button" onClick={() => setTimetableSlots(timetableSlots.filter((_, i) => i !== index))}
+                                        className="text-rose-400 bg-rose-500/10 p-1.5 rounded-lg hover:bg-rose-500/20 transition-all shrink-0">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                            {/* Header */}
+            {/* ── TAB: FINANCE ── */}
+            {activeTab === 'finance' && (
+                <div className="space-y-4">
+                    {/* Échéances des tranches */}
+                    <div className={cardCls}>
+                        {sectionTitle(<DollarSign className="w-4 h-4" />, t('cust_installment_deadlines', 'Échéances des Tranches de Paiement'))}
+                        <p className="text-xs text-slate-500 font-bold -mt-3 mb-3">Les parents seront bloqués si la date est dépassée et la tranche non réglée.</p>
+                        {installments.length === 0 && (
+                            <p className="text-center text-slate-500 text-sm font-bold italic py-4">Aucune tranche configurée. Allez dans Finances → Tranches.</p>
+                        )}
+                        <div className="space-y-2">
+                            {installments.map(inst => {
+                                const deadline = installmentDeadlines.find(d => d.installment_id === inst.id)?.deadline_date || '';
+                                return (
+                                    <div key={inst.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-slate-950 p-4 rounded-2xl border border-white/5">
+                                        <span className="text-slate-300 font-black text-xs sm:w-44 bg-white/5 rounded-xl py-2 px-3 shrink-0">{inst.name}</span>
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Date limite</label>
+                                            <input type="date" value={deadline}
+                                                onChange={e => {
+                                                    const newDeadlines = [...installmentDeadlines];
+                                                    const existing = newDeadlines.find(d => d.installment_id === inst.id);
+                                                    if (existing) { existing.deadline_date = e.target.value; }
+                                                    else { newDeadlines.push({ installment_id: inst.id, deadline_date: e.target.value }); }
+                                                    setInstallmentDeadlines(newDeadlines);
+                                                }}
+                                                className="w-full bg-transparent border-b border-white/10 px-2 py-1.5 text-sm font-bold text-white outline-none focus:border-amber-500" />
+                                        </div>
+                                        {deadline && (
+                                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shrink-0 ${new Date(deadline) < new Date() ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                                {new Date(deadline) < new Date() ? 'Dépassée' : 'À venir'}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Alertes financières */}
+                    <div className={cardCls}>
+                        {sectionTitle(<ShieldAlert className="w-4 h-4" />, t('financial_alerts_config', 'Seuils d\'Alertes Financières'))}
+                        <p className="text-xs text-slate-500 font-bold -mt-3 mb-3">{t('financial_alerts_config_desc', 'Définissez les seuils qui déclenchent les alertes dans le tableau de bord.')}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                                { label: t('unpaid_threshold', 'Seuil impayés (%)'), desc: t('unpaid_threshold_desc', 'Alerte si X% des élèves ont des impayés'), val: alertUnpaidThreshold, set: setAlertUnpaidThreshold, min: 10, max: 100 },
+                                { label: t('expense_ratio_threshold', 'Ratio dépenses (%)'), desc: t('expense_ratio_threshold_desc', 'Alerte si les dépenses dépassent X% des recettes'), val: alertExpenseRatio, set: setAlertExpenseRatio, min: 10, max: 100 },
+                                { label: t('deadline_alert_days', 'Rappel échéance (jours)'), desc: t('cust_deadline_days_desc', 'Prévenir les parents X jours avant la date limite'), val: alertDeadlineDays, set: setAlertDeadlineDays, min: 1, max: 30 },
+                                { label: t('grade_deadline_alert_days', 'Rappel notes (jours)'), desc: t('cust_grade_deadline_days_desc', 'Alerter si la saisie n\'est pas terminée X jours avant la deadline'), val: alertGradeDeadlineDays, set: setAlertGradeDeadlineDays, min: 1, max: 15 },
+                            ].map(({ label, desc, val, set, min, max }) => (
+                                <div key={label} className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-2">
+                                    <label className={labelCls}>{label}</label>
+                                    <p className="text-[10px] text-slate-600 italic">{desc}</p>
+                                    <input type="number" min={min} max={max} step="1" value={val}
+                                        onChange={e => set(parseInt(e.target.value) || min)}
+                                        className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-2.5 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" />
+                                    <p className="text-[10px] text-amber-500 font-bold">Valeur actuelle : {val}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── TAB: BARÈMES ── */}
+            {activeTab === 'baremes' && (
+                <div className={cardCls}>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <Edit3 className="w-4 h-4 text-amber-500" />
+                            <h2 className="text-sm font-black uppercase text-white tracking-wide">{t('cust_grading_scales_title', 'Échelles de Notation')}</h2>
+                        </div>
+                        {!isEditingScale && (
+                            <button type="button"
+                                onClick={() => { setEditingScale({ id: null, name: '', is_numerical: 1, min_value: 0, max_value: 20, options: [] }); setIsEditingScale(true); }}
+                                className="px-3 py-1.5 bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 hover:bg-amber-400 transition-all">
+                                <Plus className="w-3 h-3" /> {t('cust_new_scale_btn', 'Nouveau barème')}
+                            </button>
+                        )}
+                    </div>
+
+                    {!isEditingScale ? (
+                        <div className="space-y-4">
+                            <p className="text-xs text-slate-400 font-bold">{t('cust_grading_scales_desc', 'Créez des barèmes personnalisés pour convertir les notes numériques en mentions.')}</p>
+                            {gradingScales.length === 0 ? (
+                                <p className="text-center text-slate-500 text-xs font-bold py-8 italic">{t('cust_no_custom_scale', 'Aucun barème créé')}</p>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {gradingScales.map((scale: any) => (
+                                        <div key={scale.id} onClick={() => { setEditingScale(scale); setIsEditingScale(true); }}
+                                            className="p-4 bg-white/5 border border-white/5 hover:border-amber-500/30 rounded-2xl cursor-pointer transition-all hover:bg-white/[0.08]">
+                                            <h4 className="text-sm font-black text-white">{scale.name}</h4>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                {scale.is_numerical ? t('grade_conversion', 'Conversion numérique') : t('literal_grade', 'Notes littérales')}
+                                            </p>
+                                            {scale.is_numerical && (
+                                                <p className="text-[10px] text-amber-500 font-black mt-1">{scale.min_value} – {scale.max_value} / 20</p>
+                                            )}
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {(scale.options || []).map((o: any, idx: number) => (
+                                                    <span key={idx} className="bg-slate-800 border border-white/5 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded" title={o.description}>
+                                                        {o.symbol}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-5 animate-in fade-in duration-200">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>{t('cust_scale_name_label', 'Nom du barème')}</label>
+                                <input required type="text" value={editingScale.name}
+                                    onChange={e => setEditingScale({ ...editingScale, name: e.target.value })}
+                                    placeholder={t('cust_scale_name_placeholder', 'Ex: Mentions Anglophones')} className={inputCls} />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className={labelCls}>{t('cust_scale_model_label', 'Type')}</label>
+                                    <select value={editingScale.is_numerical}
+                                        onChange={e => setEditingScale({ ...editingScale, is_numerical: parseInt(e.target.value) })}
+                                        className={inputCls}>
+                                        <option value={1}>{t('cust_scale_numerical_opt', 'Conversion numérique')}</option>
+                                        <option value={0}>{t('cust_scale_literal_opt', 'Notes littérales')}</option>
+                                    </select>
+                                </div>
+                                {parseInt(editingScale.is_numerical) === 1 && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <label className={labelCls}>{t('cust_min_grade_label', 'Note min')}</label>
+                                            <input type="number" step="0.1" value={editingScale.min_value}
+                                                onChange={e => setEditingScale({ ...editingScale, min_value: e.target.value })} className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className={labelCls}>{t('cust_max_grade_label', 'Note max')}</label>
+                                            <input type="number" step="0.1" value={editingScale.max_value}
+                                                onChange={e => setEditingScale({ ...editingScale, max_value: e.target.value })} className={inputCls} />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="space-y-3 border-t border-white/5 pt-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-black uppercase text-white tracking-widest">{t('cust_scale_options_title', 'Mentions / Symboles')}</h3>
+                                    <button type="button" onClick={handleAddScaleOption}
+                                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border border-white/5">
+                                        <Plus className="w-3.5 h-3.5" /> {t('cust_add_grade_btn', 'Ajouter')}
+                                    </button>
+                                </div>
+
+                                {editingScale.options.length === 0 ? (
+                                    <p className="text-center text-slate-500 text-xs font-bold py-4 italic">{t('cust_no_mention_added', 'Aucune mention ajoutée')}</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {editingScale.options.map((opt: any, idx: number) => (
+                                            <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-950 border border-white/5 rounded-2xl items-end">
+                                                <div>
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_symbol_label', 'Symbole')}</label>
+                                                    <input required type="text" value={opt.symbol}
+                                                        onChange={e => handleOptionChange(idx, 'symbol', e.target.value.toUpperCase())}
+                                                        className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500" />
+                                                </div>
+                                                {parseInt(editingScale.is_numerical) === 1 && (
+                                                    <>
+                                                        <div>
+                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_min_range_label', 'De')}</label>
+                                                            <input required type="number" step="0.01" value={opt.min_range}
+                                                                onChange={e => handleOptionChange(idx, 'min_range', e.target.value)}
+                                                                className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">{t('cust_max_range_label', 'À')}</label>
+                                                            <input required type="number" step="0.01" value={opt.max_range}
+                                                                onChange={e => handleOptionChange(idx, 'max_range', e.target.value)}
+                                                                className="w-full bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500" />
+                                                        </div>
+                                                    </>
+                                                )}
+                                                <div>
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1">
+                                                        {parseInt(editingScale.is_numerical) === 1 ? t('cust_equivalent_avg_label', 'Équiv. /20') : t('cust_numeric_value_label', 'Valeur num.')}
+                                                    </label>
+                                                    <div className="flex gap-1.5">
+                                                        <input required type="number" step="0.1" value={opt.numeric_equivalent}
+                                                            onChange={e => handleOptionChange(idx, 'numeric_equivalent', e.target.value)}
+                                                            className="flex-1 bg-slate-900 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-amber-500" />
+                                                        <button type="button" onClick={() => handleRemoveScaleOption(idx)}
+                                                            className="text-rose-400 bg-rose-500/10 p-2 rounded-xl hover:bg-rose-500/20 shrink-0">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 border-t border-white/5 pt-4">
+                                <button type="button" onClick={() => setIsEditingScale(false)}
+                                    className="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition-colors text-sm">
+                                    {t('cust_back_cancel_btn', 'Annuler')}
+                                </button>
+                                {editingScale.id && (
+                                    <button type="button" onClick={() => handleDeleteScale(editingScale.id)}
+                                        className="px-5 py-3 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-2xl font-bold hover:bg-rose-500/20 transition-colors text-sm">
+                                        {t('cust_delete_btn', 'Supprimer')}
+                                    </button>
+                                )}
+                                <button type="button" onClick={handleSaveScale}
+                                    className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-2xl font-black hover:bg-amber-400 transition-colors flex justify-center items-center gap-2 text-sm">
+                                    <Save className="w-4 h-4" /> {t('cust_save_btn', 'Enregistrer le barème')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── TAB: APERÇU ── */}
+            {activeTab === 'apercu' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Bulletin Mockup */}
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 text-slate-900 space-y-4">
+                        <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
+                            {t('cust_official_report', 'Bulletin Scolaire Officiel')}
+                        </span>
+                        {headerImage ? (
+                            <img src={headerImage} alt="En-tête" className="w-full object-contain max-h-16 rounded" />
+                        ) : (
                             <div className="flex justify-between items-start border-b border-slate-200 pb-3 text-[5px] font-bold text-slate-600">
                                 <div>
                                     <p>RÉPUBLIQUE DU CAMEROUN</p>
@@ -1358,70 +1029,83 @@ const CustomizationSettings: React.FC = () => {
                                     <p className="text-[5px] font-black text-slate-800 uppercase mt-0.5">{headerEnglish || "MINISTRY OF BASIC EDUCATION"}</p>
                                 </div>
                             </div>
+                        )}
+                        <div className="text-center py-1">
+                            <h3 className="text-xs font-black uppercase tracking-tight" style={{ color: primaryColor }}>{schoolName || 'NOM DE L\'ÉCOLE'}</h3>
+                            <p className="text-[5px] text-slate-400 font-bold italic mt-0.5">{schoolMotto || 'Devise de l\'école'}</p>
+                        </div>
+                        <div className="p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: `${primaryColor}15` }}>
+                            <span className="text-[7px] font-black uppercase tracking-wider text-slate-700">Moyenne Générale</span>
+                            <span className="text-xs font-black" style={{ color: primaryColor }}>15.75 <span className="text-[8px] text-slate-400">/ 20</span></span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-[5px] font-black uppercase tracking-wider text-slate-400">
+                            {[bulletinSigLeft, bulletinSigMiddle, bulletinSigRight].map((sig, i) => (
+                                <div key={i} className={i < 2 ? 'border-r border-slate-100 pr-1' : ''}>
+                                    <p className="font-bold text-slate-500 truncate">{sig}</p>
+                                    <p className="text-[4px] text-slate-300 italic mt-3">Signature</p>
+                                </div>
+                            ))}
+                        </div>
+                        {footerImage && <img src={footerImage} alt="Pied" className="w-full object-contain max-h-10 rounded mt-2" />}
+                    </div>
 
-                            {/* School Title dynamic color */}
-                            <div className="text-center py-1">
-                                <h3 className="text-xs font-black uppercase tracking-tight" style={{ color: primaryColor }}>
-                                    {schoolName || ''}
-                                </h3>
-                                <p className="text-[5px] text-slate-400 font-bold italic mt-0.5">{schoolMotto || 'Education for Excellence'}</p>
+                    {/* Reçu Mockup */}
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 text-slate-900 space-y-4 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: `${secondaryColor}20` }} />
+                        <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
+                            {t('cust_receipt_badge', 'Reçu Financier')}
+                        </span>
+                        <h4 className="text-center text-xs font-black uppercase tracking-widest border-b border-slate-100 pb-3" style={{ color: primaryColor }}>
+                            Reçu de Paiement
+                        </h4>
+                        <div className="space-y-1.5 text-[7px] text-slate-600">
+                            <div className="flex justify-between border-b border-slate-100 pb-1">
+                                <span className="font-black">Montant versé</span>
+                                <span className="font-black text-slate-900">75 000 {currency}</span>
                             </div>
-
-                            {/* Grade summary row */}
-                            <div className="p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: `${primaryColor}10` }}>
-                                <span className="text-[7px] font-black uppercase tracking-wider text-slate-700">{t('general_average_label', 'Moyenne Générale')}</span>
-                                <span className="text-xs font-black" style={{ color: primaryColor }}>15.75 <span className="text-[8px] text-slate-400">/ 20</span></span>
-                            </div>
-
-                            {/* Signatures mockup */}
-                            <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-[5px] font-black uppercase tracking-wider text-slate-400">
-                                <div className="border-r border-slate-100 pr-1">
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigLeft || t('cust_sig_left_default', "L'ENSEIGNANT")}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
-                                </div>
-                                <div className="border-r border-slate-100 pr-1">
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigMiddle || t('cust_sig_middle_default', "PARENT")}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
-                                </div>
-                                <div>
-                                    <p className="font-bold text-slate-500 truncate">{bulletinSigRight || t('cust_sig_right_default', "LE DIRECTEUR")}</p>
-                                    <p className="text-[4px] text-slate-300 italic mt-3">{t('cust_signature', 'Signature')}</p>
-                                </div>
+                            <div className="flex justify-between border-b border-slate-100 pb-1">
+                                <span className="font-black">Motif</span>
+                                <span className="font-black text-slate-900">2e Tranche Pension</span>
                             </div>
                         </div>
+                        <div className="text-right text-[5px] font-black uppercase tracking-wider text-slate-400 pt-2">
+                            <p className="font-bold text-slate-600 truncate">{receiptSigTitle}</p>
+                            <p className="text-[4px] text-slate-300 italic mt-4">Cachet & Signature</p>
+                        </div>
+                    </div>
 
-                        {/* Receipt Mockup Card */}
-                        <div className="bg-white p-6 rounded-[24px] shadow-2xl border border-slate-200 text-slate-900 space-y-4 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: `${secondaryColor}15` }} />
-                            <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest block w-max">
-                                {t('cust_receipt_badge', 'Reçu Financier de Caisse')}
-                            </span>
-
-                            <h4 className="text-center text-xs font-black uppercase tracking-widest border-b border-slate-100 pb-3" style={{ color: primaryColor }}>
-                                {t('cust_receipt_title', 'Reçu de Paiement')}
-                            </h4>
-
-                            <div className="space-y-1.5 text-[7px] text-slate-600">
-                                <div className="flex justify-between border-b border-slate-100 pb-1">
-                                    <span className="font-black">{t('cust_receipt_amount', 'Montant versé')}</span>
-                                    <span className="font-black text-slate-900">75 000 FCFA</span>
-                                </div>
-                                <div className="flex justify-between border-b border-slate-100 pb-1">
-                                    <span className="font-black">{t('cust_receipt_reason', 'Motif')}</span>
-                                    <span className="font-black text-slate-900">{t('cust_receipt_reason_val', '2e Tranche Pension')}</span>
+                    {/* Info palette */}
+                    <div className="md:col-span-2 bg-slate-900/60 border border-white/5 rounded-2xl p-5">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Palette de couleurs active</p>
+                        <div className="flex flex-wrap gap-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg border border-white/10" style={{ backgroundColor: primaryColor }} />
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase">Primaire</p>
+                                    <p className="text-xs font-black text-white">{primaryColor}</p>
                                 </div>
                             </div>
-
-                            {/* Receipt Signature */}
-                            <div className="text-right text-[5px] font-black uppercase tracking-wider text-slate-400 pt-2">
-                                <p className="font-bold text-slate-600 truncate">{receiptSigTitle || t('cust_receipt_sig_default', "L'Économe / Bursar")}</p>
-                                <p className="text-[4px] text-slate-300 italic mt-4">{t('cust_stamp_sig', 'Cachet & Signature')}</p>
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg border border-white/10" style={{ backgroundColor: secondaryColor }} />
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase">Secondaire</p>
+                                    <p className="text-xs font-black text-white">{secondaryColor}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Save button — visible sur tous les onglets sauf via le header */}
+            <div className="flex justify-end mt-6 pb-6">
+                <button type="submit" disabled={saving}
+                    className="bg-amber-500 text-slate-950 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-amber-400 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
+                    <Save className="w-4 h-4" />
+                    {saving ? t('cust_saving', 'Sauvegarde...') : t('cust_save_config', 'Enregistrer la Configuration')}
+                </button>
             </div>
-        </div>
+        </form>
     );
 };
 
