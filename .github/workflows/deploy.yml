@@ -29,7 +29,8 @@ jobs:
           set -e
 
           # Fix ownership in case root created files during a previous manual fix
-          sudo chown -R deploy:deploy /var/www/saas
+          sudo chown -R deploy:deploy /var/www/saas 2>/dev/null || true
+          sudo rm -rf /var/www/saas/dist /var/www/saas/electron 2>/dev/null || rm -rf /var/www/saas/dist /var/www/saas/electron
 
           # Backup database
           mkdir -p /var/opt/eco-hub-data/backups
@@ -37,8 +38,6 @@ jobs:
             /var/opt/eco-hub-data/backups/school_pre_deploy_$(date +%Y%m%d_%H%M).db 2>/dev/null || true
 
           # Copy built assets and server files
-          rm -rf /var/www/saas/dist
-          rm -rf /var/www/saas/electron
           cp -r eco-manage/dist            /var/www/saas/dist
           cp    eco-manage/server.js       /var/www/saas/server.js
           cp    eco-manage/package.json    /var/www/saas/package.json
