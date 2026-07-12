@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, BookOpen, GraduationCap, LayoutDashboard,
-  LogOut, Wallet, Building2, Briefcase, Calendar, 
-  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award, MessageCircle
+  LogOut, Wallet, Building2, Briefcase, Calendar,
+  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award, MessageCircle, Search
 } from 'lucide-react';
 import ErrorBoundary from './ErrorBoundary';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -18,6 +18,7 @@ const Layout: React.FC = () => {
 
   const [schoolName, setSchoolName] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [navSearch, setNavSearch] = useState('');
   const [isSgActing, setIsSgActing] = useState(false);
   const [disabledModules, setDisabledModules] = useState<string[]>([]);
   const [myAllowedModules, setMyAllowedModules] = useState<string[] | null>(null);
@@ -348,37 +349,74 @@ const Layout: React.FC = () => {
           </div>
         </div>
 
+        {/* Barre de recherche modules */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-xl px-3 py-2 focus-within:border-amber-500/50 transition-all">
+            <Search className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <input
+              type="text"
+              value={navSearch}
+              onChange={e => setNavSearch(e.target.value)}
+              placeholder={t('nav_search_placeholder', 'Rechercher un module...')}
+              className="bg-transparent text-xs font-bold text-white placeholder:text-slate-600 outline-none w-full"
+            />
+            {navSearch && (
+              <button onClick={() => setNavSearch('')} className="text-slate-500 hover:text-white transition-all shrink-0">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto min-h-0 custom-scrollbar">
-          {menuItems.filter(item => {
+          {(() => {
+            const filtered = menuItems.filter(item => {
               if (user?.role === 'SUPERADMIN' && item.hideForSuperAdmin) return false;
               if (item.key === 'mobile_access' && (window as any).electronAPI?.isWebMode) return false;
               if (user?.role !== 'SUPERADMIN' && disabledModules.includes(item.key)) return false;
               if (!['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(user?.role || '') && myAllowedModules && myAllowedModules.length > 0 && !myAllowedModules.includes(item.key) && item.key !== 'dashboard' && item.key !== 'profile') return false;
-              return hasRole(item.roles as any);
-          }).map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={() => setIsSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center px-5 py-3.5 rounded-2xl transition-all text-xs font-black uppercase tracking-widest border border-transparent ${
-                  isActive
-                    ? 'bg-amber-500 text-slate-950 shadow-2xl shadow-amber-500/20 border-amber-400/50 scale-[1.02]'
-                    : 'text-slate-500 hover:bg-white/5 hover:text-white'
-                }`
+              if (!hasRole(item.roles as any)) return false;
+              if (navSearch.trim()) {
+                const label = (t(item.key) || item.key.replace(/_/g, ' ')).toLowerCase();
+                return label.includes(navSearch.trim().toLowerCase());
               }
-            >
-              <item.icon className="w-5 h-5 mr-4 opacity-70 relative" />
-              <div className="flex-1 flex justify-between items-center">
-                  <span>{t(item.key) || item.key.replace('_', ' ')}</span>
+              return true;
+            });
+            if (filtered.length === 0 && navSearch.trim()) {
+              return (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <Search className="w-6 h-6 text-slate-700" />
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest text-center">
+                    {t('nav_no_result', 'Aucun module trouvé')}
+                  </p>
+                </div>
+              );
+            }
+            return filtered.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => { setIsSidebarOpen(false); setNavSearch(''); }}
+                className={({ isActive }) =>
+                  `flex items-center px-5 py-3.5 rounded-2xl transition-all text-xs font-black uppercase tracking-widest border border-transparent ${
+                    isActive
+                      ? 'bg-amber-500 text-slate-950 shadow-2xl shadow-amber-500/20 border-amber-400/50 scale-[1.02]'
+                      : 'text-slate-500 hover:bg-white/5 hover:text-white'
+                  }`
+                }
+              >
+                <item.icon className="w-5 h-5 mr-4 opacity-70 relative" />
+                <div className="flex-1 flex justify-between items-center">
+                  <span>{t(item.key) || item.key.replace(/_/g, ' ')}</span>
                   {item.key === 'tickets' && unreadTicketsCount > 0 && (
-                      <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/20">
-                          {unreadTicketsCount}
-                      </span>
+                    <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/20">
+                      {unreadTicketsCount}
+                    </span>
                   )}
-              </div>
-            </NavLink>
-          ))}
+                </div>
+              </NavLink>
+            ));
+          })()}
         </nav>
 
         <div className="p-6 border-t border-white/5 bg-slate-900/20 space-y-2">
