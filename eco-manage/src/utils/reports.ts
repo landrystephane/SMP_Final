@@ -64,6 +64,102 @@ export const generateReportCard = (data: any) => {
         } catch (e) {}
     }
 
+    // --- Custom template path (bulletin PDF personnalisé) ---
+    if (school?.bulletin_pdf_use_custom === 1 && school?.bulletin_pdf_template) {
+        try {
+            const tplFmt = school.bulletin_pdf_template.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(school.bulletin_pdf_template, tplFmt, 0, 0, 210, 297, undefined, 'NONE');
+        } catch (err) {}
+
+        let mapping: any = {};
+        try {
+            mapping = typeof school.bulletin_pdf_mapping === 'string'
+                ? JSON.parse(school.bulletin_pdf_mapping)
+                : (school.bulletin_pdf_mapping || {});
+        } catch (e) {}
+
+        const drawCustomText = (text: string, field: string, defaultX: number, defaultY: number, size = 9, bold = false) => {
+            const coord = mapping[field] || { x: defaultX, y: defaultY };
+            if (coord.x === undefined || coord.y === undefined) return;
+            doc.setFontSize(size);
+            doc.setFont('helvetica', bold ? 'bold' : 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(text, Number(coord.x), Number(coord.y), { align: coord.align || 'left' });
+        };
+
+        drawCustomText(`${student.last_name} ${student.first_name}`, 'studentName', 80, 80, 10, true);
+        drawCustomText(student.matricule, 'matricule', 80, 87, 9);
+        drawCustomText(`${classObj.name}${classObj.code ? ' (' + classObj.code + ')' : ''}`, 'class', 80, 94, 9);
+        drawCustomText(`${new Date().getFullYear() - 1}/${new Date().getFullYear()}`, 'year', 175, 80, 9);
+        drawCustomText(classObj.section, 'section', 175, 87, 9);
+
+        const totalAbsenceSingle = attendance.reduce((acc: number, cur: any) => acc + (cur.hours_absent || 0), 0);
+        drawCustomText(`${totalAbsenceSingle} H`, 'absences', 25, 195, 9);
+        drawCustomText(calculateAttendanceObservations(totalAbsenceSingle), 'conduct', 25, 202, 9);
+
+        if (!isNursery && validatedGrades.length > 0) {
+            const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
+            const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + (Number(g.coefficient) || 1), 0);
+            const avg = totalPoints / (totalCoef || 1);
+            drawCustomText(avg.toFixed(2), 'average', 120, 195, 10, true);
+            drawCustomText(`${rank || '--'} / ${totalStudents || '--'}`, 'rank', 120, 202, 10, true);
+            const decision = avg >= 10
+                ? (isEn ? 'SATISFACTORY WORK' : 'TRAVAIL SATISFAISANT')
+                : (isEn ? 'SUSTAINED EFFORTS REQUIRED' : 'EFFORTS SOUTENUS REQUIS');
+            drawCustomText(decision, 'decision', 120, 209, 9, true);
+        } else if (!isNursery) {
+            drawCustomText('--', 'average', 120, 195, 10, true);
+            drawCustomText(`-- / ${totalStudents || '--'}`, 'rank', 120, 202, 10, true);
+            drawCustomText(isEn ? 'PENDING VALIDATION' : 'EN ATTENTE DE VALIDATION', 'decision', 120, 209, 9, true);
+        }
+
+        if (mapping.signatures) {
+            const sig = mapping.signatures;
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(primary[0], primary[1], primary[2]);
+            doc.text(school.bulletin_sig_left || (isEn ? 'TEACHER' : "L'ENSEIGNANT (TEACHER)"), Number(sig.leftX || 25), Number(sig.y || 230));
+            doc.text(school.bulletin_sig_middle || 'PARENT / GUARDIAN', Number(sig.middleX || 85), Number(sig.y || 230));
+            doc.text(school.bulletin_sig_right || (isEn ? 'HEADMASTER' : 'LE DIRECTEUR (HEADMASTER)'), Number(sig.rightX || 140), Number(sig.y || 230));
+        }
+
+        const customHeaders = isNursery
+            ? [[isEn ? 'SUBJECT / DOMAIN' : 'MATIÈRE / DOMAINE', isEn ? 'RATING' : 'ÉVALUATION', 'OBSERVATION']]
+            : [[isEn ? 'SUBJECT' : 'MATIÈRE', 'NOTE/20', 'COEF', 'TOTAL', isEn ? 'APPRECIATION' : 'APPRÉCIATION']];
+
+        const customBody = validatedGrades.map((g: any) => {
+            if (isNursery) {
+                const app = getNurseryAppreciation(g.score);
+                return [g.subjectName || g.name || '--', app.label, app.remark];
+            }
+            const s = Number(g.score) || 0;
+            const c = Number(g.coefficient) || 1;
+            return [g.subjectName || g.name || '--', s.toFixed(2), c, (s * c).toFixed(2), getPrimaryAppreciation(s)];
+        });
+
+        const tableConfig = mapping.table || { x: 20, y: 115, width: 170 };
+        (doc as any).autoTable({
+            startY: Number(tableConfig.y || 115),
+            margin: { left: Number(tableConfig.x || 20) },
+            tableWidth: Number(tableConfig.width || 170),
+            head: customHeaders,
+            body: customBody,
+            theme: 'grid',
+            headStyles: { fillColor: primary, textColor: 255, fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 8 },
+            columnStyles: {
+                0: { cellWidth: tableConfig.width ? Number(tableConfig.width) * 0.4 : 70 },
+                1: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { halign: 'center' },
+                4: { cellWidth: isNursery ? (tableConfig.width ? Number(tableConfig.width) * 0.3 : 40) : (tableConfig.width ? Number(tableConfig.width) * 0.25 : 40) }
+            }
+        });
+
+        doc.save(`Bulletin_${student.matricule}_T${term}.pdf`);
+        return;
+    }
+
     let curY = 5;
 
     // --- Header ---
@@ -374,8 +470,8 @@ export const generateReportCard = (data: any) => {
         doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
         doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
         [
-            school?.bulletin_sig_left   || 'VISA DU PARENT',
-            school?.bulletin_sig_middle || "VISA DE L'ENSEIGNANT(E)",
+            school?.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
+            school?.bulletin_sig_middle || 'PARENT / GUARDIAN',
             school?.bulletin_sig_right  || 'VISA DU DIRECTEUR'
         ].forEach((label, i) => {
             doc.setFontSize(7); doc.setFont('helvetica', 'bold');
@@ -1139,7 +1235,8 @@ export const generateClassReportCards = (data: {
         // Custom template
         if (school.bulletin_pdf_use_custom === 1 && school.bulletin_pdf_template) {
             try {
-                doc.addImage(school.bulletin_pdf_template, 'JPEG', 0, 0, 210, 297);
+                const tplFmt = school.bulletin_pdf_template.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                doc.addImage(school.bulletin_pdf_template, tplFmt, 0, 0, 210, 297, undefined, 'NONE');
             } catch (err) {
                 console.error('Failed to draw custom template in bulk:', err);
             }
@@ -1296,7 +1393,7 @@ export const generateClassReportCards = (data: {
                 if (school.logo) {
                     try {
                         const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                        doc.addImage(school.logo, ext, pageW / 2 - 10, curY + 1, 20, 20, undefined, 'FAST');
+                        doc.addImage(school.logo, ext, pageW / 2 - 10, curY + 1, 20, 20, undefined, 'NONE');
                     } catch(e) {}
                 }
                 curY += 27;
@@ -1542,8 +1639,8 @@ export const generateClassReportCards = (data: {
                 doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
                 doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
                 [
-                    school.bulletin_sig_left   || 'VISA DU PARENT',
-                    school.bulletin_sig_middle || "VISA DE L'ENSEIGNANT(E)",
+                    school.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
+                    school.bulletin_sig_middle || 'PARENT / GUARDIAN',
                     school.bulletin_sig_right  || 'VISA DU DIRECTEUR'
                 ].forEach((label, i) => {
                     doc.setFontSize(7); doc.setFont('helvetica', 'bold');
