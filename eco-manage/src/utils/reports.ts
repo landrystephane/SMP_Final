@@ -199,21 +199,21 @@ export const generateReportCard = (data: any) => {
         doc.setFont('helvetica', 'normal');
         enHdrLines.forEach((line, i) => doc.text(line.trim(), pageW - mR, headerTopY + 12 + i * 4, { align: 'right' }));
 
-        // Centre: header_image OU logo — centré, ratio préservé, max 32×32mm
+        // Centre: header_image OU logo — centré, ratio préservé, max 25×25mm
         const centerImg = template?.header_image || school?.logo || null;
         if (centerImg) {
             try {
                 const cFmt = centerImg.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                let cW = 30, cH = 30;
+                let cW = 22, cH = 22;
                 try {
                     const cp = (doc as any).getImageProperties(centerImg);
                     if (cp?.width && cp?.height) {
                         const r = cp.width / cp.height;
-                        if (r >= 1) { cW = Math.min(40, 32); cH = cW / r; }
-                        else { cH = Math.min(32, 32); cW = cH * r; }
+                        if (r >= 1) { cW = 25; cH = cW / r; }
+                        else { cH = 25; cW = cH * r; }
                     }
                 } catch(_) {}
-                doc.addImage(centerImg, cFmt, pageW / 2 - cW / 2, headerTopY, cW, cH, undefined, 'NONE');
+                doc.addImage(centerImg, cFmt, pageW / 2 - cW / 2, headerTopY + 2, cW, cH, undefined, 'NONE');
             } catch (e) {}
         }
 
@@ -469,54 +469,55 @@ export const generateReportCard = (data: any) => {
     finalY += obsH + 3;
 
     // --- Signatures / footer ---
+    // Image de pied de page : affichée AU-DESSUS des blocs de signature (proportionnelle, max 22mm)
     if (template?.footer_image) {
         try {
             const fFmt = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            // Image paysage → pleine largeur, hauteur proportionnelle (max 40mm)
-            // Image portrait → hauteur fixe 35mm, centrée
-            let fW = 210, fH = 30;
+            let fW = contentW, fH = 18;
             try {
                 const fp = (doc as any).getImageProperties(template.footer_image);
                 if (fp?.width && fp?.height) {
                     const ratio = fp.width / fp.height;
                     if (ratio >= 1) {
-                        fW = 210; fH = Math.round(210 / ratio * 10) / 10;
-                        fH = Math.max(15, Math.min(40, fH));
+                        fW = contentW; fH = fW / ratio;
+                        fH = Math.max(8, Math.min(22, fH));
+                        fW = fH * ratio;
+                        if (fW > contentW) { fW = contentW; fH = fW / ratio; }
                     } else {
-                        fH = 35; fW = Math.round(35 * ratio * 10) / 10;
-                        fW = Math.min(fW, 210);
+                        fH = 22; fW = fH * ratio;
+                        fW = Math.min(fW, contentW);
                     }
                 }
             } catch(_) {}
-            const fX = (210 - fW) / 2;
-            doc.addImage(template.footer_image, fFmt, fX, pageH - fH, fW, fH, undefined, 'NONE');
+            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, finalY, fW, fH, undefined, 'NONE');
+            finalY += fH + 2;
         } catch (e) {}
-    } else {
-        const sigH = 13;
-        const sig3W = contentW / 3;
-        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
-        doc.rect(mL, finalY, contentW, sigH);
-        doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
-        doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
-        [
-            school?.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
-            school?.bulletin_sig_middle || 'PARENT / GUARDIAN',
-            school?.bulletin_sig_right  || 'VISA DU DIRECTEUR'
-        ].forEach((label, i) => {
-            doc.setFontSize(7); doc.setFont('helvetica', 'bold');
-            doc.setTextColor(primary[0], primary[1], primary[2]);
-            doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
-        });
-        finalY += sigH + 3;
+    }
+    // Blocs de signature — toujours affichés (même si image présente)
+    const sigH = 13;
+    const sig3W = contentW / 3;
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+    doc.rect(mL, finalY, contentW, sigH);
+    doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
+    doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
+    [
+        school?.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
+        school?.bulletin_sig_middle || 'PARENT / GUARDIAN',
+        school?.bulletin_sig_right  || 'VISA DU DIRECTEUR'
+    ].forEach((label, i) => {
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
+    });
+    finalY += sigH + 3;
 
-        // --- Appreciation legend (classes utilisant le système A/EC/NA) ---
-        const usesLetterGrading = isNursery || validatedGrades.some((g: any) => g.letter_score);
-        if (usesLetterGrading) {
-            doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
-            doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
-            doc.setFont('helvetica', 'normal');
-            doc.text('A = Acquis     ECA = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
-        }
+    // --- Appreciation legend (classes utilisant le système A/EC/NA) ---
+    const usesLetterGrading = isNursery || validatedGrades.some((g: any) => g.letter_score);
+    if (usesLetterGrading) {
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+        doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
+        doc.setFont('helvetica', 'normal');
+        doc.text('A = Acquis     ECA = En cours d\'acquisition     NA = Non-Acquis', mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
     }
 
     // --- System footer ---
@@ -1680,29 +1681,49 @@ export const generateClassReportCards = (data: {
             finalY += 8;
 
             // Signatures (3 columns, bordered)
+            // Image de pied de page — affichée AU-DESSUS des blocs de signature
             if (template?.footer_image) {
-                try { doc.addImage(template.footer_image, template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 0, pageH - 45, 210, 45, undefined, 'NONE'); } catch(e) {}
-            } else {
-                const sigH = 13, sig3W = cW / 3;
-                doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
-                doc.rect(mL, finalY, cW, sigH);
-                doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
-                doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
-                [
-                    school.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
-                    school.bulletin_sig_middle || 'PARENT / GUARDIAN',
-                    school.bulletin_sig_right  || 'VISA DU DIRECTEUR'
-                ].forEach((label, i) => {
-                    doc.setFontSize(7); doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(primary[0], primary[1], primary[2]);
-                    doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
-                });
-                finalY += sigH + 3;
-                doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
-                doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
-                doc.setFont('helvetica', 'normal');
-                doc.text("A = Acquis     EC = En cours d'acquisition     NA = Non-Acquis", mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
+                try {
+                    const fFmtB = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                    let fWb = cW, fHb = 18;
+                    try {
+                        const fpb = (doc as any).getImageProperties(template.footer_image);
+                        if (fpb?.width && fpb?.height) {
+                            const ratiob = fpb.width / fpb.height;
+                            if (ratiob >= 1) {
+                                fWb = cW; fHb = fWb / ratiob;
+                                fHb = Math.max(8, Math.min(22, fHb));
+                                fWb = fHb * ratiob;
+                                if (fWb > cW) { fWb = cW; fHb = fWb / ratiob; }
+                            } else {
+                                fHb = 22; fWb = fHb * ratiob;
+                                fWb = Math.min(fWb, cW);
+                            }
+                        }
+                    } catch(_) {}
+                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, finalY, fWb, fHb, undefined, 'NONE');
+                    finalY += fHb + 2;
+                } catch(e) {}
             }
+            const sigH = 13, sig3W = cW / 3;
+            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+            doc.rect(mL, finalY, cW, sigH);
+            doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
+            doc.line(mL + 2 * sig3W, finalY, mL + 2 * sig3W, finalY + sigH);
+            [
+                school.bulletin_sig_left   || "L'ENSEIGNANT (TEACHER)",
+                school.bulletin_sig_middle || 'PARENT / GUARDIAN',
+                school.bulletin_sig_right  || 'VISA DU DIRECTEUR'
+            ].forEach((label, i) => {
+                doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+                doc.setTextColor(primary[0], primary[1], primary[2]);
+                doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
+            });
+            finalY += sigH + 3;
+            doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+            doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
+            doc.setFont('helvetica', 'normal');
+            doc.text("A = Acquis     EC = En cours d'acquisition     NA = Non-Acquis", mL + doc.getTextWidth('APPRÉCIATIONS : '), finalY + 4);
 
             doc.setFontSize(5.5); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'italic');
             doc.text(
