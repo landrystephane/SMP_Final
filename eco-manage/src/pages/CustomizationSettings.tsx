@@ -313,13 +313,32 @@ const CustomizationSettings: React.FC = () => {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 3 * 1024 * 1024) {
-            alert(t('cust_upload_max_size', "L'image est trop volumineuse (maximum 3 Mo)."));
+        if (file.size > 10 * 1024 * 1024) {
+            alert("L'image est trop volumineuse (maximum 10 Mo).");
             return;
         }
         const reader = new FileReader();
         reader.onload = (event) => {
-            if (event.target?.result) setter(event.target.result as string);
+            const raw = event.target?.result as string;
+            if (!raw) return;
+            // Compression via canvas : max 800px, qualité 0.82 (≈ < 300 Ko en base64)
+            const img = new Image();
+            img.onload = () => {
+                const MAX = 800;
+                let w = img.width, h = img.height;
+                if (w > MAX || h > MAX) {
+                    if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+                    else { w = Math.round(w * MAX / h); h = MAX; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { setter(raw); return; }
+                ctx.drawImage(img, 0, 0, w, h);
+                const isPng = file.type === 'image/png';
+                setter(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', isPng ? undefined : 0.82));
+            };
+            img.src = raw;
         };
         reader.readAsDataURL(file);
     };
