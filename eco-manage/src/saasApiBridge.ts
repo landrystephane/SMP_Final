@@ -75,8 +75,8 @@ export const initSaaSBridge = () => {
         },
         
         getSchools: async () => {
-            const res = await apiCall('/saas/schools', 'GET');
-            return res.schools;
+            const res = await apiCall('/ipc', 'POST', { channel: 'db:getSchools', args: [] });
+            return res.result;
         },
 
         // Les autres méthodes (getStudents, getGrades...) renverront un tableau vide ou null
