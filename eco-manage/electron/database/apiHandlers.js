@@ -2865,7 +2865,7 @@ handlers['db:getReportTemplate'] = async (schoolId) => {
 };
 
 handlers['db:saveReportTemplate'] = async (data) => {
-  const { schoolId, headerImage, watermarkImage, footerImage, primaryColor, secondaryColor } = data;
+  const { schoolId, headerImage, watermarkImage, footerImage, footerImagePosition, primaryColor, secondaryColor } = data;
   const sid = getActiveSchoolId(schoolId);
   if (!sid) return { success: false, error: 'No school ID' };
 
@@ -2873,19 +2873,21 @@ handlers['db:saveReportTemplate'] = async (data) => {
   const hImg = headerImage || null;
   const wImg = watermarkImage || null;
   const fImg = footerImage || null;
+  const fPos = footerImagePosition || 'footer';
 
   const existing = db.prepare('SELECT id FROM report_templates WHERE school_id = ?').get(sid);
   if (existing) {
     db.prepare(`
       UPDATE report_templates SET
-        header_image = ?, watermark_image = ?, footer_image = ?, primary_color = ?, secondary_color = ?
+        header_image = ?, watermark_image = ?, footer_image = ?, footer_image_position = ?,
+        primary_color = ?, secondary_color = ?
       WHERE school_id = ?
-    `).run(hImg, wImg, fImg, primaryColor || '#0f172a', secondaryColor || '#f59e0b', sid);
+    `).run(hImg, wImg, fImg, fPos, primaryColor || '#0f172a', secondaryColor || '#f59e0b', sid);
   } else {
     db.prepare(`
-      INSERT INTO report_templates (school_id, header_image, watermark_image, footer_image, primary_color, secondary_color)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sid, hImg, wImg, fImg, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
+      INSERT INTO report_templates (school_id, header_image, watermark_image, footer_image, footer_image_position, primary_color, secondary_color)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sid, hImg, wImg, fImg, fPos, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
   }
   return { success: true };
 

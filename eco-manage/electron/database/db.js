@@ -360,6 +360,17 @@ function initDb() {
         console.error(`[Migration] Report Templates table failed:`, e.message);
     }
 
+    // 7.1.1. footer_image_position column ('footer' | 'stamp')
+    try {
+        const rtCols = db.prepare(`PRAGMA table_info(report_templates)`).all();
+        if (!rtCols.find(c => c.name === 'footer_image_position')) {
+            console.log(`[Migration] Adding footer_image_position to report_templates`);
+            db.prepare(`ALTER TABLE report_templates ADD COLUMN footer_image_position TEXT DEFAULT 'footer'`).run();
+        }
+    } catch (e) {
+        console.error(`[Migration] report_templates footer_image_position failed:`, e.message);
+    }
+
     // 7.2. Transport Attendance Migration
     try {
         db.exec(`

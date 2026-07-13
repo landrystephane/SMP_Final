@@ -469,32 +469,11 @@ export const generateReportCard = (data: any) => {
     finalY += obsH + 3;
 
     // --- Signatures / footer ---
-    // Image de pied de page : affichée AU-DESSUS des blocs de signature (proportionnelle, max 22mm)
-    if (template?.footer_image) {
-        try {
-            const fFmt = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            let fW = contentW, fH = 18;
-            try {
-                const fp = (doc as any).getImageProperties(template.footer_image);
-                if (fp?.width && fp?.height) {
-                    const ratio = fp.width / fp.height;
-                    if (ratio >= 1) {
-                        fW = contentW; fH = fW / ratio;
-                        fH = Math.max(8, Math.min(22, fH));
-                        fW = fH * ratio;
-                        if (fW > contentW) { fW = contentW; fH = fW / ratio; }
-                    } else {
-                        fH = 22; fW = fH * ratio;
-                        fW = Math.min(fW, contentW);
-                    }
-                }
-            } catch(_) {}
-            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, finalY, fW, fH, undefined, 'NONE');
-            finalY += fH + 2;
-        } catch (e) {}
-    }
-    // Blocs de signature — toujours affichés (même si image présente)
-    const sigH = 13;
+    const fPos = template?.footer_image_position || 'footer';
+    const fFmt = template?.footer_image?.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+
+    // MODE CACHET : image tampon dans la colonne du Directeur, signatures plus hautes
+    const sigH = (template?.footer_image && fPos === 'stamp') ? 20 : 13;
     const sig3W = contentW / 3;
     doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
     doc.rect(mL, finalY, contentW, sigH);
@@ -507,9 +486,54 @@ export const generateReportCard = (data: any) => {
     ].forEach((label, i) => {
         doc.setFontSize(7); doc.setFont('helvetica', 'bold');
         doc.setTextColor(primary[0], primary[1], primary[2]);
-        doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
+        doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 3.5, { align: 'center' });
     });
-    finalY += sigH + 3;
+
+    if (template?.footer_image) {
+        try {
+            if (fPos === 'stamp') {
+                // Cachet centré dans la colonne VISA DU DIRECTEUR (droite)
+                let sW = sig3W - 6, sH = sW;
+                try {
+                    const sp = (doc as any).getImageProperties(template.footer_image);
+                    if (sp?.width && sp?.height) {
+                        const r = sp.width / sp.height;
+                        if (r >= 1) { sW = Math.min(sig3W - 6, 28); sH = sW / r; }
+                        else { sH = Math.min(sigH - 6, 14); sW = sH * r; }
+                    }
+                } catch(_) {}
+                const sX = mL + 2 * sig3W + (sig3W - sW) / 2;
+                const sY = finalY + (sigH - sH) / 2 + 1;
+                doc.addImage(template.footer_image, fFmt, sX, sY, sW, sH, undefined, 'NONE');
+            }
+        } catch (e) {}
+    }
+
+    finalY += sigH + 2;
+
+    if (template?.footer_image && fPos === 'footer') {
+        try {
+            // Pied de page : bandeau sous les signatures, centré, max 15mm
+            let fW = contentW, fH = 12;
+            try {
+                const fp = (doc as any).getImageProperties(template.footer_image);
+                if (fp?.width && fp?.height) {
+                    const ratio = fp.width / fp.height;
+                    if (ratio >= 1) {
+                        fW = contentW; fH = fW / ratio;
+                        fH = Math.max(6, Math.min(15, fH));
+                        fW = fH * ratio;
+                        if (fW > contentW) { fW = contentW; fH = fW / ratio; }
+                    } else {
+                        fH = 15; fW = fH * ratio;
+                        fW = Math.min(fW, contentW);
+                    }
+                }
+            } catch(_) {}
+            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, finalY, fW, fH, undefined, 'NONE');
+            finalY += fH + 1;
+        } catch (e) {}
+    }
 
     // --- Appreciation legend (classes utilisant le système A/EC/NA) ---
     const usesLetterGrading = isNursery || validatedGrades.some((g: any) => g.letter_score);
@@ -1681,31 +1705,11 @@ export const generateClassReportCards = (data: {
             finalY += 8;
 
             // Signatures (3 columns, bordered)
-            // Image de pied de page — affichée AU-DESSUS des blocs de signature
-            if (template?.footer_image) {
-                try {
-                    const fFmtB = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                    let fWb = cW, fHb = 18;
-                    try {
-                        const fpb = (doc as any).getImageProperties(template.footer_image);
-                        if (fpb?.width && fpb?.height) {
-                            const ratiob = fpb.width / fpb.height;
-                            if (ratiob >= 1) {
-                                fWb = cW; fHb = fWb / ratiob;
-                                fHb = Math.max(8, Math.min(22, fHb));
-                                fWb = fHb * ratiob;
-                                if (fWb > cW) { fWb = cW; fHb = fWb / ratiob; }
-                            } else {
-                                fHb = 22; fWb = fHb * ratiob;
-                                fWb = Math.min(fWb, cW);
-                            }
-                        }
-                    } catch(_) {}
-                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, finalY, fWb, fHb, undefined, 'NONE');
-                    finalY += fHb + 2;
-                } catch(e) {}
-            }
-            const sigH = 13, sig3W = cW / 3;
+            const fPosB = template?.footer_image_position || 'footer';
+            const fFmtB = template?.footer_image?.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+
+            const sigH = (template?.footer_image && fPosB === 'stamp') ? 20 : 13;
+            const sig3W = cW / 3;
             doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
             doc.rect(mL, finalY, cW, sigH);
             doc.line(mL + sig3W, finalY, mL + sig3W, finalY + sigH);
@@ -1717,9 +1721,53 @@ export const generateClassReportCards = (data: {
             ].forEach((label, i) => {
                 doc.setFontSize(7); doc.setFont('helvetica', 'bold');
                 doc.setTextColor(primary[0], primary[1], primary[2]);
-                doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 4.5, { align: 'center' });
+                doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 3.5, { align: 'center' });
             });
-            finalY += sigH + 3;
+
+            if (template?.footer_image) {
+                try {
+                    if (fPosB === 'stamp') {
+                        let sWb = sig3W - 6, sHb = sWb;
+                        try {
+                            const spb = (doc as any).getImageProperties(template.footer_image);
+                            if (spb?.width && spb?.height) {
+                                const rb = spb.width / spb.height;
+                                if (rb >= 1) { sWb = Math.min(sig3W - 6, 28); sHb = sWb / rb; }
+                                else { sHb = Math.min(sigH - 6, 14); sWb = sHb * rb; }
+                            }
+                        } catch(_) {}
+                        const sXb = mL + 2 * sig3W + (sig3W - sWb) / 2;
+                        const sYb = finalY + (sigH - sHb) / 2 + 1;
+                        doc.addImage(template.footer_image, fFmtB, sXb, sYb, sWb, sHb, undefined, 'NONE');
+                    }
+                } catch(e) {}
+            }
+
+            finalY += sigH + 2;
+
+            if (template?.footer_image && fPosB === 'footer') {
+                try {
+                    let fWb = cW, fHb = 12;
+                    try {
+                        const fpb = (doc as any).getImageProperties(template.footer_image);
+                        if (fpb?.width && fpb?.height) {
+                            const ratiob = fpb.width / fpb.height;
+                            if (ratiob >= 1) {
+                                fWb = cW; fHb = fWb / ratiob;
+                                fHb = Math.max(6, Math.min(15, fHb));
+                                fWb = fHb * ratiob;
+                                if (fWb > cW) { fWb = cW; fHb = fWb / ratiob; }
+                            } else {
+                                fHb = 15; fWb = fHb * ratiob;
+                                fWb = Math.min(fWb, cW);
+                            }
+                        }
+                    } catch(_) {}
+                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, finalY, fWb, fHb, undefined, 'NONE');
+                    finalY += fHb + 1;
+                } catch(e) {}
+            }
+
             doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
             doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
             doc.setFont('helvetica', 'normal');
