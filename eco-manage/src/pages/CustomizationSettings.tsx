@@ -545,16 +545,21 @@ const CustomizationSettings: React.FC = () => {
                     {/* En-têtes ministériels */}
                     <div className={cardCls}>
                         {sectionTitle(<Type className="w-4 h-4" />, t('cust_ministerial_headers', 'En-têtes Ministériels'))}
+                        <p className="text-[10px] font-bold text-slate-500 -mt-3 mb-3">
+                            Chaque ligne du champ apparaît sur le bulletin sous "Paix - Travail - Patrie". Appuyez sur <kbd className="bg-slate-800 text-slate-300 px-1 py-0.5 rounded text-[9px]">Entrée</kbd> pour ajouter une ligne (ex : délégation régionale, délégation départementale…).
+                        </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className={labelCls}>{t('cust_header_french', 'Sous-titre Français')}</label>
-                                <input type="text" value={headerFrench} onChange={e => setHeaderFrench(e.target.value)}
-                                    placeholder="Ex: MINISTÈRE DE L'ÉDUCATION DE BASE" className={inputCls} />
+                                <label className={labelCls}>{t('cust_header_french', 'Sous-titres Français (une ligne = une entrée)')}</label>
+                                <textarea rows={3} value={headerFrench} onChange={e => setHeaderFrench(e.target.value)}
+                                    placeholder={"MINISTÈRE DE L'ÉDUCATION DE BASE\nDÉLÉGATION RÉGIONALE DU CENTRE"}
+                                    className={`${inputCls} resize-none font-mono text-xs leading-relaxed`} />
                             </div>
                             <div className="space-y-1.5">
-                                <label className={labelCls}>{t('cust_header_english', 'Sous-titre Anglais')}</label>
-                                <input type="text" value={headerEnglish} onChange={e => setHeaderEnglish(e.target.value)}
-                                    placeholder="Ex: MINISTRY OF BASIC EDUCATION" className={inputCls} />
+                                <label className={labelCls}>{t('cust_header_english', 'Sous-titres Anglais (une ligne = une entrée)')}</label>
+                                <textarea rows={3} value={headerEnglish} onChange={e => setHeaderEnglish(e.target.value)}
+                                    placeholder={"MINISTRY OF BASIC EDUCATION\nREGIONAL DELEGATION OF THE CENTRE"}
+                                    className={`${inputCls} resize-none font-mono text-xs leading-relaxed`} />
                             </div>
                         </div>
                     </div>
