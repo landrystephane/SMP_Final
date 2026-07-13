@@ -104,7 +104,12 @@ const CustomizationSettings: React.FC = () => {
                     setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
                     setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
                     setHonorTitleText(mySchool.honor_title_text || "TABLEAU D'HONNEUR");
-                    setLogoImage(mySchool.logo || '');
+                    // Comprimer le logo chargé depuis la DB (peut être large si uploadé avant la compression)
+                    if (mySchool.logo) {
+                        compressDataUrl(mySchool.logo, setLogoImage);
+                    } else {
+                        setLogoImage('');
+                    }
 
                     // Couleurs par défaut depuis l'école (priorité : template > école > défaut)
                     setPrimaryColor(mySchool.primary_color || '#1e293b');
@@ -310,6 +315,29 @@ const CustomizationSettings: React.FC = () => {
         }
     };
 
+    // Compresse un dataURL base64 : max 800px, JPEG 0.82 ou PNG selon format d'origine
+    const compressDataUrl = (dataUrl: string, callback: (result: string) => void) => {
+        if (!dataUrl) { callback(''); return; }
+        const img = new Image();
+        img.onload = () => {
+            const MAX = 800;
+            let w = img.width, h = img.height;
+            if (w > MAX || h > MAX) {
+                if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+                else { w = Math.round(w * MAX / h); h = MAX; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { callback(dataUrl); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            const isPng = dataUrl.startsWith('data:image/png');
+            callback(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', isPng ? undefined : 0.82));
+        };
+        img.onerror = () => callback(dataUrl);
+        img.src = dataUrl;
+    };
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -321,24 +349,7 @@ const CustomizationSettings: React.FC = () => {
         reader.onload = (event) => {
             const raw = event.target?.result as string;
             if (!raw) return;
-            // Compression via canvas : max 800px, qualité 0.82 (≈ < 300 Ko en base64)
-            const img = new Image();
-            img.onload = () => {
-                const MAX = 800;
-                let w = img.width, h = img.height;
-                if (w > MAX || h > MAX) {
-                    if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
-                    else { w = Math.round(w * MAX / h); h = MAX; }
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) { setter(raw); return; }
-                ctx.drawImage(img, 0, 0, w, h);
-                const isPng = file.type === 'image/png';
-                setter(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', isPng ? undefined : 0.82));
-            };
-            img.src = raw;
+            compressDataUrl(raw, setter);
         };
         reader.readAsDataURL(file);
     };
