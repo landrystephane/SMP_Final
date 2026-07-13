@@ -55,11 +55,23 @@ export const generateReportCard = (data: any) => {
         return { ...sg, score: tw > 0 ? ws / tw : 0, letter_score: sg.letter_scores[sg.letter_scores.length - 1] ?? sg.letter_score };
     });
 
-    // --- Watermark ---
+    // --- Watermark (centré, ratio préservé, max 160mm) ---
     if (template?.watermark_image) {
         try {
+            const wFmt = template.watermark_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            let wW = 140, wH = 140;
+            try {
+                const wp = (doc as any).getImageProperties(template.watermark_image);
+                if (wp?.width && wp?.height) {
+                    const ratio = wp.width / wp.height;
+                    if (ratio >= 1) { wW = Math.min(160, 210 - 30); wH = wW / ratio; }
+                    else { wH = Math.min(160, 297 - 60); wW = wH * ratio; }
+                }
+            } catch(_) {}
+            const wX = (210 - wW) / 2;
+            const wY = (297 - wH) / 2;
             doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-            doc.addImage(template.watermark_image, template.watermark_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 35, 80, 140, 140, undefined, 'NONE');
+            doc.addImage(template.watermark_image, wFmt, wX, wY, wW, wH, undefined, 'NONE');
             doc.setGState(new (doc as any).GState({ opacity: 1 }));
         } catch (e) {}
     }
@@ -461,10 +473,19 @@ export const generateReportCard = (data: any) => {
     doc.line(mL + 2, finalY + 12, pageW - mR - 2, finalY + 12);
     finalY += obsH + 3;
 
-    // --- Signatures (3 columns, bordered) ---
+    // --- Signatures / footer (ratio préservé, hauteur auto) ---
     if (template?.footer_image) {
         try {
-            doc.addImage(template.footer_image, template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG', 0, pageH - 45, 210, 45, undefined, 'NONE');
+            const fFmt = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            let fH = 30;
+            try {
+                const fp = (doc as any).getImageProperties(template.footer_image);
+                if (fp?.width && fp?.height) {
+                    fH = Math.round((fp.height / fp.width) * 210 * 10) / 10;
+                    fH = Math.max(15, Math.min(55, fH));
+                }
+            } catch(_) {}
+            doc.addImage(template.footer_image, fFmt, 0, pageH - fH, 210, fH, undefined, 'NONE');
         } catch (e) {}
     } else {
         const sigH = 13;
@@ -1170,8 +1191,20 @@ export const generateClassReportCards = (data: {
     const addWatermarkBulk = () => {
         if (template?.watermark_image) {
             try {
-                doc.setGState(new (doc as any).GState({opacity: 0.15}));
-                doc.addImage(template.watermark_image, 'PNG', 35, 70, 140, 140, undefined, 'FAST');
+                const wFmtB = template.watermark_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                let wWb = 140, wHb = 140;
+                try {
+                    const wpb = (doc as any).getImageProperties(template.watermark_image);
+                    if (wpb?.width && wpb?.height) {
+                        const ratio = wpb.width / wpb.height;
+                        if (ratio >= 1) { wWb = Math.min(160, 210 - 30); wHb = wWb / ratio; }
+                        else { wHb = Math.min(160, 297 - 60); wWb = wHb * ratio; }
+                    }
+                } catch(_) {}
+                const wXb = (210 - wWb) / 2;
+                const wYb = (297 - wHb) / 2;
+                doc.setGState(new (doc as any).GState({opacity: 0.12}));
+                doc.addImage(template.watermark_image, wFmtB, wXb, wYb, wWb, wHb, undefined, 'NONE');
                 doc.setGState(new (doc as any).GState({opacity: 1}));
             } catch (e) {}
         }
