@@ -54,7 +54,7 @@ jobs:
           # Restart app and verify
           sudo pm2 restart eco-hub-saas
           sleep 5
-          curl -sf http://localhost:8080/api/health \
-            || (echo "HEALTH CHECK FAILED" && sudo pm2 logs eco-hub-saas --lines 20 && exit 1)
+          curl -sf http://localhost:3001/api/health \
+            || (echo "HEALTH CHECK FAILED" && sudo pm2 logs eco-hub-saas --lines 20 --nostream && exit 1)
 
           echo "DEPLOY SUCCESS"
