@@ -77,7 +77,7 @@ export const generateReportCard = (data: any) => {
     }
 
     // --- Custom template path (bulletin PDF personnalisé) ---
-    if (school?.bulletin_pdf_use_custom === 1 && school?.bulletin_pdf_template) {
+    if (parseInt(school?.bulletin_pdf_use_custom) === 1 && school?.bulletin_pdf_template) {
         try {
             const tplFmt = school.bulletin_pdf_template.startsWith('data:image/png') ? 'PNG' : 'JPEG';
             doc.addImage(school.bulletin_pdf_template, tplFmt, 0, 0, 210, 297, undefined, 'NONE');
@@ -1300,7 +1300,7 @@ export const generateClassReportCards = (data: {
         addWatermarkBulk();
 
         // Custom template
-        if (school.bulletin_pdf_use_custom === 1 && school.bulletin_pdf_template) {
+        if (parseInt(school.bulletin_pdf_use_custom) === 1 && school.bulletin_pdf_template) {
             try {
                 const tplFmt = school.bulletin_pdf_template.startsWith('data:image/png') ? 'PNG' : 'JPEG';
                 doc.addImage(school.bulletin_pdf_template, tplFmt, 0, 0, 210, 297, undefined, 'NONE');

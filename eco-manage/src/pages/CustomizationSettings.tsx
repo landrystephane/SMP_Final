@@ -158,7 +158,7 @@ const CustomizationSettings: React.FC = () => {
                         setGradingScales(scales || []);
                     } catch(e: any) { setGradingScales([]); }
 
-                    setBulletinUseCustom(mySchool.bulletin_pdf_use_custom || 0);
+                    setBulletinUseCustom(parseInt(mySchool.bulletin_pdf_use_custom) === 1 ? 1 : 0);
                     setBulletinTemplate(mySchool.bulletin_pdf_template || '');
                     try {
                         if (mySchool.bulletin_pdf_mapping) {
