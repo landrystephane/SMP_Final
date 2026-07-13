@@ -500,16 +500,16 @@ const CustomizationSettings: React.FC = () => {
                         {sectionTitle(<ImageIcon className="w-4 h-4" />, t('cust_pdf_template_title', 'Visuels du Bulletin PDF'))}
                         <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 -mt-2 mb-3 space-y-1">
                             <p className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Comment fonctionnent ces images ?</p>
-                            <p className="text-[10px] text-slate-400">• <b>En-tête :</b> Remplace entièrement le texte de l'en-tête (nom, adresse, ministère). Doit être large (21 cm, PNG/JPG haute résolution).</p>
-                            <p className="text-[10px] text-slate-400">• <b>Filigrane :</b> Apparaît en fond translucide au centre du bulletin.</p>
-                            <p className="text-[10px] text-slate-400">• <b>Pied de page :</b> Remplace les blocs de signature en bas du bulletin.</p>
+                            <p className="text-[10px] text-slate-400">• <b>Sceau / emblème :</b> Placé <b>au centre de l'en-tête</b> du bulletin (à côté du texte, max 32×32mm). Prioritaire sur le logo si les deux sont définis.</p>
+                            <p className="text-[10px] text-slate-400">• <b>Filigrane :</b> Apparaît en fond translucide centré sur la page, ratio préservé.</p>
+                            <p className="text-[10px] text-slate-400">• <b>Pied de page :</b> Image paysage → pleine largeur (max 40mm). Image portrait → centrée (35mm de haut).</p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {[
-                                { label: t('cust_header_image_label', 'En-tête (bandeau haut)'), state: headerImage, setter: setHeaderImage, key: 'header' },
-                                { label: t('cust_watermark_label', 'Filigrane (fond)'), state: watermarkImage, setter: setWatermarkImage, key: 'watermark' },
-                                { label: t('cust_footer_image_label', 'Pied de page'), state: footerImage, setter: setFooterImage, key: 'footer' },
+                                { label: 'Sceau / Emblème (centre en-tête)', state: headerImage, setter: setHeaderImage, key: 'header' },
+                                { label: t('cust_watermark_label', 'Filigrane (fond translucide)'), state: watermarkImage, setter: setWatermarkImage, key: 'watermark' },
+                                { label: t('cust_footer_image_label', 'Pied de page (bas)'), state: footerImage, setter: setFooterImage, key: 'footer' },
                             ].map(({ label, state, setter, key }) => (
                                 <div key={key} className="space-y-2">
                                     <label className={labelCls}>{label}</label>

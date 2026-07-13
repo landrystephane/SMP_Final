@@ -174,28 +174,12 @@ export const generateReportCard = (data: any) => {
 
     let curY = 5;
 
-    // --- Header ---
-    if (template?.header_image) {
-        try {
-            const hImgFmt = template.header_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            // Calcul de la hauteur en préservant le ratio si on peut lire les dimensions
-            let hImgH = 35;
-            try {
-                const props = (doc as any).getImageProperties(template.header_image);
-                if (props && props.width && props.height) {
-                    hImgH = Math.round((props.height / props.width) * 210 * 10) / 10;
-                    if (hImgH < 20) hImgH = 20;
-                    if (hImgH > 60) hImgH = 60;
-                }
-            } catch(_) {}
-            doc.addImage(template.header_image, hImgFmt, 0, 0, 210, hImgH, undefined, 'NONE');
-            curY = hImgH + 3;
-        } catch (e) {}
-    } else {
+    // --- Header (texte toujours affiché; image centrée si fournie) ---
+    {
         doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
         const headerTopY = curY;
 
-        // Left: French state info (multi-ligne supporté via \n)
+        // Texte gauche (multi-lignes)
         const frHdrLines = (school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE").split('\n').filter(l => l.trim());
         const enHdrLines = (school?.header_english || 'MINISTRY OF BASIC EDUCATION').split('\n').filter(l => l.trim());
         const hdrExtraLines = Math.max(frHdrLines.length, enHdrLines.length) - 1;
@@ -207,7 +191,7 @@ export const generateReportCard = (data: any) => {
         doc.setFont('helvetica', 'normal');
         frHdrLines.forEach((line, i) => doc.text(line.trim(), mL, headerTopY + 12 + i * 4));
 
-        // Right: English state info (multi-ligne)
+        // Texte droit (multi-lignes)
         doc.setFont('helvetica', 'bold');
         doc.text('REPUBLIC OF CAMEROON', pageW - mR, headerTopY + 4, { align: 'right' });
         doc.setFont('helvetica', 'italic');
@@ -215,16 +199,27 @@ export const generateReportCard = (data: any) => {
         doc.setFont('helvetica', 'normal');
         enHdrLines.forEach((line, i) => doc.text(line.trim(), pageW - mR, headerTopY + 12 + i * 4, { align: 'right' }));
 
-        // Center: Logo (bigger — 30x30)
-        if (school?.logo) {
+        // Centre: header_image OU logo — centré, ratio préservé, max 32×32mm
+        const centerImg = template?.header_image || school?.logo || null;
+        if (centerImg) {
             try {
-                const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                doc.addImage(school.logo, ext, pageW / 2 - 15, headerTopY, 30, 30, undefined, 'NONE');
+                const cFmt = centerImg.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                let cW = 30, cH = 30;
+                try {
+                    const cp = (doc as any).getImageProperties(centerImg);
+                    if (cp?.width && cp?.height) {
+                        const r = cp.width / cp.height;
+                        if (r >= 1) { cW = Math.min(40, 32); cH = cW / r; }
+                        else { cH = Math.min(32, 32); cW = cH * r; }
+                    }
+                } catch(_) {}
+                doc.addImage(centerImg, cFmt, pageW / 2 - cW / 2, headerTopY, cW, cH, undefined, 'NONE');
             } catch (e) {}
         }
-        curY = headerTopY + Math.max(32, 16 + (hdrExtraLines + 1) * 4);
 
-        // School name + address + motto centered below logo
+        curY = headerTopY + Math.max(34, 16 + (hdrExtraLines + 1) * 4);
+
+        // Nom, adresse, devise de l'école — centrés sous l'image
         doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
         doc.text((school?.name || '').toUpperCase(), pageW / 2, curY, { align: 'center' });
         curY += 4;
@@ -473,19 +468,28 @@ export const generateReportCard = (data: any) => {
     doc.line(mL + 2, finalY + 12, pageW - mR - 2, finalY + 12);
     finalY += obsH + 3;
 
-    // --- Signatures / footer (ratio préservé, hauteur auto) ---
+    // --- Signatures / footer ---
     if (template?.footer_image) {
         try {
             const fFmt = template.footer_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            let fH = 30;
+            // Image paysage → pleine largeur, hauteur proportionnelle (max 40mm)
+            // Image portrait → hauteur fixe 35mm, centrée
+            let fW = 210, fH = 30;
             try {
                 const fp = (doc as any).getImageProperties(template.footer_image);
                 if (fp?.width && fp?.height) {
-                    fH = Math.round((fp.height / fp.width) * 210 * 10) / 10;
-                    fH = Math.max(15, Math.min(55, fH));
+                    const ratio = fp.width / fp.height;
+                    if (ratio >= 1) {
+                        fW = 210; fH = Math.round(210 / ratio * 10) / 10;
+                        fH = Math.max(15, Math.min(40, fH));
+                    } else {
+                        fH = 35; fW = Math.round(35 * ratio * 10) / 10;
+                        fW = Math.min(fW, 210);
+                    }
                 }
             } catch(_) {}
-            doc.addImage(template.footer_image, fFmt, 0, pageH - fH, 210, fH, undefined, 'NONE');
+            const fX = (210 - fW) / 2;
+            doc.addImage(template.footer_image, fFmt, fX, pageH - fH, fW, fH, undefined, 'NONE');
         } catch (e) {}
     } else {
         const sigH = 13;
@@ -1395,15 +1399,8 @@ export const generateClassReportCards = (data: {
             const pageW = 210, pageH = 297, mL = 10, mR = 10, cW = 190;
             let curY = 5;
 
-            // Header
-            if (template?.header_image) {
-                try {
-                    const hImgFmt2 = template.header_image.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                    let hImgH2 = 35;
-                    try { const p = (doc as any).getImageProperties(template.header_image); if (p?.width && p?.height) { hImgH2 = Math.min(60, Math.max(20, Math.round((p.height / p.width) * 210 * 10) / 10)); } } catch(_) {}
-                    doc.addImage(template.header_image, hImgFmt2, 0, 0, 210, hImgH2, undefined, 'NONE'); curY = hImgH2 + 3;
-                } catch(e) {}
-            } else {
+            // Header (texte toujours affiché; image centrée dans l'en-tête)
+            {
                 doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
                 const frBulkLines = (school.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE").split('\n').filter((l: string) => l.trim());
                 const enBulkLines = (school.header_english || 'MINISTRY OF BASIC EDUCATION').split('\n').filter((l: string) => l.trim());
@@ -1432,10 +1429,21 @@ export const generateClassReportCards = (data: {
                 doc.setFont('helvetica', 'normal');
                 if (school.address) doc.text(school.address, pageW - mR, bulkNameY + 4, { align: 'right' });
 
-                if (school.logo) {
+                // Centre: header_image OU logo, ratio préservé, max 25×25mm
+                const centerImgB = template?.header_image || school.logo || null;
+                if (centerImgB) {
                     try {
-                        const ext = school.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-                        doc.addImage(school.logo, ext, pageW / 2 - 10, curY + 1, 20, 20, undefined, 'NONE');
+                        const cFmtB = centerImgB.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                        let cWb = 20, cHb = 20;
+                        try {
+                            const cpb = (doc as any).getImageProperties(centerImgB);
+                            if (cpb?.width && cpb?.height) {
+                                const rb = cpb.width / cpb.height;
+                                if (rb >= 1) { cWb = Math.min(28, 25); cHb = cWb / rb; }
+                                else { cHb = Math.min(25, 25); cWb = cHb * rb; }
+                            }
+                        } catch(_) {}
+                        doc.addImage(centerImgB, cFmtB, pageW / 2 - cWb / 2, curY + 1, cWb, cHb, undefined, 'NONE');
                     } catch(e) {}
                 }
                 curY += 27 + bulkHdrExtra * 4;
