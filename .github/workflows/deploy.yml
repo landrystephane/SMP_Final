@@ -51,19 +51,6 @@ jobs:
           cd /var/www/saas
           npm install --legacy-peer-deps --production
 
-          # Nginx: augmenter la taille max des requêtes pour les images base64 (logos, filigranes)
-          NGINX_CONF=$(sudo nginx -T 2>/dev/null | grep -l 'ecomanageapp' /etc/nginx/sites-enabled/* 2>/dev/null | head -1 || echo "")
-          if [ -z "$NGINX_CONF" ]; then
-            NGINX_CONF=$(ls /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
-            NGINX_CONF="/etc/nginx/sites-enabled/$NGINX_CONF"
-          fi
-          if [ -f "$NGINX_CONF" ] && ! grep -q 'client_max_body_size' "$NGINX_CONF"; then
-            sudo sed -i '/server {/a\    client_max_body_size 20m;' "$NGINX_CONF"
-            sudo nginx -t && sudo systemctl reload nginx && echo "Nginx: client_max_body_size 20m ajouté"
-          else
-            echo "Nginx: client_max_body_size déjà configuré ou fichier introuvable"
-          fi
-
           # Restart app and verify
           sudo pm2 restart eco-hub-saas
           sleep 5
