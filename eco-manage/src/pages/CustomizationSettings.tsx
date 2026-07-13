@@ -73,7 +73,10 @@ const CustomizationSettings: React.FC = () => {
         table: { x: 20, y: 115, width: 170 }
     });
 
-    // Custom PDF template fields
+    // Logo de l'établissement (affiché dans l'en-tête texte du bulletin)
+    const [logoImage, setLogoImage] = useState('');
+
+    // Images du template PDF (en-tête bandeau, filigrane, pied de page)
     const [headerImage, setHeaderImage] = useState('');
     const [watermarkImage, setWatermarkImage] = useState('');
     const [footerImage, setFooterImage] = useState('');
@@ -100,6 +103,11 @@ const CustomizationSettings: React.FC = () => {
                     setHeaderFrench(mySchool.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE");
                     setHeaderEnglish(mySchool.header_english || "MINISTRY OF BASIC EDUCATION");
                     setHonorTitleText(mySchool.honor_title_text || "TABLEAU D'HONNEUR");
+                    setLogoImage(mySchool.logo || '');
+
+                    // Couleurs par défaut depuis l'école (priorité : template > école > défaut)
+                    setPrimaryColor(mySchool.primary_color || '#1e293b');
+                    setSecondaryColor(mySchool.secondary_color || '#f59e0b');
 
                     try {
                         setTimetableSlots(mySchool.timetable_slots ? JSON.parse(mySchool.timetable_slots) : [
@@ -134,8 +142,8 @@ const CustomizationSettings: React.FC = () => {
                         setHeaderImage(template.header_image || '');
                         setWatermarkImage(template.watermark_image || '');
                         setFooterImage(template.footer_image || '');
-                        setPrimaryColor(template.primary_color || mySchool.primary_color || '#1e293b');
-                        setSecondaryColor(template.secondary_color || mySchool.secondary_color || '#f59e0b');
+                        if (template.primary_color) setPrimaryColor(template.primary_color);
+                        if (template.secondary_color) setSecondaryColor(template.secondary_color);
                     }
 
                     const insts = window.electronAPI.getInstallments ? await window.electronAPI.getInstallments() : [];
@@ -247,6 +255,7 @@ const CustomizationSettings: React.FC = () => {
                 motto: schoolMotto,
                 address: schoolAddress,
                 bp: schoolBp,
+                logo: logoImage || null,
                 primary_color: primaryColor,
                 secondary_color: secondaryColor,
                 receipt_sig_title: receiptSigTitle,
@@ -447,6 +456,39 @@ const CustomizationSettings: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    <div className={cardCls}>
+                        {sectionTitle(<ImageIcon className="w-4 h-4" />, 'Logo de l\'Établissement')}
+                        <p className="text-[10px] font-bold text-slate-500 -mt-3 mb-2">
+                            Affiché au centre de l'en-tête du bulletin (format carré recommandé, fond transparent PNG).
+                        </p>
+                        <div className="flex items-start gap-5">
+                            <div className="relative w-28 h-28 shrink-0 border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center hover:border-amber-500/40 transition-all overflow-hidden">
+                                {logoImage ? (
+                                    <img src={logoImage} alt="Logo" className="w-full h-full object-contain p-1" />
+                                ) : (
+                                    <div className="text-center space-y-1">
+                                        <ImageIcon className="w-6 h-6 text-slate-600 mx-auto" />
+                                        <p className="text-[9px] font-bold text-slate-500">Cliquer</p>
+                                    </div>
+                                )}
+                                <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setLogoImage)}
+                                    className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
+                            </div>
+                            <div className="flex-1 space-y-2 pt-1">
+                                <p className="text-xs text-slate-300 font-bold">
+                                    {logoImage ? 'Logo chargé ✓' : 'Aucun logo importé'}
+                                </p>
+                                <p className="text-[10px] text-slate-500">Max 3 Mo — PNG, JPG, WebP</p>
+                                {logoImage && (
+                                    <button type="button" onClick={() => setLogoImage('')}
+                                        className="px-3 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-all">
+                                        Supprimer le logo
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -456,7 +498,12 @@ const CustomizationSettings: React.FC = () => {
                     {/* Images PDF */}
                     <div className={cardCls}>
                         {sectionTitle(<ImageIcon className="w-4 h-4" />, t('cust_pdf_template_title', 'Visuels du Bulletin PDF'))}
-                        <p className="text-xs text-slate-500 font-bold -mt-3 mb-2">{t('cust_hybrid_template_desc', 'Images haute résolution recommandées. Format : largeur image > 2000px pour un rendu net.')}</p>
+                        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 -mt-2 mb-3 space-y-1">
+                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Comment fonctionnent ces images ?</p>
+                            <p className="text-[10px] text-slate-400">• <b>En-tête :</b> Remplace entièrement le texte de l'en-tête (nom, adresse, ministère). Doit être large (21 cm, PNG/JPG haute résolution).</p>
+                            <p className="text-[10px] text-slate-400">• <b>Filigrane :</b> Apparaît en fond translucide au centre du bulletin.</p>
+                            <p className="text-[10px] text-slate-400">• <b>Pied de page :</b> Remplace les blocs de signature en bas du bulletin.</p>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {[
@@ -466,14 +513,20 @@ const CustomizationSettings: React.FC = () => {
                             ].map(({ label, state, setter, key }) => (
                                 <div key={key} className="space-y-2">
                                     <label className={labelCls}>{label}</label>
-                                    <div className="border-2 border-dashed border-white/10 rounded-2xl p-4 text-center hover:border-amber-500/40 transition-all relative min-h-[120px] flex flex-col items-center justify-center">
+                                    <div className="border-2 border-dashed border-white/10 rounded-2xl p-3 text-center hover:border-amber-500/40 transition-all relative min-h-[120px] flex flex-col items-center justify-center">
                                         {state ? (
-                                            <div className="w-full space-y-3">
-                                                <img src={state} alt={label} className="w-full object-contain max-h-24 rounded-lg" />
-                                                <button type="button" onClick={() => setter('')}
-                                                    className="w-full px-3 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-all">
-                                                    Supprimer
-                                                </button>
+                                            <div className="w-full space-y-2">
+                                                <img src={state} alt={label} className="w-full object-contain max-h-20 rounded-lg" />
+                                                <div className="flex gap-2">
+                                                    <label className="flex-1 px-2 py-1.5 bg-amber-500/10 text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-amber-500/20 transition-all cursor-pointer text-center">
+                                                        Changer
+                                                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setter)} className="hidden" />
+                                                    </label>
+                                                    <button type="button" onClick={() => setter('')}
+                                                        className="flex-1 px-2 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-all">
+                                                        Supprimer
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="space-y-2">

@@ -2869,18 +2869,23 @@ handlers['db:saveReportTemplate'] = async (data) => {
   const sid = getActiveSchoolId(schoolId);
   if (!sid) return { success: false, error: 'No school ID' };
 
+  // Convertir '' en null pour ne pas stocker de chaîne vide en base
+  const hImg = headerImage || null;
+  const wImg = watermarkImage || null;
+  const fImg = footerImage || null;
+
   const existing = db.prepare('SELECT id FROM report_templates WHERE school_id = ?').get(sid);
   if (existing) {
     db.prepare(`
       UPDATE report_templates SET
         header_image = ?, watermark_image = ?, footer_image = ?, primary_color = ?, secondary_color = ?
       WHERE school_id = ?
-    `).run(headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b', sid);
+    `).run(hImg, wImg, fImg, primaryColor || '#0f172a', secondaryColor || '#f59e0b', sid);
   } else {
     db.prepare(`
       INSERT INTO report_templates (school_id, header_image, watermark_image, footer_image, primary_color, secondary_color)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sid, headerImage, watermarkImage, footerImage, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
+    `).run(sid, hImg, wImg, fImg, primaryColor || '#0f172a', secondaryColor || '#f59e0b');
   }
   return { success: true };
 
@@ -3384,6 +3389,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         contact_email,
         contact_phone,
         slug,
+        logo,
         primary_color,
         secondary_color,
         receipt_sig_title,
@@ -3426,6 +3432,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
             contact_email = COALESCE(?, contact_email),
             contact_phone = COALESCE(?, contact_phone),
             slug = COALESCE(?, slug),
+            logo = CASE WHEN ? IS NOT NULL THEN ? ELSE logo END,
             primary_color = COALESCE(?, primary_color),
             secondary_color = COALESCE(?, secondary_color),
             receipt_sig_title = COALESCE(?, receipt_sig_title),
@@ -3453,6 +3460,7 @@ handlers['db:updateSchoolSettings'] = async (settings) => {
         contact_email !== undefined ? contact_email : null,
         contact_phone !== undefined ? contact_phone : null,
         cleanSlug !== undefined ? cleanSlug : null,
+        logo !== undefined ? logo : null, logo !== undefined ? (logo || null) : null,
         primary_color !== undefined ? primary_color : null,
         secondary_color !== undefined ? secondary_color : null,
         receipt_sig_title !== undefined ? receipt_sig_title : null,

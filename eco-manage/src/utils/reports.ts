@@ -189,7 +189,7 @@ export const generateReportCard = (data: any) => {
         doc.setFont('helvetica', 'italic');
         doc.text('Paix - Travail - Patrie', mL, headerTopY + 8);
         doc.setFont('helvetica', 'normal');
-        doc.text("MINISTÈRE DE L'ÉDUCATION DE BASE", mL, headerTopY + 12);
+        doc.text(school?.header_french || "MINISTÈRE DE L'ÉDUCATION DE BASE", mL, headerTopY + 12);
 
         // Right: English state info only
         doc.setFont('helvetica', 'bold');
@@ -197,7 +197,7 @@ export const generateReportCard = (data: any) => {
         doc.setFont('helvetica', 'italic');
         doc.text('Peace - Work - Fatherland', pageW - mR, headerTopY + 8, { align: 'right' });
         doc.setFont('helvetica', 'normal');
-        doc.text('MINISTRY OF BASIC EDUCATION', pageW - mR, headerTopY + 12, { align: 'right' });
+        doc.text(school?.header_english || 'MINISTRY OF BASIC EDUCATION', pageW - mR, headerTopY + 12, { align: 'right' });
 
         // Center: Logo (bigger — 30x30)
         if (school?.logo) {
