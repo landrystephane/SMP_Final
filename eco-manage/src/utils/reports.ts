@@ -513,7 +513,7 @@ export const generateReportCard = (data: any) => {
 
     if (template?.footer_image && fPos === 'footer') {
         try {
-            // Pied de page : bandeau sous les signatures, centré, max 15mm
+            // Pied de page : ancré en bas de page, au-dessus du texte "Généré par"
             let fW = contentW, fH = 12;
             try {
                 const fp = (doc as any).getImageProperties(template.footer_image);
@@ -521,17 +521,18 @@ export const generateReportCard = (data: any) => {
                     const ratio = fp.width / fp.height;
                     if (ratio >= 1) {
                         fW = contentW; fH = fW / ratio;
-                        fH = Math.max(6, Math.min(15, fH));
+                        fH = Math.max(6, Math.min(18, fH));
                         fW = fH * ratio;
                         if (fW > contentW) { fW = contentW; fH = fW / ratio; }
                     } else {
-                        fH = 15; fW = fH * ratio;
+                        fH = 18; fW = fH * ratio;
                         fW = Math.min(fW, contentW);
                     }
                 }
             } catch(_) {}
-            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, finalY, fW, fH, undefined, 'NONE');
-            finalY += fH + 1;
+            // Positionné en bas de page, 5mm au-dessus du texte "Généré par"
+            const fY = pageH - fH - 5;
+            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, fY, fW, fH, undefined, 'NONE');
         } catch (e) {}
     }
 
@@ -1754,17 +1755,18 @@ export const generateClassReportCards = (data: {
                             const ratiob = fpb.width / fpb.height;
                             if (ratiob >= 1) {
                                 fWb = cW; fHb = fWb / ratiob;
-                                fHb = Math.max(6, Math.min(15, fHb));
+                                fHb = Math.max(6, Math.min(18, fHb));
                                 fWb = fHb * ratiob;
                                 if (fWb > cW) { fWb = cW; fHb = fWb / ratiob; }
                             } else {
-                                fHb = 15; fWb = fHb * ratiob;
+                                fHb = 18; fWb = fHb * ratiob;
                                 fWb = Math.min(fWb, cW);
                             }
                         }
                     } catch(_) {}
-                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, finalY, fWb, fHb, undefined, 'NONE');
-                    finalY += fHb + 1;
+                    // Ancré en bas de page, 5mm au-dessus du texte "Généré par"
+                    const fYb = pageH - fHb - 5;
+                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, fYb, fWb, fHb, undefined, 'NONE');
                 } catch(e) {}
             }
 
