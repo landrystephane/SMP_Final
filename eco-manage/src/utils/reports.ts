@@ -70,7 +70,7 @@ export const generateReportCard = (data: any) => {
             } catch(_) {}
             const wX = (210 - wW) / 2;
             const wY = (297 - wH) / 2;
-            doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+            doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
             doc.addImage(template.watermark_image, wFmt, wX, wY, wW, wH, undefined, 'NONE');
             doc.setGState(new (doc as any).GState({ opacity: 1 }));
         } catch (e) {}
@@ -1208,7 +1208,7 @@ export const generateClassReportCards = (data: {
                 } catch(_) {}
                 const wXb = (210 - wWb) / 2;
                 const wYb = (297 - wHb) / 2;
-                doc.setGState(new (doc as any).GState({opacity: 0.12}));
+                doc.setGState(new (doc as any).GState({opacity: 0.06}));
                 doc.addImage(template.watermark_image, wFmtB, wXb, wYb, wWb, wHb, undefined, 'NONE');
                 doc.setGState(new (doc as any).GState({opacity: 1}));
             } catch (e) {}
