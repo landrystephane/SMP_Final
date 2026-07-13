@@ -24,7 +24,21 @@ const port = process.env.PORT || 3001;
 // Derrière nginx/proxy : faire confiance au X-Forwarded-For pour le rate limiter
 app.set('trust proxy', 1);
 
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['https://ecomanageapp.com', 'https://www.ecomanageapp.com'];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Autoriser les requêtes sans origin (apps mobiles, Postman, serveur-à-serveur)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.some(o => origin === o || origin.endsWith('.ecomanageapp.com'))) {
+            return callback(null, true);
+        }
+        callback(new Error('CORS: origine non autorisée'));
+    },
+    credentials: true
+}));
 // Limite augmentée pour supporter les images base64 (logos, filigranes, etc.)
 app.use(bodyParser.json({ limit: '20mb' }));
 app.use(bodyParser.urlencoded({ limit: '20mb', extended: true }));
@@ -256,10 +270,22 @@ app.post('/api/auth/switchSchool', (req, res) => {
 // ROUTES SUPER ADMIN (Gestion SaaS)
 // ==========================================
 
-// Récupérer toutes les écoles (Pour le tableau de bord SuperAdmin)
-app.get('/api/saas/schools', (req, res) => {
+const requireSuperAdmin = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentification requise' });
     try {
-        // Todo: Add authentication middleware to verify SuperAdmin token
+        const user = jwt.verify(authHeader.substring(7), JWT_SECRET);
+        if (user.role !== 'SUPERADMIN') return res.status(403).json({ error: 'Accès réservé au Super Admin' });
+        req.superAdmin = user;
+        next();
+    } catch (e) {
+        return res.status(401).json({ error: 'Token invalide ou expiré' });
+    }
+};
+
+// Récupérer toutes les écoles (Pour le tableau de bord SuperAdmin)
+app.get('/api/saas/schools', requireSuperAdmin, (req, res) => {
+    try {
         const schools = db.prepare('SELECT * FROM schools WHERE deleted_at IS NULL').all();
         res.json({ success: true, schools });
     } catch (error) {
@@ -268,9 +294,10 @@ app.get('/api/saas/schools', (req, res) => {
 });
 
 // Valider un paiement en espèces et activer/renouveler l'abonnement
-app.post('/api/saas/validate-payment', (req, res) => {
-    const { schoolId, monthsGranted, amount, superAdminId } = req.body;
-    
+app.post('/api/saas/validate-payment', requireSuperAdmin, (req, res) => {
+    const { schoolId, monthsGranted, amount } = req.body;
+    const superAdminId = req.superAdmin.id;
+
     try {
         const transaction = db.transaction(() => {
             // 1. Enregistrer le paiement
@@ -281,8 +308,8 @@ app.post('/api/saas/validate-payment', (req, res) => {
 
             // 2. Mettre à jour la date de fin d'abonnement de l'école
             db.prepare(`
-                UPDATE schools 
-                SET subscription_status = 'ACTIVE', 
+                UPDATE schools
+                SET subscription_status = 'ACTIVE',
                     subscription_end_date = date(COALESCE(subscription_end_date, date('now')), '+' || ? || ' months'),
                     is_active = 1
                 WHERE id = ?

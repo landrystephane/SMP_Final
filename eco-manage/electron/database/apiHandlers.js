@@ -219,7 +219,13 @@ handlers['db:addSchool'] = async (school) => {
 };
 
 handlers['db:updateSchool'] = async (school) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(currentUser.role)) throw new Error('Non autorisé');
     const { id, name, address, contact_email, contact_phone, bp, motto, slug } = school;
+    // Non-SUPERADMIN ne peut modifier que leur propre école
+    if (currentUser.role !== 'SUPERADMIN' && Number(id) !== Number(currentUser.schoolId)) {
+        throw new Error('Non autorisé : vous ne pouvez modifier que votre propre établissement.');
+    }
     const cleanSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) : null;
     return db.prepare('UPDATE schools SET name = ?, address = ?, contact_email = ?, contact_phone = ?, bp = ?, motto = ?, slug = COALESCE(?, slug) WHERE id = ?')
         .run(name, address, contact_email, contact_phone, bp, motto, cleanSlug, id);
@@ -1379,11 +1385,12 @@ handlers['db:getSchoolSubjects'] = async (schoolId) => {
 };
 
 handlers['db:toggleSchoolSubject'] = async ({ schoolId, subjectId, isActive }) => {
+  const sid = getActiveSchoolId(schoolId);
   const result = db.prepare(`
     INSERT INTO school_subjects (school_id, subject_id, is_active)
     VALUES (?, ?, ?)
     ON CONFLICT(school_id, subject_id) DO UPDATE SET is_active = excluded.is_active
-  `).run(schoolId, subjectId, isActive ? 1 : 0);
+  `).run(sid, subjectId, isActive ? 1 : 0);
 
   if (isActive) {
     const subject = db.prepare('SELECT name, level, section FROM subjects WHERE id = ?').get(subjectId);
@@ -1392,7 +1399,7 @@ handlers['db:toggleSchoolSubject'] = async ({ schoolId, subjectId, isActive }) =
         INSERT INTO announcements (school_id, sender_id, target, title, content)
         VALUES (?, ?, 'STAFF', 'Nouvelle Matière Autorisée', ?)
       `).run(
-        schoolId,
+        sid,
         (session.getStore()?.user) ? (session.getStore()?.user).id : null,
         `La matière globale "${subject.name}" (${subject.level} - ${subject.section}) a été autorisée pour votre établissement. Vous pouvez dès à présent l'associer à vos classes.`
       );
@@ -2045,6 +2052,8 @@ handlers['db:setSetting'] = async ({ key, value }) => {
 
 handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, recordedBy, scheduleId }) => {
   const sid = getActiveSchoolId();
+  const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
+  if (!student) throw new Error('Élève non autorisé pour cet établissement.');
   return db.prepare(`
     INSERT INTO attendance (student_id, date, status, hours_absent, recorded_by, schedule_id, school_id)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -2375,13 +2384,13 @@ handlers['db:updateUser'] = async (userToUpdate) => {
     }
 
     if (finalRole === 'TEACHER') {
-        db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ?').run(id);
-        db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ?').run(id);
+        db.prepare('UPDATE classes SET main_teacher_id = NULL WHERE main_teacher_id = ? AND school_id = ?').run(id, updateSchoolId);
+        db.prepare('UPDATE classes SET assistant_teacher_id = NULL WHERE assistant_teacher_id = ? AND school_id = ?').run(id, updateSchoolId);
         if (assignedClasses && assignedClasses.length > 0) {
             if (classRole === 'ASSISTANT') {
-                db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+                db.prepare('UPDATE classes SET assistant_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ') AND school_id = ?').run(id, ...assignedClasses, updateSchoolId);
             } else {
-                db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ')').run(id, ...assignedClasses);
+                db.prepare('UPDATE classes SET main_teacher_id = ? WHERE id IN (' + assignedClasses.map(() => '?').join(',') + ') AND school_id = ?').run(id, ...assignedClasses, updateSchoolId);
             }
         }
     }
