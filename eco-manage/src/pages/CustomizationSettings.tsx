@@ -709,13 +709,15 @@ const CustomizationSettings: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     <div className="flex-1">
                                                         <span className="text-[9px] text-slate-600 font-bold">X</span>
-                                                        <input type="number" value={bulletinMapping[field.key]?.x || 0}
+                                                        <input type="number" value={bulletinMapping[field.key]?.x ?? 0}
+                                                            onFocus={e => e.target.select()}
                                                             onChange={e => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), x: parseInt(e.target.value) || 0}})}
                                                             className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                     </div>
                                                     <div className="flex-1">
                                                         <span className="text-[9px] text-slate-600 font-bold">Y</span>
-                                                        <input type="number" value={bulletinMapping[field.key]?.y || 0}
+                                                        <input type="number" value={bulletinMapping[field.key]?.y ?? 0}
+                                                            onFocus={e => e.target.select()}
                                                             onChange={e => setBulletinMapping({...bulletinMapping, [field.key]: {...(bulletinMapping[field.key] || {}), y: parseInt(e.target.value) || 0}})}
                                                             className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                     </div>
@@ -727,19 +729,22 @@ const CustomizationSettings: React.FC = () => {
                                             <div className="flex gap-2">
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">X</span>
-                                                    <input type="number" value={bulletinMapping.table?.x || 20}
+                                                    <input type="number" value={bulletinMapping.table?.x ?? 20}
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), x: parseInt(e.target.value) || 20}})}
                                                         className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">Y</span>
-                                                    <input type="number" value={bulletinMapping.table?.y || 115}
+                                                    <input type="number" value={bulletinMapping.table?.y ?? 115}
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), y: parseInt(e.target.value) || 115}})}
                                                         className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
                                                 <div className="flex-1">
                                                     <span className="text-[9px] text-slate-600 font-bold">Largeur</span>
-                                                    <input type="number" value={bulletinMapping.table?.width || 170}
+                                                    <input type="number" value={bulletinMapping.table?.width ?? 170}
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => setBulletinMapping({...bulletinMapping, table: {...(bulletinMapping.table || {}), width: parseInt(e.target.value) || 170}})}
                                                         className="w-full bg-slate-900 border border-white/5 rounded-lg p-1.5 text-white text-xs font-bold outline-none focus:border-amber-500" />
                                                 </div>
