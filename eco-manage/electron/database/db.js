@@ -882,6 +882,20 @@ function initDb() {
         }
     } catch(e) { console.error('[Migration] archive_snapshot:', e.message); }
 
+    // Migration: seed default installments (1ÈRE/2ÈME/3ÈME TRANCHE) for school 1 if none exist
+    try {
+        const globalInstCount = db.prepare("SELECT COUNT(*) as cnt FROM installments WHERE school_id = 1 OR school_id IS NULL").get().cnt;
+        if (globalInstCount === 0) {
+            const stmtInst = db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, 1)');
+            db.transaction(() => {
+                stmtInst.run('1ÈRE TRANCHE', 1);
+                stmtInst.run('2ÈME TRANCHE', 2);
+                stmtInst.run('3ÈME TRANCHE', 3);
+            })();
+            console.log('[Migration] Seeded 3 default installments for school 1');
+        }
+    } catch(e) { console.error('[Migration] Default installments seeding failed:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

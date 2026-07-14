@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock, User } from 'lucide-react';
+import { Download, TrendingUp, Users, Search, Plus, Filter, FileText, Printer, CheckCircle, Wallet, ArrowUpRight, Clock, User, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { downloadCSV } from '../utils/exports';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { notifyDataChanged } from '../utils/dataSync';
@@ -536,6 +537,33 @@ const Finance: React.FC = () => {
                             }}
                             className="text-[10px] font-black text-amber-500 hover:text-white flex items-center uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl transition-all border border-amber-500/20">
                             <Download className="w-4 h-4 mr-2" /> {t('export_report')}
+                        </button>
+                        <button
+                            onClick={() => {
+                                const fp = filterDate ? payments.filter((p: any) => p.payment_date?.startsWith(filterDate)) : payments;
+                                const rows = fp.map((p: any) => {
+                                    const stud = students.find((s: any) => s.id === p.student_id) || {};
+                                    const cls = classes.find((c: any) => c.id === (stud.class_id || p.class_id)) || {};
+                                    return [
+                                        p.receipt_number || '',
+                                        `${p.last_name || ''} ${p.first_name || ''}`.trim(),
+                                        stud.matricule || '',
+                                        cls.name || '',
+                                        p.payment_type || '',
+                                        p.installment_name || '',
+                                        p.payment_date ? p.payment_date.slice(0, 10) : '',
+                                        p.amount ?? '',
+                                        p.depositor_name || '',
+                                    ];
+                                });
+                                downloadCSV(
+                                    ['Reçu N°', 'Élève', 'Matricule', 'Classe', 'Type', 'Tranche', 'Date', 'Montant (FCFA)', 'Déposant'],
+                                    rows,
+                                    `Paiements_${filterDate || new Date().toISOString().slice(0,7)}.csv`
+                                );
+                            }}
+                            className="text-[10px] font-black text-emerald-400 hover:text-white flex items-center uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-xl transition-all border border-emerald-500/20">
+                            <FileSpreadsheet className="w-4 h-4 mr-2" /> {t('export_csv', 'Exporter CSV')}
                         </button>
                     </div>
                 </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen, X, Eye, Award, Printer } from 'lucide-react';
+import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen, X, Eye, Award, Printer, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
+import { downloadCSV } from '../utils/exports';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { notifyDataChanged } from '../utils/dataSync';
@@ -595,6 +596,36 @@ const Grades: React.FC = () => {
     }
   }
 
+  const handleExportGrades = async () => {
+    if (!selectedClass || !selectedTerm || !window.electronAPI) return;
+    const classObj = classes.find(c => c.id.toString() === selectedClass);
+    const rawGrades = await window.electronAPI.getGrades({ classId: parseInt(selectedClass), term: selectedTerm });
+    const rows = (rawGrades || []).map((g: any) => {
+        const stud = students.find((s: any) => s.id === g.student_id) || {};
+        const subj = subjects.find((s: any) => s.id === g.subject_id) || {};
+        return [
+            stud.last_name || '',
+            stud.first_name || '',
+            stud.matricule || '',
+            classObj?.name || '',
+            classObj?.section || '',
+            subj.name || '',
+            subj.domain || '',
+            subj.coefficient ?? g.coefficient ?? '',
+            `T${selectedTerm}`,
+            g.month || '',
+            g.score ?? '',
+            g.letter_score || '',
+            g.validated ? 'Oui' : 'Non',
+        ];
+    });
+    downloadCSV(
+        ['Nom', 'Prénom', 'Matricule', 'Classe', 'Section', 'Matière', 'Domaine', 'Coef', 'Trimestre', 'Séquence', 'Note /20', 'Appréciation', 'Validé'],
+        rows,
+        `Notes_${classObj?.name || 'Classe'}_T${selectedTerm}.csv`
+    );
+  };
+
   const handlePrintAllClass = async () => {
     if (!selectedClass || !window.electronAPI) return;
     const eligibleStudents = students.filter(s => s.has_paid_registration !== 0 && s.status !== 'BLOCKED');
@@ -793,6 +824,15 @@ const Grades: React.FC = () => {
                             className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all inline-flex items-center shadow-lg shadow-emerald-600/20"
                         >
                             <CheckCircle2 className="w-4 h-4 mr-2" /> {t('validate_for_printing', 'VALIDER LES IMPRESSIONS')}
+                        </button>
+                    )}
+                    {selectedClass && selectedTerm !== '' && (
+                        <button
+                            onClick={handleExportGrades}
+                            className="bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all inline-flex items-center"
+                        >
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                            {t('gr_export_csv', 'Exporter CSV')}
                         </button>
                     )}
                     {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && isClassValidated && (

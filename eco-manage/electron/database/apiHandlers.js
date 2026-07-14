@@ -188,34 +188,38 @@ handlers['db:addSchool'] = async (school) => {
     const { name, address, contact_email, contact_phone, bp, motto } = school;
     const accessCode = name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X') + Date.now().toString().slice(-4);
     const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 16) + Date.now().toString().slice(-4);
-    const info = db.prepare('INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto, access_code, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(name, address, contact_email, contact_phone, bp, motto, accessCode, slug);
+    const info = db.prepare(
+        "INSERT INTO schools (name, address, contact_email, contact_phone, bp, motto, access_code, slug, subscription_end_date, subscription_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now', '+1 year'), 'ACTIVE')"
+    ).run(name, address, contact_email, contact_phone, bp, motto, accessCode, slug);
     const newSchoolId = info.lastInsertRowid;
 
     const transaction = db.transaction(() => {
-        // Create a default founder for this school
+        // Default FOUNDER account
         const hash = bcrypt.hashSync('admin', 10);
         db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
           .run(`admin_${newSchoolId}`, hash, `Fondateur ${name}`, 'FOUNDER', newSchoolId);
-          
-        // Auto-enable all existing global subjects for this new school
-        db.prepare(`
-            INSERT INTO school_subjects (school_id, subject_id, is_active)
-            SELECT ?, id, 1 FROM subjects
-        `).run(newSchoolId);
 
-        // Auto-create a default grading scale (sur 20) with standard options
+        // Auto-enable all existing global subjects
+        db.prepare('INSERT INTO school_subjects (school_id, subject_id, is_active) SELECT ?, id, 1 FROM subjects').run(newSchoolId);
+
+        // Default grading scale (notes sur 20)
         const scaleInfo = db.prepare('INSERT INTO grading_scales (school_id, name, is_numerical, min_value, max_value) VALUES (?, ?, 1, 0, 20)').run(newSchoolId, 'Notes sur 20');
         const scaleId = scaleInfo.lastInsertRowid;
         const insertOption = db.prepare('INSERT INTO grading_scale_options (scale_id, symbol, min_range, max_range, numeric_equivalent, description) VALUES (?, ?, ?, ?, ?, ?)');
-        insertOption.run(scaleId, 'N.A', 0, 9.99, 0, 'Non Acquis');
+        insertOption.run(scaleId, 'N.A',   0,  9.99, 0,  'Non Acquis');
         insertOption.run(scaleId, 'E.C.A', 10, 14.99, 10, "En Cours d'Acquisition");
-        insertOption.run(scaleId, 'A', 15, 17.99, 15, 'Acquis');
-        insertOption.run(scaleId, 'E', 18, 20, 20, 'Expert');
+        insertOption.run(scaleId, 'A',     15, 17.99, 15, 'Acquis');
+        insertOption.run(scaleId, 'E',     18, 20,    20, 'Expert');
+
+        // Default payment installments (3 tranches propres à cette école)
+        const insertInst = db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, ?)');
+        insertInst.run('1ÈRE TRANCHE', 1, newSchoolId);
+        insertInst.run('2ÈME TRANCHE', 2, newSchoolId);
+        insertInst.run('3ÈME TRANCHE', 3, newSchoolId);
     });
     transaction();
 
     return { success: true, id: newSchoolId };
-
 };
 
 handlers['db:updateSchool'] = async (school) => {
