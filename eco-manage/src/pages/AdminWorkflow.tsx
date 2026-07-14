@@ -430,6 +430,7 @@ const AdminWorkflow: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Evaluation Period Control */}
+        {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR' || user?.role === 'SUPERADMIN') && (
         <div className="glass-card p-6 space-y-4">
           <div className="flex items-center space-x-3 text-slate-gold-gold">
             <Calendar className="w-6 h-6" />
@@ -488,6 +489,7 @@ const AdminWorkflow: React.FC = () => {
             </button>
           </div>
         </div>
+        )}
 
         {/* SG Acting Director Toggle */}
         {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR') && (

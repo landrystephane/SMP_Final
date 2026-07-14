@@ -705,7 +705,7 @@ const Grades: React.FC = () => {
                     )}
                 </div>
                 <div className="flex items-center space-x-4">
-                    {hasRole(['DIRECTOR', 'FOUNDER', 'ADVISOR']) && (
+                    {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && (
                         <button
                             onClick={handleGrantOverride}
                             className="bg-indigo-500/20 text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-500/30 transition-all border border-indigo-500/30 flex items-center"

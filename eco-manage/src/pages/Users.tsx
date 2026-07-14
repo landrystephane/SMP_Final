@@ -274,6 +274,7 @@ const Users: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        {['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(currentUser?.role || '') && (
         <div className="xl:col-span-4 space-y-6">
             <div className="glass-card p-8 shadow-2xl border-white/5">
                 <div className="flex items-center space-x-3 text-amber-500 mb-8">
@@ -457,8 +458,9 @@ const Users: React.FC = () => {
                 </form>
             </div>
         </div>
+        )}
 
-        <div className="xl:col-span-8 glass-card shadow-2xl border-none overflow-hidden flex flex-col">
+        <div className={`${['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(currentUser?.role || '') ? 'xl:col-span-8' : 'xl:col-span-12'} glass-card shadow-2xl border-none overflow-hidden flex flex-col`}>
           <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-center bg-slate-900/80 gap-4">
             <h2 className="text-2xl font-black text-white tracking-tight flex items-center italic">
                 <Shield className="w-7 h-7 mr-4 text-emerald-500" />
@@ -539,6 +541,7 @@ const Users: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-8 py-6">
+                        {['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(currentUser?.role || '') ? (
                         <button
                             onClick={() => handleToggleActive(u.id, u.is_active !== 0, u.fullName)}
                             className={`flex items-center text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full w-fit border transition-all ${
@@ -551,6 +554,12 @@ const Users: React.FC = () => {
                             <div className={`w-1.5 h-1.5 rounded-full mr-2 ${u.is_active !== 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                             {u.is_active !== 0 ? t('status_active') : t('usr_status_inactive')}
                         </button>
+                        ) : (
+                        <span className={`flex items-center text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full w-fit border ${u.is_active !== 0 ? 'text-emerald-500 bg-emerald-500/5 border-emerald-500/20' : 'text-rose-500 bg-rose-500/5 border-rose-500/20'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full mr-2 ${u.is_active !== 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                            {u.is_active !== 0 ? t('status_active') : t('usr_status_inactive')}
+                        </span>
+                        )}
                     </td>
                      <td className="px-8 py-6 text-right">
                        <div className="flex items-center justify-end space-x-2">

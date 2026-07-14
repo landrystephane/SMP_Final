@@ -425,7 +425,7 @@ const Finance: React.FC = () => {
             >
                 {t('services')}
             </button>
-            {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER' || user?.role === 'BURSAR') && (
+            {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER' || user?.role === 'DIRECTOR' || user?.role === 'BURSAR') && (
                 <button
                     onClick={() => setActiveTab('EXPENSES')}
                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXPENSES' ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
@@ -605,12 +605,14 @@ const Finance: React.FC = () => {
                     <h2 className="text-2xl font-black tracking-tight">{t('quick_collection_module')}</h2>
                     <p className="text-slate-900/60 text-sm font-bold mt-1">{t('quick_collection_desc')}</p>
                 </div>
+                {['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'BURSAR', 'SG'].includes(user?.role || '') && (
                 <button
                     onClick={() => setIsAddingPayment(true)}
                     className="bg-slate-950 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center"
                 >
                     <Plus className="w-5 h-5 mr-3" /> {t('new_payment')}
                 </button>
+                )}
             </div>
 
             <div className="glass-card border-none shadow-xl overflow-hidden">
@@ -776,6 +778,7 @@ const Finance: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right space-x-2">
+                                            {['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'BURSAR', 'SG'].includes(user?.role || '') && (
                                             <button
                                                 onClick={() => {
                                                     setNewPayment({...newPayment, studentId: s.id.toString()});
@@ -785,6 +788,7 @@ const Finance: React.FC = () => {
                                             >
                                                 {t('pay')}
                                             </button>
+                                            )}
                                             <button
                                                 title={isEn ? 'Financial Statement' : 'Relevé Financier'}
                                                 className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-indigo-500/20 rounded-xl border border-white/5"
@@ -1072,7 +1076,7 @@ const Finance: React.FC = () => {
                          </div>
                       )}
                     </div>
-                    {(user?.role === 'SUPERADMIN' || user?.role === 'FOUNDER') && exp.status === 'PENDING' && (
+                    {(['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(user?.role || '')) && exp.status === 'PENDING' && (
                       <div className="flex items-center gap-2 w-full md:w-auto">
                         <button onClick={() => handleValidateExpense(exp.id, 'VALIDATED')} className="flex-1 md:flex-none px-4 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                           {t('fin_approve', 'Approuver')}

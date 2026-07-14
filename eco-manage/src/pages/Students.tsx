@@ -111,6 +111,7 @@ const Students: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">{t('student_management')}</h1>
           <p className="text-slate-400 mt-1">{t('student_management')} - {t('global_effectif')}</p>
         </div>
+        {['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'].includes(user?.role || '') && (
         <button
           onClick={() => setIsAdding(true)}
           className="flex items-center justify-center py-2 px-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
@@ -118,6 +119,7 @@ const Students: React.FC = () => {
           <UserPlus className="w-4 h-4 mr-2" />
           {t('new_student')}
         </button>
+        )}
       </div>
 
       {/* Barre de Filtres */}
@@ -263,9 +265,11 @@ const Students: React.FC = () => {
                         <FileText className="w-4 h-4" />
                     </button>
                     )}
+                    {['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'].includes(user?.role || '') && (
                     <button onClick={() => setEditingStudent(s)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md transition-all">
                         <Edit className="w-4 h-4" />
                     </button>
+                    )}
                     {['SUPERADMIN', 'FOUNDER', 'DIRECTOR'].includes(user?.role || '') && (
                         <>
                             <button
