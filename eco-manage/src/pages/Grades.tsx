@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen, X, Eye, Award } from 'lucide-react';
+import { Save, Lock, Unlock, Filter, Download, CheckCircle2, AlertCircle, FileText, BookOpen, X, Eye, Award, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { generateReportCard } from '../utils/reports';
 import { useAuth } from '../context/AuthContext';
@@ -40,7 +40,8 @@ const Grades: React.FC = () => {
   const [detailGrades, setDetailGrades] = useState<any[]>([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedSubjectForDetail, setSelectedSubjectForDetail] = useState<any>(null);
-    const [isSgActing, setIsSgActing] = useState(false);
+  const [isSgActing, setIsSgActing] = useState(false);
+  const [isBatchPrinting, setIsBatchPrinting] = useState(false);
 
   const loadData = async () => {
       if (window.electronAPI) {
@@ -594,6 +595,78 @@ const Grades: React.FC = () => {
     }
   }
 
+  const handlePrintAllClass = async () => {
+    if (!selectedClass || !window.electronAPI) return;
+    const eligibleStudents = students.filter(s => s.has_paid_registration !== 0 && s.status !== 'BLOCKED');
+    if (eligibleStudents.length === 0) {
+        showNotification(t('gr_no_eligible_students', "Aucun élève éligible dans cette classe."), "error");
+        return;
+    }
+    if (user?.role === 'SG' && !bulletinsValidated) {
+        showNotification(t('gr_print_blocked_global', "Impression bloquée — validation globale requise."), "error");
+        return;
+    }
+    setIsBatchPrinting(true);
+    try {
+        const classObj = classes.find(c => c.id.toString() === selectedClass);
+        const schools = await window.electronAPI.getSchools();
+        const school = schools.find((s: any) => s.id?.toString() === user?.schoolId?.toString()) || schools[0];
+        const isDirector = user?.role === 'DIRECTOR' || user?.role === 'FOUNDER' || (user?.role === 'SG' && isSgActing);
+
+        const allStudents = await window.electronAPI.getStudents(user?.schoolId);
+        const classStudents = allStudents.filter((s: any) => s.class_id?.toString() === selectedClass?.toString());
+
+        const studentsWithAverages = await Promise.all(classStudents.map(async (s: any) => {
+            const details = await window.electronAPI.getStudentDetails(s.id);
+            const validatedGrades = details.grades.filter((g: any) => g.term === selectedTerm && (g.validated === 1 || isDirector));
+            const totalPoints = validatedGrades.reduce((acc: number, g: any) => acc + ((Number(g.score) || 0) * (Number(g.coefficient) || 1)), 0);
+            const totalCoef = validatedGrades.reduce((acc: number, g: any) => acc + (Number(g.coefficient) || 1), 0);
+            const avg = totalCoef > 0 ? (totalPoints / totalCoef) : 0;
+            return { id: s.id, avg, details };
+        }));
+        studentsWithAverages.sort((a, b) => b.avg - a.avg);
+
+        const totalStudents = studentsWithAverages.length;
+        const firstAverage = studentsWithAverages[0]?.avg;
+        const lastAverage = studentsWithAverages[studentsWithAverages.length - 1]?.avg;
+        const classAverage = totalStudents > 0
+            ? studentsWithAverages.reduce((sum: number, s: any) => sum + s.avg, 0) / totalStudents
+            : undefined;
+
+        let template = null;
+        try { template = await window.electronAPI.getReportTemplate(user?.schoolId); } catch(e) {}
+
+        for (const student of eligibleStudents) {
+            const rankIndex = studentsWithAverages.findIndex(s => s.id === student.id);
+            const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
+            const studentData = studentsWithAverages.find(s => s.id === student.id);
+            if (studentData) {
+                generateReportCard({
+                    student,
+                    classObj,
+                    school,
+                    template,
+                    grades: studentData.details.grades.filter((g: any) => g.term === selectedTerm),
+                    attendance: studentData.details.attendance,
+                    term: selectedTerm,
+                    rank,
+                    totalStudents,
+                    classAverage,
+                    firstAverage,
+                    lastAverage,
+                    ignoreValidation: isDirector
+                });
+                await new Promise(resolve => setTimeout(resolve, 400));
+            }
+        }
+        showNotification(`✅ ${eligibleStudents.length} bulletin${eligibleStudents.length > 1 ? 's' : ''} généré${eligibleStudents.length > 1 ? 's' : ''} !`, "success");
+    } catch (err: any) {
+        showNotification(t('gr_report_generation_error', "Erreur lors de la génération : ") + err.message, "error");
+    } finally {
+        setIsBatchPrinting(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -723,9 +796,19 @@ const Grades: React.FC = () => {
                         </button>
                     )}
                     {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && isClassValidated && (
+                        <>
                         <span className="flex items-center text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
                             <CheckCircle2 className="w-3 h-3 mr-2" /> {t('class_validated_badge', 'CLASSE VALIDÉE')}
                         </span>
+                        <button
+                            onClick={handlePrintAllClass}
+                            disabled={isBatchPrinting}
+                            className="bg-purple-600 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-purple-500 transition-all inline-flex items-center shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Printer className="w-4 h-4 mr-2" />
+                            {isBatchPrinting ? t('gr_printing_all', 'Impression...') : t('gr_print_all_class', 'Imprimer la classe')}
+                        </button>
+                        </>
                     )}
                     {!isLocked ? (
                         <button

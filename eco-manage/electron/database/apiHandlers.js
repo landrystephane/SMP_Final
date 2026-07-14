@@ -3237,6 +3237,55 @@ handlers['db:getDashboardStats'] = async (params) => {
     console.error('Financial alerts error:', e);
   }
 
+  // Top 5 absentéistes (> 15h)
+  const topAbsentees = (() => {
+    try {
+      return db.prepare(`
+        SELECT s.first_name, s.last_name, s.matricule, c.name as class_name,
+               COALESCE(SUM(a.hours_absent), 0) as total_hours
+        FROM students s
+        JOIN classes c ON s.class_id = c.id
+        LEFT JOIN attendance a ON a.student_id = s.id
+        WHERE s.school_id = ? AND s.status != 'DELETED'
+        GROUP BY s.id
+        HAVING total_hours > 15
+        ORDER BY total_hours DESC
+        LIMIT 5
+      `).all(schoolId);
+    } catch(e) { return []; }
+  })();
+
+  // Dépenses en attente d'approbation
+  const pendingExpensesCount = (() => {
+    try {
+      return db.prepare("SELECT COUNT(*) as count FROM expenses WHERE status = 'PENDING' AND school_id = ?").get(schoolId).count || 0;
+    } catch(e) { return 0; }
+  })();
+
+  // Taux d'assiduité par classe (% présents sur total enregistrements)
+  const attendanceByClass = (() => {
+    try {
+      return db.prepare(`
+        SELECT c.id as class_id, c.name as class_name,
+               COUNT(a.id) as total_records,
+               SUM(CASE WHEN a.status = 'PRESENT' THEN 1 ELSE 0 END) as present_count
+        FROM classes c
+        LEFT JOIN students s ON s.class_id = c.id AND s.status != 'DELETED'
+        LEFT JOIN attendance a ON a.student_id = s.id
+        WHERE c.school_id = ?
+        GROUP BY c.id
+      `).all(schoolId);
+    } catch(e) { return []; }
+  })();
+
+  const classStatsWithAttendance = classStats.map(c => {
+    const att = attendanceByClass.find(a => a.class_name === c.level);
+    const attendanceRate = att && att.total_records > 0
+      ? Math.round((att.present_count / att.total_records) * 100)
+      : null;
+    return { ...c, avg: c.avg || 0, passRate: c.passRate || 0, attendanceRate };
+  });
+
   return {
     totalStudents,
     genderDist: { boys, girls },
@@ -3244,10 +3293,12 @@ handlers['db:getDashboardStats'] = async (params) => {
     totalExpenses,
     totalTuitionDue,
     completedClasses,
-    classStats: classStats.map(c => ({ ...c, avg: c.avg || 0, passRate: c.passRate || 0 })),
+    classStats: classStatsWithAttendance,
     honorRoll: honorRoll.map(h => ({ name: (h.last_name + ' ' + (h.first_name || '')).trim(), class: h.class_name, level: h.class_level, section: h.class_section, avg: h.avg || 0, rank: h.class_rank, totalStudents: h.class_total })),
     honorRollThreshold: honorThreshold,
-    financialAlerts
+    financialAlerts,
+    topAbsentees,
+    pendingExpensesCount
   };
 
 };
@@ -3639,6 +3690,9 @@ handlers['db:getSchoolArchives'] = async (schoolId) => {
 };
 
 handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    if (!yearName || !yearName.trim()) throw new Error('Le libellé de l\'année scolaire est requis.');
     const sid = getActiveSchoolId(schoolId);
     const totalStudents = db.prepare('SELECT COUNT(*) as count FROM students WHERE school_id = ?').get(sid).count;
     const totalRevenue = db.prepare(`

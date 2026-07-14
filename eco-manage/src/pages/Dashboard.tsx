@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download, RefreshCw, TrendingUp } from 'lucide-react';
+import { Users as UsersIcon, CreditCard, Activity, ChevronRight, Globe, School, LayoutGrid, AlertTriangle, Wallet, BookOpen, Download, RefreshCw, TrendingUp, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -906,6 +906,7 @@ const Dashboard: React.FC = () => {
 
       {/* Financial Overview for Founder/Director */}
       {(user?.role === 'FOUNDER' || user?.role === 'DIRECTOR') && (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass-card p-6 border-none group hover:translate-y-[-4px] transition-all">
           <div className="flex items-center justify-between mb-4">
@@ -936,6 +937,23 @@ const Dashboard: React.FC = () => {
           <p className="text-2xl font-black text-white mt-1">{((stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) > 0 ? (stats?.totalTuitionDue || 0) - (stats?.totalRevenue || 0) : 0).toLocaleString()} <span className="text-xs text-slate-500">{currency}</span></p>
         </div>
       </div>
+      {(stats?.pendingExpensesCount ?? 0) > 0 && (
+        <div className="flex items-center gap-4 px-5 py-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+          <div className="p-2.5 bg-amber-500/20 rounded-xl shrink-0">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-amber-400 font-black text-sm">
+              {stats.pendingExpensesCount} dépense{stats.pendingExpensesCount > 1 ? 's' : ''} en attente d'approbation
+            </p>
+            <p className="text-amber-500/60 text-[10px] font-bold uppercase tracking-widest mt-0.5">Nécessite votre validation</p>
+          </div>
+          <button onClick={() => navigate('/finance')} className="shrink-0 px-4 py-2 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all">
+            Voir
+          </button>
+        </div>
+      )}
+      </>
       )}
 
       {/* Performance Bar Chart — always visible when classes exist */}
@@ -1109,7 +1127,7 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="pt-2">
-                        <button 
+                        <button
                             onClick={() => navigate('/admin-workflow')}
                             className="w-full py-3 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all border border-white/5"
                         >
@@ -1118,6 +1136,33 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Top Absentéistes */}
+            {stats?.topAbsentees && stats.topAbsentees.length > 0 && (
+            <div className="glass-card p-6 border-none shadow-xl">
+                <h2 className="text-sm font-black text-white mb-5 flex items-center gap-2 uppercase tracking-widest">
+                    <Clock className="w-4 h-4 text-rose-500 shrink-0" />
+                    Top Absentéistes (&gt;15h)
+                </h2>
+                <div className="space-y-3">
+                    {stats.topAbsentees.map((ab: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                            <span className="text-[10px] font-black text-rose-500 w-5 shrink-0 text-center">{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-black text-xs truncate uppercase">{ab.last_name} {ab.first_name}</p>
+                                <p className="text-[10px] text-slate-500 font-bold truncate">{ab.class_name}</p>
+                            </div>
+                            <span className="shrink-0 text-xs font-black text-rose-400 bg-rose-500/10 px-2 py-1 rounded-lg">
+                                {ab.total_hours}h
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                <button onClick={() => navigate('/attendance')} className="w-full mt-4 py-2.5 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/10 hover:text-rose-400 transition-all border border-white/5">
+                    Voir les présences
+                </button>
+            </div>
+            )}
         </div>
       </div>
     </div>
