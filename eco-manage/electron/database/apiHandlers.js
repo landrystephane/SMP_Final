@@ -494,7 +494,20 @@ handlers['db:getGrades'] = async ({ classId, term, month }) => {
 };
 
 handlers['db:saveGrades'] = async (grades) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['TEACHER', 'FOUNDER', 'DIRECTOR', 'ADVISOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) {
+    throw new Error('Non autorisé : vous n\'avez pas le droit de saisir des notes.');
+  }
   const sid = getActiveSchoolId();
+  // Validation des scores côté serveur
+  if (grades && grades.length > 0) {
+    for (const g of grades) {
+      if (g.score !== null && g.score !== undefined) {
+        const s = parseFloat(g.score);
+        if (!isFinite(s) || s < 0 || s > 100) throw new Error(`Score invalide (${g.score}) : doit être entre 0 et 100.`);
+      }
+    }
+  }
   if (grades && grades.length > 0) {
     const classIds = [...new Set(grades.map(g => g.class_id))];
     for (const cId of classIds) {
@@ -632,6 +645,10 @@ handlers['db:unlockGrades'] = async ({ classId, term, month }) => {
   const currentUser = session.getStore()?.user;
   if (!currentUser || !['FOUNDER','DIRECTOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const sid = getActiveSchoolId();
+  if (currentUser.role === 'SG') {
+    const sgActing = db.prepare('SELECT value FROM settings WHERE key = ?').get(scopeSettingKey('sg_acting_director'));
+    if (!sgActing || sgActing.value !== 'true') throw new Error('Non autorisé : le SG doit être en mode directeur par intérim pour déverrouiller les notes.');
+  }
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
   const result = db.prepare('UPDATE grades SET locked = 0, validated = 0 WHERE class_id = ? AND term = ? AND month = ?').run(classId, term, month);
@@ -735,8 +752,11 @@ handlers['db:getPayments'] = async (schoolId) => {
 };
 
 handlers['db:addPayment'] = async (payment) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['BURSAR', 'FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé : seul le personnel administratif peut enregistrer un paiement.');
   const { studentId, amount, type, userId, installmentId, depositorName } = payment;
-  if (!amount || parseFloat(amount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
+  const parsedAmount = parseFloat(amount);
+  if (!isFinite(parsedAmount) || parsedAmount <= 0) throw new Error('Le montant doit être un nombre valide supérieur à 0.');
   const sid = getActiveSchoolId();
   const studentCheck = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
   if (!studentCheck) throw new Error('Élève non autorisé pour cet établissement.');
@@ -805,7 +825,8 @@ handlers['db:addPayment'] = async (payment) => {
 };
 
 handlers['db:getPaymentInstallmentInfo'] = async (paymentId) => {
-    const p = db.prepare('SELECT id, student_id, payment_type, installment_id, amount FROM payments WHERE id = ?').get(paymentId);
+    const sid = getActiveSchoolId();
+    const p = db.prepare('SELECT p.id, p.student_id, p.payment_type, p.installment_id, p.amount FROM payments p JOIN students s ON p.student_id = s.id WHERE p.id = ? AND s.school_id = ?').get(paymentId, sid);
     if (!p) return { installmentDue: null, installmentPaidBefore: 0 };
 
     let installmentDue = null;
@@ -848,7 +869,10 @@ handlers['db:getPaymentInstallmentInfo'] = async (paymentId) => {
 };
 
 handlers['db:smartPayment'] = async ({ studentId, totalAmount, userId, depositorName, includeTransport, includeExam }) => {
-    if (!totalAmount || parseFloat(totalAmount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['BURSAR', 'FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé : seul le personnel administratif peut enregistrer un paiement.');
+    const parsedTotal = parseFloat(totalAmount);
+    if (!isFinite(parsedTotal) || parsedTotal <= 0) throw new Error('Le montant doit être un nombre valide supérieur à 0.');
     const sid = getActiveSchoolId();
     const student = db.prepare('SELECT s.*, c.name as className FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? AND s.school_id = ?').get(studentId, sid);
     if (!student) throw new Error('Élève non autorisé.');
@@ -984,12 +1008,16 @@ handlers['db:getInstallments'] = async () => {
 };
 
 handlers['db:addInstallment'] = async (name) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId() || 1;
     const count = db.prepare('SELECT COUNT(*) as count FROM installments WHERE school_id = ?').get(sid).count;
     return db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, ?)').run(name, count + 1, sid);
 };
 
 handlers['db:deleteInstallment'] = async (id) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     db.prepare('DELETE FROM class_installment_fees WHERE installment_id = ?').run(id);
     if (sid) {
@@ -1004,6 +1032,8 @@ handlers['db:getClassInstallmentFees'] = async (schoolId) => {
 };
 
 handlers['db:updateTuitionFee'] = async ({ classId, totalFee, registrationFee, transportFee = 0, examFee = 0 }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé : seul le personnel administratif peut modifier les barèmes.');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id, name FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -1036,6 +1066,8 @@ handlers['db:updateTuitionFee'] = async ({ classId, totalFee, registrationFee, t
 };
 
 handlers['db:updateClassInstallmentFee'] = async ({ classId, installmentId, amount }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
     if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -1052,6 +1084,8 @@ handlers['db:getInstallmentDeadlines'] = async (schoolId) => {
 };
 
 handlers['db:saveInstallmentDeadlines'] = async (arg1, arg2) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const schoolId = arg2 !== undefined ? arg1 : arg1.schoolId;
     const deadlines = arg2 !== undefined ? arg2 : arg1.deadlines;
     const sid = getActiveSchoolId(schoolId);
@@ -1071,6 +1105,8 @@ handlers['db:saveInstallmentDeadlines'] = async (arg1, arg2) => {
 };
 
 handlers['db:notifyLateInstallments'] = async ({ schoolId, installmentId, senderId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
 
     const installment = db.prepare('SELECT name FROM installments WHERE id = ?').get(installmentId);
@@ -1425,6 +1461,8 @@ handlers['db:getClassSubjects'] = async (classId) => {
 };
 
 handlers['db:assignSubjectToClass'] = async ({ classId, subjectId, coefficient, isOptional }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -2051,6 +2089,16 @@ handlers['db:getSetting'] = async (key) => {
 };
 
 handlers['db:setSetting'] = async ({ key, value }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) {
+    throw new Error('Non autorisé : seul le personnel de direction peut modifier les paramètres de l\'établissement.');
+  }
+  // SG ne peut modifier que le mode directeur par intérim et les verrous de classe
+  if (currentUser.role === 'SG') {
+    const ALLOWED_FOR_SG = ['sg_acting_director', 'class_locked_'];
+    const isAllowed = ALLOWED_FOR_SG.some(prefix => key.startsWith(prefix) || key.includes(prefix));
+    if (!isAllowed) throw new Error('Non autorisé : le SG ne peut pas modifier ce paramètre.');
+  }
   const scopedKey = scopeSettingKey(key);
   return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(scopedKey, value);
 };
@@ -2071,13 +2119,17 @@ handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, r
 
 handlers['db:validatePayment'] = async (data) => {
   const user = session.getStore()?.user;
-  if (!user || (user.role !== 'SUPERADMIN' && user.role !== 'FOUNDER')) throw new Error('Non autorisé');
+  if (!user || user.role !== 'SUPERADMIN') throw new Error('Non autorisé : seul un SuperAdmin peut valider un paiement d\'abonnement.');
   const { schoolId, monthsGranted, amount } = data;
+  const parsedMonths = parseInt(monthsGranted, 10);
+  if (!parsedMonths || parsedMonths < 1 || parsedMonths > 120) throw new Error('Nombre de mois invalide (1 à 120).');
+  const parsedAmount = parseFloat(amount);
+  if (!isFinite(parsedAmount) || parsedAmount < 0) throw new Error('Montant invalide.');
   const tx = db.transaction(() => {
     db.prepare("INSERT INTO saas_subscriptions (school_id, amount, payment_method, months_granted, start_date, end_date, status, validated_by) VALUES (?, ?, 'CASH', ?, date('now'), date('now', '+' || ? || ' months'), 'VALIDATED', ?)")
-      .run(schoolId, amount, monthsGranted, monthsGranted, user.id);
+      .run(schoolId, parsedAmount, parsedMonths, parsedMonths, user.id);
     db.prepare("UPDATE schools SET subscription_status = 'ACTIVE', subscription_end_date = date(COALESCE(subscription_end_date, date('now')), '+' || ? || ' months'), is_active = 1 WHERE id = ?")
-      .run(monthsGranted, schoolId);
+      .run(parsedMonths, schoolId);
   });
   tx();
   return { success: true };
@@ -2532,15 +2584,20 @@ handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actio
 };
 
 handlers['db:createExpense'] = async (expense) => {
-  const { amount, reason, requested_by, school_id } = expense;
-  if (!amount || parseFloat(amount) <= 0) throw new Error('Le montant doit être supérieur à 0.');
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non authentifié.');
+  const { amount, reason, school_id } = expense;
+  const parsedAmount = parseFloat(amount);
+  if (!isFinite(parsedAmount) || parsedAmount <= 0) throw new Error('Le montant doit être un nombre valide supérieur à 0.');
   const sid = getActiveSchoolId(school_id);
+  // requested_by vient de la session, jamais du client
+  const requestedBy = currentUser.id;
   const result = db.prepare('INSERT INTO expenses (amount, reason, requested_by, school_id) VALUES (?, ?, ?, ?)')
-    .run(amount, reason, requested_by, sid);
+    .run(parsedAmount, reason, requestedBy, sid);
 
-  const user = db.prepare('SELECT full_name, role FROM users WHERE id = ?').get(requested_by);
+  const user = db.prepare('SELECT full_name, role FROM users WHERE id = ?').get(requestedBy);
   const roleName = user?.role === 'BURSAR' ? "l'Économe" : (user?.full_name || 'un utilisateur');
-  const reqData = JSON.stringify({ expenseId: result.lastInsertRowid, amount, reason, requested_by });
+  const reqData = JSON.stringify({ expenseId: result.lastInsertRowid, amount: parsedAmount, reason, requested_by: requestedBy });
   db.prepare("INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data, action_status) VALUES (?, NULL, ?, 'ACTION_REQUIRED', 'CASH_WITHDRAWAL', ?, 'PENDING')")
     .run(sid, `Une demande de ${amount} FCFA a été soumise par ${roleName} pour: ${reason}. Veuillez vous rendre dans l'onglet "Gestion Financière > Décaissements" pour l'approuver ou la rejeter.`, reqData);
 
@@ -2553,8 +2610,13 @@ handlers['db:getExpenses'] = async (schoolId) => {
 };
 
 handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé : seul un Fondateur, Directeur ou SuperAdmin peut valider un décaissement.');
+  const VALID_STATUSES = ['VALIDATED', 'REJECTED'];
+  if (!VALID_STATUSES.includes(status)) throw new Error('Statut invalide.');
   const sid = getActiveSchoolId();
-  return db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ? AND school_id = ?').run(status, validatedBy, expenseId, sid);
+  const safeValidatedBy = currentUser.id;
+  return db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ? AND school_id = ?').run(status, safeValidatedBy, expenseId, sid);
 };
 
 handlers['db:createNotification'] = async (notification) => {
@@ -3626,8 +3688,12 @@ handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) =
 handlers['db:addGradeOverride'] = async ({ teacherId, classId, term, month, deadline, grantedBy }) => {
     const user = session.getStore()?.user;
     if (!user || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(user.role)) throw new Error('Unauthorized');
+    const sid = getActiveSchoolId();
     const tId = teacherId ? parseInt(teacherId, 10) : null;
     const cId = classId ? parseInt(classId, 10) : null;
+    // Vérifier que la classe appartient bien à l'école de l'utilisateur
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(cId, sid);
+    if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
     const gBy = grantedBy ? parseInt(grantedBy, 10) : null;
     // Supprimer les anciennes dérogations pour ce prof/classe/période avant d'insérer la nouvelle
     db.prepare('DELETE FROM grade_overrides WHERE teacher_id = ? AND class_id = ? AND term = ? AND month = ?').run(tId, cId, term, month);
@@ -3728,6 +3794,8 @@ handlers['db:saveGradingScale'] = async ({ id, schoolId, name, is_numerical, min
 };
 
 handlers['db:updateSchoolSuperAdminSettings'] = async ({ schoolId, requiresSubjectCode, allowFounderTermEdit }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || currentUser.role !== 'SUPERADMIN') throw new Error('Non autorisé : réservé au SuperAdmin.');
   const tx = db.transaction(() => {
     db.prepare('UPDATE schools SET requires_subject_code = ?, allow_founder_term_edit = ? WHERE id = ?')
       .run(requiresSubjectCode, allowFounderTermEdit, schoolId);
@@ -3886,6 +3954,8 @@ handlers['db:getClassTeacherAssignments'] = async (classId) => {
 };
 
 handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -3916,6 +3986,8 @@ handlers['db:saveClassTeacherAssignments'] = async ({ classId, assignments }) =>
 };
 
 handlers['db:submitSystemRequest'] = async ({ schoolId, senderId, requestType, requestData }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || ['PARENT', 'DRIVER'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const reqDataObj = typeof requestData === 'string' ? JSON.parse(requestData) : requestData;
   const actualSenderId = senderId || reqDataObj.teacherId || reqDataObj.senderId;
   const sid = getActiveSchoolId(schoolId || reqDataObj.schoolId);
@@ -4155,7 +4227,7 @@ handlers['db:approveExpenseInline'] = async ({ expenseId, action, resolvedBy }) 
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ? AND school_id = ?').get(expenseId, sid);
   if (!expense) throw new Error("Décaissement introuvable.");
   const newStatus = action === 'APPROVED' ? 'VALIDATED' : 'REJECTED';
-  db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ?').run(newStatus, resolvedBy, expenseId);
+  db.prepare('UPDATE expenses SET status = ?, validated_by = ? WHERE id = ? AND school_id = ?').run(newStatus, currentUser.id, expenseId, sid);
   const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(expense.requested_by);
   const msg = action === 'APPROVED'
     ? `Votre demande de décaissement de ${expense.amount} FCFA a été approuvée.`
