@@ -5,7 +5,7 @@ import { generateReportCard } from '../utils/reports';
 import { downloadCSV } from '../utils/exports';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { notifyDataChanged } from '../utils/dataSync';
+import { notifyDataChanged, useDataRefresh } from '../utils/dataSync';
 import { getRoleLabel } from '../utils/roleLabels';
 
 const Grades: React.FC = () => {
@@ -100,6 +100,7 @@ const Grades: React.FC = () => {
   }
 
   useEffect(() => { loadData(); }, []);
+  useDataRefresh(loadData);
 
   const handleLoadContext = async () => {
     if (window.electronAPI && selectedClass) {

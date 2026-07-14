@@ -3,6 +3,7 @@ import { Plus, Globe, X, Save, Trash2, CheckCircle2, Circle, Edit } from 'lucide
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
+import { useDataRefresh } from '../utils/dataSync';
 
 const Subjects: React.FC = () => {
   const { t } = useTranslation();
@@ -79,6 +80,7 @@ const Subjects: React.FC = () => {
     loadData();
     loadPendingSubjects();
   }, []);
+  useDataRefresh(loadData);
 
   useEffect(() => {
     if (selectedClassId) {

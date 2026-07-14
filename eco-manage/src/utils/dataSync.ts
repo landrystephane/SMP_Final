@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const EVENT_NAME = 'app:data-changed';
 
@@ -10,6 +10,22 @@ export const onDataChanged = (callback: () => void) => {
   window.addEventListener(EVENT_NAME, callback);
   return () => window.removeEventListener(EVENT_NAME, callback);
 };
+
+/**
+ * Abonne automatiquement une page à app:data-changed.
+ * Utilise une ref interne pour toujours appeler la version la plus
+ * récente de loadFn sans créer de boucle infinie de useEffect.
+ */
+export function useDataRefresh(loadFn: () => void): void {
+  const ref = useRef(loadFn);
+  useEffect(() => { ref.current = loadFn; });
+
+  useEffect(() => {
+    const handler = () => ref.current();
+    window.addEventListener(EVENT_NAME, handler);
+    return () => window.removeEventListener(EVENT_NAME, handler);
+  }, []);
+}
 
 /**
  * Retourne true si la connexion est active.

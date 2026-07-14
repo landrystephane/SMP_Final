@@ -3,6 +3,7 @@ import { MapPin, Navigation, Clock, Users, Shield, Radio, Activity, Pencil, Tras
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
+import { useDataRefresh } from '../utils/dataSync';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -98,6 +99,7 @@ const Transport: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [user]);
+  useDataRefresh(loadData);
 
   useEffect(() => {
       loadPoints();

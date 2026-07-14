@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Send, MessageSquare, History, Megaphone, Users, Award, ShieldAlert, CheckCircle, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useDataRefresh } from '../utils/dataSync';
 
 const Tickets: React.FC = () => {
   const { user } = useAuth();
@@ -70,6 +71,7 @@ const Tickets: React.FC = () => {
   useEffect(() => {
       loadData();
   }, [user]);
+  useDataRefresh(loadData);
 
   const handleSendTicket = async () => {
       if (!newTicketMessage.trim() || !window.electronAPI || !user) return;

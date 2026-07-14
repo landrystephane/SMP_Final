@@ -3,11 +3,13 @@
   "short_name": "Eco-Manage",
   "description": "Plateforme de gestion scolaire pour établissements primaires et maternelles",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#020617",
   "theme_color": "#f59e0b",
   "lang": "fr",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -20,6 +22,26 @@
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tableau de bord",
+      "short_name": "Dashboard",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Élèves",
+      "short_name": "Élèves",
+      "url": "/students",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Finance",
+      "short_name": "Finance",
+      "url": "/finance",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "screenshots": [],

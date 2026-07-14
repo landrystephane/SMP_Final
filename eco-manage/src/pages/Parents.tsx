@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { generateParentsListReport } from '../utils/reports';
+import { useDataRefresh } from '../utils/dataSync';
 
 const Parents: React.FC = () => {
   const { t } = useTranslation();
@@ -43,6 +44,7 @@ const Parents: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [currentUser]);
+  useDataRefresh(loadData);
 
   const filteredParents = parents.filter(p => {
         const matchesSearch = (p.parent_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

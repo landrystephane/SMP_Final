@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { Building2, Plus, Edit2, Trash2, Users, Search, Save, X, Copy, BookOpen } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
+import { useDataRefresh } from '../utils/dataSync';
 
 const generateClassCode = (name: string, existingClasses: any[]) => {
     if (!name) return '';
@@ -132,6 +133,7 @@ const Classes: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [user]);
+    useDataRefresh(loadData);
 
     const handleOpenModal = (cls?: any) => {
         if (cls) {

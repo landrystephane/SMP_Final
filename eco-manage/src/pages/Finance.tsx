@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { downloadCSV } from '../utils/exports';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { notifyDataChanged } from '../utils/dataSync';
+import { notifyDataChanged, useDataRefresh } from '../utils/dataSync';
 import { generateFinancialStatement } from '../utils/reports';
 
 const Finance: React.FC = () => {
@@ -62,6 +62,8 @@ const Finance: React.FC = () => {
       window.electronAPI.getSetting('currency').then((val: string) => { if (val) setCurrency(val); });
     }
   }, [user]);
+
+  useDataRefresh(loadData);
 
   const totalCollected = payments.reduce((acc, p) => acc + p.amount, 0);
   const totalValidatedExpenses = expenses.filter(e => e.status === 'VALIDATED').reduce((acc, e) => acc + e.amount, 0);

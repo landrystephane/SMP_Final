@@ -122,6 +122,11 @@ export const initSaaSBridge = () => {
                         channel: channel,
                         args: args
                     });
+                    // Réponse offline émise par le Service Worker (hors connexion)
+                    if (res && res.offline) {
+                        console.warn(`[SaaS Bridge] Hors connexion — ${prop} retourne données vides`);
+                        return prop.startsWith('get') ? [] : null;
+                    }
                     return res.result;
                 } catch (error: any) {
                     console.error(`[SaaS Bridge Error] ${prop} (${channel}):`, error);
