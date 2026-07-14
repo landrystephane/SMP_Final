@@ -1883,15 +1883,18 @@ handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, rout
 
 handlers['db:getParentStudents'] = async (parentPhone) => {
     const sid = getActiveSchoolId();
-    return db.prepare(`
+    const all = db.prepare(`
         SELECT s.*,
                (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Inscription') >= COALESCE(tf.registration_fee, 0) AS has_paid_registration,
                (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = s.id AND payment_type = 'Scolarité') as pension_paid,
                COALESCE(tf.total_fee, 0) - COALESCE(s.scholarship_reduction, 0) as pension_due
         FROM students s
         LEFT JOIN tuition_fees tf ON s.class_id = tf.class_id
-        WHERE s.parent_contact = ? AND s.school_id = ?
+        WHERE s.parent_contact = ? AND s.school_id = ? AND s.status != 'DELETED'
     `).all(parentPhone, sid);
+    const blockedCount = all.filter(s => s.status === 'BLOCKED').length;
+    const students = all.filter(s => s.status !== 'BLOCKED');
+    return { students, blockedCount };
 };
 
 handlers['db:logTransport'] = async (log) => {

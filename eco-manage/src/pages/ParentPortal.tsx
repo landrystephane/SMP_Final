@@ -13,6 +13,7 @@ const ParentPortal: React.FC = () => {
     const [children, setChildren] = useState<any[]>([]);
     const [selectedChild, setSelectedChild] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [accessBlocked, setAccessBlocked] = useState(false);
     const [stats, setStats] = useState<any>(null);
     const [termStructure, setTermStructure] = useState<any[]>([]);
     const [selectedTerm, setSelectedTerm] = useState<number | ''>('');
@@ -46,7 +47,16 @@ const ParentPortal: React.FC = () => {
         if (window.electronAPI && user) {
             let studs: any[] = [];
             if (user.role === 'PARENT') {
-                studs = await window.electronAPI.getParentStudents(user.username);
+                const raw = await window.electronAPI.getParentStudents(user.username);
+                // Backend returns { students, blockedCount } — handle both old array shape and new object shape
+                if (Array.isArray(raw)) {
+                    studs = raw;
+                } else {
+                    studs = raw?.students || [];
+                    if (studs.length === 0 && (raw?.blockedCount || 0) > 0) {
+                        setAccessBlocked(true);
+                    }
+                }
                 setChildren(studs);
 
                 const tf = await window.electronAPI.getTuitionFees(user.schoolId);
@@ -334,17 +344,35 @@ const ParentPortal: React.FC = () => {
         </div>
     );
 
-    if (children.length === 0) return (
-        <div className="p-20 text-center space-y-6">
-            <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto border border-white/5">
-                <User className="w-10 h-10 text-slate-700" />
+    if (children.length === 0) {
+        if (accessBlocked) return (
+            <div className="h-[80vh] flex flex-col items-center justify-center p-8 text-center space-y-6">
+                <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-rose-500/30">
+                    <ShieldCheck className="w-12 h-12 text-rose-500" />
+                </div>
+                <div className="space-y-3 max-w-sm">
+                    <h2 className="text-2xl font-black text-white uppercase italic">{t('pp_access_blocked_title', 'Accès suspendu')}</h2>
+                    <p className="text-slate-400 text-sm font-bold leading-relaxed">
+                        {t('pp_access_blocked_desc', 'Le compte de votre enfant a été temporairement bloqué par l\'administration. Aucune donnée n\'est accessible pendant cette période.')}
+                    </p>
+                    <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest mt-4">
+                        {t('pp_access_blocked_contact', 'Veuillez contacter l\'établissement pour plus d\'informations.')}
+                    </p>
+                </div>
             </div>
-            <h2 className="text-xl font-black text-white uppercase italic">{t('pp_no_student_linked', 'Aucun élève associé')}</h2>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">
-                {t('pp_no_student_linked_desc', 'Le compte parent est configuré automatiquement à l\'enregistrement de l\'élève. Veuillez vous assurer que le numéro de téléphone saisi correspond parfaitement.')}
-            </p>
-        </div>
-    );
+        );
+        return (
+            <div className="p-20 text-center space-y-6">
+                <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto border border-white/5">
+                    <User className="w-10 h-10 text-slate-700" />
+                </div>
+                <h2 className="text-xl font-black text-white uppercase italic">{t('pp_no_student_linked', 'Aucun élève associé')}</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">
+                    {t('pp_no_student_linked_desc', 'Le compte parent est configuré automatiquement à l\'enregistrement de l\'élève. Veuillez vous assurer que le numéro de téléphone saisi correspond parfaitement.')}
+                </p>
+            </div>
+        );
+    }
 
     if (!selectedChild) return null;
 
