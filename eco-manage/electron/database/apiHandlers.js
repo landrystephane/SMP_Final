@@ -1319,6 +1319,8 @@ handlers['db:validateSubjectCode'] = async ({ pendingId, code }) => {
 };
 
 handlers['db:resendSubjectCode'] = async (pendingId) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || currentUser.role !== 'SUPERADMIN') throw new Error('Non autorisé');
   const pending = db.prepare("SELECT * FROM pending_subjects WHERE id = ?").get(pendingId);
   if (!pending) throw new Error("Demande introuvable.");
   
@@ -1866,9 +1868,9 @@ handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, rout
     if (!point) return { success: false, error: 'Point introuvable' };
 
     // 3. Create announcement for parent
-    const student = db.prepare('SELECT parent_contact, first_name FROM students WHERE id = ?').get(studentId);
+    const student = db.prepare('SELECT parent_contact, first_name, school_id FROM students WHERE id = ?').get(studentId);
     if (student && student.parent_contact) {
-        const parentUser = db.prepare('SELECT id FROM users WHERE username = ?').get(student.parent_contact.trim());
+        const parentUser = db.prepare('SELECT id FROM users WHERE username = ? AND school_id = ?').get(student.parent_contact.trim(), student.school_id);
         if (parentUser) {
             const mapLink = (point.latitude && point.longitude && point.latitude !== 0) ? `https://www.google.com/maps?q=${point.latitude},${point.longitude}` : '';
             const msg = `🚌 **Abonnement Transport Validé**\n\nVotre enfant ${student.first_name} a été assigné au point de ramassage : **${point.name}**.\nLe bus passera approximativement à **+${point.estimated_time_from_start} minutes** après le départ de la tournée.\n\n${mapLink ? `📍 [Voir sur Google Maps](${mapLink})` : ''}`;
@@ -1931,7 +1933,7 @@ handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, 
     if (status === 'PRESENT') {
         const student = db.prepare('SELECT first_name, last_name, parent_contact, school_id FROM students WHERE id = ?').get(studentId);
         if (student && student.parent_contact) {
-            const parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND role = 'PARENT'").get(student.parent_contact);
+            const parentUser = db.prepare("SELECT id FROM users WHERE username = ? AND role = 'PARENT' AND school_id = ?").get(student.parent_contact, student.school_id);
             if (parentUser) {
                 db.prepare(`
                     INSERT INTO notifications (school_id, user_id, message, type)
@@ -2113,6 +2115,10 @@ handlers['db:getServerIp'] = async () => {
 };
 
 handlers['db:getSystemRequests'] = async ({ schoolId }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) {
+    throw new Error('Non autorisé');
+  }
   const sid = getActiveSchoolId(schoolId);
   return db.prepare("SELECT * FROM notifications WHERE school_id = ? AND type = 'ACTION_REQUIRED' ORDER BY created_at DESC").all(sid);
 };
@@ -2178,9 +2184,9 @@ handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
                 if (student) {
                     exceeders.push({ studentId: r.studentId, firstName: student.first_name, lastName: student.last_name, total: newTotal });
                     
-                    // Find parent user
+                    // Find parent user — scopé par school_id pour éviter cross-school
                     if (student.parent_contact) {
-                        const parentUser = db.prepare('SELECT id FROM users WHERE username = ?').get(student.parent_contact.trim());
+                        const parentUser = db.prepare('SELECT id FROM users WHERE username = ? AND school_id = ?').get(student.parent_contact.trim(), student.school_id);
                         if (parentUser) {
                             const message = `URGENT - CONVOCATION PARENTALE : Votre enfant ${student.first_name} ${student.last_name} a cumulé ${newTotal} heures d'absence non justifiées. Veuillez vous présenter à la direction de l'école dans les plus brefs délais.`;
                             db.prepare('INSERT INTO tickets (sender_id, receiver_id, receiver_role, subject, message, school_id) VALUES (?, ?, ?, ?, ?, ?)').run(userId, parentUser.id, 'PARENT', 'CONVOCATION PARENTALE', message, student.school_id);
@@ -2435,9 +2441,9 @@ handlers['db:sendTicket'] = async (ticket) => {
   const sid = getActiveSchoolId(school_id);
   const safeReceiverId = receiver_id ? parseInt(receiver_id, 10) : null;
   if (safeReceiverId) {
-    const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(safeReceiverId);
+    const exists = db.prepare('SELECT id FROM users WHERE id = ? AND school_id = ?').get(safeReceiverId, sid);
     if (!exists) {
-      throw new Error('Le destinataire sélectionné est introuvable.');
+      throw new Error('Le destinataire sélectionné est introuvable ou n\'appartient pas à cet établissement.');
     }
   }
   return db.prepare('INSERT INTO tickets (sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -2476,8 +2482,13 @@ handlers['db:getUnreadTicketsCount'] = async ({ userId, role, schoolId }) => {
 
 handlers['db:resolveTicket'] = async ({ ticketId, status, responseMessage, actionData }) => {
     const sid = getActiveSchoolId();
+    const currentUser = session.getStore()?.user;
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND school_id = ?').get(ticketId, sid);
     if (!ticket) throw new Error("Ticket introuvable");
+    const adminRoles = ['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'BURSAR'];
+    const isAdmin = currentUser && adminRoles.includes(currentUser.role);
+    const isReceiver = currentUser && (ticket.receiver_id === currentUser.id || ticket.receiver_role === currentUser.role);
+    if (!isAdmin && !isReceiver) throw new Error("Non autorisé : seul le destinataire ou un administrateur peut résoudre ce ticket.");
     
     // Si c'est une demande d'extension de délai et qu'elle est approuvée avec un nombre d'heures
     if (status === 'RESOLVED' && (ticket.request_type === 'GRADE_EXTENSION' || ticket.request_type === 'GRADE_REACTIVATION') && actionData && actionData.hours) {
@@ -2572,14 +2583,15 @@ handlers['db:createNotification'] = async (notification) => {
 
 handlers['db:respondExamSurveillance'] = async ({ notificationId, examId, status, rejectionReason, schoolId }) => {
     const sid = getActiveSchoolId(schoolId);
-    
-    // Update the exam schedule
-    db.prepare('UPDATE evaluation_schedules SET status = ?, rejection_reason = ? WHERE id = ?').run(status, rejectionReason || null, examId);
-    
-    // Delete the original ACTION_REQUIRED notification sent to the teacher
-    db.prepare('DELETE FROM notifications WHERE id = ?').run(notificationId);
 
-    const exam = db.prepare('SELECT e.*, u.full_name as teacher_name FROM evaluation_schedules e JOIN users u ON e.teacher_id = u.id WHERE e.id = ?').get(examId);
+    const exam = db.prepare('SELECT e.*, u.full_name as teacher_name FROM evaluation_schedules e JOIN users u ON e.teacher_id = u.id WHERE e.id = ? AND e.school_id = ?').get(examId, sid);
+    if (!exam) throw new Error("Évaluation introuvable ou non autorisée pour cet établissement.");
+
+    // Update the exam schedule — scopé par school_id
+    db.prepare('UPDATE evaluation_schedules SET status = ?, rejection_reason = ? WHERE id = ? AND school_id = ?').run(status, rejectionReason || null, examId, sid);
+
+    // Delete the original ACTION_REQUIRED notification — scopé par school_id
+    db.prepare('DELETE FROM notifications WHERE id = ? AND school_id = ?').run(notificationId, sid);
 
     if (status === 'PENDING_ADMIN') {
         // Send notification to Admin/Advisor
@@ -2603,14 +2615,14 @@ handlers['db:adminResolveExamRefusal'] = async ({ notificationId, examId, adminA
     
     // adminAction can be 'ACCEPT_REFUSAL' or 'FORCE_ASSIGNMENT'
     const newStatus = adminAction === 'ACCEPT_REFUSAL' ? 'REJECTED' : 'FORCED_APPROVED';
-    
-    db.prepare('UPDATE evaluation_schedules SET status = ? WHERE id = ?').run(newStatus, examId);
-    
-    // Mark admin notification as read or delete it
-    db.prepare('DELETE FROM notifications WHERE id = ?').run(notificationId);
-    
+
+    db.prepare('UPDATE evaluation_schedules SET status = ? WHERE id = ? AND school_id = ?').run(newStatus, examId, sid);
+
+    // Mark admin notification as read or delete it — scopé par school_id
+    db.prepare('DELETE FROM notifications WHERE id = ? AND school_id = ?').run(notificationId, sid);
+
     // Notify the teacher about the admin's decision
-    const exam = db.prepare('SELECT teacher_id, date FROM evaluation_schedules WHERE id = ?').get(examId);
+    const exam = db.prepare('SELECT teacher_id, date FROM evaluation_schedules WHERE id = ? AND school_id = ?').get(examId, sid);
     if (exam && exam.teacher_id) {
         const msg = adminAction === 'ACCEPT_REFUSAL' 
             ? `Votre refus de surveiller l'évaluation du ${exam.date} a été accepté. Vous avez été remplacé.`
@@ -2623,6 +2635,10 @@ handlers['db:adminResolveExamRefusal'] = async ({ notificationId, examId, adminA
 };
 
 handlers['db:sendParentAnnouncement'] = async ({ sender_id, school_id, subject, message, filter_cycle, filter_section, filter_class, target_student_id }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) {
+        throw new Error('Non autorisé : vous n\'avez pas le droit d\'envoyer des annonces aux parents.');
+    }
     const sid = getActiveSchoolId(school_id);
     let query = `
         SELECT DISTINCT u.id 
@@ -2765,7 +2781,8 @@ handlers['db:getNotifications'] = async ({ userId, schoolId, role }) => {
 handlers['db:markNotificationRead'] = async (notificationId) => {
   const user = session.getStore()?.user;
   const userId = user?.id;
-  return db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND (user_id = ? OR user_id IS NULL)').run(notificationId, userId);
+  const sid = getActiveSchoolId();
+  return db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND school_id = ? AND (user_id = ? OR user_id IS NULL)').run(notificationId, sid, userId);
 };
 
 handlers['db:getStudentDetails'] = async (studentId) => {
@@ -3625,20 +3642,25 @@ handlers['db:getParentMessages'] = async ({ schoolId, userId }) => {
     const parentPhone = parentRow ? parentRow.username : '';
     const children = db.prepare('SELECT class_id FROM students WHERE school_id = ? AND parent_contact = ?').all(sid, parentPhone);
     const classIds = children.map(c => c.class_id).filter(Boolean);
-    const classTargets = classIds.map(id => `'CLASS_${id}'`).join(',');
-    
-    let targetCondition = `a.target IN ('PARENTS', 'ALL')`;
-    if (classTargets) {
-        targetCondition = `a.target IN ('PARENTS', 'ALL', ${classTargets})`;
+
+    // Construire la condition target sans interpolation de valeurs (anti-injection SQL)
+    let announcementQuery = `
+        SELECT a.id, a.title, a.content, a.created_at, u.full_name as sender_name, u.role as sender_role, a.sender_id, 'ANNOUNCEMENT' as message_type
+        FROM announcements a
+        LEFT JOIN users u ON a.sender_id = u.id
+        WHERE a.school_id = ?`;
+    let announcementParams = [sid];
+
+    if (classIds.length > 0) {
+        const placeholders = classIds.map(() => '?').join(',');
+        const classTargetValues = classIds.map(id => `CLASS_${id}`);
+        announcementQuery += ` AND (a.target IN ('PARENTS', 'ALL') OR a.target IN (${placeholders}))`;
+        announcementParams = [...announcementParams, ...classTargetValues];
+    } else {
+        announcementQuery += ` AND a.target IN ('PARENTS', 'ALL')`;
     }
 
-    // Fetch announcements meant for PARENTS, ALL, or specific classes
-    const announcements = db.prepare(`
-        SELECT a.id, a.title, a.content, a.created_at, u.full_name as sender_name, u.role as sender_role, a.sender_id, 'ANNOUNCEMENT' as message_type
-        FROM announcements a 
-        LEFT JOIN users u ON a.sender_id = u.id 
-        WHERE a.school_id = ? AND ${targetCondition}
-    `).all(sid);
+    const announcements = db.prepare(announcementQuery).all(...announcementParams);
 
     // Fetch direct tickets to the parent
     const tickets = db.prepare(`
@@ -3951,6 +3973,10 @@ handlers['db:resolveSystemRequest'] = async ({ notificationId, action, durationH
   if (!currentUser || !['FOUNDER','DIRECTOR','SUPERADMIN','SG'].includes(currentUser.role)) throw new Error('Non autorisé');
   const notif = db.prepare('SELECT * FROM notifications WHERE id = ?').get(notificationId);
   if (!notif) throw new Error("Notification introuvable.");
+  // Non-SUPERADMIN: vérifier que la notification appartient bien à leur école
+  if (currentUser.role !== 'SUPERADMIN' && notif.school_id !== currentUser.schoolId) {
+    throw new Error("Non autorisé : cette demande n'appartient pas à votre établissement.");
+  }
   if (notif.action_status !== 'PENDING') throw new Error("Cette demande a déjà été résolue.");
 
   let grantedById = currentUser?.id || parseInt(resolvedBy, 10);
