@@ -1496,6 +1496,8 @@ handlers['db:getClasses'] = async (schoolId) => {
 };
 
 handlers['db:addClass'] = async (classData) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     let { name, code } = classData;
     const { section, level, mainTeacherId, assistantTeacherId, schoolId, baseClassId } = classData;
     const sid = getActiveSchoolId(schoolId);
@@ -1562,6 +1564,8 @@ handlers['db:addClass'] = async (classData) => {
 };
 
 handlers['db:updateClass'] = async (classData) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const { id, name, code, section, level, mainTeacherId, assistantTeacherId } = classData;
     const sid = getActiveSchoolId();
 
@@ -1616,6 +1620,8 @@ handlers['db:updateClass'] = async (classData) => {
 };
 
 handlers['db:deleteClass'] = async (classId) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
     if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
@@ -1659,6 +1665,8 @@ handlers['db:getSchedules'] = async (schoolId) => {
 };
 
 handlers['db:updateSchedule'] = async (schedule) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const { id, class_id, teacher_id, subject_id, day_of_week, start_time, end_time, type, school_id, week_start_date } = schedule;
     const sid = getActiveSchoolId(school_id);
 
@@ -1703,6 +1711,8 @@ handlers['db:updateSchedule'] = async (schedule) => {
 };
 
 handlers['db:deleteSchedule'] = async (id) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     return db.prepare('DELETE FROM schedules WHERE id = ? AND school_id = ?').run(id, sid);
 };
@@ -1724,6 +1734,8 @@ handlers['db:getWeekSchedule'] = async ({ schoolId, classId, weekStart }) => {
 
 // Clone template entries as week-specific starting point
 handlers['db:copyTemplateToWeek'] = async ({ schoolId, classId, weekStart }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
     db.prepare('DELETE FROM schedules WHERE school_id = ? AND class_id = ? AND week_start_date = ?').run(sid, classId, weekStart);
     const template = db.prepare(
@@ -2105,7 +2117,9 @@ handlers['db:setSetting'] = async ({ key, value }) => {
   return db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(scopedKey, value);
 };
 
-handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, recordedBy, scheduleId }) => {
+handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, scheduleId }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['TEACHER', 'FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId();
   const student = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
   if (!student) throw new Error('Élève non autorisé pour cet établissement.');
@@ -2116,7 +2130,7 @@ handlers['db:saveAttendance'] = async ({ studentId, date, status, hoursAbsent, r
       status = excluded.status,
       hours_absent = excluded.hours_absent,
       recorded_by = excluded.recorded_by
-  `).run(studentId, date, status, hoursAbsent || 0, recordedBy, scheduleId || 0, sid);
+  `).run(studentId, date, status, hoursAbsent || 0, currentUser.id, scheduleId || 0, sid);
 };
 
 handlers['db:validatePayment'] = async (data) => {
@@ -2177,7 +2191,10 @@ handlers['db:getSystemRequests'] = async ({ schoolId }) => {
   return db.prepare("SELECT * FROM notifications WHERE school_id = ? AND type = 'ACTION_REQUIRED' ORDER BY created_at DESC").all(sid);
 };
 
-handlers['db:saveAttendanceBulk'] = async ({ records, userId }) => {
+handlers['db:saveAttendanceBulk'] = async ({ records }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['TEACHER', 'FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    const userId = currentUser.id;
     const sid = getActiveSchoolId();
     let blockedSkipped = 0;
     if (records && records.length > 0) {
@@ -2995,6 +3012,8 @@ handlers['db:getReportTemplate'] = async (schoolId) => {
 };
 
 handlers['db:saveReportTemplate'] = async (data) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const { schoolId, headerImage, watermarkImage, footerImage, footerImagePosition, primaryColor, secondaryColor } = data;
   const sid = getActiveSchoolId(schoolId);
   if (!sid) return { success: false, error: 'No school ID' };
