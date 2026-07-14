@@ -10,6 +10,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useNotification } from '../context/NotificationContext';
+import { useOnlineStatus } from '../utils/dataSync';
 
 const Layout: React.FC = () => {
   const { user, logout, hasRole, exitImpersonation } = useAuth();
@@ -24,6 +25,7 @@ const Layout: React.FC = () => {
   const [myAllowedModules, setMyAllowedModules] = useState<string[] | null>(null);
 
   const { showNotification } = useNotification();
+  const isOnline = useOnlineStatus();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [durations, setDurations] = useState<Record<number, number>>({});
@@ -444,6 +446,15 @@ const Layout: React.FC = () => {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto bg-gradient-to-br from-[#030711] via-[#080d1a] to-[#030711]">
+        {/* Bannière hors-connexion */}
+        {!isOnline && (
+          <div className="bg-slate-800 border-b border-rose-500/30 px-4 py-2.5 flex items-center gap-3">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse" />
+            <span className="text-xs font-black text-rose-400 uppercase tracking-widest">
+              Hors connexion — données en cache affichées. Reconnectez-vous pour synchroniser.
+            </span>
+          </div>
+        )}
         {user?.role === 'SUPERADMIN' && isImpersonating && (
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-3.5 flex items-center justify-between shadow-2xl border-b border-amber-400/20">
             <div className="flex items-center space-x-3">

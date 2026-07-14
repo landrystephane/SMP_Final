@@ -1,7 +1,20 @@
-const CACHE_NAME = 'eco-manage-v5';
+const CACHE_NAME = 'eco-manage-v6';
+
+// Assets statiques à pré-cacher dès l'installation
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon-192.png',
+  '/icon-512.png',
+];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -9,44 +22,91 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
-      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
-      .then((clients) => clients.forEach((c) => c.navigate(c.url)))
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
+  const { request } = event;
+  const url = new URL(request.url);
 
-  // Network-first for API calls and HTML/JS/CSS (always get latest app code)
-  if (
-    url.includes('/api/') ||
-    url.endsWith('.html') ||
-    url.includes('/assets/') ||
-    url === self.location.origin + '/' ||
-    url === self.location.origin + '/index.html'
-  ) {
+  // Appels API (/api/) : network-first, cache en fallback offline
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(event.request).then((response) => {
-        if (response.status === 200 && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => caches.match(event.request))
+      fetch(request.clone())
+        .then((response) => {
+          // Mettre en cache uniquement les GET réussis
+          if (response.ok && request.method === 'GET') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          // Offline : essayer le cache pour les GET
+          if (request.method === 'GET') {
+            const cached = await caches.match(request);
+            if (cached) return cached;
+          }
+          // Réponse JSON structurée pour que le bridge React gère proprement
+          return new Response(
+            JSON.stringify({ offline: true, error: 'Hors connexion — données non disponibles', result: null }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } }
+          );
+        })
     );
     return;
   }
 
-  // Cache-first for icons, fonts, images
+  // HTML principal + routes SPA : network-first, fallback sur /index.html en cache
+  if (
+    url.pathname === '/' ||
+    url.pathname.endsWith('.html') ||
+    (!url.pathname.includes('.') && url.origin === self.location.origin)
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request) || caches.match('/') || caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Assets Vite versionnés (/assets/) : cache-first (hachés → immuables)
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Tout le reste (icônes, fonts, images) : cache-first avec fallback réseau
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        if (response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    }).catch(() => caches.match('/index.html'))
+    caches.match(request).then((cached) => {
+      return (
+        cached ||
+        fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        }).catch(() => caches.match('/index.html'))
+      );
+    })
   );
 });
