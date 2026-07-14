@@ -481,6 +481,8 @@ handlers['db:sendAnnouncement'] = async (announcement) => {
 };
 
 handlers['db:assignStudentToBus'] = async ({ studentId, routeId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
@@ -1822,11 +1824,15 @@ handlers['db:getBusRoutes'] = async (schoolId) => {
 };
 
 handlers['db:addBusRoute'] = async ({ name, bus_number, driver_id, schoolId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
     return db.prepare('INSERT INTO bus_routes (name, bus_number, driver_id, school_id) VALUES (?, ?, ?, ?)').run(name, bus_number, driver_id, sid);
 };
 
 handlers['db:updateBusRoute'] = async ({ id, name, bus_number, driver_id }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(id, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
@@ -1834,6 +1840,8 @@ handlers['db:updateBusRoute'] = async ({ id, name, bus_number, driver_id }) => {
 };
 
 handlers['db:deleteBusRoute'] = async (routeId) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
@@ -1845,11 +1853,15 @@ handlers['db:deleteBusRoute'] = async (routeId) => {
 };
 
 handlers['db:unassignStudentFromTransport'] = async (studentId) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     return db.prepare('UPDATE students SET transport_point_id = NULL WHERE id = ? AND school_id = ?').run(studentId, sid);
 };
 
 handlers['db:addTransportPoint'] = async ({ routeId, name, latitude, longitude, estimatedTime }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée.');
@@ -1857,6 +1869,8 @@ handlers['db:addTransportPoint'] = async ({ routeId, name, latitude, longitude, 
 };
 
 handlers['db:deleteTransportPoint'] = async (pointId) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const pt = db.prepare('SELECT route_id FROM transport_points WHERE id = ?').get(pointId);
     if (pt) {
@@ -1909,6 +1923,8 @@ handlers['db:getTransportEligibleStudents'] = async (schoolId) => {
 };
 
 handlers['db:assignStudentToTransportPoint'] = async ({ studentId, pointId, routeId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
@@ -1952,6 +1968,8 @@ handlers['db:getParentStudents'] = async (parentPhone) => {
 };
 
 handlers['db:logTransport'] = async (log) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const { route_id, event_type, latitude, longitude } = log;
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(route_id, sid);
@@ -1959,7 +1977,10 @@ handlers['db:logTransport'] = async (log) => {
     return db.prepare(`INSERT INTO transport_logs (route_id, event_type, latitude, longitude) VALUES (?, ?, ?, ?)`).run(route_id, event_type, latitude, longitude);
 };
 
-handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, status, recordedBy }) => {
+handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, status }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    const recordedBy = currentUser.id;
     const sid = getActiveSchoolId();
     const route = db.prepare('SELECT id FROM bus_routes WHERE id = ? AND school_id = ?').get(routeId, sid);
     if (!route) throw new Error('Route non autorisée pour cet établissement.');
@@ -1971,7 +1992,7 @@ handlers['db:logTransportAttendance'] = async ({ studentId, routeId, direction, 
     let res;
     if (existing) {
         res = db.prepare(`
-            UPDATE transport_attendance 
+            UPDATE transport_attendance
             SET status = ?, recorded_by = ?, recorded_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).run(status, recordedBy, existing.id);
@@ -2042,6 +2063,8 @@ handlers['db:getLatestBusPosition'] = async ({ routeId }) => {
 };
 
 handlers['db:notifyTransportProximity'] = async ({ pointId, driverId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['DRIVER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const point = db.prepare('SELECT name, route_id FROM transport_points WHERE id = ?').get(pointId);
     if (!point) return false;
     const sid = getActiveSchoolId();
