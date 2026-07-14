@@ -1,5 +1,41 @@
 import { Capacitor } from '@capacitor/core';
 
+// ─── Cache localStorage pour le mode hors connexion ──────────────────────────
+const CACHE_PREFIX = 'eco_api_';
+const CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48h — données restent accessibles 2 jours
+
+function cacheKey(channel: string, args: any[]): string {
+    // Clé unique par channel + arguments sérialisés (tronqué à 80 chars)
+    const argStr = JSON.stringify(args).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 80);
+    return CACHE_PREFIX + channel + '_' + argStr;
+}
+
+function saveCache(key: string, data: any): void {
+    try {
+        localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+    } catch (_) {
+        // localStorage plein → on nettoie les entrées expirées
+        const toDelete: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(CACHE_PREFIX)) toDelete.push(k);
+        }
+        toDelete.slice(0, Math.ceil(toDelete.length / 2)).forEach(k => localStorage.removeItem(k));
+        try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch (_2) { /* abandon */ }
+    }
+}
+
+function readCache(key: string): any | null {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts > CACHE_TTL_MS) { localStorage.removeItem(key); return null; }
+        return data;
+    } catch (_) { return null; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const initSaaSBridge = () => {
     // Si electronAPI est déjà défini (on est dans l'appli de bureau), on ne fait rien.
     if (window.electronAPI) {
@@ -27,11 +63,10 @@ export const initSaaSBridge = () => {
             if (body) {
                 config.body = JSON.stringify(body);
             }
-            
-            // Ajouter un cache buster pour les requêtes GET pour forcer le rafraîchissement
+
             const cacheBuster = method === 'GET' ? (endpoint.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`) : '';
             const finalUrl = `${API_BASE}${endpoint}${cacheBuster}`;
-            
+
             const response = await fetch(finalUrl, config);
 
             if (response.status === 401) {
@@ -41,13 +76,11 @@ export const initSaaSBridge = () => {
                 throw new Error('Session expirée');
             }
 
-            // Lire la réponse comme texte d'abord pour éviter un crash JSON si le serveur retourne du HTML
             const text = await response.text();
             let data: any;
             try {
                 data = JSON.parse(text);
             } catch(_) {
-                // Le serveur a retourné du HTML (probablement indisponible ou en cours de redémarrage)
                 throw new Error(`Serveur indisponible (${response.status}). Veuillez réessayer dans quelques secondes.`);
             }
 
@@ -55,7 +88,6 @@ export const initSaaSBridge = () => {
                 throw new Error(data.error || 'Erreur réseau API');
             }
 
-            // On s'assure de renvoyer le même format que l'ancien IPC Electron
             return data;
         } catch (error: any) {
             console.error(`[API Error] ${endpoint}:`, error);
@@ -73,14 +105,12 @@ export const initSaaSBridge = () => {
             }
             return res.user;
         },
-        
+
         getSchools: async () => {
             const res = await apiCall('/ipc', 'POST', { channel: 'db:getSchools', args: [] });
             return res.result;
         },
 
-        // Les autres méthodes (getStudents, getGrades...) renverront un tableau vide ou null
-        // le temps que nous les programmions dans server.js, pour ne pas faire planter React.
     } as any;
 
     // Pour intercepter toutes les requêtes (getStudents, saveGrades, etc.)
@@ -89,7 +119,7 @@ export const initSaaSBridge = () => {
             if (prop in target) {
                 return target[prop];
             }
-            
+
             // Déterminer le channel IPC
             let channel = `db:${prop}`;
             if (prop === 'switchSchool') {
@@ -116,26 +146,52 @@ export const initSaaSBridge = () => {
                 return undefined;
             }
 
+            // Les opérations de lecture sont cachées localement pour le mode offline
+            const isReadOp = prop.startsWith('get') || prop.startsWith('fetch');
+
             return async (...args: any[]) => {
+                const ck = isReadOp ? cacheKey(channel, args) : null;
                 try {
                     const res = await apiCall('/ipc', 'POST', {
                         channel: channel,
                         args: args
                     });
+
                     // Réponse offline émise par le Service Worker (hors connexion)
                     if (res && res.offline) {
-                        console.warn(`[SaaS Bridge] Hors connexion — ${prop} retourne données vides`);
-                        return prop.startsWith('get') ? [] : null;
+                        console.warn(`[SaaS Bridge] Hors connexion — lecture du cache local pour ${prop}`);
+                        if (ck) {
+                            const cached = readCache(ck);
+                            if (cached !== null) return cached;
+                        }
+                        return isReadOp ? [] : null;
                     }
-                    return res.result;
+
+                    const result = res.result;
+
+                    // Sauvegarder les résultats de lecture dans le cache local
+                    if (isReadOp && ck && result !== null && result !== undefined) {
+                        saveCache(ck, result);
+                    }
+
+                    return result;
                 } catch (error: any) {
                     console.error(`[SaaS Bridge Error] ${prop} (${channel}):`, error);
-                    // Si c'est une erreur de validation ou métier venant du backend, on la relance
+
+                    // En cas d'erreur réseau (offline), tenter le cache local
+                    if (isReadOp && ck && (!navigator.onLine || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError'))) {
+                        const cached = readCache(ck);
+                        if (cached !== null) {
+                            console.info(`[SaaS Bridge] Cache local utilisé pour ${prop}`);
+                            return cached;
+                        }
+                    }
+
+                    // Si c'est une erreur métier (validation, autorisation), on la relance
                     if (error && error.message && error.message !== 'Erreur réseau API') {
                         throw error;
                     }
-                    // Pour éviter que l'UI crashe brutalement si une route n'est pas encore prête
-                    return prop.startsWith('get') ? [] : { error: String(error) };
+                    return isReadOp ? [] : { error: String(error) };
                 }
             };
         }

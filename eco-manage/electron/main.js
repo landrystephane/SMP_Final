@@ -17,7 +17,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, '../public/vite.svg') // Optionnel: icône
+    icon: path.join(__dirname, '../public/icon-512.png')
   });
 
   // Si on est en développement local, on charge le serveur Vite local
