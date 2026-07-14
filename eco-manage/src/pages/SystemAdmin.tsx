@@ -34,6 +34,7 @@ const SystemAdmin: React.FC = () => {
   const [subAmount, setSubAmount] = useState(5000);
   const [subHistory, setSubHistory] = useState<any[]>([]);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading' | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [detailTab, setDetailTab] = useState<'meta' | 'subs' | 'subjects' | 'modules'>('meta');
 
   // Password confirmation state
@@ -90,6 +91,26 @@ const SystemAdmin: React.FC = () => {
         const hist = await (window.electronAPI as any).getSubscriptionHistory({ schoolId });
         setSubHistory(hist || []);
       } catch { setSubHistory([]); }
+    }
+  };
+
+  const handleExportBackup = async () => {
+    if (!window.electronAPI) return;
+    setIsExporting(true);
+    try {
+      const result = await (window.electronAPI as any).exportBackup();
+      const json = JSON.stringify(result, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const date = new Date().toISOString().split('T')[0];
+      const a = document.createElement('a');
+      a.href = url; a.download = `backup_ecomanage_${date}.json`; a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Backup téléchargé avec succès', 'success');
+    } catch (err: any) {
+      showNotification(err.message, 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -760,6 +781,17 @@ const SystemAdmin: React.FC = () => {
                       {healthStatus === 'ok' && <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-black"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Opérationnel</span>}
                       {healthStatus === 'error' && <span className="flex items-center gap-1.5 text-[10px] text-rose-400 font-black"><span className="w-2 h-2 rounded-full bg-rose-500" /> Hors ligne</span>}
                     </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Sauvegarde</p>
+                    <button
+                      onClick={handleExportBackup}
+                      disabled={isExporting}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                    >
+                      <Database className="w-3 h-3" />
+                      {isExporting ? 'Export en cours…' : 'Télécharger le backup'}
+                    </button>
                   </div>
                 </div>
               </div>

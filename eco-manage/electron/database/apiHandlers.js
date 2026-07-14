@@ -4413,4 +4413,109 @@ handlers['db:reassignExamSurveillant'] = async ({ examId, newTeacherId, schoolId
   return { success: true };
 };
 
+// ─── Import CSV d'élèves ──────────────────────────────────────────────────────
+handlers['db:importStudents'] = async (payload) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role))
+        throw new Error('Non autorisé.');
+
+    const { rows, schoolId } = payload;
+    const sid = getActiveSchoolId(schoolId);
+    const year = new Date().getFullYear();
+    const yearShort = year.toString().slice(-2);
+
+    const results = { success: 0, errors: [] };
+
+    const importTx = db.transaction(() => {
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            try {
+                const { firstName, lastName, birthDate, birthPlace, gender, section,
+                        className, parentName, parentContact, emergencyContact, neighborhood } = row;
+
+                if (!firstName || !lastName || !birthDate || !gender || !section || !className) {
+                    results.errors.push({ row: i + 2, message: `Ligne ${i + 2} : champs obligatoires manquants (Prenom, Nom, Date_Naissance, Genre, Section, Classe)` });
+                    continue;
+                }
+
+                const classObj = db.prepare('SELECT id, code FROM classes WHERE school_id = ? AND LOWER(name) = LOWER(?)').get(sid, className.trim());
+                if (!classObj) {
+                    results.errors.push({ row: i + 2, message: `Ligne ${i + 2} : classe "${className}" introuvable` });
+                    continue;
+                }
+
+                const birthYear = new Date(birthDate).getFullYear();
+                if (isNaN(birthYear) || birthYear > year - 2) {
+                    results.errors.push({ row: i + 2, message: `Ligne ${i + 2} : date de naissance invalide pour ${firstName} ${lastName} (doit être née avant ${year - 1})` });
+                    continue;
+                }
+
+                const cleanCode = classObj.code.replace(/\d+$/, '');
+                const prefix = `${yearShort}${cleanCode}`;
+                const maxRow = db.prepare("SELECT COALESCE(MAX(CAST(SUBSTR(matricule, -4) AS INTEGER)), 0) as m FROM students WHERE school_id = ? AND matricule LIKE ?").get(sid, `${prefix}%`);
+                const orderNumber = maxRow.m + 1;
+                const matricule = `${prefix}${orderNumber.toString().padStart(4, '0')}`;
+
+                db.prepare(`
+                    INSERT INTO students (matricule, registration_year, order_number, first_name, last_name,
+                        birth_date, birth_place, gender, parent_name, parent_contact, emergency_contact,
+                        address, neighborhood, section, class_id, school_id, scholarship_reduction, has_moratoire)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, 0, 0)
+                `).run(matricule, year, orderNumber,
+                    firstName.trim(), lastName.trim(), birthDate,
+                    birthPlace || '', gender.toUpperCase().charAt(0),
+                    parentName || '', parentContact || '', emergencyContact || '',
+                    neighborhood || '', section.toUpperCase(), classObj.id, sid);
+
+                if (parentContact && parentContact.trim()) {
+                    const pUser = parentContact.trim();
+                    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(pUser);
+                    if (!exists) {
+                        const hash = bcrypt.hashSync(pUser, 10);
+                        db.prepare('INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, ?, ?, ?)')
+                            .run(pUser, hash, parentName || 'Parent', 'PARENT', sid);
+                    }
+                }
+
+                results.success++;
+            } catch (err) {
+                results.errors.push({ row: i + 2, message: `Ligne ${i + 2} : ${err.message}` });
+            }
+        }
+    });
+
+    importTx();
+    return results;
+};
+
+// ─── Export/Backup de la base ─────────────────────────────────────────────────
+handlers['db:exportBackup'] = async () => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || currentUser.role !== 'SUPERADMIN') throw new Error('Réservé au SUPERADMIN.');
+
+    const tables = [
+        'schools', 'classes', 'students', 'users', 'payments', 'grades',
+        'attendance', 'subjects', 'settings', 'saas_subscriptions',
+        'bus_routes', 'transport_attendance', 'announcements', 'tickets'
+    ];
+    const data = {};
+    for (const table of tables) {
+        try {
+            if (table === 'users') {
+                data[table] = db.prepare('SELECT id, username, full_name, role, school_id, is_active, created_at FROM users').all();
+            } else {
+                data[table] = db.prepare(`SELECT * FROM ${table}`).all();
+            }
+        } catch (_) {
+            data[table] = [];
+        }
+    }
+
+    return {
+        exportDate: new Date().toISOString(),
+        version: '1.0',
+        data
+    };
+};
+
 module.exports = handlers;

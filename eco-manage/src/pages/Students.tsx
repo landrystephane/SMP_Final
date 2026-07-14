@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Search, UserPlus, Filter, Download, Trash2, Edit, FileText, Lock, Unlock } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Search, UserPlus, Download, Trash2, Edit, FileText, Lock, Unlock, Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import StudentForm from '../components/StudentForm';
 import { generateRegistrationSheet, generateStudentsListReport } from '../utils/reports';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,11 @@ const Students: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: number; errors: { row: number; message: string }[] } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = async () => {
     if (window.electronAPI) {
@@ -87,6 +92,102 @@ const Students: React.FC = () => {
     return matchSection && matchClass && matchCycle && matchSearch;
   });
 
+  const parseCSV = (text: string): any[] => {
+    const clean = text.replace(/^﻿/, '');
+    const lines = clean.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+
+    const parseRow = (line: string): string[] => {
+      const result: string[] = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (ch === ',' && !inQ) {
+          result.push(cur.trim()); cur = '';
+        } else { cur += ch; }
+      }
+      result.push(cur.trim());
+      return result;
+    };
+
+    const normalize = (s: string) =>
+      s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '_');
+
+    const colMap: Record<string, string> = {
+      prenom: 'firstName', nom: 'lastName',
+      date_naissance: 'birthDate', date_de_naissance: 'birthDate',
+      lieu_naissance: 'birthPlace', lieu_de_naissance: 'birthPlace',
+      genre: 'gender', sexe: 'gender',
+      section: 'section',
+      classe: 'className', class: 'className',
+      nom_parent: 'parentName', nom_du_parent: 'parentName',
+      contact_parent: 'parentContact', telephone_parent: 'parentContact',
+      contact_urgence: 'emergencyContact',
+      quartier: 'neighborhood', adresse: 'neighborhood',
+    };
+
+    const headers = parseRow(lines[0]).map(normalize);
+
+    const normalizeDate = (d: string): string => {
+      if (!d) return '';
+      const parts = d.split('/');
+      if (parts.length === 3 && parts[2].length === 4)
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      return d;
+    };
+
+    return lines.slice(1).map((line, i) => {
+      const vals = parseRow(line);
+      const row: any = { _row: i + 2 };
+      headers.forEach((h, idx) => { row[colMap[h] || h] = vals[idx] || ''; });
+      if (row.birthDate) row.birthDate = normalizeDate(row.birthDate);
+      if (row.gender) row.gender = row.gender.toUpperCase().charAt(0);
+      if (row.section) row.section = row.section.toUpperCase();
+      return row;
+    });
+  };
+
+  const handleCSVFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const rows = parseCSV(ev.target?.result as string);
+      setCsvRows(rows);
+      setImportResult(null);
+      setImportModalOpen(true);
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  const handleImport = async () => {
+    if (!window.electronAPI) return;
+    setIsImporting(true);
+    try {
+      const result = await (window.electronAPI as any).importStudents({ rows: csvRows, schoolId: user?.schoolId });
+      setImportResult(result);
+      if (result.success > 0) { loadData(); notifyDataChanged(); }
+    } catch (err: any) {
+      showNotification(err.message, 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csv = 'Prenom,Nom,Date_Naissance,Lieu_Naissance,Genre,Section,Classe,Nom_Parent,Contact_Parent,Contact_Urgence,Quartier\nJean,Dupont,2015-03-12,Yaoundé,M,FRANCOPHONE,CP1,Marie Dupont,+237612345678,,Bastos';
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'modele_import_eleves.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const getReportTitle = () => {
       let title = t('students_list', 'LISTE DES ÉLÈVES');
       if (selectedClass !== 'ALL') {
@@ -112,13 +213,31 @@ const Students: React.FC = () => {
           <p className="text-slate-400 mt-1">{t('student_management')} - {t('global_effectif')}</p>
         </div>
         {['SUPERADMIN', 'FOUNDER', 'DIRECTOR', 'SG'].includes(user?.role || '') && (
-        <button
-          onClick={() => setIsAdding(true)}
-          className="flex items-center justify-center py-2 px-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          {t('new_student')}
-        </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={downloadTemplate}
+              className="flex items-center justify-center py-2 px-4 bg-slate-700 text-slate-300 rounded-lg font-bold hover:bg-slate-600 transition-colors text-sm"
+              title="Télécharger le modèle CSV"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Modèle CSV
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              className="flex items-center justify-center py-2 px-4 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors text-sm"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importer CSV
+            </button>
+            <input ref={importInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVFile} />
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center justify-center py-2 px-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              {t('new_student')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -301,6 +420,101 @@ const Students: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {importModalOpen && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-black text-white">
+                {importResult ? 'Résultat de l\'import' : `Aperçu — ${csvRows.length} élève${csvRows.length > 1 ? 's' : ''} à importer`}
+              </h2>
+              <button onClick={() => { setImportModalOpen(false); setImportResult(null); setCsvRows([]); }} className="p-2 text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!importResult ? (
+              <>
+                <div className="overflow-x-auto mb-6 rounded-xl border border-white/5">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-white/5 text-slate-500 uppercase font-black">
+                      <tr>
+                        <th className="px-3 py-2">Ligne</th>
+                        <th className="px-3 py-2">Prénom</th>
+                        <th className="px-3 py-2">Nom</th>
+                        <th className="px-3 py-2">Naissance</th>
+                        <th className="px-3 py-2">G</th>
+                        <th className="px-3 py-2">Section</th>
+                        <th className="px-3 py-2">Classe</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-slate-300">
+                      {csvRows.slice(0, 8).map((r, i) => (
+                        <tr key={i} className="hover:bg-white/5">
+                          <td className="px-3 py-2 text-slate-500">{r._row}</td>
+                          <td className="px-3 py-2">{r.firstName}</td>
+                          <td className="px-3 py-2 font-bold text-white">{r.lastName}</td>
+                          <td className="px-3 py-2">{r.birthDate}</td>
+                          <td className="px-3 py-2">{r.gender}</td>
+                          <td className="px-3 py-2">{r.section}</td>
+                          <td className="px-3 py-2 text-blue-400">{r.className}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {csvRows.length > 8 && (
+                    <p className="text-center text-slate-500 text-xs py-2">… et {csvRows.length - 8} autres élèves</p>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mb-6">
+                  Colonnes obligatoires : <span className="text-amber-400 font-bold">Prenom, Nom, Date_Naissance, Genre, Section, Classe</span>.<br />
+                  Optionnelles : Lieu_Naissance, Nom_Parent, Contact_Parent, Contact_Urgence, Quartier.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => { setImportModalOpen(false); setCsvRows([]); }} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-600">
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={isImporting || csvRows.length === 0}
+                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-black hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {isImporting ? 'Import en cours…' : `Importer ${csvRows.length} élève${csvRows.length > 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`flex items-center gap-3 p-4 rounded-xl mb-6 ${importResult.success > 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-slate-800'}`}>
+                  <CheckCircle className="w-6 h-6 text-emerald-400 flex-shrink-0" />
+                  <p className="text-white font-bold">
+                    <span className="text-emerald-400 text-xl">{importResult.success}</span> élève{importResult.success > 1 ? 's' : ''} importé{importResult.success > 1 ? 's' : ''} avec succès
+                  </p>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-4 mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-rose-400" />
+                      <p className="text-rose-400 font-black text-xs uppercase tracking-widest">{importResult.errors.length} erreur{importResult.errors.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <ul className="space-y-1 max-h-40 overflow-y-auto">
+                      {importResult.errors.map((e, i) => (
+                        <li key={i} className="text-xs text-slate-400">{e.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <button onClick={() => { setImportModalOpen(false); setImportResult(null); setCsvRows([]); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-700">
+                    Fermer
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {(isAdding || editingStudent) && (
         <StudentForm
