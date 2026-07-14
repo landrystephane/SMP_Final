@@ -375,6 +375,8 @@ handlers['db:getStudents'] = async (schoolId) => {
 };
 
 handlers['db:addStudent'] = async (student) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const { firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, schoolId, entryYear, scholarshipReduction, hasMoratoire } = student;
   const sid = getActiveSchoolId(schoolId);
   const parsedClassId = parseInt(classId, 10);
@@ -2308,9 +2310,18 @@ handlers['db:getMyAllowedModules'] = async () => {
 };
 
 handlers['db:addUser'] = async (user) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const { username, password, fullName, role, schoolId, assignedClasses, civility, section, gender, phone, classRole, allowedModules } = user;
+  // Whitelist des rôles autorisés selon le créateur
+  const ALLOWED_ROLES = ['TEACHER', 'DRIVER', 'BURSAR', 'SG', 'DIRECTOR', 'FOUNDER', 'ADVISOR', 'PARENT'];
+  if (!ALLOWED_ROLES.includes(role)) throw new Error('Rôle invalide.');
+  // Seul SUPERADMIN peut créer un compte SUPERADMIN
+  if (role === 'SUPERADMIN' && currentUser.role !== 'SUPERADMIN') throw new Error('Non autorisé à créer ce type de compte.');
+  // DIRECTOR ne peut pas créer FOUNDER
+  if (role === 'FOUNDER' && currentUser.role === 'DIRECTOR') throw new Error('Non autorisé : seul le FOUNDER peut créer un autre fondateur.');
   const sid = getActiveSchoolId(schoolId);
-  
+
   const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (existingUsername) {
       throw new Error("Ce nom d'utilisateur est déjà utilisé");
@@ -2400,15 +2411,25 @@ handlers['db:deleteUser'] = async (id) => {
 };
 
 handlers['db:toggleUserActive'] = async ({ id, isActive }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     return db.prepare('UPDATE users SET is_active = ? WHERE id = ? AND school_id = ?').run(isActive ? 1 : 0, id, sid);
 };
 
 handlers['db:updateUser'] = async (userToUpdate) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const { id, username, fullName, role, phone, assignedClasses, civility, section, gender, password, classRole, schoolId, allowedModules } = userToUpdate;
   if (!id) throw new Error("ID de l'utilisateur requis");
+  // Whitelist des rôles autorisés
+  if (role) {
+    const ALLOWED_ROLES = ['TEACHER', 'DRIVER', 'BURSAR', 'SG', 'DIRECTOR', 'FOUNDER', 'ADVISOR', 'PARENT'];
+    if (!ALLOWED_ROLES.includes(role)) throw new Error('Rôle invalide.');
+    if (role === 'SUPERADMIN' && currentUser.role !== 'SUPERADMIN') throw new Error('Non autorisé à attribuer ce rôle.');
+    if (role === 'FOUNDER' && currentUser.role === 'DIRECTOR') throw new Error('Non autorisé : seul le FOUNDER peut accorder le rôle fondateur.');
+  }
   const sid = getActiveSchoolId(schoolId);
-  const currentUser = session.getStore()?.user;
 
   let existing;
   if (currentUser?.role === 'SUPERADMIN') {
@@ -2904,6 +2925,9 @@ handlers['db:searchStudentsDetailed'] = async ({ name, schoolId, section, level,
 
 handlers['db:updateStudentStatus'] = async ({ id, status }) => {
     const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    const VALID_STATUSES = ['ACTIVE', 'BLOCKED', 'SUSPENDED', 'GRADUATED', 'TRANSFERRED', 'DELETED'];
+    if (!VALID_STATUSES.includes(status)) throw new Error('Statut invalide.');
     let result;
     if (currentUser?.role === 'SUPERADMIN') {
         result = db.prepare('UPDATE students SET status = ? WHERE id = ?').run(status, id);
@@ -2936,6 +2960,8 @@ handlers['db:deleteStudent'] = async (id) => {
 };
 
 handlers['db:updateStudent'] = async (student) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const { id, firstName, lastName, birthDate, birthPlace, gender, parentName, parentContact, emergencyContact, medicalInfo, address, neighborhood, section, classId, scholarshipReduction, hasMoratoire, busRouteId } = student;
   const parsedClassId = parseInt(classId, 10);
   const sid = getActiveSchoolId();
