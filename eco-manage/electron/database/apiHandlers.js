@@ -450,7 +450,10 @@ handlers['db:getAnnouncements'] = async (schoolId) => {
 };
 
 handlers['db:sendAnnouncement'] = async (announcement) => {
-  const { sender_id, target, title, content, school_id } = announcement;
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+  const { target, title, content, school_id } = announcement;
+  const sender_id = currentUser.id;
   const sid = getActiveSchoolId(school_id);
   
   const transaction = db.transaction(() => {
@@ -1753,6 +1756,8 @@ handlers['db:copyTemplateToWeek'] = async ({ schoolId, classId, weekStart }) => 
 
 // Publish a week schedule: notify all concerned teachers and parents
 handlers['db:publishWeekSchedule'] = async ({ schoolId, weekStart, classIds }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
     const weekDate = new Date(weekStart + 'T00:00:00');
     const satDate = new Date(weekStart + 'T00:00:00');
@@ -1807,6 +1812,8 @@ handlers['db:getEvaluationSchedules'] = async (schoolId) => {
 };
 
 handlers['db:addEvaluationSchedule'] = async (schedule) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const { school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time } = schedule;
     const sid = getActiveSchoolId(school_id);
     const result = db.prepare(`INSERT INTO evaluation_schedules (school_id, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(sid, class_id, subject_id, teacher_id, evaluation_period_id, date, start_time, end_time);
@@ -1814,6 +1821,8 @@ handlers['db:addEvaluationSchedule'] = async (schedule) => {
 };
 
 handlers['db:deleteEvaluationSchedule'] = async (id) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
     return db.prepare('DELETE FROM evaluation_schedules WHERE id = ? AND school_id = ?').run(id, sid);
 };
@@ -2550,7 +2559,10 @@ handlers['db:changePassword'] = async ({ userId, newPassword }) => {
 };
 
 handlers['db:sendTicket'] = async (ticket) => {
-  const { sender_id, receiver_role, receiver_id, subject, message, school_id, request_type, request_data } = ticket;
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non authentifié.');
+  const { receiver_role, receiver_id, subject, message, school_id, request_type, request_data } = ticket;
+  const sender_id = currentUser.id;
   const sid = getActiveSchoolId(school_id);
   const safeReceiverId = receiver_id ? parseInt(receiver_id, 10) : null;
   if (safeReceiverId) {
@@ -2681,6 +2693,8 @@ handlers['db:updateExpenseStatus'] = async ({ expenseId, status, validatedBy }) 
 };
 
 handlers['db:createNotification'] = async (notification) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser) throw new Error('Non authentifié.');
   const { user_id, message, type, school_id, request_type, request_data, role } = notification;
   const sid = getActiveSchoolId(school_id);
 
@@ -2705,6 +2719,8 @@ handlers['db:createNotification'] = async (notification) => {
 };
 
 handlers['db:respondExamSurveillance'] = async ({ notificationId, examId, status, rejectionReason, schoolId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['TEACHER', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
 
     const exam = db.prepare('SELECT e.*, u.full_name as teacher_name FROM evaluation_schedules e JOIN users u ON e.teacher_id = u.id WHERE e.id = ? AND e.school_id = ?').get(examId, sid);
@@ -2734,8 +2750,10 @@ handlers['db:respondExamSurveillance'] = async ({ notificationId, examId, status
 };
 
 handlers['db:adminResolveExamRefusal'] = async ({ notificationId, examId, adminAction, schoolId }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId(schoolId);
-    
+
     // adminAction can be 'ACCEPT_REFUSAL' or 'FORCE_ASSIGNMENT'
     const newStatus = adminAction === 'ACCEPT_REFUSAL' ? 'REJECTED' : 'FORCED_APPROVED';
 
@@ -3891,6 +3909,8 @@ handlers['db:getGradingScales'] = async (schoolId) => {
 };
 
 handlers['db:saveGradingScale'] = async ({ id, schoolId, name, is_numerical, min_value, max_value, options }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId(schoolId);
   let scaleId = id;
   const tx = db.transaction(() => {
@@ -4008,6 +4028,8 @@ function getRoleLabelBackend(role) {
 }
 
 handlers['db:deleteGradingScale'] = async (id) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId();
   const tx = db.transaction(() => {
     db.prepare('UPDATE classes SET grading_scale_id = NULL WHERE grading_scale_id = ? AND school_id = ?').run(id, sid);
@@ -4019,6 +4041,8 @@ handlers['db:deleteGradingScale'] = async (id) => {
 };
 
 handlers['db:setClassGradingScale'] = async ({ classId, scaleId }) => {
+  const currentUser = session.getStore()?.user;
+  if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SG', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
   const sid = getActiveSchoolId();
   const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
   if (!cls) throw new Error('Classe non autorisée pour cet établissement.');
