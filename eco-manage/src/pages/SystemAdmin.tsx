@@ -30,6 +30,11 @@ const SystemAdmin: React.FC = () => {
   const [isAddingFounder, setIsAddingFounder] = useState(false);
   const [errorLogs, setErrorLogs] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+  const [subMonths, setSubMonths] = useState(1);
+  const [subAmount, setSubAmount] = useState(5000);
+  const [subHistory, setSubHistory] = useState<any[]>([]);
+  const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading' | null>(null);
+  const [detailTab, setDetailTab] = useState<'meta' | 'subs' | 'subjects' | 'modules'>('meta');
 
   // Password confirmation state
   const [confirmPasswordModal, setConfirmPasswordModal] = useState<{
@@ -79,6 +84,24 @@ const SystemAdmin: React.FC = () => {
     }
   };
 
+  const loadSubscriptionHistory = async (schoolId: number) => {
+    if (window.electronAPI) {
+      try {
+        const hist = await (window.electronAPI as any).getSubscriptionHistory({ schoolId });
+        setSubHistory(hist || []);
+      } catch { setSubHistory([]); }
+    }
+  };
+
+  const checkServerHealth = async () => {
+    setHealthStatus('loading');
+    try {
+      const res = await fetch('/api/health', { cache: 'no-store' });
+      const data = await res.json();
+      setHealthStatus(data.status === 'ok' ? 'ok' : 'error');
+    } catch { setHealthStatus('error'); }
+  };
+
   const loadGlobalSubjects = async () => {
     if (window.electronAPI) {
         const data = await window.electronAPI.getGlobalSubjects();
@@ -121,6 +144,7 @@ const SystemAdmin: React.FC = () => {
   useEffect(() => {
       if (activeTab === 'HEALTH') {
           loadErrorLogs();
+          checkServerHealth();
       } else if (activeTab === 'TRASH') {
           loadDeletedSchools();
       }
@@ -243,8 +267,12 @@ const SystemAdmin: React.FC = () => {
       setEditSchoolAllowTermEdit(school.allow_founder_term_edit !== undefined ? school.allow_founder_term_edit : 0);
       setEditSchoolSlug(school.slug || '');
       setIsEditingMetadata(false);
+      setDetailTab('meta');
+      setSubMonths(1);
+      setSubAmount(5000);
 
       if (window.electronAPI) {
+          loadSubscriptionHistory(school.id);
           const activeSubs = await window.electronAPI.getSchoolSubjects(school.id);
           setSchoolSubjects((activeSubs || []).filter((s: any) => s.is_active).map((s: any) => s.id));
 
@@ -564,60 +592,50 @@ const SystemAdmin: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="p-8 space-y-4">
-                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-                    <MapPin className="w-4 h-4 text-slate-600" /> {s.address}
+                <div className="px-6 pb-6 space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+                    <span className="truncate">{s.address}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-                    <Mail className="w-4 h-4 text-slate-600" /> {s.contact_email}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {s.access_code && (
+                      <span className="text-amber-500 font-mono text-xs font-black tracking-widest bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> {s.access_code}
+                      </span>
+                    )}
+                    {s.subscription_end_date && (() => {
+                      const days = Math.ceil((new Date(s.subscription_end_date).getTime() - Date.now()) / 86400000);
+                      return (
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${days > 30 ? 'bg-emerald-500/10 text-emerald-400' : days > 7 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                          {days > 0 ? `${days}j restants` : 'ABONNEMENT EXPIRÉ'}
+                        </span>
+                      );
+                    })()}
                   </div>
-                  {s.access_code && (
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                    <Lock className="w-4 h-4 text-amber-500" />
-                    <span className="text-slate-500">{t('sys_access_code_label')}</span>
-                    <span className="text-amber-500 font-black tracking-widest bg-amber-500/10 px-3 py-1 rounded-lg">{s.access_code}</span>
-                  </div>
-                  )}
-                  {s.slug && (
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                    <span className="text-slate-500">🌐 URL</span>
-                    <span className="text-emerald-400 font-black bg-emerald-500/10 px-3 py-1 rounded-lg">{s.slug}.ecomanageapp.com</span>
-                  </div>
-                  )}
-                  <div className="pt-4 grid grid-cols-1 gap-3">
-                    <button
-                      onClick={() => openSchoolDetail(s)}
-                      className="w-full py-3 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Settings className="w-3.5 h-3.5 text-amber-500" /> {t('sys_config')}
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => openSchoolDetail(s)}
+                      className="flex-1 py-2.5 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:border-amber-500/30 transition-all flex items-center justify-center gap-1.5">
+                      <Settings className="w-3 h-3 text-amber-500" /> {t('sys_config')}
+                    </button>
+                    <button onClick={async () => { await switchSchool(s.id); navigate('/'); }}
+                      className="flex-1 py-2.5 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-1.5">
+                      <ExternalLink className="w-3 h-3" /> {t('sys_access')}
                     </button>
                     <button
                       onClick={async () => {
-                          await switchSchool(s.id);
-                          navigate('/');
+                        const nextActive = s.is_active === 0 ? 1 : 0;
+                        if (window.electronAPI && (window.electronAPI as any).toggleSchoolStatus) {
+                          await (window.electronAPI as any).toggleSchoolStatus({ id: s.id, isActive: nextActive });
+                          loadSchools();
+                        }
                       }}
-                      className="w-full py-3 bg-amber-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-950 hover:bg-amber-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> {t('sys_access')}
+                      title={s.is_active !== 0 ? t('sys_suspend') : t('sys_activate')}
+                      className={`p-2.5 rounded-xl transition-all border flex items-center justify-center text-sm ${s.is_active !== 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950'}`}>
+                      {s.is_active !== 0 ? '⏸' : '▶'}
                     </button>
-                    <button
-                      onClick={async () => {
-                          const nextActive = s.is_active === 0 ? 1 : 0;
-                          if (window.electronAPI && (window.electronAPI as any).toggleSchoolStatus) {
-                              await (window.electronAPI as any).toggleSchoolStatus({ id: s.id, isActive: nextActive });
-                              alert(nextActive ? t('sys_school_reactivated', { name: s.name }) : t('sys_school_suspended_msg', { name: s.name }));
-                              loadSchools();
-                          }
-                      }}
-                      className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border ${s.is_active !== 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950'}`}
-                    >
-                      {s.is_active !== 0 ? t('sys_suspend') : t('sys_activate')}
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteSchool(s.id, s.name)} 
-                      className="w-full py-3 bg-rose-500/10 hover:bg-rose-500 rounded-xl text-[9px] font-black uppercase tracking-widest text-rose-400 hover:text-white border border-rose-500/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> {t('sys_delete')}
+                    <button onClick={() => handleDeleteSchool(s.id, s.name)} title={t('sys_delete')}
+                      className="p-2.5 bg-rose-500/10 hover:bg-rose-500 rounded-xl text-rose-400 hover:text-white border border-rose-500/20 transition-all flex items-center justify-center">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -712,9 +730,12 @@ const SystemAdmin: React.FC = () => {
               <div className="glass-card p-8 bg-slate-900 border-white/5">
                 <h3 className="font-black text-white uppercase tracking-widest text-xs mb-6 text-amber-500">{t('sys_info')}</h3>
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-black uppercase">{t('sys_db_status')}</p>
-                    <p className="text-sm font-bold text-white mt-1">{t('sys_db_connected')}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-black uppercase">{t('sys_db_status')}</p>
+                      <p className="text-sm font-bold text-white mt-1">{t('sys_db_connected')}</p>
+                    </div>
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-black uppercase">{t('sys_sec_isolation')}</p>
@@ -722,7 +743,23 @@ const SystemAdmin: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-black uppercase">{t('sys_env_version')}</p>
-                    <p className="text-sm font-bold text-white mt-1">Electron v29.1.0 • Node v20</p>
+                    <p className="text-sm font-bold text-white mt-1">
+                      {(window as any).electronAPI?.isWebMode ? 'Web SaaS Cloud' : 'Electron Desktop'} • Node v{typeof process !== 'undefined' && process.versions?.node ? process.versions.node.split('.')[0] : '20'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Santé Serveur</p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={checkServerHealth}
+                        className="px-3 py-1.5 bg-white/5 border border-white/10 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                      >
+                        Vérifier
+                      </button>
+                      {healthStatus === 'loading' && <span className="text-[10px] text-slate-500 font-bold animate-pulse">Vérification...</span>}
+                      {healthStatus === 'ok' && <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-black"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Opérationnel</span>}
+                      {healthStatus === 'error' && <span className="flex items-center gap-1.5 text-[10px] text-rose-400 font-black"><span className="w-2 h-2 rounded-full bg-rose-500" /> Hors ligne</span>}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -869,9 +906,24 @@ const SystemAdmin: React.FC = () => {
                       </div>
                   </div>
 
+                  {/* Tab Navigation */}
+                  <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-white/5 gap-1 mb-8 flex-wrap">
+                    {[
+                      { id: 'meta', label: 'Infos & Fondateurs', icon: Building2 },
+                      { id: 'subs', label: 'Abonnement', icon: Activity },
+                      { id: 'subjects', label: 'Matières', icon: BookOpen },
+                      { id: 'modules', label: 'Modules', icon: Shield },
+                    ].map(tab => (
+                      <button key={tab.id} onClick={() => setDetailTab(tab.id as any)}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${detailTab === tab.id ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                        <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 flex-1">
-                      {/* Left: General Info & Admin Users */}
-                      <div className="space-y-8">
+                      {/* Left: General Info & Admin Users — only on meta tab */}
+                      <div className={`space-y-8 ${detailTab !== 'meta' ? 'hidden' : ''}`}>
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
@@ -1134,51 +1186,128 @@ const SystemAdmin: React.FC = () => {
                           </div>
                         </section>
 
-                        <section className="glass-card p-10 bg-slate-900 border-white/10">
-                          <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
-                              <Activity className="w-6 h-6 text-emerald-500" /> {t('sys_saas_subscription')}
-                            </h3>
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedSchool.subscription_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                                {selectedSchool.subscription_status || t('sys_status_unknown')}
-                            </span>
-                          </div>
-                          <div className="space-y-4">
-                              <div>
-                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t('sys_expiration_date')}</p>
-                                  <p className="text-lg font-black text-white">{selectedSchool.subscription_end_date ? new Date(selectedSchool.subscription_end_date).toLocaleDateString() : t('sys_not_defined')}</p>
-                              </div>
-                              <div className="pt-4 border-t border-white/5 space-y-3">
-                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t('sys_validate_cash_payment')}</p>
-                                  <div className="flex flex-col gap-3">
-                                      <div className="flex gap-3">
-                                          <div className="flex-1">
-                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('sys_months_purchased')}</label>
-                                              <input type="number" id="sub_months" defaultValue={1} min={1} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
-                                          </div>
-                                          <div className="flex-1">
-                                              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">{t('sys_amount_fcfa_label')}</label>
-                                              <input type="number" id="sub_amount" defaultValue={5000} min={0} className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
-                                          </div>
-                                      </div>
-                                      <button
-                                        onClick={() => {
-                                            const m = parseInt((document.getElementById('sub_months') as HTMLInputElement).value) || 1;
-                                            const a = parseInt((document.getElementById('sub_amount') as HTMLInputElement).value) || 0;
-                                            handleRenewSubscription(m, a);
-                                        }}
-                                        className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
-                                      >
-                                          {t('sys_confirm_payment_btn')}
-                                      </button>
-                                  </div>
-                              </div>
-                          </div>
-                        </section>
                       </div>
 
-                      {/* Right: Subject Permissions (authorized for this school) */}
-                      <div className="lg:col-span-2 space-y-8">
+                      {/* Subscription Tab Content (full width when on subs tab) */}
+                      {detailTab === 'subs' && (() => {
+                        const endDate = selectedSchool.subscription_end_date ? new Date(selectedSchool.subscription_end_date) : null;
+                        const daysLeft = endDate ? Math.ceil((endDate.getTime() - Date.now()) / 86400000) : null;
+                        const isActive = selectedSchool.subscription_status === 'ACTIVE' && daysLeft !== null && daysLeft > 0;
+                        const progressPct = daysLeft !== null && daysLeft > 0 ? Math.min(100, Math.round((daysLeft / 365) * 100)) : 0;
+                        const PRESETS = [
+                          { months: 1, amount: 5000, label: '1 Mois' },
+                          { months: 3, amount: 14000, label: '3 Mois' },
+                          { months: 6, amount: 25000, label: '6 Mois' },
+                          { months: 12, amount: 45000, label: '1 An' },
+                        ];
+                        return (
+                          <div className="lg:col-span-3 space-y-8">
+                            {/* Status Header */}
+                            <div className="glass-card p-8 bg-slate-900 border-white/10">
+                              <div className="flex items-center justify-between mb-6">
+                                <div>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Statut Abonnement</p>
+                                  <div className="flex items-center gap-3">
+                                    <span className={`text-2xl font-black ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      {isActive ? 'ACTIF' : (daysLeft !== null && daysLeft <= 0 ? 'EXPIRÉ' : selectedSchool.subscription_status || 'INCONNU')}
+                                    </span>
+                                    {daysLeft !== null && (
+                                      <span className={`text-[10px] font-black px-3 py-1 rounded-full ${daysLeft > 30 ? 'bg-emerald-500/10 text-emerald-400' : daysLeft > 7 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                        {daysLeft > 0 ? `${daysLeft} jours restants` : 'Expiré'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {endDate && (
+                                  <div className="text-right">
+                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Expire le</p>
+                                    <p className="text-lg font-black text-white">{endDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {daysLeft !== null && (
+                                <div>
+                                  <div className="flex justify-between text-[9px] text-slate-600 font-black uppercase tracking-widest mb-2">
+                                    <span>Temps écoulé</span>
+                                    <span>{progressPct}% restant</span>
+                                  </div>
+                                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                                    <div className={`h-2 rounded-full transition-all duration-700 ${progressPct > 30 ? 'bg-emerald-500' : progressPct > 10 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${progressPct}%` }} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                              {/* Recharge Panel */}
+                              <div className="glass-card p-8 bg-slate-900 border-white/10 space-y-6">
+                                <h3 className="text-lg font-black text-white uppercase tracking-tight">{t('sys_validate_cash_payment')}</h3>
+                                {/* Presets */}
+                                <div>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-3">Plans rapides</p>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {PRESETS.map(p => (
+                                      <button key={p.months}
+                                        onClick={() => { setSubMonths(p.months); setSubAmount(p.amount); }}
+                                        className={`p-3 rounded-xl border-2 text-center transition-all ${subMonths === p.months && subAmount === p.amount ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                                      >
+                                        <p className="font-black text-sm">{p.label}</p>
+                                        <p className="text-[9px] mt-1">{p.amount.toLocaleString()} F</p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Custom inputs */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">{t('sys_months_purchased')}</label>
+                                    <input type="number" min={1} value={subMonths} onChange={e => setSubMonths(Math.max(1, parseInt(e.target.value) || 1))}
+                                      className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">{t('sys_amount_fcfa_label')}</label>
+                                    <input type="number" min={0} value={subAmount} onChange={e => setSubAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                                      className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" />
+                                  </div>
+                                </div>
+                                <button onClick={() => handleRenewSubscription(subMonths, subAmount)}
+                                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2">
+                                  <CheckCircle className="w-4 h-4" /> Valider — +{subMonths} mois pour {subAmount.toLocaleString()} FCFA
+                                </button>
+                              </div>
+
+                              {/* Payment History */}
+                              <div className="glass-card p-8 bg-slate-900 border-white/10">
+                                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-6">Historique des paiements</h3>
+                                {subHistory.length === 0 ? (
+                                  <div className="text-center py-10 text-slate-600">
+                                    <p className="font-black uppercase text-xs tracking-widest">Aucun paiement enregistré</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {subHistory.map((h: any, i: number) => (
+                                      <div key={i} className="flex items-center justify-between p-4 bg-slate-950/60 rounded-xl border border-white/5">
+                                        <div>
+                                          <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{h.start_date}</p>
+                                          <p className="text-xs font-black text-white mt-0.5">+{h.months_granted} mois</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-sm font-black text-emerald-400">{(h.amount || 0).toLocaleString()} FCFA</p>
+                                          <p className="text-[9px] text-slate-600 mt-0.5">{h.validated_by_name || 'Admin'}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Subjects Tab */}
+                      {detailTab === 'subjects' && (
+                      <div className="lg:col-span-2">
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-10">
                             <div>
@@ -1191,16 +1320,12 @@ const SystemAdmin: React.FC = () => {
                               {schoolSubjects.length} {t('sys_modules_active')}
                             </div>
                           </div>
-
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {globalSubjects.map(subj => {
                                 const isActive = schoolSubjects.includes(subj.id);
                                 return (
-                                    <button
-                                      key={subj.id}
-                                      onClick={() => toggleSchoolSubject(subj.id)}
-                                      className={`p-8 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isActive ? 'bg-amber-500/5 border-amber-500 shadow-xl shadow-amber-500/5' : 'bg-slate-950/50 border-slate-800 opacity-40 hover:opacity-100 hover:border-slate-600'}`}
-                                    >
+                                    <button key={subj.id} onClick={() => toggleSchoolSubject(subj.id)}
+                                      className={`p-8 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isActive ? 'bg-amber-500/5 border-amber-500 shadow-xl shadow-amber-500/5' : 'bg-slate-950/50 border-slate-800 opacity-40 hover:opacity-100 hover:border-slate-600'}`}>
                                         <div>
                                             <p className={`font-black uppercase text-base tracking-tight ${isActive ? 'text-amber-500' : 'text-slate-300'}`}>{subj.name}</p>
                                             <p className="text-[10px] text-slate-500 font-bold mt-1 tracking-widest">{subj.section} • {subj.level}</p>
@@ -1213,7 +1338,12 @@ const SystemAdmin: React.FC = () => {
                             })}
                           </div>
                         </section>
+                      </div>
+                      )}
 
+                      {/* Modules Tab */}
+                      {detailTab === 'modules' && (
+                      <div className="lg:col-span-2 space-y-8">
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-10">
                             <div>
@@ -1223,16 +1353,12 @@ const SystemAdmin: React.FC = () => {
                               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">{t('sys_app_modules_desc', "Désactivez silencieusement des modules pour cette école. L'utilisateur ne verra aucune trace de cette restriction.")}</p>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {AVAILABLE_MODULES.map(mod => {
                                 const isDisabled = disabledModules.includes(mod.key);
                                 return (
-                                    <button
-                                      key={mod.key}
-                                      onClick={() => handleToggleModule(mod.key)}
-                                      className={`p-6 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isDisabled ? 'bg-rose-500/5 border-rose-500/40 opacity-60' : 'bg-slate-950/50 border-slate-800 hover:border-emerald-600'}`}
-                                    >
+                                    <button key={mod.key} onClick={() => handleToggleModule(mod.key)}
+                                      className={`p-6 rounded-3xl border-2 text-left transition-all flex items-center justify-between group ${isDisabled ? 'bg-rose-500/5 border-rose-500/40 opacity-60' : 'bg-slate-950/50 border-slate-800 hover:border-emerald-600'}`}>
                                         <p className={`font-black uppercase text-sm tracking-tight ${isDisabled ? 'text-rose-400 line-through' : 'text-slate-300'}`}>{mod.label}</p>
                                         <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${isDisabled ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-800 group-hover:border-emerald-600'}`}>
                                             {isDisabled ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4 text-slate-700 group-hover:text-emerald-600" />}
@@ -1242,16 +1368,14 @@ const SystemAdmin: React.FC = () => {
                             })}
                           </div>
                         </section>
-
-                        <div className="flex justify-end pt-10">
-                          <button
-                            onClick={() => setSelectedSchool(null)}
-                            className="px-16 py-6 bg-white text-slate-950 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-amber-500 hover:scale-105 transition-all"
-                          >
+                        <div className="flex justify-end pt-4">
+                          <button onClick={() => setSelectedSchool(null)}
+                            className="px-16 py-6 bg-white text-slate-950 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-amber-500 hover:scale-105 transition-all">
                             {t('sys_finalize_config')}
                           </button>
                         </div>
                       </div>
+                      )}
                   </div>
               </div>
           </div>

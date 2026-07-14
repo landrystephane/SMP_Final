@@ -2078,6 +2078,19 @@ handlers['db:validatePayment'] = async (data) => {
   return { success: true };
 };
 
+handlers['db:getSubscriptionHistory'] = async ({ schoolId }) => {
+    const user = session.getStore()?.user;
+    if (!user || user.role !== 'SUPERADMIN') throw new Error('Non autorisé');
+    return db.prepare(`
+        SELECT ss.*, u.full_name as validated_by_name
+        FROM saas_subscriptions ss
+        LEFT JOIN users u ON ss.validated_by = u.id
+        WHERE ss.school_id = ?
+        ORDER BY ss.start_date DESC
+        LIMIT 10
+    `).all(schoolId);
+};
+
 handlers['db:cancelPendingSubject'] = async (id) => {
   const sid = getActiveSchoolId();
   const pending = db.prepare('SELECT id FROM pending_subjects WHERE id = ? AND school_id = ?').get(id, sid);
