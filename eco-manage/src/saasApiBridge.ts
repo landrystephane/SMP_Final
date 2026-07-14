@@ -2,19 +2,17 @@ import { Capacitor } from '@capacitor/core';
 
 // ─── Cache localStorage pour le mode hors connexion ──────────────────────────
 const CACHE_PREFIX = 'eco_api_';
-const CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48h — données restent accessibles 2 jours
+const CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48h
 
 function cacheKey(channel: string, args: any[]): string {
-    // Clé unique par channel + arguments sérialisés (tronqué à 80 chars)
     const argStr = JSON.stringify(args).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 80);
     return CACHE_PREFIX + channel + '_' + argStr;
 }
-
 function saveCache(key: string, data: any): void {
     try {
         localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
     } catch (_) {
-        // localStorage plein → on nettoie les entrées expirées
+        // localStorage plein → purger la moitié des entrées en cache
         const toDelete: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -24,7 +22,6 @@ function saveCache(key: string, data: any): void {
         try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch (_2) { /* abandon */ }
     }
 }
-
 function readCache(key: string): any | null {
     try {
         const raw = localStorage.getItem(key);
@@ -34,21 +31,60 @@ function readCache(key: string): any | null {
         return data;
     } catch (_) { return null; }
 }
+
+// ─── File d'attente offline (mutations hors connexion) ───────────────────────
+const QUEUE_KEY = 'eco_offline_queue';
+
+interface QueueItem { channel: string; args: any[]; ts: number; }
+
+function getQueue(): QueueItem[] {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch { return []; }
+}
+function saveQueue(q: QueueItem[]): void {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+}
+function enqueue(channel: string, args: any[]): void {
+    const q = getQueue();
+    q.push({ channel, args, ts: Date.now() });
+    saveQueue(q);
+    window.dispatchEvent(new CustomEvent('eco:queue-changed', { detail: { count: q.length } }));
+}
+export function getOfflineQueueCount(): number {
+    return getQueue().length;
+}
+
+// Rejouer la queue au retour de connexion
+async function flushQueue(makeApiCall: (channel: string, args: any[]) => Promise<any>): Promise<void> {
+    const q = getQueue();
+    if (q.length === 0) return;
+
+    window.dispatchEvent(new CustomEvent('eco:queue-flushing', { detail: { count: q.length } }));
+    const failed: QueueItem[] = [];
+
+    for (const item of q) {
+        try {
+            await makeApiCall(item.channel, item.args);
+        } catch (_) {
+            failed.push(item); // Réessayer à la prochaine reconnexion
+        }
+    }
+
+    saveQueue(failed);
+    window.dispatchEvent(new CustomEvent('eco:queue-changed', { detail: { count: failed.length } }));
+    if (failed.length === 0) {
+        // Tout sync → rafraîchir toutes les pages
+        window.dispatchEvent(new CustomEvent('app:data-changed'));
+    }
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const initSaaSBridge = () => {
-    // Si electronAPI est déjà défini (on est dans l'appli de bureau), on ne fait rien.
-    if (window.electronAPI) {
-        return;
-    }
+    if (window.electronAPI) return;
 
     console.log("[SaaS Mode] Activation du Pont API Web...");
 
-    // Sur le Cloud, l'API Express répond sous /api
-    // Si on est sur Mobile (Android/iOS via Capacitor), on force l'URL absolue du domaine
     const API_BASE = Capacitor.isNativePlatform() ? 'https://ecomanageapp.com/api' : '/api';
 
-    // Fonction utilitaire pour faire des requêtes vers server.js
     const apiCall = async (endpoint: string, method: string = 'GET', body: any = null) => {
         try {
             const token = localStorage.getItem('saas_token');
@@ -60,14 +96,10 @@ export const initSaaSBridge = () => {
                 },
                 cache: 'no-store'
             };
-            if (body) {
-                config.body = JSON.stringify(body);
-            }
+            if (body) config.body = JSON.stringify(body);
 
             const cacheBuster = method === 'GET' ? (endpoint.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`) : '';
-            const finalUrl = `${API_BASE}${endpoint}${cacheBuster}`;
-
-            const response = await fetch(finalUrl, config);
+            const response = await fetch(`${API_BASE}${endpoint}${cacheBuster}`, config);
 
             if (response.status === 401) {
                 localStorage.removeItem('saas_token');
@@ -78,16 +110,10 @@ export const initSaaSBridge = () => {
 
             const text = await response.text();
             let data: any;
-            try {
-                data = JSON.parse(text);
-            } catch(_) {
-                throw new Error(`Serveur indisponible (${response.status}). Veuillez réessayer dans quelques secondes.`);
-            }
+            try { data = JSON.parse(text); }
+            catch (_) { throw new Error(`Serveur indisponible (${response.status}). Veuillez réessayer dans quelques secondes.`); }
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Erreur réseau API');
-            }
-
+            if (!response.ok) throw new Error(data.error || 'Erreur réseau API');
             return data;
         } catch (error: any) {
             console.error(`[API Error] ${endpoint}:`, error);
@@ -95,32 +121,38 @@ export const initSaaSBridge = () => {
         }
     };
 
-    // On crée une fausse variable electronAPI pour tromper React
+    // Wrapper pour appeler un channel IPC directement (utilisé par flushQueue)
+    const callChannel = async (channel: string, args: any[]) => {
+        const res = await apiCall('/ipc', 'POST', { channel, args });
+        return res?.result;
+    };
+
+    // Rejouer la queue au retour de connexion
+    window.addEventListener('online', () => {
+        setTimeout(() => flushQueue(callChannel), 1000);
+    });
+    // Rejouer aussi au démarrage si la queue n'est pas vide et qu'on est en ligne
+    if (navigator.onLine && getQueue().length > 0) {
+        setTimeout(() => flushQueue(callChannel), 2000);
+    }
+
     window.electronAPI = {
         isWebMode: true,
         login: async (credentials: any) => {
             const res = await apiCall('/auth/login', 'POST', credentials);
-            if (res.token) {
-                localStorage.setItem('saas_token', res.token);
-            }
+            if (res.token) localStorage.setItem('saas_token', res.token);
             return res.user;
         },
-
         getSchools: async () => {
             const res = await apiCall('/ipc', 'POST', { channel: 'db:getSchools', args: [] });
             return res.result;
         },
-
     } as any;
 
-    // Pour intercepter toutes les requêtes (getStudents, saveGrades, etc.)
     const handler = {
         get: function(target: any, prop: string) {
-            if (prop in target) {
-                return target[prop];
-            }
+            if (prop in target) return target[prop];
 
-            // Déterminer le channel IPC
             let channel = `db:${prop}`;
             if (prop === 'switchSchool') {
                 return async (schoolId: number) => {
@@ -139,37 +171,41 @@ export const initSaaSBridge = () => {
             }
             if (prop === 'logout' || prop === 'restoreSession') {
                 channel = `auth:${prop}`;
-                if (prop === 'logout') {
-                    localStorage.removeItem('saas_token');
-                }
+                if (prop === 'logout') localStorage.removeItem('saas_token');
             } else if (prop === 'showAlert') {
                 return undefined;
             }
 
-            // Les opérations de lecture sont cachées localement pour le mode offline
             const isReadOp = prop.startsWith('get') || prop.startsWith('fetch');
 
             return async (...args: any[]) => {
                 const ck = isReadOp ? cacheKey(channel, args) : null;
-                try {
-                    const res = await apiCall('/ipc', 'POST', {
-                        channel: channel,
-                        args: args
-                    });
+                const isNetworkError = (err: any) =>
+                    !navigator.onLine ||
+                    err?.message?.includes('Failed to fetch') ||
+                    err?.message?.includes('NetworkError') ||
+                    err?.message?.includes('Load failed');
 
-                    // Réponse offline émise par le Service Worker (hors connexion)
+                try {
+                    const res = await apiCall('/ipc', 'POST', { channel, args });
+
+                    // Réponse offline du Service Worker
                     if (res && res.offline) {
-                        console.warn(`[SaaS Bridge] Hors connexion — lecture du cache local pour ${prop}`);
-                        if (ck) {
+                        if (isReadOp && ck) {
                             const cached = readCache(ck);
                             if (cached !== null) return cached;
                         }
-                        return isReadOp ? [] : null;
+                        if (!isReadOp) {
+                            // Mise en file d'attente de la mutation
+                            enqueue(channel, args);
+                            return { queued: true };
+                        }
+                        return [];
                     }
 
                     const result = res.result;
 
-                    // Sauvegarder les résultats de lecture dans le cache local
+                    // Sauvegarder les lectures en cache local
                     if (isReadOp && ck && result !== null && result !== undefined) {
                         saveCache(ck, result);
                     }
@@ -178,16 +214,22 @@ export const initSaaSBridge = () => {
                 } catch (error: any) {
                     console.error(`[SaaS Bridge Error] ${prop} (${channel}):`, error);
 
-                    // En cas d'erreur réseau (offline), tenter le cache local
-                    if (isReadOp && ck && (!navigator.onLine || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError'))) {
-                        const cached = readCache(ck);
-                        if (cached !== null) {
-                            console.info(`[SaaS Bridge] Cache local utilisé pour ${prop}`);
-                            return cached;
+                    if (isNetworkError(error)) {
+                        if (isReadOp && ck) {
+                            const cached = readCache(ck);
+                            if (cached !== null) {
+                                console.info(`[SaaS Bridge] Cache local utilisé pour ${prop}`);
+                                return cached;
+                            }
+                            return [];
                         }
+                        // Mutation offline → mise en file d'attente
+                        enqueue(channel, args);
+                        console.info(`[SaaS Bridge] Mutation mise en attente offline: ${channel}`);
+                        return { queued: true };
                     }
 
-                    // Si c'est une erreur métier (validation, autorisation), on la relance
+                    // Erreur métier (validation, autorisation) → relancer
                     if (error && error.message && error.message !== 'Erreur réseau API') {
                         throw error;
                     }

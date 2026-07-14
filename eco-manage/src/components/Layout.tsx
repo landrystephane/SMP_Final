@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useNotification } from '../context/NotificationContext';
 import { useOnlineStatus } from '../utils/dataSync';
+import { getOfflineQueueCount } from '../saasApiBridge';
 
 const Layout: React.FC = () => {
   const { user, logout, hasRole, exitImpersonation } = useAuth();
@@ -26,6 +27,8 @@ const Layout: React.FC = () => {
 
   const { showNotification } = useNotification();
   const isOnline = useOnlineStatus();
+  const [queueCount, setQueueCount] = useState(getOfflineQueueCount());
+  const [isFlushing, setIsFlushing] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [durations, setDurations] = useState<Record<number, number>>({});
@@ -65,6 +68,17 @@ const Layout: React.FC = () => {
     const interval = setInterval(loadNotifications, 30000);
     return () => clearInterval(interval);
   }, [user]);
+
+  useEffect(() => {
+    const onQueueChanged = (e: Event) => setQueueCount((e as CustomEvent).detail?.count ?? 0);
+    const onFlushing = () => { setIsFlushing(true); setTimeout(() => setIsFlushing(false), 5000); };
+    window.addEventListener('eco:queue-changed', onQueueChanged);
+    window.addEventListener('eco:queue-flushing', onFlushing);
+    return () => {
+      window.removeEventListener('eco:queue-changed', onQueueChanged);
+      window.removeEventListener('eco:queue-flushing', onFlushing);
+    };
+  }, []);
 
   const handleResolveRequest = async (notifId: number, action: 'APPROVED' | 'REJECTED', n: any) => {
     if (!window.electronAPI) return;
@@ -446,15 +460,27 @@ const Layout: React.FC = () => {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto bg-gradient-to-br from-[#030711] via-[#080d1a] to-[#030711]">
-        {/* Bannière hors-connexion */}
-        {!isOnline && (
+        {/* Bannière hors-connexion / synchronisation */}
+        {!isOnline ? (
           <div className="bg-slate-800 border-b border-rose-500/30 px-4 py-2.5 flex items-center gap-3">
             <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse" />
-            <span className="text-xs font-black text-rose-400 uppercase tracking-widest">
-              Hors connexion — données en cache affichées. Reconnectez-vous pour synchroniser.
+            <span className="text-xs font-black text-rose-400 uppercase tracking-widest flex-1">
+              Hors connexion — données en cache.
+              {queueCount > 0 && (
+                <span className="ml-2 bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-[10px]">
+                  {queueCount} action{queueCount > 1 ? 's' : ''} en attente de sync
+                </span>
+              )}
             </span>
           </div>
-        )}
+        ) : isFlushing ? (
+          <div className="bg-emerald-900/40 border-b border-emerald-500/30 px-4 py-2.5 flex items-center gap-3">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+            <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">
+              Synchronisation en cours — envoi des données en attente…
+            </span>
+          </div>
+        ) : null}
         {user?.role === 'SUPERADMIN' && isImpersonating && (
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-3.5 flex items-center justify-between shadow-2xl border-b border-amber-400/20">
             <div className="flex items-center space-x-3">
