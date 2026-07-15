@@ -1,37 +1,45 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Login from './pages/Login';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Students from './pages/Students';
-import Subjects from './pages/Subjects';
-import Grades from './pages/Grades';
-import Finance from './pages/Finance';
-import TuitionConfig from './pages/TuitionConfig';
-import AdminWorkflow from './pages/AdminWorkflow';
-import Attendance from './pages/Attendance';
-import Tickets from './pages/Tickets';
-import Transport from './pages/Transport';
-import Users from './pages/Users';
-import Parents from './pages/Parents';
-import Profile from './pages/Profile';
-import MobileProvisioning from './pages/MobileProvisioning';
-import SyncCenter from './pages/SyncCenter';
-import SystemAdmin from './pages/SystemAdmin';
-import AdvisorPortal from './pages/AdvisorPortal';
-import DriverPortal from './pages/DriverPortal';
-import ParentPortal from './pages/ParentPortal';
-import Statistics from './pages/Statistics';
-import CustomizationSettings from './pages/CustomizationSettings';
-import AnnualArchives from './pages/AnnualArchives';
-import LessonDiary from './pages/LessonDiary';
-import Classes from './pages/Classes';
-import Messaging from './pages/Messaging';
 import HelpGuide from './components/HelpGuide';
 import OnboardingModal from './components/OnboardingModal';
 import './index.css';
+
+// Chargement différé de toutes les pages — réduit le bundle initial
+const Dashboard            = React.lazy(() => import('./pages/Dashboard'));
+const Students             = React.lazy(() => import('./pages/Students'));
+const Subjects             = React.lazy(() => import('./pages/Subjects'));
+const Grades               = React.lazy(() => import('./pages/Grades'));
+const Finance              = React.lazy(() => import('./pages/Finance'));
+const TuitionConfig        = React.lazy(() => import('./pages/TuitionConfig'));
+const AdminWorkflow        = React.lazy(() => import('./pages/AdminWorkflow'));
+const Attendance           = React.lazy(() => import('./pages/Attendance'));
+const Tickets              = React.lazy(() => import('./pages/Tickets'));
+const Transport            = React.lazy(() => import('./pages/Transport'));
+const Users                = React.lazy(() => import('./pages/Users'));
+const Parents              = React.lazy(() => import('./pages/Parents'));
+const Profile              = React.lazy(() => import('./pages/Profile'));
+const MobileProvisioning   = React.lazy(() => import('./pages/MobileProvisioning'));
+const SyncCenter           = React.lazy(() => import('./pages/SyncCenter'));
+const SystemAdmin          = React.lazy(() => import('./pages/SystemAdmin'));
+const AdvisorPortal        = React.lazy(() => import('./pages/AdvisorPortal'));
+const DriverPortal         = React.lazy(() => import('./pages/DriverPortal'));
+const ParentPortal         = React.lazy(() => import('./pages/ParentPortal'));
+const Statistics           = React.lazy(() => import('./pages/Statistics'));
+const CustomizationSettings = React.lazy(() => import('./pages/CustomizationSettings'));
+const AnnualArchives       = React.lazy(() => import('./pages/AnnualArchives'));
+const LessonDiary          = React.lazy(() => import('./pages/LessonDiary'));
+const Classes              = React.lazy(() => import('./pages/Classes'));
+const Messaging            = React.lazy(() => import('./pages/Messaging'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-full min-h-[300px]">
+    <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 import { useTranslation } from 'react-i18next';
 
@@ -104,7 +112,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/login/:slug" element={<Login />} />
-            <Route path="/activate" element={<MobileProvisioning />} />
+            <Route path="/activate" element={<Suspense fallback={<PageLoader />}><MobileProvisioning /></Suspense>} />
             <Route
               path="/"
               element={
@@ -113,30 +121,30 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Dashboard />} />
-              <Route path="students" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="students"><Students /></RoleGuard>} />
-              <Route path="subjects" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','ADVISOR','SUPERADMIN']}><Subjects /></RoleGuard>} />
-              <Route path="grades" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','SUPERADMIN']} moduleKey="grades"><Grades /></RoleGuard>} />
-              <Route path="finance" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']} moduleKey="finance"><Finance /></RoleGuard>} />
-              <Route path="tuition-config" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']} moduleKey="tuition_config"><TuitionConfig /></RoleGuard>} />
-              <Route path="admin-workflow" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="admin"><AdminWorkflow /></RoleGuard>} />
-              <Route path="attendance" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','ADVISOR','SUPERADMIN']} moduleKey="attendance"><Attendance /></RoleGuard>} />
-              <Route path="tickets" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','BURSAR','DRIVER','SUPERADMIN']} moduleKey="tickets"><Tickets /></RoleGuard>} />
-              <Route path="transport" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="transport"><Transport /></RoleGuard>} />
-              <Route path="users" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="users"><Users /></RoleGuard>} />
-              <Route path="parents" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="parents"><Parents /></RoleGuard>} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="sync" element={<RoleGuard roles={['TEACHER','DIRECTOR','SG','SUPERADMIN']}><SyncCenter /></RoleGuard>} />
-              <Route path="system-admin" element={<RoleGuard roles={['SUPERADMIN']}><SystemAdmin /></RoleGuard>} />
-              <Route path="advisor" element={<RoleGuard roles={['FOUNDER','SG','ADVISOR','SUPERADMIN']} moduleKey="pedagogy_advisor"><AdvisorPortal /></RoleGuard>} />
-              <Route path="driver-portal" element={<RoleGuard roles={['DRIVER','SUPERADMIN']}><DriverPortal /></RoleGuard>} />
-              <Route path="parent-portal" element={<RoleGuard roles={['PARENT','FOUNDER','SUPERADMIN']}><ParentPortal /></RoleGuard>} />
-              <Route path="stats" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="stats"><Statistics /></RoleGuard>} />
-              <Route path="customization" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="customization"><CustomizationSettings /></RoleGuard>} />
-              <Route path="archives" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="archives"><AnnualArchives /></RoleGuard>} />
-              <Route path="lesson-diary" element={<RoleGuard roles={['FOUNDER','DIRECTOR','ADVISOR','TEACHER','SUPERADMIN']} moduleKey="lesson_diary"><LessonDiary /></RoleGuard>} />
-              <Route path="classes" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Classes /></RoleGuard>} />
-              <Route path="messaging" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','BURSAR','TEACHER','ADVISOR','DRIVER','SUPERADMIN']} moduleKey="messaging"><Messaging /></RoleGuard>} />
+              <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+              <Route path="students" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="students"><Suspense fallback={<PageLoader />}><Students /></Suspense></RoleGuard>} />
+              <Route path="subjects" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','ADVISOR','SUPERADMIN']}><Suspense fallback={<PageLoader />}><Subjects /></Suspense></RoleGuard>} />
+              <Route path="grades" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','SUPERADMIN']} moduleKey="grades"><Suspense fallback={<PageLoader />}><Grades /></Suspense></RoleGuard>} />
+              <Route path="finance" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']} moduleKey="finance"><Suspense fallback={<PageLoader />}><Finance /></Suspense></RoleGuard>} />
+              <Route path="tuition-config" element={<RoleGuard roles={['FOUNDER','BURSAR','SUPERADMIN']} moduleKey="tuition_config"><Suspense fallback={<PageLoader />}><TuitionConfig /></Suspense></RoleGuard>} />
+              <Route path="admin-workflow" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="admin"><Suspense fallback={<PageLoader />}><AdminWorkflow /></Suspense></RoleGuard>} />
+              <Route path="attendance" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','ADVISOR','SUPERADMIN']} moduleKey="attendance"><Suspense fallback={<PageLoader />}><Attendance /></Suspense></RoleGuard>} />
+              <Route path="tickets" element={<RoleGuard roles={['FOUNDER','DIRECTOR','TEACHER','SG','BURSAR','DRIVER','SUPERADMIN']} moduleKey="tickets"><Suspense fallback={<PageLoader />}><Tickets /></Suspense></RoleGuard>} />
+              <Route path="transport" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="transport"><Suspense fallback={<PageLoader />}><Transport /></Suspense></RoleGuard>} />
+              <Route path="users" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="users"><Suspense fallback={<PageLoader />}><Users /></Suspense></RoleGuard>} />
+              <Route path="parents" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']} moduleKey="parents"><Suspense fallback={<PageLoader />}><Parents /></Suspense></RoleGuard>} />
+              <Route path="profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
+              <Route path="sync" element={<RoleGuard roles={['TEACHER','DIRECTOR','SG','SUPERADMIN']}><Suspense fallback={<PageLoader />}><SyncCenter /></Suspense></RoleGuard>} />
+              <Route path="system-admin" element={<RoleGuard roles={['SUPERADMIN']}><Suspense fallback={<PageLoader />}><SystemAdmin /></Suspense></RoleGuard>} />
+              <Route path="advisor" element={<RoleGuard roles={['FOUNDER','SG','ADVISOR','SUPERADMIN']} moduleKey="pedagogy_advisor"><Suspense fallback={<PageLoader />}><AdvisorPortal /></Suspense></RoleGuard>} />
+              <Route path="driver-portal" element={<RoleGuard roles={['DRIVER','SUPERADMIN']}><Suspense fallback={<PageLoader />}><DriverPortal /></Suspense></RoleGuard>} />
+              <Route path="parent-portal" element={<RoleGuard roles={['PARENT','FOUNDER','SUPERADMIN']}><Suspense fallback={<PageLoader />}><ParentPortal /></Suspense></RoleGuard>} />
+              <Route path="stats" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="stats"><Suspense fallback={<PageLoader />}><Statistics /></Suspense></RoleGuard>} />
+              <Route path="customization" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="customization"><Suspense fallback={<PageLoader />}><CustomizationSettings /></Suspense></RoleGuard>} />
+              <Route path="archives" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="archives"><Suspense fallback={<PageLoader />}><AnnualArchives /></Suspense></RoleGuard>} />
+              <Route path="lesson-diary" element={<RoleGuard roles={['FOUNDER','DIRECTOR','ADVISOR','TEACHER','SUPERADMIN']} moduleKey="lesson_diary"><Suspense fallback={<PageLoader />}><LessonDiary /></Suspense></RoleGuard>} />
+              <Route path="classes" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Suspense fallback={<PageLoader />}><Classes /></Suspense></RoleGuard>} />
+              <Route path="messaging" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','BURSAR','TEACHER','ADVISOR','DRIVER','SUPERADMIN']} moduleKey="messaging"><Suspense fallback={<PageLoader />}><Messaging /></Suspense></RoleGuard>} />
             </Route>
           </Routes>
           <HelpGuide />
