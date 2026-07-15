@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import QRCode from 'qrcode';
 import { getNurseryAppreciation, getPrimaryAppreciation, calculateAttendanceObservations } from './pedagogy';
 import i18n from './i18n';
 
@@ -12,7 +13,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
         num & 255
     ];
 };
-export const generateReportCard = (data: any) => {
+export const generateReportCard = async (data: any): Promise<void> => {
     const { student, classObj, school, template, grades, attendance, term, rank, totalStudents, classAverage, firstAverage, lastAverage } = data;
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -468,12 +469,8 @@ export const generateReportCard = (data: any) => {
     doc.line(mL + 2, finalY + 12, pageW - mR - 2, finalY + 12);
     finalY += obsH + 3;
 
-    // --- Signatures / footer ---
-    const fPos = template?.footer_image_position || 'footer';
-    const fFmt = template?.footer_image?.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-
-    // MODE CACHET : image tampon dans la colonne du Directeur, signatures plus hautes
-    const sigH = (template?.footer_image && fPos === 'stamp') ? 20 : 13;
+    // --- Signatures ---
+    const sigH = 13;
     const sig3W = contentW / 3;
     doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
     doc.rect(mL, finalY, contentW, sigH);
@@ -489,52 +486,26 @@ export const generateReportCard = (data: any) => {
         doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 3.5, { align: 'center' });
     });
 
-    if (template?.footer_image) {
-        try {
-            if (fPos === 'stamp') {
-                // Cachet centré dans la colonne VISA DU DIRECTEUR (droite)
-                let sW = sig3W - 6, sH = sW;
-                try {
-                    const sp = (doc as any).getImageProperties(template.footer_image);
-                    if (sp?.width && sp?.height) {
-                        const r = sp.width / sp.height;
-                        if (r >= 1) { sW = Math.min(sig3W - 6, 28); sH = sW / r; }
-                        else { sH = Math.min(sigH - 6, 14); sW = sH * r; }
-                    }
-                } catch(_) {}
-                const sX = mL + 2 * sig3W + (sig3W - sW) / 2;
-                const sY = finalY + (sigH - sH) / 2 + 1;
-                doc.addImage(template.footer_image, fFmt, sX, sY, sW, sH, undefined, 'NONE');
-            }
-        } catch (e) {}
-    }
-
     finalY += sigH + 2;
 
-    if (template?.footer_image && fPos === 'footer') {
-        try {
-            // Pied de page : ancré en bas de page, au-dessus du texte "Généré par"
-            let fW = contentW, fH = 12;
-            try {
-                const fp = (doc as any).getImageProperties(template.footer_image);
-                if (fp?.width && fp?.height) {
-                    const ratio = fp.width / fp.height;
-                    if (ratio >= 1) {
-                        fW = contentW; fH = fW / ratio;
-                        fH = Math.max(6, Math.min(18, fH));
-                        fW = fH * ratio;
-                        if (fW > contentW) { fW = contentW; fH = fW / ratio; }
-                    } else {
-                        fH = 18; fW = fH * ratio;
-                        fW = Math.min(fW, contentW);
-                    }
-                }
-            } catch(_) {}
-            // Positionné en bas de page, 5mm au-dessus du texte "Généré par"
-            const fY = pageH - fH - 5;
-            doc.addImage(template.footer_image, fFmt, mL + (contentW - fW) / 2, fY, fW, fH, undefined, 'NONE');
-        } catch (e) {}
-    }
+    // --- QR code d'authentification ---
+    try {
+        const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const qrContent = [
+            school?.name || 'ECO-MANAGE',
+            student.matricule,
+            `T${term}`,
+            new Date().getFullYear().toString(),
+            dateStr
+        ].join('|');
+        const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 128, margin: 1 });
+        const qrSize = 22;
+        const qrX = pageW - mR - qrSize;
+        const qrY = pageH - qrSize - 9;
+        doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+        doc.setFontSize(4.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
+        doc.text('Authenticité', qrX + qrSize / 2, qrY + qrSize + 2, { align: 'center' });
+    } catch (_) { /* silencieux si QR indisponible */ }
 
     // --- Appreciation legend (classes utilisant le système A/EC/NA) ---
     const usesLetterGrading = isNursery || validatedGrades.some((g: any) => g.letter_score);

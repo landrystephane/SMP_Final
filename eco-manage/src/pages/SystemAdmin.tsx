@@ -955,7 +955,7 @@ const SystemAdmin: React.FC = () => {
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 flex-1">
                       {/* Left: General Info & Admin Users — only on meta tab */}
-                      <div className={`space-y-8 ${detailTab !== 'meta' ? 'hidden' : ''}`}>
+                      <div className={`${detailTab !== 'meta' ? 'hidden' : 'lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-8'}`}>
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
@@ -1339,7 +1339,7 @@ const SystemAdmin: React.FC = () => {
 
                       {/* Subjects Tab */}
                       {detailTab === 'subjects' && (
-                      <div className="lg:col-span-2">
+                      <div className="lg:col-span-3">
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-10">
                             <div>
@@ -1375,7 +1375,7 @@ const SystemAdmin: React.FC = () => {
 
                       {/* Modules Tab */}
                       {detailTab === 'modules' && (
-                      <div className="lg:col-span-2 space-y-8">
+                      <div className="lg:col-span-3 space-y-8">
                         <section className="glass-card p-10 bg-slate-900 border-white/10">
                           <div className="flex justify-between items-center mb-10">
                             <div>
@@ -1583,8 +1583,6 @@ const SystemAdmin: React.FC = () => {
                           <select className="input-field w-full" value={newSubject.level} onChange={e => setNewSubject({...newSubject, level: e.target.value})}>
                               <option value="MATERNELLE">{t('sys_level_maternelle_opt')}</option>
                               <option value="PRIMAIRE">{t('sys_level_primaire_opt')}</option>
-                              <option value="COLLEGE">{t('sys_level_college_opt')}</option>
-                              <option value="LYCEE">{t('sys_level_lycee_opt')}</option>
                           </select>
                       </div>
                       <div className="pt-8 flex gap-4">

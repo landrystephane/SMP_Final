@@ -76,11 +76,9 @@ const CustomizationSettings: React.FC = () => {
     // Logo de l'établissement (affiché dans l'en-tête texte du bulletin)
     const [logoImage, setLogoImage] = useState('');
 
-    // Images du template PDF (en-tête bandeau, filigrane, pied de page)
+    // Images du template PDF (en-tête bandeau, filigrane)
     const [headerImage, setHeaderImage] = useState('');
     const [watermarkImage, setWatermarkImage] = useState('');
-    const [footerImage, setFooterImage] = useState('');
-    const [footerImagePosition, setFooterImagePosition] = useState<'footer' | 'stamp'>('footer');
 
     const loadSettings = async () => {
         setLoading(true);
@@ -147,8 +145,6 @@ const CustomizationSettings: React.FC = () => {
                     if (template) {
                         setHeaderImage(template.header_image || '');
                         setWatermarkImage(template.watermark_image || '');
-                        setFooterImage(template.footer_image || '');
-                        setFooterImagePosition((template.footer_image_position as 'footer' | 'stamp') || 'footer');
                         if (template.primary_color) setPrimaryColor(template.primary_color);
                         if (template.secondary_color) setSecondaryColor(template.secondary_color);
                     }
@@ -285,8 +281,6 @@ const CustomizationSettings: React.FC = () => {
                 schoolId: activeSchool.id,
                 headerImage,
                 watermarkImage,
-                footerImage,
-                footerImagePosition,
                 primaryColor,
                 secondaryColor
             });
@@ -572,61 +566,6 @@ const CustomizationSettings: React.FC = () => {
                                 </div>
                             ))}
 
-                            {/* Slot pied de page — avec choix de placement */}
-                            <div className="space-y-2">
-                                <label className={labelCls}>Image de Pied de Page / Cachet &amp; Signatures</label>
-                                <div className="border-2 border-dashed border-white/10 rounded-2xl p-3 text-center hover:border-amber-500/40 transition-all relative min-h-[120px] flex flex-col items-center justify-center">
-                                    {footerImage ? (
-                                        <div className="w-full space-y-2">
-                                            <img src={footerImage} alt="Pied de page" className="w-full object-contain max-h-20 rounded-lg" />
-                                            <div className="flex gap-2">
-                                                <label className="flex-1 px-2 py-1.5 bg-amber-500/10 text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-amber-500/20 transition-all cursor-pointer text-center">
-                                                    Changer
-                                                    <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setFooterImage)} className="hidden" />
-                                                </label>
-                                                <button type="button" onClick={() => setFooterImage('')}
-                                                    className="flex-1 px-2 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-all">
-                                                    Supprimer
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <ImageIcon className="w-6 h-6 text-slate-600 mx-auto" />
-                                            <p className="text-[10px] font-bold text-slate-500">Cliquer pour importer</p>
-                                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setFooterImage)}
-                                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" />
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Choix de placement — visible seulement si image uploadée */}
-                                {footerImage && (
-                                    <div className="bg-slate-800/60 rounded-xl p-3 space-y-2 border border-white/5">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Emplacement de l'image</p>
-                                        <div className="space-y-1.5">
-                                            {([
-                                                { value: 'footer', label: 'Pied de page', desc: 'Bandeau sous les blocs de signature' },
-                                                { value: 'stamp',  label: 'Cachet sur signature', desc: 'Tampon dans la colonne du Directeur' },
-                                            ] as { value: 'footer' | 'stamp'; label: string; desc: string }[]).map(opt => (
-                                                <label key={opt.value} className="flex items-start gap-2 cursor-pointer group">
-                                                    <input
-                                                        type="radio"
-                                                        name="footerImagePosition"
-                                                        value={opt.value}
-                                                        checked={footerImagePosition === opt.value}
-                                                        onChange={() => setFooterImagePosition(opt.value)}
-                                                        className="mt-0.5 accent-amber-500"
-                                                    />
-                                                    <span>
-                                                        <span className="text-[10px] font-bold text-slate-300 group-hover:text-amber-400 transition-colors">{opt.label}</span>
-                                                        <span className="text-[9px] text-slate-500 block">{opt.desc}</span>
-                                                    </span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     </div>
 
@@ -1197,7 +1136,6 @@ const CustomizationSettings: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        {footerImage && <img src={footerImage} alt="Pied" className="w-full object-contain max-h-10 rounded mt-2" />}
                     </div>
 
                     {/* Reçu Mockup */}

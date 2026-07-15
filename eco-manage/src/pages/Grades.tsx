@@ -574,7 +574,7 @@ const Grades: React.FC = () => {
                 if (window.electronAPI) {
                     template = await window.electronAPI.getReportTemplate(user?.schoolId);
                 }
-                generateReportCard({
+                await generateReportCard({
                     student,
                     classObj,
                     school,
@@ -673,7 +673,7 @@ const Grades: React.FC = () => {
             const rank = rankIndex !== -1 ? rankIndex + 1 : undefined;
             const studentData = studentsWithAverages.find(s => s.id === student.id);
             if (studentData) {
-                generateReportCard({
+                await generateReportCard({
                     student,
                     classObj,
                     school,
@@ -774,102 +774,98 @@ const Grades: React.FC = () => {
           </div>
       ) : (
           <div className="glass-card overflow-hidden border-slate-800">
-            <div className="p-4 bg-white/5 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center space-x-2">
-                    {isLocked ? (
-                        <span className="flex items-center text-[10px] font-black text-rose-500 bg-rose-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-rose-500/20">
-                            <Lock className="w-3 h-3 mr-2" /> {t('locked_status')}
+            <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex flex-wrap gap-2 items-center">
+                {/* Statut verrou */}
+                {isLocked ? (
+                    <span className="flex items-center text-[10px] font-black text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-lg uppercase tracking-widest border border-rose-500/20">
+                        <Lock className="w-3 h-3 mr-1.5" /> {t('locked_status')}
+                    </span>
+                ) : (
+                    <span className="flex items-center text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg uppercase tracking-widest border border-emerald-500/20">
+                        <Unlock className="w-3 h-3 mr-1.5" /> {t('unlocked_status')}
+                    </span>
+                )}
+
+                {/* Délai dépassé */}
+                {isPastDeadline && (
+                    <span className="flex items-center text-[10px] font-black text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg uppercase tracking-widest border border-amber-500/20">
+                        <AlertCircle className="w-3 h-3 mr-1.5" /> {t('deadline_exceeded', 'Délai dépassé')}
+                    </span>
+                )}
+
+                {/* Séparateur visuel */}
+                <div className="flex-1" />
+
+                {/* Demander réactivation (TEACHER) */}
+                {isPastDeadline && user?.role === 'TEACHER' && (
+                    <button onClick={handleRequestReactivation}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg font-bold text-[10px] uppercase hover:bg-amber-500/20 transition-all">
+                        {t('request_reactivation_btn', 'Réactivation')}
+                    </button>
+                )}
+
+                {/* Demander déblocage (TEACHER) */}
+                {user?.role === 'TEACHER' && (isLocked || isPastDeadline) && (
+                    <button onClick={handleRequestUnlock}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg font-black text-[10px] uppercase hover:bg-amber-400 transition-all">
+                        {t('request_unlock_btn', 'Déblocage')}
+                    </button>
+                )}
+
+                {/* Dérogation */}
+                {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && (
+                    <button onClick={handleGrantOverride}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg font-bold text-[10px] uppercase hover:bg-indigo-500/20 transition-all"
+                        title={t('grant_override_tooltip', "Accorder une dérogation de délai")}>
+                        {t('override_label', 'Dérogation')}
+                    </button>
+                )}
+
+                {/* Valider impressions */}
+                {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && !isClassValidated && (
+                    <button onClick={handleValidateClass}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-black text-[10px] uppercase hover:bg-emerald-500 transition-all">
+                        <CheckCircle2 className="w-3 h-3" /> {t('validate_for_printing', 'Valider')}
+                    </button>
+                )}
+
+                {/* Classe validée + Imprimer */}
+                {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && isClassValidated && (
+                    <>
+                        <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg uppercase tracking-widest border border-emerald-500/20">
+                            <CheckCircle2 className="w-3 h-3" /> {t('class_validated_badge', 'Validée')}
                         </span>
-                    ) : (
-                        <span className="flex items-center text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
-                            <Unlock className="w-3 h-3 mr-2" /> {t('unlocked_status')}
-                        </span>
-                    )}
-                    {isPastDeadline && (
-                      <div className="flex items-center space-x-2">
-                        <span className="flex items-center text-[10px] font-black text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-amber-500/20">
-                            <AlertCircle className="w-3 h-3 mr-2" /> {t('deadline_exceeded', 'DÉLAI DÉPASSÉ')}
-                        </span>
-                        {user?.role === 'TEACHER' && (
-                          <button
-                            onClick={handleRequestReactivation}
-                            className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full font-bold text-[10px] uppercase hover:bg-amber-500/30 transition-all border border-amber-500/30"
-                          >
-                            {t('request_reactivation_btn', 'Demander Réactivation')}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {user?.role === 'TEACHER' && (isLocked || isPastDeadline) && (
-                        <button
-                            onClick={handleRequestUnlock}
-                            className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20"
-                        >
-                            {t('request_unlock_btn', 'Demander Déblocage')}
+                        <button onClick={handlePrintAllClass} disabled={isBatchPrinting}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-black text-[10px] uppercase hover:bg-purple-500 transition-all disabled:opacity-50">
+                            <Printer className="w-3 h-3" />
+                            {isBatchPrinting ? t('gr_printing_all', 'Impression...') : t('gr_print_all_class', 'Imprimer')}
                         </button>
-                    )}
-                </div>
-                <div className="flex items-center space-x-4">
-                    {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && (
-                        <button
-                            onClick={handleGrantOverride}
-                            className="bg-indigo-500/20 text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-500/30 transition-all border border-indigo-500/30 flex items-center"
-                            title={t('grant_override_tooltip', "Accorder une dérogation de délai à l'enseignant")}
-                        >
-                            {t('override_label', 'DÉROGATION')}
+                    </>
+                )}
+
+                {/* Export CSV */}
+                {selectedClass && selectedTerm !== '' && (
+                    <button onClick={handleExportGrades}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-slate-300 border border-slate-600 rounded-lg font-bold text-[10px] uppercase hover:bg-slate-600 transition-all">
+                        <FileSpreadsheet className="w-3 h-3" />
+                        {t('gr_export_csv', 'CSV')}
+                    </button>
+                )}
+
+                {/* Sauvegarder / Déverrouiller */}
+                {!isLocked ? (
+                    <button onClick={handleSave} disabled={isLocked || isPastDeadline}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-slate-950 rounded-lg font-black text-[10px] uppercase hover:bg-amber-400 transition-all disabled:opacity-30">
+                        <Save className="w-3 h-3" /> {t('save_grades') || 'Sauvegarder'}
+                    </button>
+                ) : (
+                    (hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && (
+                        <button onClick={handleUnlock}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 text-white rounded-lg font-black text-[10px] uppercase hover:bg-rose-600 transition-all">
+                            <Unlock className="w-3 h-3" /> {t('unlock_for_correction', 'Déverrouiller')}
                         </button>
-                    )}
-                    {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && !isClassValidated && (
-                        <button
-                            onClick={handleValidateClass}
-                            className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all inline-flex items-center shadow-lg shadow-emerald-600/20"
-                        >
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> {t('validate_for_printing', 'VALIDER LES IMPRESSIONS')}
-                        </button>
-                    )}
-                    {selectedClass && selectedTerm !== '' && (
-                        <button
-                            onClick={handleExportGrades}
-                            className="bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all inline-flex items-center"
-                        >
-                            <FileSpreadsheet className="w-4 h-4 mr-2" />
-                            {t('gr_export_csv', 'Exporter CSV')}
-                        </button>
-                    )}
-                    {(hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && isClassValidated && (
-                        <>
-                        <span className="flex items-center text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
-                            <CheckCircle2 className="w-3 h-3 mr-2" /> {t('class_validated_badge', 'CLASSE VALIDÉE')}
-                        </span>
-                        <button
-                            onClick={handlePrintAllClass}
-                            disabled={isBatchPrinting}
-                            className="bg-purple-600 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-purple-500 transition-all inline-flex items-center shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Printer className="w-4 h-4 mr-2" />
-                            {isBatchPrinting ? t('gr_printing_all', 'Impression...') : t('gr_print_all_class', 'Imprimer la classe')}
-                        </button>
-                        </>
-                    )}
-                    {!isLocked ? (
-                        <button
-                            onClick={handleSave}
-                            disabled={isLocked || isPastDeadline}
-                            className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all inline-flex items-center shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            <Save className="w-4 h-4 mr-2" /> {t('save_grades') || 'Sauvegarder'}
-                        </button>
-                    ) : (
-                        (hasRole(['DIRECTOR', 'FOUNDER']) || (user?.role === 'SG' && isSgActing)) && (
-                            <button
-                                onClick={handleUnlock}
-                                className="bg-rose-500 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all inline-flex items-center shadow-lg shadow-rose-500/20"
-                            >
-                                <Unlock className="w-4 h-4 mr-2" /> {t('unlock_for_correction')}
-                            </button>
-                        )
-                    )}
-                </div>
+                    )
+                )}
             </div>
 
             <div className="overflow-x-auto">

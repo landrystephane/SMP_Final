@@ -1497,9 +1497,18 @@ handlers['db:removeSubjectFromClass'] = async ({ classId, subjectId }) => {
 handlers['db:getClasses'] = async (schoolId) => {
   const sid = getActiveSchoolId(schoolId);
   return db.prepare(`
-    SELECT c.*, u.full_name AS teacher_name, u.gender AS teacher_gender, u.civility AS teacher_civility
+    SELECT c.*,
+      COALESCE(u.full_name, fb.full_name) AS teacher_name,
+      COALESCE(u.gender, fb.gender) AS teacher_gender,
+      COALESCE(u.civility, fb.civility) AS teacher_civility
     FROM classes c
     LEFT JOIN users u ON c.main_teacher_id = u.id
+    LEFT JOIN (
+      SELECT cts.class_id, u2.full_name, u2.gender, u2.civility
+      FROM class_teacher_subjects cts
+      JOIN users u2 ON cts.teacher_id = u2.id
+      GROUP BY cts.class_id
+    ) fb ON fb.class_id = c.id AND c.main_teacher_id IS NULL
     WHERE c.school_id = ?
   `).all(sid);
 };

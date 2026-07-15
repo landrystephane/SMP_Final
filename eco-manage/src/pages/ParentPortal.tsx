@@ -281,7 +281,7 @@ const ParentPortal: React.FC = () => {
                         template = await window.electronAPI.getReportTemplate(school.id);
                     }
                     const { generateReportCard } = await import('../utils/reports');
-                    generateReportCard({
+                    await generateReportCard({
                         student: selectedChild,
                         classObj,
                         school,
@@ -300,7 +300,7 @@ const ParentPortal: React.FC = () => {
                 }
             } else {
                 const { generateReportCard } = await import('../utils/reports');
-                generateReportCard({
+                await generateReportCard({
                     student: selectedChild,
                     classObj: { name: 'Classe Démo', level: 'PRIMAIRE', section: 'FRANCOPHONE' },
                     school: { name: 'École Démo' },
