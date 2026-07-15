@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X, BookOpen } from 'lucide-react';
+import { Calendar, Trash2, MapPin, Truck, Award, CheckCircle2, Eye, ShieldAlert, X, BookOpen, NotebookPen } from 'lucide-react';
+import { DiaryAdminView } from './LessonDiary';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
@@ -11,7 +12,7 @@ const AdvisorPortal: React.FC = () => {
     const { t } = useTranslation();
     const { showNotification } = useNotification();
     const [termStructure, setTermStructure] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS' | 'EXAMS_PROGRAM'>('PLANNING');
+    const [activeTab, setActiveTab] = useState<'PLANNING' | 'EVALUATIONS' | 'EXAMS_PROGRAM' | 'CAHIER_DE_TEXTE'>('PLANNING');
     const [examSchedules, setExamSchedules] = useState<any[]>([]);
     const [examWeekOffset, setExamWeekOffset] = useState(0);
     const [showExamModal, setShowExamModal] = useState(false);
@@ -519,6 +520,7 @@ const AdvisorPortal: React.FC = () => {
                     <button onClick={() => setActiveTab('PLANNING')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'PLANNING' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_planning', 'Plannings')}</button>
                     <button onClick={() => setActiveTab('EVALUATIONS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EVALUATIONS' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_evaluations', 'Validation Notes')}</button>
                     <button onClick={() => setActiveTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('tab_exams_program', 'Programme Évaluations')}</button>
+                    <button onClick={() => setActiveTab('CAHIER_DE_TEXTE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${activeTab === 'CAHIER_DE_TEXTE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}><NotebookPen className="w-3.5 h-3.5" />{t('tab_cahier_texte', 'Cahier de Texte')}</button>
                 </div>
             </div>
 
@@ -1089,6 +1091,13 @@ const AdvisorPortal: React.FC = () => {
                 </div>
                 );
             })()}
+
+            {/* Cahier de Texte Tab */}
+            {activeTab === 'CAHIER_DE_TEXTE' && (
+                <div className="mt-6 pb-20">
+                    <DiaryAdminView />
+                </div>
+            )}
 
             {/* Grades Inspection Slide-over Drawer / Modal */}
             {showDetailModal && selectedSubjectForDetail && (

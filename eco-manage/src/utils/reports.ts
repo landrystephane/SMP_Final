@@ -1136,7 +1136,7 @@ export const generateHonorCertificate = (studentName: string, className: string,
     doc.save(isEn ? `Certificate_${studentName.replace(/[\s]+/g, '_')}.pdf` : `Certificat_${studentName.replace(/[\s]+/g, '_')}.pdf`);
 };
 
-export const generateClassReportCards = (data: {
+export const generateClassReportCards = async (data: {
     classObj: any;
     school: any;
     term: any;
@@ -1144,7 +1144,7 @@ export const generateClassReportCards = (data: {
     ignoreValidation?: boolean;
     isAnnual?: boolean;
     template?: any;
-}) => {
+}): Promise<void> => {
     const { classObj, school, term, studentsData, ignoreValidation, isAnnual, template } = data;
     const doc = new jsPDF();
     const isNursery = classObj.level === 'MATERNELLE';
@@ -1211,7 +1211,8 @@ export const generateClassReportCards = (data: {
         }
     };
 
-    studentsData.forEach((sData, index) => {
+    for (let index = 0; index < studentsData.length; index++) {
+    const sData = studentsData[index];
         const { student, grades, attendance, rank, totalStudents, validGrades, termAverages, termsArray, average: annualAvg } = sData;
         let validatedGrades = isAnnual ? validGrades : (ignoreValidation ? grades : grades.filter((g: any) => g.validated === 1));
 
@@ -1677,10 +1678,7 @@ export const generateClassReportCards = (data: {
             finalY += 8;
 
             // Signatures (3 columns, bordered)
-            const fPosB = template?.footer_image_position || 'footer';
-            const fFmtB = template?.footer_image?.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-
-            const sigH = (template?.footer_image && fPosB === 'stamp') ? 20 : 13;
+            const sigH = 13;
             const sig3W = cW / 3;
             doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
             doc.rect(mL, finalY, cW, sigH);
@@ -1696,50 +1694,20 @@ export const generateClassReportCards = (data: {
                 doc.text(label, mL + i * sig3W + sig3W / 2, finalY + 3.5, { align: 'center' });
             });
 
-            if (template?.footer_image) {
-                try {
-                    if (fPosB === 'stamp') {
-                        let sWb = sig3W - 6, sHb = sWb;
-                        try {
-                            const spb = (doc as any).getImageProperties(template.footer_image);
-                            if (spb?.width && spb?.height) {
-                                const rb = spb.width / spb.height;
-                                if (rb >= 1) { sWb = Math.min(sig3W - 6, 28); sHb = sWb / rb; }
-                                else { sHb = Math.min(sigH - 6, 14); sWb = sHb * rb; }
-                            }
-                        } catch(_) {}
-                        const sXb = mL + 2 * sig3W + (sig3W - sWb) / 2;
-                        const sYb = finalY + (sigH - sHb) / 2 + 1;
-                        doc.addImage(template.footer_image, fFmtB, sXb, sYb, sWb, sHb, undefined, 'NONE');
-                    }
-                } catch(e) {}
-            }
-
             finalY += sigH + 2;
 
-            if (template?.footer_image && fPosB === 'footer') {
-                try {
-                    let fWb = cW, fHb = 12;
-                    try {
-                        const fpb = (doc as any).getImageProperties(template.footer_image);
-                        if (fpb?.width && fpb?.height) {
-                            const ratiob = fpb.width / fpb.height;
-                            if (ratiob >= 1) {
-                                fWb = cW; fHb = fWb / ratiob;
-                                fHb = Math.max(6, Math.min(18, fHb));
-                                fWb = fHb * ratiob;
-                                if (fWb > cW) { fWb = cW; fHb = fWb / ratiob; }
-                            } else {
-                                fHb = 18; fWb = fHb * ratiob;
-                                fWb = Math.min(fWb, cW);
-                            }
-                        }
-                    } catch(_) {}
-                    // Ancré en bas de page, 5mm au-dessus du texte "Généré par"
-                    const fYb = pageH - fHb - 5;
-                    doc.addImage(template.footer_image, fFmtB, mL + (cW - fWb) / 2, fYb, fWb, fHb, undefined, 'NONE');
-                } catch(e) {}
-            }
+            // QR code d'authentification
+            try {
+                const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const qrContent = [school?.name || 'ECO-MANAGE', student.matricule, `T${term}`, new Date().getFullYear().toString(), dateStr].join('|');
+                const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 128, margin: 1 });
+                const qrSize = 22;
+                const qrX = pageW - mR - qrSize;
+                const qrY = pageH - qrSize - 9;
+                doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+                doc.setFontSize(4.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
+                doc.text('Authenticité', qrX + qrSize / 2, qrY + qrSize + 2, { align: 'center' });
+            } catch (_) { }
 
             doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
             doc.text('APPRÉCIATIONS : ', mL, finalY + 4);
@@ -1752,7 +1720,7 @@ export const generateClassReportCards = (data: {
                 pageW / 2, pageH - 3, { align: 'center' }
             );
         }
-    });
+    }
 
     doc.save(`Bulletins_Classe_${classObj.name.replace(/[\s/]+/g, '_')}_T${term}.pdf`);
 };

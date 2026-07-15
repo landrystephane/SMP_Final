@@ -27,7 +27,7 @@ function formatDate(d: string) {
 
 // ─── Vue Admin ────────────────────────────────────────────────────────────────
 
-function AdminView() {
+export function DiaryAdminView() {
     const { user } = useAuth();
     const [classes, setClasses] = useState<any[]>([]);
     const [subjects, setSubjects] = useState<any[]>([]);
@@ -368,7 +368,7 @@ const LessonDiary: React.FC = () => {
                 </div>
             </div>
 
-            {isAdmin ? <AdminView /> : <TeacherView />}
+            {isAdmin ? <DiaryAdminView /> : <TeacherView />}
         </div>
     );
 };

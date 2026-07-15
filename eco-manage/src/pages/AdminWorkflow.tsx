@@ -280,7 +280,7 @@ const AdminWorkflow: React.FC = () => {
 
         let reportTemplate = null;
         try { reportTemplate = await window.electronAPI.getReportTemplate(user?.schoolId); } catch(e) {}
-        generateClassReportCards({
+        await generateClassReportCards({
             classObj,
             school,
             term: getActiveTerm(),
@@ -402,7 +402,7 @@ const AdminWorkflow: React.FC = () => {
 
         let reportTemplateAnnual = null;
         try { reportTemplateAnnual = await window.electronAPI.getReportTemplate(user?.schoolId); } catch(e) {}
-        generateClassReportCards({
+        await generateClassReportCards({
             classObj,
             school,
             term: 'ANNUEL',
