@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Archive, Download, Calendar, Search, DollarSign, Users, Award, ShieldAlert, FolderOpen, ArrowUpRight, BarChart3, Database, ChevronDown, ChevronUp, BookOpen, Clock } from 'lucide-react';
+import { Archive, Download, Calendar, Search, DollarSign, Users, Award, ShieldAlert, FolderOpen, ArrowUpRight, BarChart3, Database, ChevronDown, ChevronUp, BookOpen, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,14 @@ const AnnualArchives: React.FC = () => {
     const [filterType, setFilterType] = useState('ALL');
     const [expandedArchive, setExpandedArchive] = useState<number | null>(null);
     const [archiveTab, setArchiveTab] = useState<'students' | 'payments' | 'grades' | 'attendance' | 'schedules' | 'expenses'>('students');
+
+    // Nouvelle année / promotion
+    const [promoThreshold, setPromoThreshold] = useState(10);
+    const [promoResults, setPromoResults] = useState<any[]>([]);
+    const [promoOverrides, setPromoOverrides] = useState<Record<number, { action: string; newClassId: number | null }>>({});
+    const [isComputing, setIsComputing] = useState(false);
+    const [isApplying, setIsApplying] = useState(false);
+    const [promoStep, setPromoStep] = useState<'idle' | 'computed' | 'done'>('idle');
 
     const loadData = async () => {
         setLoading(true);
@@ -92,6 +100,59 @@ const AnnualArchives: React.FC = () => {
                 classes: classes
             });
         });
+    };
+
+    const handleComputePromotion = async () => {
+        if (!window.electronAPI || !user) return;
+        setIsComputing(true);
+        try {
+            const results = await window.electronAPI.computePromotion({ schoolId: user.schoolId, threshold: promoThreshold });
+            setPromoResults(results || []);
+            setPromoOverrides({});
+            setPromoStep('computed');
+        } catch (e: any) {
+            alert('Erreur : ' + e.message);
+        } finally {
+            setIsComputing(false);
+        }
+    };
+
+    const handleApplyNewYear = async () => {
+        if (!window.electronAPI || !user) return;
+        const ok = window.confirm(
+            'Attention ! Cette action va :\n' +
+            '• Mettre à jour les classes de chaque élève selon les décisions\n' +
+            '• Supprimer toutes les notes et présences de l\'année\n' +
+            '• Remettre les inscriptions à zéro\n\n' +
+            'Assurez-vous d\'avoir archivé l\'année avant. Continuer ?'
+        );
+        if (!ok) return;
+        setIsApplying(true);
+        try {
+            const decisions = promoResults.map(r => {
+                const ov = promoOverrides[r.student.id];
+                const action = ov?.action ?? r.proposed;
+                const newClassId = ov?.newClassId !== undefined
+                    ? ov.newClassId
+                    : (action === 'PROMOTE' ? (r.nextClass?.id ?? null) : null);
+                return { studentId: r.student.id, action, newClassId };
+            });
+            await window.electronAPI.applyNewSchoolYear({ schoolId: user.schoolId, decisions });
+            setPromoStep('done');
+            setPromoResults([]);
+            loadData();
+        } catch (e: any) {
+            alert('Erreur : ' + e.message);
+        } finally {
+            setIsApplying(false);
+        }
+    };
+
+    const getEffectiveAction = (r: any) => promoOverrides[r.student.id]?.action ?? r.proposed;
+    const getEffectiveClassId = (r: any) => {
+        const ov = promoOverrides[r.student.id];
+        if (ov?.newClassId !== undefined) return ov.newClassId;
+        return r.nextClass?.id ?? null;
     };
 
     // Filter payments
@@ -264,6 +325,47 @@ const AnnualArchives: React.FC = () => {
                                 <Database className="w-4 h-4" /> {archiving ? t('arch_archiving_progress', 'Archivage...') : t('arch_launch_archive', "Lancer l'Archivage Physique")}
                             </button>
                         </form>
+                    </div>
+
+                    {/* Démarrer la nouvelle année */}
+                    <div className="glass-card p-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] shadow-2xl space-y-4">
+                        <div className="flex items-center space-x-3 text-emerald-400">
+                            <ArrowUpRight className="w-5 h-5" />
+                            <h2 className="text-sm font-black uppercase tracking-wider text-white">{t('arch_new_year_title', 'Démarrer la Nouvelle Année')}</h2>
+                        </div>
+                        <p className="text-slate-400 text-[10px] font-bold leading-relaxed">
+                            {t('arch_new_year_desc', 'Calcule les promotions selon la moyenne seuil, met à jour les classes et réinitialise les notes, présences et paiements.')}
+                        </p>
+
+                        {promoStep === 'done' ? (
+                            <div className="text-center py-4 space-y-3">
+                                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                                <p className="text-emerald-400 font-black text-sm uppercase">{t('arch_new_year_done', 'Nouvelle année démarrée !')}</p>
+                                <button onClick={() => setPromoStep('idle')} className="text-[9px] text-slate-500 hover:text-white transition-colors underline uppercase tracking-widest">
+                                    {t('arch_new_year_restart', 'Relancer un calcul')}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">{t('arch_promo_threshold', 'Moyenne Minimale de Promotion (/20)')}</label>
+                                    <input
+                                        type="number" min={0} max={20} step={0.5}
+                                        value={promoThreshold}
+                                        onChange={e => setPromoThreshold(parseFloat(e.target.value) || 10)}
+                                        className="w-full bg-slate-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleComputePromotion}
+                                    disabled={isComputing}
+                                    className="w-full bg-emerald-700 hover:bg-emerald-600 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    <Users className="w-4 h-4" />
+                                    {isComputing ? t('arch_computing', 'Calcul en cours...') : t('arch_compute_btn', 'Calculer les Promotions')}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Archived Years timeline history */}
@@ -454,6 +556,135 @@ const AnnualArchives: React.FC = () => {
                 </div>
 
             </div>
+
+            {/* ── Tableau de promotion (pleine largeur) ── */}
+            {promoStep === 'computed' && promoResults.length > 0 && (
+                <div className="glass-card p-6 bg-gradient-to-br from-slate-900 to-slate-950 border border-white/5 rounded-[32px] shadow-2xl space-y-5">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                        <div className="flex items-center space-x-3">
+                            <ArrowUpRight className="w-5 h-5 text-emerald-400" />
+                            <h2 className="text-sm font-black uppercase text-white tracking-wider">
+                                {t('arch_promo_table_title', 'Tableau de Promotion')} — {promoResults.length} {t('arch_promo_students', 'élèves')}
+                            </h2>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setPromoStep('idle'); setPromoResults([]); setPromoOverrides({}); }}
+                                className="px-4 py-2.5 bg-white/5 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" /> {t('arch_promo_retry', 'Recalculer')}
+                            </button>
+                            <button
+                                onClick={handleApplyNewYear}
+                                disabled={isApplying}
+                                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                <Database className="w-4 h-4" />
+                                {isApplying ? t('arch_applying', 'Application...') : t('arch_apply_new_year', 'Appliquer la Nouvelle Année')}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-3">
+                        {[
+                            { label: t('arch_stat_admitted', 'Admis'), action: 'PROMOTE', color: 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' },
+                            { label: t('arch_stat_repeating', 'Redoublants'), action: 'HOLD', color: 'text-amber-400 bg-amber-500/10 border border-amber-500/20' },
+                            { label: t('arch_stat_graduated', 'Diplômés'), action: 'GRADUATE', color: 'text-blue-400 bg-blue-500/10 border border-blue-500/20' },
+                        ].map(stat => (
+                            <div key={stat.action} className={`${stat.color} rounded-2xl p-3 text-center`}>
+                                <p className="text-2xl font-black">{promoResults.filter(r => getEffectiveAction(r) === stat.action).length}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest mt-1 opacity-80">{stat.label}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-white/5">
+                        <table className="w-full text-[10px]">
+                            <thead>
+                                <tr className="bg-slate-950 text-slate-500 font-black uppercase tracking-widest border-b border-white/5">
+                                    <th className="px-4 py-3 text-left">{t('arch_col_student', 'Élève')}</th>
+                                    <th className="px-4 py-3 text-left">{t('arch_col_current_class', 'Classe actuelle')}</th>
+                                    <th className="px-4 py-3 text-center">{t('arch_col_average', 'Moy. Annuelle')}</th>
+                                    <th className="px-4 py-3 text-center">{t('arch_col_decision', 'Décision')}</th>
+                                    <th className="px-4 py-3 text-left">{t('arch_col_next_class', 'Prochaine Classe')}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {promoResults.map(r => {
+                                    const action = getEffectiveAction(r);
+                                    const nextClassId = getEffectiveClassId(r);
+                                    return (
+                                        <tr key={r.student.id} className="hover:bg-white/2 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <p className="text-white font-black">{r.student.last_name} {r.student.first_name}</p>
+                                                <p className="text-slate-500 text-[8px] mt-0.5">{r.student.matricule}</p>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-300 font-bold">{r.currentClass?.name || '—'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                {r.hasGrades ? (
+                                                    <span className={`font-black text-xs ${r.average >= promoThreshold ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                        {r.average?.toFixed(2)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-600 text-[9px] italic">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <select
+                                                    value={action}
+                                                    onChange={e => {
+                                                        const a = e.target.value;
+                                                        setPromoOverrides(prev => ({
+                                                            ...prev,
+                                                            [r.student.id]: {
+                                                                action: a,
+                                                                newClassId: a === 'HOLD' ? r.student.class_id
+                                                                    : a === 'GRADUATE' ? null
+                                                                    : (r.nextClass?.id ?? null)
+                                                            }
+                                                        }));
+                                                    }}
+                                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase border-0 outline-none cursor-pointer ${
+                                                        action === 'PROMOTE'  ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        action === 'GRADUATE' ? 'bg-blue-500/20 text-blue-400' :
+                                                                                'bg-amber-500/20 text-amber-400'
+                                                    }`}
+                                                >
+                                                    <option value="PROMOTE">{t('arch_action_admitted', 'Admis')}</option>
+                                                    <option value="HOLD">{t('arch_action_repeat', 'Redoublant')}</option>
+                                                    <option value="GRADUATE">{t('arch_action_graduated', 'Diplômé')}</option>
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {action === 'GRADUATE' ? (
+                                                    <span className="text-slate-500 text-[9px] italic">{t('arch_end_of_cycle', 'Fin de cycle')}</span>
+                                                ) : action === 'HOLD' ? (
+                                                    <span className="text-slate-400 font-bold">{r.currentClass?.name || '—'} <span className="text-slate-600 text-[8px]">({t('arch_kept', 'maintenu')})</span></span>
+                                                ) : (
+                                                    <select
+                                                        value={nextClassId ?? ''}
+                                                        onChange={e => setPromoOverrides(prev => ({
+                                                            ...prev,
+                                                            [r.student.id]: { ...(prev[r.student.id] || { action: 'PROMOTE' }), newClassId: e.target.value ? parseInt(e.target.value) : null }
+                                                        }))}
+                                                        className="bg-slate-800 text-white rounded-lg px-2 py-1 text-[9px] font-bold border border-white/10 outline-none cursor-pointer"
+                                                    >
+                                                        <option value="">{t('arch_select_class', '— Choisir —')}</option>
+                                                        {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                    </select>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

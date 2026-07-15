@@ -3828,6 +3828,95 @@ handlers['db:createSchoolYearArchive'] = async ({ schoolId, yearName }) => {
 
 };
 
+// ─── Promotion & Nouvelle Année ────────────────────────────────────────────
+
+const CLASS_PROGRESSIONS = {
+    PRIMAIRE_FRANCOPHONE:  ['SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'],
+    PRIMAIRE_ANGLOPHONE:   ['CLASS 1', 'CLASS 2', 'CLASS 3', 'CLASS 4', 'CLASS 5', 'CLASS 6'],
+    MATERNELLE_FRANCOPHONE:['PETITE SECTION', 'MOYENNE SECTION', 'GRANDE SECTION'],
+    MATERNELLE_ANGLOPHONE: ['NURSERY 1', 'NURSERY 2', 'NURSERY 3'],
+};
+
+function getClassStep(name, level, section) {
+    const key = `${level}_${section}`;
+    const order = CLASS_PROGRESSIONS[key] || [];
+    const n = name.toUpperCase().trim();
+    for (let i = 0; i < order.length; i++) {
+        if (n.includes(order[i])) return i;
+    }
+    return -1;
+}
+
+handlers['db:computePromotion'] = async ({ schoolId, threshold }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+    const minAvg = parseFloat(threshold) || 10;
+
+    const allClasses = db.prepare('SELECT * FROM classes WHERE school_id = ?').all(sid);
+    const activeStudents = db.prepare("SELECT * FROM students WHERE school_id = ? AND status = 'ACTIVE'").all(sid);
+
+    return activeStudents.map(student => {
+        const cls = allClasses.find(c => c.id === student.class_id) || null;
+
+        const grades = db.prepare('SELECT score, coefficient FROM grades WHERE student_id = ? AND validated = 1 AND score IS NOT NULL').all(student.id);
+        let totalPoints = 0, totalCoef = 0;
+        grades.forEach(g => { totalPoints += g.score * (g.coefficient || 1); totalCoef += g.coefficient || 1; });
+        const average = totalCoef > 0 ? Math.round((totalPoints / totalCoef) * 100) / 100 : null;
+        const hasGrades = grades.length > 0;
+
+        let step = -1, isLastClass = false, nextClass = null;
+        if (cls) {
+            step = getClassStep(cls.name, cls.level, cls.section);
+            const key = `${cls.level}_${cls.section}`;
+            const order = CLASS_PROGRESSIONS[key] || [];
+            isLastClass = step >= 0 && step === order.length - 1;
+            if (!isLastClass && step >= 0) {
+                const nextKeyword = order[step + 1];
+                nextClass = allClasses.find(c =>
+                    c.level === cls.level && c.section === cls.section &&
+                    c.name.toUpperCase().includes(nextKeyword)
+                ) || null;
+            }
+        }
+
+        let proposed;
+        if (isLastClass) proposed = 'GRADUATE';
+        else if (average !== null && average >= minAvg) proposed = 'PROMOTE';
+        else if (average === null) proposed = 'PROMOTE'; // pas de notes → admis par défaut
+        else proposed = 'HOLD';
+
+        return { student, currentClass: cls, nextClass, average, hasGrades, isLastClass, proposed };
+    });
+};
+
+handlers['db:applyNewSchoolYear'] = async ({ schoolId, decisions }) => {
+    const currentUser = session.getStore()?.user;
+    if (!currentUser || !['FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+
+    db.transaction(() => {
+        for (const { studentId, action, newClassId } of decisions) {
+            const s = db.prepare('SELECT id FROM students WHERE id = ? AND school_id = ?').get(studentId, sid);
+            if (!s) continue;
+            if (action === 'GRADUATE') {
+                db.prepare("UPDATE students SET status = 'GRADUATED', class_id = NULL WHERE id = ?").run(studentId);
+            } else if (action === 'PROMOTE' && newClassId) {
+                db.prepare('UPDATE students SET class_id = ? WHERE id = ?').run(newClassId, studentId);
+            }
+            // HOLD : aucun changement de classe
+        }
+
+        // Réinitialisation des données annuelles (toujours inclus dans l'archive avant)
+        db.prepare('DELETE FROM grades WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(sid);
+        db.prepare('DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)').run(sid);
+        db.prepare('DELETE FROM grade_overrides WHERE class_id IN (SELECT id FROM classes WHERE school_id = ?)').run(sid);
+        db.prepare("UPDATE students SET has_paid_registration = 0 WHERE school_id = ? AND status = 'ACTIVE'").run(sid);
+    })();
+
+    return { success: true };
+};
+
 handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) => {
     const sid = getActiveSchoolId();
     const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);
