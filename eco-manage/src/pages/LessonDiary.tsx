@@ -35,15 +35,20 @@ export function DiaryAdminView() {
     const [selectedClass, setSelectedClass] = useState<any>(null);
     const [selectedSubject, setSelectedSubject] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [apiError, setApiError] = useState<string | null>(null);
 
     useEffect(() => { loadClasses(); }, []);
 
     const loadClasses = async () => {
         setLoading(true);
+        setApiError(null);
         try {
             const data = await window.electronAPI.getDiaryClasses(user?.schoolId);
-            setClasses(data || []);
-        } catch(e) {}
+            if (data && data.error) { setApiError(data.error); setClasses([]); }
+            else setClasses(data || []);
+        } catch(e: any) {
+            setApiError(e?.message || 'Erreur de connexion au serveur');
+        }
         setLoading(false);
     };
 
@@ -84,6 +89,17 @@ export function DiaryAdminView() {
                 {selectedClass && (<><ChevronRight className="w-3 h-3" /><button onClick={() => { setSelectedSubject(null); setEntries(null); selectClass(selectedClass); }} className="hover:text-amber-400 transition-colors">{selectedClass.name}</button></>)}
                 {selectedSubject && (<><ChevronRight className="w-3 h-3" /><span className="text-white">{selectedSubject.subject_name}</span></>)}
             </div>
+
+            {/* Erreur API */}
+            {apiError && !selectedClass && (
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-5 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-rose-300 font-black text-xs">{apiError}</p>
+                        <p className="text-rose-400/70 text-[10px] mt-1">Vérifiez que le serveur est bien redémarré (<code className="bg-white/5 px-1 rounded">pm2 restart eco-hub-saas</code>)</p>
+                    </div>
+                </div>
+            )}
 
             {/* Vue : liste des classes */}
             {!selectedClass && (

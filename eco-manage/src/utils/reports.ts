@@ -500,7 +500,7 @@ export const generateReportCard = async (data: any): Promise<void> => {
         ].join('|');
         const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 128, margin: 1 });
         const qrSize = 22;
-        const qrX = pageW - mR - qrSize;
+        const qrX = (pageW - qrSize) / 2;
         const qrY = pageH - qrSize - 9;
         doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
         doc.setFontSize(4.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
@@ -1702,7 +1702,7 @@ export const generateClassReportCards = async (data: {
                 const qrContent = [school?.name || 'ECO-MANAGE', student.matricule, `T${term}`, new Date().getFullYear().toString(), dateStr].join('|');
                 const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 128, margin: 1 });
                 const qrSize = 22;
-                const qrX = pageW - mR - qrSize;
+                const qrX = (pageW - qrSize) / 2;
                 const qrY = pageH - qrSize - 9;
                 doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
                 doc.setFontSize(4.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
