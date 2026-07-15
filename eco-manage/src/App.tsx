@@ -26,6 +26,7 @@ import ParentPortal from './pages/ParentPortal';
 import Statistics from './pages/Statistics';
 import CustomizationSettings from './pages/CustomizationSettings';
 import AnnualArchives from './pages/AnnualArchives';
+import LessonDiary from './pages/LessonDiary';
 import Classes from './pages/Classes';
 import Messaging from './pages/Messaging';
 import HelpGuide from './components/HelpGuide';
@@ -133,6 +134,7 @@ function App() {
               <Route path="stats" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="stats"><Statistics /></RoleGuard>} />
               <Route path="customization" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="customization"><CustomizationSettings /></RoleGuard>} />
               <Route path="archives" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SUPERADMIN']} moduleKey="archives"><AnnualArchives /></RoleGuard>} />
+              <Route path="lesson-diary" element={<RoleGuard roles={['FOUNDER','DIRECTOR','ADVISOR','TEACHER','SUPERADMIN']} moduleKey="lesson_diary"><LessonDiary /></RoleGuard>} />
               <Route path="classes" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','SUPERADMIN']}><Classes /></RoleGuard>} />
               <Route path="messaging" element={<RoleGuard roles={['FOUNDER','DIRECTOR','SG','BURSAR','TEACHER','ADVISOR','DRIVER','SUPERADMIN']} moduleKey="messaging"><Messaging /></RoleGuard>} />
             </Route>

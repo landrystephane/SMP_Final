@@ -896,6 +896,30 @@ function initDb() {
         }
     } catch(e) { console.error('[Migration] Default installments seeding failed:', e.message); }
 
+    // Cahier de texte
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS lesson_diary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_id INTEGER NOT NULL,
+                class_id INTEGER NOT NULL,
+                subject_id INTEGER NOT NULL,
+                teacher_id INTEGER NOT NULL,
+                lesson_date TEXT NOT NULL,
+                lesson_title TEXT NOT NULL,
+                lesson_content TEXT,
+                homework TEXT,
+                homework_due_date TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(school_id, class_id, subject_id, lesson_date)
+            );
+            CREATE INDEX IF NOT EXISTS idx_lesson_diary_class ON lesson_diary(school_id, class_id);
+            CREATE INDEX IF NOT EXISTS idx_lesson_diary_teacher ON lesson_diary(teacher_id, lesson_date);
+        `);
+        console.log('[Migration] lesson_diary table verified/created');
+    } catch(e) { console.error('[Migration] lesson_diary error:', e.message); }
+
     console.log('Database initialized and migrated at:', dbPath);
 }
 

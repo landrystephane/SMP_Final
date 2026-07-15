@@ -200,4 +200,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWeekSchedule: (params) => ipcRenderer.invoke('db:getWeekSchedule', params),
   copyTemplateToWeek: (params) => ipcRenderer.invoke('db:copyTemplateToWeek', params),
   publishWeekSchedule: (params) => ipcRenderer.invoke('db:publishWeekSchedule', params),
+
+  // Cahier de Texte
+  getDiaryClasses: (schoolId) => ipcRenderer.invoke('db:getDiaryClasses', schoolId),
+  getDiarySubjects: (params) => ipcRenderer.invoke('db:getDiarySubjects', params),
+  getDiaryEntries: (params) => ipcRenderer.invoke('db:getDiaryEntries', params),
+  saveDiaryEntry: (data) => ipcRenderer.invoke('db:saveDiaryEntry', data),
+  deleteDiaryEntry: (data) => ipcRenderer.invoke('db:deleteDiaryEntry', data),
+  getTeacherDiaryStatus: (schoolId) => ipcRenderer.invoke('db:getTeacherDiaryStatus', schoolId),
 });

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Users, BookOpen, GraduationCap, LayoutDashboard,
   LogOut, Wallet, Building2, Briefcase, Calendar,
-  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award, MessageCircle, Search
+  Settings, Bus, HelpCircle, Bell, UserCircle, RefreshCcw, TabletSmartphone, Server, Archive, Menu, X, CreditCard, ClipboardList, ShieldCheck, UserCheck, MessageSquare, RefreshCw, HeartHandshake, TrendingUp, Palette, Award, MessageCircle, Search, NotebookPen
 } from 'lucide-react';
 import ErrorBoundary from './ErrorBoundary';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -279,6 +279,7 @@ const Layout: React.FC = () => {
     { key: 'messaging', path: '/messaging', icon: MessageCircle, roles: ['FOUNDER', 'DIRECTOR', 'SG', 'BURSAR', 'TEACHER', 'ADVISOR', 'DRIVER'], hideForSuperAdmin: !isImpersonating },
     { key: 'customization', path: '/customization', icon: Palette, roles: isSgActing ? ['FOUNDER', 'DIRECTOR', 'SG'] : ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
     { key: 'archives', path: '/archives', icon: Archive, roles: ['FOUNDER', 'DIRECTOR'], hideForSuperAdmin: !isImpersonating },
+    { key: 'lesson_diary', path: '/lesson-diary', icon: NotebookPen, roles: ['FOUNDER', 'DIRECTOR', 'ADVISOR', 'TEACHER'], hideForSuperAdmin: !isImpersonating },
     { key: 'system_admin', path: '/system-admin', icon: Building2, roles: ['SUPERADMIN'] },
     { key: 'sync', path: '/sync', icon: RefreshCw, roles: ['TEACHER', 'DIRECTOR', 'SG'], hideForSuperAdmin: !isImpersonating },
     { key: 'transport_driver', path: '/driver-portal', icon: Bus, roles: ['DRIVER'] },

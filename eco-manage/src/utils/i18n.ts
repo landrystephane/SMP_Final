@@ -365,6 +365,7 @@ i18n
           // Sidebar additions
           customization: 'Personnalisation',
           archives: 'Archives Annuelles',
+          lesson_diary: 'Cahier de Texte',
           // SystemAdmin page
           sys_core_version: 'SYSTEME CORE V2.4.0',
           sys_hub_root: 'ECO-HUB ROOT',
@@ -2167,6 +2168,7 @@ i18n
           // Sidebar additions
           customization: 'Customization',
           archives: 'Annual Archives',
+          lesson_diary: 'Lesson Diary',
           // SystemAdmin page
           sys_core_version: 'SYSTEM CORE V2.4.0',
           sys_hub_root: 'ECO-HUB ROOT',

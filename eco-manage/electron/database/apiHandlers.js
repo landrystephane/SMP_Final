@@ -3917,6 +3917,150 @@ handlers['db:applyNewSchoolYear'] = async ({ schoolId, decisions }) => {
     return { success: true };
 };
 
+// ─── Cahier de Texte ────────────────────────────────────────────────────────
+
+function diaryExpectedDates(classId, subjectId, fromDate, toDate) {
+    const schedDays = db.prepare(
+        "SELECT DISTINCT day_of_week FROM schedules WHERE class_id = ? AND subject_id = ? AND type = 'COURSE'"
+    ).all(classId, subjectId);
+    const dates = [];
+    for (const { day_of_week } of schedDays) {
+        let d = new Date(fromDate + 'T00:00:00');
+        const end = new Date(toDate + 'T00:00:00');
+        while (d < end) {
+            if (d.getDay() === day_of_week) dates.push(d.toISOString().split('T')[0]);
+            d.setDate(d.getDate() + 1);
+        }
+    }
+    return [...new Set(dates)];
+}
+
+handlers['db:getDiaryClasses'] = async (schoolId) => {
+    const cu = session.getStore()?.user;
+    if (!cu || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(cu.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+    const today = new Date().toISOString().split('T')[0];
+    const from30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    return db.prepare('SELECT * FROM classes WHERE school_id = ? ORDER BY name').all(sid).map(cls => {
+        const subjectIds = db.prepare('SELECT DISTINCT subject_id FROM class_teacher_subjects WHERE class_id = ?').all(cls.id).map(r => r.subject_id);
+        let expected = 0;
+        for (const sid2 of subjectIds) {
+            expected += diaryExpectedDates(cls.id, sid2, from30, today).length;
+        }
+        const filled = db.prepare('SELECT COUNT(*) as c FROM lesson_diary WHERE school_id = ? AND class_id = ? AND lesson_date BETWEEN ? AND ?').get(sid, cls.id, from30, today).c;
+        return { ...cls, expected, filled };
+    });
+};
+
+handlers['db:getDiarySubjects'] = async ({ schoolId, classId }) => {
+    const cu = session.getStore()?.user;
+    if (!cu || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'SUPERADMIN'].includes(cu.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+    const cId = parseInt(classId);
+    const today = new Date().toISOString().split('T')[0];
+    const from30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const rows = db.prepare(`
+        SELECT DISTINCT cts.subject_id, cts.teacher_id,
+            sub.name as subject_name, sub.domain,
+            u.full_name as teacher_name, u.civility as teacher_civility
+        FROM class_teacher_subjects cts
+        JOIN subjects sub ON cts.subject_id = sub.id
+        JOIN users u ON cts.teacher_id = u.id
+        WHERE cts.class_id = ?
+        ORDER BY sub.name
+    `).all(cId);
+
+    return rows.map(row => {
+        const expected = diaryExpectedDates(cId, row.subject_id, from30, today).length;
+        const filled = db.prepare('SELECT COUNT(*) as c FROM lesson_diary WHERE school_id = ? AND class_id = ? AND subject_id = ? AND lesson_date BETWEEN ? AND ?').get(sid, cId, row.subject_id, from30, today).c;
+        return { ...row, expected, filled };
+    });
+};
+
+handlers['db:getDiaryEntries'] = async ({ schoolId, classId, subjectId, days }) => {
+    const cu = session.getStore()?.user;
+    if (!cu || !['FOUNDER', 'DIRECTOR', 'ADVISOR', 'TEACHER', 'SUPERADMIN'].includes(cu.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+    const cId = parseInt(classId), sId = parseInt(subjectId), nDays = parseInt(days) || 30;
+    const today = new Date().toISOString().split('T')[0];
+    const fromDate = new Date(Date.now() - nDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const entries = db.prepare(`
+        SELECT ld.*, u.full_name as teacher_name
+        FROM lesson_diary ld
+        JOIN users u ON ld.teacher_id = u.id
+        WHERE ld.school_id = ? AND ld.class_id = ? AND ld.subject_id = ? AND ld.lesson_date BETWEEN ? AND ?
+        ORDER BY ld.lesson_date DESC
+    `).all(sid, cId, sId, fromDate, today);
+
+    const filledSet = new Set(entries.map(e => e.lesson_date));
+    const allExpected = diaryExpectedDates(cId, sId, fromDate, today);
+    const missingDates = allExpected.filter(d => !filledSet.has(d)).sort().reverse();
+
+    return { entries, missingDates };
+};
+
+handlers['db:saveDiaryEntry'] = async ({ schoolId, classId, subjectId, lessonDate, lessonTitle, lessonContent, homework, homeworkDueDate }) => {
+    const cu = session.getStore()?.user;
+    if (!cu || !['TEACHER', 'FOUNDER', 'DIRECTOR', 'SUPERADMIN'].includes(cu.role)) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+
+    if (cu.role === 'TEACHER') {
+        const ok = db.prepare('SELECT 1 FROM class_teacher_subjects WHERE class_id = ? AND subject_id = ? AND teacher_id = ?').get(classId, subjectId, cu.id);
+        if (!ok) throw new Error('Non autorisé pour cette classe/matière.');
+    }
+
+    db.prepare(`
+        INSERT INTO lesson_diary (school_id, class_id, subject_id, teacher_id, lesson_date, lesson_title, lesson_content, homework, homework_due_date, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(school_id, class_id, subject_id, lesson_date) DO UPDATE SET
+            lesson_title = excluded.lesson_title,
+            lesson_content = excluded.lesson_content,
+            homework = excluded.homework,
+            homework_due_date = excluded.homework_due_date,
+            teacher_id = excluded.teacher_id,
+            updated_at = datetime('now')
+    `).run(sid, classId, subjectId, cu.id, lessonDate, lessonTitle, lessonContent || null, homework || null, homeworkDueDate || null);
+
+    return { success: true };
+};
+
+handlers['db:deleteDiaryEntry'] = async ({ id }) => {
+    const cu = session.getStore()?.user;
+    if (!cu) throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId();
+    if (cu.role === 'TEACHER') {
+        const entry = db.prepare('SELECT id FROM lesson_diary WHERE id = ? AND school_id = ? AND teacher_id = ?').get(id, sid, cu.id);
+        if (!entry) throw new Error('Entrée introuvable.');
+    }
+    db.prepare('DELETE FROM lesson_diary WHERE id = ?').run(id);
+    return { success: true };
+};
+
+handlers['db:getTeacherDiaryStatus'] = async (schoolId) => {
+    const cu = session.getStore()?.user;
+    if (!cu || cu.role !== 'TEACHER') throw new Error('Non autorisé.');
+    const sid = getActiveSchoolId(schoolId);
+    const today = new Date().toISOString().split('T')[0];
+    const dayOfWeek = new Date().getDay();
+
+    const slots = db.prepare(`
+        SELECT s.*, c.name as class_name, sub.name as subject_name, sub.domain
+        FROM schedules s
+        JOIN classes c ON s.class_id = c.id
+        JOIN subjects sub ON s.subject_id = sub.id
+        WHERE s.school_id = ? AND s.teacher_id = ? AND s.day_of_week = ? AND s.type = 'COURSE'
+        ORDER BY s.start_time
+    `).all(sid, cu.id, dayOfWeek);
+
+    return slots.map(s => ({
+        ...s,
+        entry: db.prepare('SELECT * FROM lesson_diary WHERE school_id = ? AND class_id = ? AND subject_id = ? AND lesson_date = ?').get(sid, s.class_id, s.subject_id, today) || null
+    }));
+};
+
 handlers['db:getGradeOverrides'] = async ({ teacherId, classId, term, month }) => {
     const sid = getActiveSchoolId();
     const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND school_id = ?').get(classId, sid);

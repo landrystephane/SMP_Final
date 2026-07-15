@@ -375,9 +375,50 @@ const checkDeadlines = () => {
     }
 };
 
+// ─── Cron : notifications cahier de texte non rempli ─────────────────────────
+function checkDiaryNotifications() {
+    try {
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0=Dim, 6=Sam
+        if (dayOfWeek === 0 || dayOfWeek === 6) return;
+        const today = now.toISOString().split('T')[0];
+        const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+        const schools = db.prepare("SELECT id FROM schools WHERE is_active = 1 AND deleted_at IS NULL").all();
+        for (const school of schools) {
+            const sid = school.id;
+            // Cours terminés aujourd'hui dont le cahier n'est pas rempli
+            const slots = db.prepare(`
+                SELECT s.class_id, s.subject_id, s.teacher_id, c.name as class_name, sub.name as subject_name
+                FROM schedules s
+                JOIN classes c ON s.class_id = c.id
+                JOIN subjects sub ON s.subject_id = sub.id
+                WHERE s.school_id = ? AND s.day_of_week = ? AND s.end_time <= ? AND s.type = 'COURSE'
+            `).all(sid, dayOfWeek, currentTime);
+
+            for (const slot of slots) {
+                const hasEntry = db.prepare('SELECT id FROM lesson_diary WHERE school_id = ? AND class_id = ? AND subject_id = ? AND lesson_date = ?').get(sid, slot.class_id, slot.subject_id, today);
+                if (hasEntry) continue;
+                const alreadyNotified = db.prepare(`SELECT id FROM notifications WHERE school_id = ? AND user_id = ? AND request_type = 'DIARY_FILL' AND DATE(created_at) = ? AND request_data LIKE ?`).get(sid, slot.teacher_id, today, `%"class_id":${slot.class_id},"subject_id":${slot.subject_id}%`);
+                if (alreadyNotified) continue;
+                db.prepare(`INSERT INTO notifications (school_id, user_id, message, type, request_type, request_data)
+                    VALUES (?, ?, ?, 'ACTION_REQUIRED', 'DIARY_FILL', ?)`).run(
+                    sid, slot.teacher_id,
+                    `Rappel : remplissez le cahier de texte pour ${slot.subject_name} en ${slot.class_name}.`,
+                    JSON.stringify({ class_id: slot.class_id, subject_id: slot.subject_id, date: today })
+                );
+            }
+        }
+    } catch(e) { console.error('[Diary Cron]', e.message); }
+}
+
 // Démarrage
 app.listen(port, '0.0.0.0', () => {
     console.log(`[🚀 SaaS Cloud] Serveur démarré et accessible sur le port ${port}`);
     checkDeadlines();
     setInterval(checkDeadlines, 60 * 60 * 1000);
+    setTimeout(() => {
+        checkDiaryNotifications();
+        setInterval(checkDiaryNotifications, 60 * 60 * 1000);
+    }, 5 * 60 * 1000);
 });
