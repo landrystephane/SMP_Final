@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import SystemAdmin from './SystemAdmin';
 import { generateSchedulePdf, generateExamSchedulePdf } from '../utils/reports';
 import { onDataChanged } from '../utils/dataSync';
+import { TeacherView as TeacherDiaryView } from './LessonDiary';
 
 
 const DAYS_OF_WEEK_KEYS = [
@@ -27,7 +28,8 @@ const Dashboard: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<'FRANCOPHONE' | 'ANGLOPHONE'>('FRANCOPHONE');
   const [selectedCycle, setSelectedCycle] = useState<'ALL' | 'PRIMAIRE' | 'MATERNELLE'>('ALL');
   const [selectedDiagnosticClass, setSelectedDiagnosticClass] = useState<string>('ALL');
-  const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE' | 'EXAMS_PROGRAM'>('OVERVIEW');
+  const [teacherTab, setTeacherTab] = useState<'OVERVIEW' | 'TIMETABLE' | 'EXAMS_PROGRAM' | 'CAHIER_DE_TEXTE'>('OVERVIEW');
+  const [selectedMeritClass, setSelectedMeritClass] = useState<string>('ALL');
   const [currency, setCurrency] = useState('FCFA');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -112,10 +114,10 @@ const Dashboard: React.FC = () => {
     };
     loadCurrency();
 
-    // Auto-refresh stats every 5 seconds for real-time updates
+    // Auto-refresh stats toutes les 30 secondes
     const interval = setInterval(() => {
         if (isMounted) loadStats();
-    }, 5000);
+    }, 30000);
 
     // Instant refresh whenever any action mutates data elsewhere in the app
     const unsubscribe = onDataChanged(() => {
@@ -158,10 +160,15 @@ const Dashboard: React.FC = () => {
                     <button onClick={() => setTeacherTab('OVERVIEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'OVERVIEW' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_classes', 'Mes Classes')}</button>
                     <button onClick={() => setTeacherTab('TIMETABLE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'TIMETABLE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('my_timetable', 'Mon Emploi du Temps')}</button>
                     <button onClick={() => setTeacherTab('EXAMS_PROGRAM')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'EXAMS_PROGRAM' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('exams_program', 'Programme Évaluations')}</button>
+                    <button onClick={() => setTeacherTab('CAHIER_DE_TEXTE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest ${teacherTab === 'CAHIER_DE_TEXTE' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t('lesson_diary', 'Cahier de Texte')}</button>
                 </div>
             </div>
 
-            {teacherTab === 'TIMETABLE' ? (
+            {teacherTab === 'CAHIER_DE_TEXTE' ? (
+                <div className="mt-2 pb-12">
+                    <TeacherDiaryView />
+                </div>
+            ) : teacherTab === 'TIMETABLE' ? (
                 <div className="glass-card p-6 border-none shadow-xl">
                     <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
                         <div className="flex items-center space-x-3 text-amber-500">
@@ -404,80 +411,125 @@ const Dashboard: React.FC = () => {
                 </div>
             ) : (
                 <>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #fb923c, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
-                  <div className="p-6 pt-7">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
-                        <UsersIcon className="text-amber-500 group-hover:text-slate-950 w-6 h-6" />
+            {/* KPI Cards — filtrées par classe sélectionnée */}
+            {(() => {
+                const allStudents: any[] = stats.students || [];
+                const kpiStudents = selectedMeritClass === 'ALL'
+                    ? allStudents
+                    : allStudents.filter((s: any) => s.className === selectedMeritClass);
+                const kpiTotal = kpiStudents.length;
+                // En mode ALL, utiliser les compteurs backend (toujours corrects)
+                // En mode classe filtrée, calculer depuis la liste si gender disponible
+                const hasGender = allStudents.some((s: any) => s.gender);
+                const kpiBoys  = selectedMeritClass === 'ALL'
+                    ? (stats.genderDist?.boys || 0)
+                    : (hasGender ? kpiStudents.filter((s: any) => s.gender === 'M').length : 0);
+                const kpiGirls = selectedMeritClass === 'ALL'
+                    ? (stats.genderDist?.girls || 0)
+                    : (hasGender ? kpiStudents.filter((s: any) => s.gender === 'F').length : 0);
+                const classLabel = selectedMeritClass === 'ALL' ? null : selectedMeritClass;
+                return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #fb923c, #f59e0b)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                      <div className="p-6 pt-7">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-amber-500/10 rounded-2xl group-hover:bg-amber-500 transition-all">
+                            <UsersIcon className="text-amber-500 group-hover:text-slate-950 w-6 h-6" />
+                        </div>
+                        {classLabel && <span className="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-[9px] font-black uppercase">{classLabel}</span>}
+                      </div>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
+                      <p className="text-3xl font-black text-white mt-1">{kpiTotal}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('global_effectif')}</p>
-                  <p className="text-3xl font-black text-white mt-1">{stats.totalStudents}</p>
-                  </div>
-                </div>
-                {/* Boys */}
-                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #60a5fa, #3b82f6)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
-                  <div className="p-6 pt-7">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500 transition-all">
-                        <UsersIcon className="text-blue-500 group-hover:text-slate-950 w-6 h-6" />
+                    {/* Boys */}
+                    <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #60a5fa, #3b82f6)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                      <div className="p-6 pt-7">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500 transition-all">
+                            <UsersIcon className="text-blue-500 group-hover:text-slate-950 w-6 h-6" />
+                        </div>
+                        {classLabel && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg text-[9px] font-black uppercase">{classLabel}</span>}
+                      </div>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('boys', 'Garçons')}</p>
+                      <p className="text-3xl font-black text-white mt-1">{kpiBoys}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('boys', 'Garçons')}</p>
-                  <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.boys || 0}</p>
-                  </div>
-                </div>
-                {/* Girls */}
-                <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #f472b6, #ec4899)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
-                  <div className="p-6 pt-7">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-pink-500/10 rounded-2xl group-hover:bg-pink-500 transition-all">
-                        <UsersIcon className="text-pink-500 group-hover:text-slate-950 w-6 h-6" />
+                    {/* Girls */}
+                    <div className="glass-card border-none hover:translate-y-[-4px] transition-all cursor-pointer group" style={{ backgroundImage: 'linear-gradient(to right, #f472b6, #ec4899)', backgroundSize: '100% 3px', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}>
+                      <div className="p-6 pt-7">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-pink-500/10 rounded-2xl group-hover:bg-pink-500 transition-all">
+                            <UsersIcon className="text-pink-500 group-hover:text-slate-950 w-6 h-6" />
+                        </div>
+                        {classLabel && <span className="px-2 py-1 bg-pink-500/10 text-pink-400 rounded-lg text-[9px] font-black uppercase">{classLabel}</span>}
+                      </div>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('girls', 'Filles')}</p>
+                      <p className="text-3xl font-black text-white mt-1">{kpiGirls}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('girls', 'Filles')}</p>
-                  <p className="text-3xl font-black text-white mt-1">{stats.genderDist?.girls || 0}</p>
-                  </div>
                 </div>
-            </div>
+                );
+            })()}
 
             {/* List of students by merit */}
-            <div className="glass-card p-6 border-none shadow-xl">
-                <h2 className="text-lg font-black text-white mb-6 flex items-center tracking-tight">
-                    {t('students_by_merit', 'Liste des élèves par ordre de mérite')}
-                </h2>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
-                            <tr>
-                                <th className="p-4">{t('dash_rank_header')}</th>
-                                <th className="p-4">{t('matricule')}</th>
-                                <th className="p-4">{t('full_name')}</th>
-                                <th className="p-4">{t('class')}</th>
-                                <th className="p-4 text-right">{t('class_average')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-slate-300">
-                            {stats.students?.map((s: any, idx: number) => (
-                                <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                                    <td className="p-4 font-bold text-amber-500">{idx + 1}</td>
-                                    <td className="p-4 text-xs font-mono">{s.matricule}</td>
-                                    <td className="p-4 font-bold text-white uppercase">{s.last_name} <span className="capitalize font-normal text-slate-400">{s.first_name}</span></td>
-                                    <td className="p-4"><span className="px-2 py-1 bg-slate-800 rounded-lg text-[10px]">{s.className}</span></td>
-                                    <td className="p-4 text-right font-black text-emerald-400">{s.average.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                            {!stats.students?.length && (
+            {(() => {
+                const allStudents: any[] = stats.students || [];
+                const classNames = Array.from(new Set(allStudents.map((s: any) => s.className))).sort();
+                const filteredStudents = selectedMeritClass === 'ALL'
+                    ? allStudents
+                    : allStudents.filter((s: any) => s.className === selectedMeritClass);
+                return (
+                <div className="glass-card p-6 border-none shadow-xl">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                        <h2 className="text-lg font-black text-white tracking-tight">
+                            {t('students_by_merit', 'Liste des élèves par ordre de mérite')}
+                        </h2>
+                        {classNames.length > 1 && (
+                            <select
+                                value={selectedMeritClass}
+                                onChange={e => setSelectedMeritClass(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 text-white text-[11px] font-black uppercase tracking-wider rounded-xl px-4 py-2 focus:outline-none focus:border-amber-500 cursor-pointer"
+                            >
+                                <option value="ALL">{t('all_classes', 'Toutes les classes')}</option>
+                                {classNames.map((cn: any) => (
+                                    <option key={cn} value={cn}>{cn}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="text-slate-500 text-[10px] uppercase bg-slate-900/50">
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-500">{t('dash_no_student_found')}</td>
+                                    <th className="p-4">{t('dash_rank_header')}</th>
+                                    <th className="p-4">{t('matricule')}</th>
+                                    <th className="p-4">{t('full_name')}</th>
+                                    <th className="p-4">{t('class')}</th>
+                                    <th className="p-4 text-right">{t('class_average')}</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="text-slate-300">
+                                {filteredStudents.map((s: any, idx: number) => (
+                                    <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                                        <td className="p-4 font-bold text-amber-500">{idx + 1}</td>
+                                        <td className="p-4 text-xs font-mono">{s.matricule}</td>
+                                        <td className="p-4 font-bold text-white uppercase">{s.last_name} <span className="capitalize font-normal text-slate-400">{s.first_name}</span></td>
+                                        <td className="p-4"><span className="px-2 py-1 bg-slate-800 rounded-lg text-[10px]">{s.className}</span></td>
+                                        <td className="p-4 text-right font-black text-emerald-400">{s.average.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                                {!filteredStudents.length && (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-slate-500">{t('dash_no_student_found')}</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+                );
+            })()}
             </>
             )}
         </div>

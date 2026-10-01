@@ -442,9 +442,19 @@ const ParentPortal: React.FC = () => {
                         <p className="text-white font-black text-sm uppercase tracking-tight truncate">
                             {selectedChild.first_name} {selectedChild.last_name}
                         </p>
-                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest truncate">
-                            {t('matricule', 'Matricule')} : {selectedChild.matricule}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                                {t('matricule', 'Matricule')} : {selectedChild.matricule}
+                            </p>
+                            {(() => {
+                                const cls = classes.find((c: any) => c.id === selectedChild.class_id);
+                                return cls ? (
+                                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                        {cls.name}
+                                    </span>
+                                ) : null;
+                            })()}
+                        </div>
                     </div>
                     {children.length > 1 && (
                         <div className="flex gap-1 overflow-x-auto flex-shrink-0">

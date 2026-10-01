@@ -72,7 +72,7 @@ const Finance: React.FC = () => {
   const handleAddPaymentLegacy = async (paymentData: { studentId: string; amount: string; type: string; installmentId: string; depositorName: string }) => {
     if (window.electronAPI) {
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
             const res = await window.electronAPI.addPayment({
                 ...paymentData,
                 studentId: parseInt(paymentData.studentId),
@@ -123,7 +123,7 @@ const Finance: React.FC = () => {
 
     if (window.electronAPI) {
         try {
-            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const currentUser = JSON.parse(sessionStorage.getItem('user') || '{}');
             const res = await window.electronAPI.smartPayment({
                 studentId: parseInt(newPayment.studentId),
                 totalAmount: parsedAmount,
@@ -221,7 +221,7 @@ const Finance: React.FC = () => {
     e.preventDefault();
     if (window.electronAPI) {
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
             await window.electronAPI.createExpense({
                 amount: parseFloat(newExpense.amount.replace(/\s+/g, '')),
                 reason: newExpense.reason,
@@ -251,7 +251,7 @@ const Finance: React.FC = () => {
   const handleValidateExpense = async (expenseId: number, status: 'VALIDATED' | 'REJECTED') => {
     if (window.electronAPI) {
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
             await window.electronAPI.updateExpenseStatus({
                 expenseId,
                 status,
@@ -380,7 +380,7 @@ const Finance: React.FC = () => {
 
   const handleSearch = async () => {
     if (window.electronAPI) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
         const results = await window.electronAPI.searchStudentsDetailed({
             name: searchQuery,
             schoolId: localStorage.getItem('impersonated_school_id') || user?.schoolId,
@@ -461,7 +461,35 @@ const Finance: React.FC = () => {
                     </div>
                     <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{t('up_to_date_students')}</p>
                     <p className="text-3xl font-black text-white mt-1">
-                        {students.filter(s => getStudentFinancials(s).balance <= 0).length} <span className="text-xs text-slate-500">/ {students.length}</span>
+                        {(() => {
+                            const today = new Date(); today.setHours(0,0,0,0);
+                            const passedDeadlines = deadlines.filter((d: any) => new Date(d.deadline_date) < today);
+                            return students.filter(s => {
+                                if (s.has_moratoire) return true;
+                                const classConfig = tuitionFees.find((f: any) => f.classId === s.class_id);
+                                // Inscription payée si frais > 0
+                                const regDue = classConfig?.registrationFee || 0;
+                                if (regDue > 0) {
+                                    const regPaid = payments.filter((p: any) => p.student_id === s.id && p.payment_type === 'Inscription').reduce((a: number, p: any) => a + p.amount, 0);
+                                    if (regPaid < regDue) return false;
+                                }
+                                // Aucune tranche échue impayée
+                                return passedDeadlines.every((dl: any) => {
+                                    const cif = classInstallmentFees.find((c: any) => c.installment_id === dl.installment_id && c.class_id === s.class_id);
+                                    if (!cif || !cif.amount) return true;
+                                    const paid = payments.filter((p: any) => p.student_id === s.id && p.payment_type === 'Scolarité').reduce((a: number, p: any) => a + p.amount, 0);
+                                    const instsBefore = (installments || []).filter((inst: any) => {
+                                        const d = deadlines.find((dd: any) => dd.installment_id === inst.id);
+                                        return d && new Date(d.deadline_date) <= new Date(dl.deadline_date);
+                                    });
+                                    const totalDueSoFar = instsBefore.reduce((a: number, inst: any) => {
+                                        const fee = classInstallmentFees.find((c: any) => c.installment_id === inst.id && c.class_id === s.class_id);
+                                        return a + (fee?.amount || 0);
+                                    }, 0);
+                                    return paid >= totalDueSoFar;
+                                });
+                            }).length;
+                        })()} <span className="text-xs text-slate-500">/ {students.length}</span>
                     </p>
                 </div>
                 <div className="glass-card p-6 border-none hover:translate-y-[-4px] transition-all group">
@@ -521,7 +549,7 @@ const Finance: React.FC = () => {
                         <button
                             onClick={async () => {
                                 try {
-                                    const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || JSON.parse(localStorage.getItem('user') || '{}')?.schoolId)?.toString()) || schools[0];
+                                    const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || JSON.parse(sessionStorage.getItem('user') || '{}')?.schoolId)?.toString()) || schools[0];
                                     const reportsModule = await import('../utils/reports');
                                     const filteredPayments = filterDate ? payments.filter(p => p.created_at?.startsWith(filterDate)) : payments;
                                     reportsModule.generateAnnualAuditReport({
@@ -601,7 +629,7 @@ const Finance: React.FC = () => {
                                             onClick={async () => {
                                                 const s = students.find(stud => stud.id === p.student_id);
                                                 const financials = getStudentFinancials(s || { id: p.student_id, class_id: p.class_id }, p.payment_type);
-                                                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                                const user = JSON.parse(sessionStorage.getItem('user') || '{}');
                                                 const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
                                                 // Enrichir avec les infos de la tranche pour un reçu correct
                                                 let enrichedP = { ...p };
@@ -676,7 +704,7 @@ const Finance: React.FC = () => {
                                         financials: getStudentFinancials(s, filterFeeType)
                                     }));
                                     
-                                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
                                     const activeSchool = schools.find(sch => sch.id.toString() === (localStorage.getItem('impersonated_school_id') || user?.schoolId)?.toString()) || schools[0];
                                     
                                     // @ts-ignore

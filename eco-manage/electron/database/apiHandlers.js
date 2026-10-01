@@ -1022,18 +1022,23 @@ handlers['db:addInstallment'] = async (name) => {
     const currentUser = session.getStore()?.user;
     if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId() || 1;
-    const count = db.prepare('SELECT COUNT(*) as count FROM installments WHERE school_id = ?').get(sid).count;
-    return db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, ?)').run(name, count + 1, sid);
+    // Utiliser MAX global (école + défaut) pour placer la nouvelle tranche en dernier
+    const row = db.prepare('SELECT MAX(display_order) as maxOrder FROM installments WHERE school_id = ? OR school_id = 1').get(sid);
+    const nextOrder = (row?.maxOrder || 0) + 1;
+    return db.prepare('INSERT INTO installments (name, display_order, school_id) VALUES (?, ?, ?)').run(name, nextOrder, sid);
 };
 
 handlers['db:deleteInstallment'] = async (id) => {
     const currentUser = session.getStore()?.user;
     if (!currentUser || !['FOUNDER', 'DIRECTOR', 'BURSAR', 'SUPERADMIN'].includes(currentUser.role)) throw new Error('Non autorisé.');
     const sid = getActiveSchoolId();
-    db.prepare('DELETE FROM class_installment_fees WHERE installment_id = ?').run(id);
-    if (sid) {
-        return db.prepare('DELETE FROM installments WHERE id = ? AND school_id = ?').run(id, sid);
+    // Vérifier que la tranche appartient bien à cette école (pas une tranche globale)
+    const installment = db.prepare('SELECT school_id FROM installments WHERE id = ?').get(id);
+    if (!installment) throw new Error('Tranche introuvable.');
+    if (sid && installment.school_id !== sid && installment.school_id !== 0) {
+        throw new Error('Cette tranche est une tranche par défaut et ne peut pas être supprimée.');
     }
+    db.prepare('DELETE FROM class_installment_fees WHERE installment_id = ?').run(id);
     return db.prepare('DELETE FROM installments WHERE id = ?').run(id);
 };
 
@@ -3587,7 +3592,7 @@ handlers['db:getTeacherDashboardStats'] = async (params) => {
             girls = studentStats.girls || 0;
 
             studentsAverages = db.prepare(`
-                SELECT s.id, s.first_name, s.last_name, s.matricule, c.name as className,
+                SELECT s.id, s.first_name, s.last_name, s.matricule, s.gender, s.class_id, c.name as className,
                     AVG(g.score) as average
                 FROM students s
                 JOIN classes c ON s.class_id = c.id

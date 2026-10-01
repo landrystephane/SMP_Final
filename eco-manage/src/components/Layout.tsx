@@ -235,7 +235,7 @@ const Layout: React.FC = () => {
       }
     };
     loadActiveSchool();
-    const interval = setInterval(loadActiveSchool, 4000);
+    const interval = setInterval(loadActiveSchool, 60000);
     
     // Override window.alert
     const originalAlert = window.alert;

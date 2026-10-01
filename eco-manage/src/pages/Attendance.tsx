@@ -22,7 +22,7 @@ const Attendance: React.FC = () => {
   
   // New States for Reports
   const [activeTab, setActiveTab] = useState<'INPUT' | 'REPORT' | 'JUSTIFICATIONS'>(() => {
-      const storedUser = localStorage.getItem('user');
+      const storedUser = sessionStorage.getItem('user');
       if (storedUser) {
           const u = JSON.parse(storedUser);
           if (u.role === 'SG' || u.role === 'DIRECTOR') return 'REPORT';
@@ -346,7 +346,7 @@ const Attendance: React.FC = () => {
 
   const handleSave = async () => {
       if (window.electronAPI) {
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const user = JSON.parse(sessionStorage.getItem('user') || '{}');
           const records = Object.keys(absences).map(studentId => ({
               studentId: parseInt(studentId),
               date: currentDate,

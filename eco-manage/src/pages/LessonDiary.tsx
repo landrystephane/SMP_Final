@@ -204,7 +204,7 @@ export function DiaryAdminView() {
 
 // ─── Vue Enseignant ───────────────────────────────────────────────────────────
 
-function TeacherView() {
+export function TeacherView() {
     const { user } = useAuth();
     const [todaySlots, setTodaySlots] = useState<any[]>([]);
     const [editingSlot, setEditingSlot] = useState<any>(null);

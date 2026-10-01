@@ -16,24 +16,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = sessionStorage.getItem('user');
     try {
       if (!savedUser) return null;
       const parsed = JSON.parse(savedUser);
       // Safety check: ensure required fields and valid role exist
       if (!parsed.role || !parsed.username) {
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
         return null;
       }
       return parsed;
     } catch {
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('user');
       return null;
     }
   });
 
   const [isRestoringSession, setIsRestoringSession] = useState(() => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = sessionStorage.getItem('user');
     return !!savedUser && typeof window !== 'undefined' && !!(window as any).electronAPI;
   });
 
@@ -44,8 +44,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!result) {
             // School suspended/deleted or user blocked — force logout
             setUser(null);
-            localStorage.removeItem('user');
-            localStorage.removeItem('saas_token');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('saas_token');
             setIsRestoringSession(false);
             return;
           }
@@ -60,8 +60,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsRestoringSession(false);
           if (err?.message?.includes('401') || err?.message?.includes('expir') || err?.message?.includes('Authentification')) {
             setUser(null);
-            localStorage.removeItem('user');
-            localStorage.removeItem('saas_token');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('saas_token');
           }
         });
     } else {
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     role: result.role || 'TEACHER'
                 };
                 setUser(userObj);
-                localStorage.setItem('user', JSON.stringify(userObj));
+                sessionStorage.setItem('user', JSON.stringify(userObj));
                 
                 // Update document title for alert boxes
                 window.electronAPI.getSchools().then((schools: any) => {
@@ -108,15 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (lowerUser === 'admin' && password === 'admin') {
             const mockUser: User = { id: 1, username: 'admin', fullName: 'Super Admin', role: 'FOUNDER', schoolId: 1 };
             setUser(mockUser);
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            sessionStorage.setItem('user', JSON.stringify(mockUser));
         } else if (lowerUser === 'teacher' && password === 'teacher') {
             const mockUser: User = { id: 2, username: 'teacher', fullName: 'M. Enseignant', role: 'TEACHER', schoolId: 1 };
             setUser(mockUser);
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            sessionStorage.setItem('user', JSON.stringify(mockUser));
         } else if (lowerUser === 'superadmin' && password === 'superadmin') {
             const mockUser: User = { id: 3, username: 'superadmin', fullName: 'Super Développeur', role: 'SUPERADMIN', schoolId: 1 };
             setUser(mockUser);
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            sessionStorage.setItem('user', JSON.stringify(mockUser));
         } else {
             throw new Error('Invalid credentials');
         }
@@ -132,8 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Ignore API errors during logout
     }
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('saas_token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('saas_token');
     localStorage.removeItem('impersonated_school_id');
   };
 
@@ -143,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await window.electronAPI.switchSchool(schoolId);
               const updatedUser = { ...user, schoolId };
               setUser(updatedUser);
-              localStorage.setItem('user', JSON.stringify(updatedUser));
+              sessionStorage.setItem('user', JSON.stringify(updatedUser));
               localStorage.setItem('impersonated_school_id', schoolId.toString());
           } catch (err) {
               console.error("Erreur de changement d'école", err);
@@ -157,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await window.electronAPI.switchSchool(0);
               const updatedUser = { ...user, schoolId: undefined };
               setUser(updatedUser);
-              localStorage.setItem('user', JSON.stringify(updatedUser));
+              sessionStorage.setItem('user', JSON.stringify(updatedUser));
               localStorage.removeItem('impersonated_school_id');
           } catch (err) {
               console.error("Erreur de sortie d'impersonation", err);
@@ -177,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkActingStatus();
     
     window.addEventListener('sg_mode_changed', checkActingStatus);
-    const interval = setInterval(checkActingStatus, 8000);
+    const interval = setInterval(checkActingStatus, 60000);
     
     return () => {
         window.removeEventListener('sg_mode_changed', checkActingStatus);

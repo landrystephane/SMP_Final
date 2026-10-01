@@ -87,7 +87,7 @@ export const initSaaSBridge = () => {
 
     const apiCall = async (endpoint: string, method: string = 'GET', body: any = null) => {
         try {
-            const token = localStorage.getItem('saas_token');
+            const token = sessionStorage.getItem('saas_token');
             const config: RequestInit = {
                 method,
                 headers: {
@@ -102,8 +102,8 @@ export const initSaaSBridge = () => {
             const response = await fetch(`${API_BASE}${endpoint}${cacheBuster}`, config);
 
             if (response.status === 401) {
-                localStorage.removeItem('saas_token');
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('saas_token');
+                sessionStorage.removeItem('user');
                 window.location.href = '/login';
                 throw new Error('Session expirée');
             }
@@ -140,7 +140,7 @@ export const initSaaSBridge = () => {
         isWebMode: true,
         login: async (credentials: any) => {
             const res = await apiCall('/auth/login', 'POST', credentials);
-            if (res.token) localStorage.setItem('saas_token', res.token);
+            if (res.token) sessionStorage.setItem('saas_token', res.token);
             return res.user;
         },
         getSchools: async () => {
@@ -157,21 +157,21 @@ export const initSaaSBridge = () => {
             if (prop === 'switchSchool') {
                 return async (schoolId: number) => {
                     try {
-                        const token = localStorage.getItem('saas_token');
+                        const token = sessionStorage.getItem('saas_token');
                         const res = await fetch(`${API_BASE.replace('/api', '')}/api/auth/switchSchool`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                             body: JSON.stringify({ schoolId })
                         });
                         const data = await res.json();
-                        if (data.token) localStorage.setItem('saas_token', data.token);
+                        if (data.token) sessionStorage.setItem('saas_token', data.token);
                         return true;
                     } catch (e) { return false; }
                 };
             }
             if (prop === 'logout' || prop === 'restoreSession') {
                 channel = `auth:${prop}`;
-                if (prop === 'logout') localStorage.removeItem('saas_token');
+                if (prop === 'logout') sessionStorage.removeItem('saas_token');
             } else if (prop === 'showAlert') {
                 return undefined;
             }
